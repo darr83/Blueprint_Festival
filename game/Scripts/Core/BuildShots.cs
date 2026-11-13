@@ -1,5 +1,7 @@
 using System;
 using BlueprintFestival.Simulation.People;
+using BlueprintFestival.Simulation.Site;
+using BlueprintFestival.Simulation.World;
 using BlueprintFestival.World;
 using Godot;
 
@@ -14,14 +16,14 @@ public partial class BuildShots : Node
 {
     private static readonly string[] Names =
     {
-        "1_stages", "2_fences", "3_gates", "4_first_year_field", "5_first_year_stage", "6_first_year_gate",
-        "7_trailer_year_field", "8_later_year_field", "9_later_year_stage", "10_later_year_gate",
+        "1_stages", "2_fences", "3_gates", "4_choosing_a_stage", "5_dragging_a_fence", "6_first_festival", "7_queue_at_the_gate",
+        "8_hired_stage", "9_arch_gate_two_lanes", "10_no_way_in",
     };
 
     private readonly string _directory;
     private int _scene = -1;
     private int _frame;
-    private FestivalScene? _festival;
+    private bool _ready;
     private Node3D? _set;
 
     public BuildShots(string directory)
@@ -36,40 +38,48 @@ public partial class BuildShots : Node
     public override void _Ready()
     {
         DirAccess.MakeDirRecursiveAbsolute(_directory);
-        Callable.From(() => GameManager.Instance.StartNewGame(null, new DateTime(2027, 7, 17, 13, 0, 0))).CallDeferred();
+        Callable.From(NextScene).CallDeferred();
     }
 
     public override void _Process(double delta)
     {
-        if (_festival is null)
+        if (_scene < 0 || _scene >= Names.Length)
         {
-            if (GetTree().CurrentScene is FestivalScene f && f.IsNodeReady())
+            return;
+        }
+
+        _frame++;
+        if (!_ready)
+        {
+            if (GetTree().CurrentScene is FestivalScene f && f.IsNodeReady() && f.Game == GameManager.Instance.Game)
             {
-                _festival = f;
                 f.Game.Clock.SetSpeed(Simulation.Core.GameSpeed.Paused);
-                f.SetHudShown(false);
-                Next();
+                _set = new Node3D { Name = "Set" };
+                f.AddChild(_set);
+                Arrange(f);
+                f.Crowd.Snap();
+                f.Camera.Snap();
+                _ready = true;
+                _frame = 0;
             }
 
             return;
         }
 
-        _frame++;
-        if (_frame == 12)
+        if (_frame == 20)
         {
             var path = $"{_directory}/{Names[_scene]}.png";
             GetViewport().GetTexture().GetImage().SavePng(path);
             GD.Print($"[build] {path}");
-            Next();
+            NextScene();
         }
     }
 
-    private void Next()
+    private void NextScene()
     {
         _scene++;
+        _ready = false;
         _frame = 0;
-        _set?.Free();
-        _set = null;
         if (_scene >= Names.Length)
         {
             GD.Print("[build] Done.");
@@ -77,49 +87,96 @@ public partial class BuildShots : Node
             return;
         }
 
-        var festival = _festival!;
+        GameManager.Instance.StartNewGame(null);
+    }
+
+    private static int StandingInQueue(FestivalScene festival) =>
+        System.Linq.Enumerable.Count(festival.Game.Crowd.Parties, p => p.State == PartyState.Queuing && !p.IsWalking);
+
+    private static void RunTo(FestivalScene festival, double hour)
+    {
+        var until = festival.Game.Now.Date.AddHours(hour);
+        while (festival.Game.Now < until)
+        {
+            festival.Game.Clock.Step();
+        }
+    }
+
+    /// <summary>Closes the gap in the hedge with fence and puts a gate in the middle of it.</summary>
+    private static void GateInTheGap(FestivalScene festival, GateKind gate, FenceKind fence)
+    {
+        var game = festival.Game;
+        var gap = game.Field.Gap;
+        var y = gap.Y + 1;
+        game.BuildFence(fence, new TilePoint(gap.X, y), new TilePoint(gap.Right - 1, y));
+        var width = Catalogue.Of(gate).Width;
+        game.BuildGate(gate, gap.X + ((gap.Width - width) / 2), y, false);
+    }
+
+    /// <summary>A stage at the north end with a fenced patch behind it for the acts.</summary>
+    private static TileRect StageWithBackstage(FestivalScene festival, StageKind kind, FenceKind fence)
+    {
+        var game = festival.Game;
+        var f = game.Field.Field;
+        var info = Catalogue.Of(kind);
+        var x = f.X + ((f.Width - info.Width) / 2) + 8;
+        var y = f.Y + 12;
+        game.BuildStage(kind, x, y, Facing.South);
+        var rect = new TileRect(x, y, info.Width, info.Depth);
+        var left = rect.X - 8;
+        var right = rect.Right + 7;
+        var back = rect.Y - 7;
+        var front = rect.Bottom - 2;
+        game.BuildFence(fence, new TilePoint(left, back), new TilePoint(right, back));
+        game.BuildFence(fence, new TilePoint(left, back), new TilePoint(left, front));
+        game.BuildFence(fence, new TilePoint(right, back), new TilePoint(right, front));
+        game.BuildFence(fence, new TilePoint(left, front), new TilePoint(rect.X - 1, front));
+        game.BuildFence(fence, new TilePoint(rect.Right, front), new TilePoint(right, front));
+        return rect;
+    }
+
+    private void Arrange(FestivalScene festival)
+    {
         var name = festival.Game.Name;
         var field = festival.Game.Field.Field;
         var gap = festival.Game.Field.Gap;
         var centre = new Vector3((field.X + (field.Width / 2f)) * 0.5f, 0, (field.Y + (field.Height / 2f)) * 0.5f);
-        var stageAt = new Vector3(centre.X + 4, 0, (field.Y * 0.5f) + 7f);
         var gateAt = new Vector3((gap.X + (gap.Width / 2f)) * 0.5f, 0, gap.Bottom * 0.5f);
-        _set = new Node3D { Name = "Set" };
-        festival.AddChild(_set);
+        festival.SetHudShown(_scene >= 3);
 
         switch (_scene)
         {
             case 0:
             {
                 // A stand turned to face the camera.
-                _set.Position = centre;
+                _set!.Position = centre;
                 _set.RotationDegrees = new Vector3(0, 45, 0);
-                var x = -11.5f;
-                foreach (var kind in Enum.GetValues<StageKind>())
+                var x = -13.5f;
+                foreach (var info in Catalogue.Stages)
                 {
-                    var (w, d) = SiteProps.StageSize(kind);
-                    var stage = SiteProps.Stage(kind, name);
-                    stage.Position = new Vector3(x + (w / 2), 0, -d / 2);
+                    var w = info.Width / 2f;
+                    var stage = SiteProps.Stage(info.Kind, name);
+                    stage.Position = new Vector3(x + (w / 2), 0, -info.Depth / 4f);
                     _set.AddChild(stage);
-                    Label(SiteProps.StageName(kind), new Vector3(x + (w / 2), 0, 4.4f), 0.011f);
-                    People(3, new Vector3(x + (w / 2) - 1.2f, 0, 2.4f), 1.2f, 0, 180, 40 + (int)kind);
-                    x += w + 3.2f;
+                    Label($"{info.Name}  £{info.Cost:N0}", new Vector3(x + (w / 2), 0, 4.4f), 0.011f);
+                    People(3, new Vector3(x + (w / 2) - 1.2f, 0, 2.4f), 1.2f, 0, 180, 40 + (int)info.Kind);
+                    x += w + 2.2f;
                 }
 
-                festival.Camera.LookAt(centre.X + 0.6f, centre.Z + 0.6f, 21f);
+                festival.Camera.LookAt(centre.X + 0.6f, centre.Z + 0.6f, 22f);
                 break;
             }
 
             case 1:
             {
-                _set.Position = centre;
+                _set!.Position = centre;
                 _set.RotationDegrees = new Vector3(0, 45, 0);
                 var x = -15.4f;
-                foreach (var kind in Enum.GetValues<FenceKind>())
+                foreach (var info in Catalogue.Fences)
                 {
-                    _set.AddChild(SiteProps.Fence(kind, new Vector3(x, 0, 0), new Vector3(x + 7f, 0, 0)));
-                    Label(SiteProps.FenceName(kind), new Vector3(x + 3.5f, 0, 2.6f), 0.008f);
-                    People(2, new Vector3(x + 2.6f, 0, -0.9f), 1.6f, 0, 0, 60 + (int)kind);
+                    _set.AddChild(SiteProps.Fence(info.Kind, new Vector3(x, 0, 0), new Vector3(x + 7f, 0, 0)));
+                    Label($"{info.Name}  £{info.CostPerMetre} a metre", new Vector3(x + 3.5f, 0, 2.6f), 0.007f);
+                    People(2, new Vector3(x + 2.6f, 0, -0.9f), 1.6f, 0, 0, 60 + (int)info.Kind);
                     x += 8f;
                 }
 
@@ -129,133 +186,90 @@ public partial class BuildShots : Node
 
             case 2:
             {
-                _set.Position = centre;
+                _set!.Position = centre;
                 _set.RotationDegrees = new Vector3(0, 45, 0);
                 var village = SiteProps.Gate(GateKind.VillageGate, name);
                 village.Position = new Vector3(-7f, 0, 0);
                 _set.AddChild(village);
-                Label("Village gate", new Vector3(-7f, 0, 6.2f), 0.009f);
+                Label("Village gate  £40", new Vector3(-7f, 0, 6.2f), 0.009f);
                 People(4, new Vector3(-7f, 0, 1.6f), 0, 1.0f, 180, 70);
                 var arch = SiteProps.Gate(GateKind.ArchGate, name);
                 arch.Position = new Vector3(5f, 0, -2f);
                 _set.AddChild(arch);
-                Label("Arch gate", new Vector3(5f, 0, 6.2f), 0.009f);
-                People(4, new Vector3(3.4f, 0, 0f), 0, 1.0f, 180, 80);
-                People(4, new Vector3(6.6f, 0, 0.4f), 0, 1.0f, 180, 90);
+                Label("Arch gate  £600", new Vector3(5f, 0, 6.2f), 0.009f);
+                People(4, new Vector3(3.5f, 0, 0f), 0, 1.0f, 180, 80);
+                People(4, new Vector3(6.5f, 0, 0.4f), 0, 1.0f, 180, 90);
                 festival.Camera.LookAt(centre.X + 0.9f, centre.Z + 0.9f, 17f);
                 break;
             }
 
             case 3:
-                LayOut(StageKind.Bandstand, FenceKind.Rope, GateKind.VillageGate, stageAt, gateAt, name, 110);
+            {
+                // The build bar open on Stages, with a bandstand following the pointer.
+                festival.BuildBar.Toggle(BuildMode.Stage);
+                festival.BuildBar.Choose("stageBandstand");
+                festival.Build.ShowGhost(new TilePoint(field.X + 70, field.Y + 18));
+                festival.Camera.LookAt(centre.X + 3, centre.Z - 2, 34f);
+                break;
+            }
+
+            case 4:
+            {
+                var rect = StageWithBackstage(festival, StageKind.Bandstand, FenceKind.Paling);
+                festival.BuildBar.Toggle(BuildMode.Fence);
+                festival.BuildBar.Choose("fenceRope");
+                festival.Build.ShowGhost(new TilePoint(rect.X - 30, rect.Bottom + 14));
+                festival.Camera.LookAt((rect.X * 0.5f) - 2, (rect.Bottom * 0.5f) + 4, 30f);
+                break;
+            }
+
+            case 5:
+                StageWithBackstage(festival, StageKind.Bandstand, FenceKind.Rope);
+                GateInTheGap(festival, GateKind.VillageGate, FenceKind.Paling);
+                RunTo(festival, 9.5);
                 festival.Camera.ShowWholeField();
                 break;
-            case 4:
-                LayOut(StageKind.Bandstand, FenceKind.Rope, GateKind.VillageGate, stageAt, gateAt, name, 110);
-                festival.Camera.LookAt(stageAt.X + 1.5f, stageAt.Z + 6.5f, 24f);
-                break;
-            case 5:
-                LayOut(StageKind.Bandstand, FenceKind.Rope, GateKind.VillageGate, stageAt, gateAt, name, 110);
+
+            case 6:
+                StageWithBackstage(festival, StageKind.Bandstand, FenceKind.Rope);
+                GateInTheGap(festival, GateKind.VillageGate, FenceKind.Paling);
+                RunTo(festival, 8.5);
+                while (StandingInQueue(festival) < 4 && festival.Game.Now.Hour < 11)
+                {
+                    festival.Game.Clock.Step();
+                }
+
                 festival.Camera.LookAt(gateAt.X + 1.5f, gateAt.Z + 1.5f, 17f);
                 break;
-            case 6:
-                LayOut(StageKind.FarmTrailer, FenceKind.Paling, GateKind.VillageGate, stageAt, gateAt, name, 70);
-                festival.Camera.LookAt(stageAt.X + 1.5f, stageAt.Z + 6.5f, 24f);
-                break;
+
             case 7:
-                LayOut(StageKind.HiredStage, FenceKind.SteelMesh, GateKind.ArchGate, stageAt, gateAt, name, 190);
-                festival.Camera.ShowWholeField();
+            {
+                var rect = StageWithBackstage(festival, StageKind.HiredStage, FenceKind.SteelMesh);
+                festival.Game.BuildFence(FenceKind.CrowdBarrier, new TilePoint(rect.X - 2, rect.Bottom + 3), new TilePoint(rect.Right + 1, rect.Bottom + 3));
+                GateInTheGap(festival, GateKind.VillageGate, FenceKind.Rope);
+                RunTo(festival, 12);
+                festival.Camera.LookAt((rect.X + 12) * 0.5f + 1.5f, (rect.Bottom * 0.5f) + 5.5f, 30f);
                 break;
+            }
+
             case 8:
-                LayOut(StageKind.HiredStage, FenceKind.SteelMesh, GateKind.ArchGate, stageAt, gateAt, name, 190);
-                festival.Camera.LookAt(stageAt.X + 1.5f, stageAt.Z + 7.5f, 27f);
-                break;
-            case 9:
-                LayOut(StageKind.HiredStage, FenceKind.SteelMesh, GateKind.ArchGate, stageAt, gateAt, name, 190);
+                festival.Game.BuildStage(StageKind.FarmTrailer, field.X + 60, field.Y + 10, Facing.South);
+                GateInTheGap(festival, GateKind.ArchGate, FenceKind.Rope);
+                RunTo(festival, 8.5);
+                while (StandingInQueue(festival) < 3 && festival.Game.Now.Hour < 11)
+                {
+                    festival.Game.Clock.Step();
+                }
+
                 festival.Camera.LookAt(gateAt.X + 2f, gateAt.Z + 2.5f, 20f);
                 break;
-        }
 
-        festival.Camera.Snap();
-    }
-
-    /// <summary>The field set out for a show: a stage at the north end, a fenced-off patch behind it, a gate in the gap and a crowd.</summary>
-    private void LayOut(StageKind stageKind, FenceKind fenceKind, GateKind gateKind, Vector3 stageAt, Vector3 gateAt, string name, int crowd)
-    {
-        var (w, d) = SiteProps.StageSize(stageKind);
-        var stage = SiteProps.Stage(stageKind, name);
-        stage.Position = stageAt;
-        _set!.AddChild(stage);
-
-        // Backstage: fenced off behind and beside the stage.
-        var b = new MeshBuilder();
-        var left = stageAt.X - (w / 2) - 5f;
-        var right = stageAt.X + (w / 2) + 5f;
-        var back = stageAt.Z - (d / 2) - 3.5f;
-        var front = stageAt.Z + (d / 2) - 0.6f;
-        SiteProps.AddFence(b, fenceKind, new Vector3(left, 0, front), new Vector3(stageAt.X - (w / 2) - 1.2f, 0, front));
-        SiteProps.AddFence(b, fenceKind, new Vector3(stageAt.X + (w / 2) + 1.2f, 0, front), new Vector3(right, 0, front));
-        SiteProps.AddFence(b, fenceKind, new Vector3(left, 0, back), new Vector3(left, 0, front));
-        SiteProps.AddFence(b, fenceKind, new Vector3(right, 0, back), new Vector3(right, 0, front));
-        SiteProps.AddFence(b, fenceKind, new Vector3(left, 0, back), new Vector3(right, 0, back));
-        if (stageKind == StageKind.HiredStage)
-        {
-            // A barrier across the front of a tall stage keeps a gap for stewards.
-            SiteProps.AddFence(b, FenceKind.CrowdBarrier, new Vector3(stageAt.X - (w / 2) - 1.4f, 0, stageAt.Z + (d / 2) + 1.6f), new Vector3(stageAt.X + (w / 2) + 1.4f, 0, stageAt.Z + (d / 2) + 1.6f));
-        }
-
-        // The gate, with fence closing the rest of the gap.
-        var gate = SiteProps.Gate(gateKind, name);
-        var gateZ = gateAt.Z + (gateKind == GateKind.ArchGate ? 1.1f : 0.2f);
-        gate.Position = new Vector3(gateAt.X, 0, gateZ);
-        _set.AddChild(gate);
-        if (gateKind == GateKind.VillageGate)
-        {
-            SiteProps.AddFence(b, fenceKind, new Vector3(gateAt.X - 3f, 0, gateZ), new Vector3(gateAt.X - 2.1f, 0, gateZ));
-            SiteProps.AddFence(b, fenceKind, new Vector3(gateAt.X + 2.1f, 0, gateZ), new Vector3(gateAt.X + 3f, 0, gateZ));
-        }
-
-        _set.AddChild(b.BuildNode("Fences"));
-
-        // The crowd in front of the stage, a few people about the field, and a queue at the gate.
-        var random = new Random(31);
-        var frontRow = stageAt.Z + (d / 2) + (stageKind == StageKind.HiredStage ? 2.4f : 1.8f);
-        for (var i = 0; i < crowd; i++)
-        {
-            var person = PersonView.Build(LookGenerator.FestivalGoer(3000 + i));
-            if (i < crowd * 0.72)
-            {
-                var deep = Math.Pow(random.NextDouble(), 0.75) * (6 + (crowd / 18.0));
-                var across = (random.NextDouble() - 0.5) * (w + 3 + (deep * 1.1));
-                person.Position = new Vector3(stageAt.X + (float)across, 0, frontRow + (float)deep);
-                person.RotationDegrees = new Vector3(0, 180 + ((float)random.NextDouble() * 24) - 12, 0);
-                person.SetPose(random.NextDouble() < 0.35 ? Pose.Cheering : Pose.Standing);
-            }
-            else
-            {
-                person.Position = new Vector3(
-                    stageAt.X + (((float)random.NextDouble() - 0.5f) * 50f),
-                    0,
-                    stageAt.Z + 14f + ((float)random.NextDouble() * 16f));
-                person.RotationDegrees = new Vector3(0, (float)random.NextDouble() * 360, 0);
-                person.SetPose(random.NextDouble() < 0.6 ? Pose.Walking : Pose.Standing, (float)random.NextDouble());
-            }
-
-            _set.AddChild(person);
-        }
-
-        var lanes = gateKind == GateKind.ArchGate ? new[] { -1.4f, 1.4f } : new[] { 0.3f };
-        var seed = 5000;
-        foreach (var lane in lanes)
-        {
-            for (var i = 0; i < 9; i++)
-            {
-                var person = PersonView.Build(LookGenerator.FestivalGoer(seed++));
-                person.Position = new Vector3(gateAt.X + lane + (((i * 7) % 3) - 1) * 0.12f, 0, gateZ + 0.9f + (i * 0.75f));
-                person.RotationDegrees = new Vector3(0, 180, 0);
-                person.SetPose(Pose.Standing);
-                _set.AddChild(person);
-            }
+            case 9:
+                // The gap fenced shut and no gate: people wait on the track.
+                festival.Game.BuildFence(FenceKind.SteelMesh, new TilePoint(gap.X, gap.Y + 1), new TilePoint(gap.Right - 1, gap.Y + 1));
+                RunTo(festival, 9.5);
+                festival.Camera.LookAt(gateAt.X + 1.5f, gateAt.Z + 2.5f, 20f);
+                break;
         }
     }
 

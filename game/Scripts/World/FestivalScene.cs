@@ -25,6 +25,12 @@ public partial class FestivalScene : Node3D
 
     public TopBar TopBar { get; private set; } = null!;
 
+    public SiteView Site { get; private set; } = null!;
+
+    public BuildTool Build { get; private set; } = null!;
+
+    public BuildBar BuildBar { get; private set; } = null!;
+
     public override void _Ready()
     {
         // Run straight from the editor (F6) and there is no game yet: start a default one.
@@ -37,6 +43,10 @@ public partial class FestivalScene : Node3D
         AddChild(Field);
         Field.Initialise(Game.Field, Game.Name);
 
+        Site = new SiteView { Name = "Site" };
+        AddChild(Site);
+        Site.Initialise(Game);
+
         Crowd = new CrowdView { Name = "Crowd" };
         AddChild(Crowd);
         Crowd.Initialise(Game);
@@ -45,8 +55,15 @@ public partial class FestivalScene : Node3D
         AddChild(Camera);
         Camera.Initialise(Game.Field);
 
+        Build = new BuildTool { Name = "BuildTool" };
+        AddChild(Build);
+        Build.Initialise(Game, Camera);
+
         _hud = new CanvasLayer { Name = "Hud" };
         AddChild(_hud);
+        BuildBar = new BuildBar { Name = "BuildBar" };
+        _hud.AddChild(BuildBar);
+        BuildBar.Initialise(Game, Build);
         TopBar = new TopBar { Name = "TopBar" };
         _hud.AddChild(TopBar);
         TopBar.Initialise(Game, OpenMenu);
@@ -54,7 +71,7 @@ public partial class FestivalScene : Node3D
         _hud.AddChild(view);
         view.Initialise(Camera);
 
-        var hint = UiStyle.Body("Q / E turn    WASD move    Wheel zoom    Space pause    1 to 4 speed", muted: true, size: 13);
+        var hint = UiStyle.Body("Q / E turn view    WASD move    Wheel zoom    Space pause    R turn a piece", muted: true, size: 13);
         hint.Theme = UiStyle.Theme;
         hint.AddThemeColorOverride("font_color", new Color(1, 1, 1, 0.85f));
         hint.AddThemeColorOverride("font_shadow_color", new Color(0, 0, 0, 0.5f));

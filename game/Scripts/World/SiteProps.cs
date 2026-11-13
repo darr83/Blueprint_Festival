@@ -1,46 +1,8 @@
 using System;
+using BlueprintFestival.Simulation.Site;
 using Godot;
 
 namespace BlueprintFestival.World;
-
-/// <summary>The kinds of small stage a village festival can put up.</summary>
-public enum StageKind
-{
-    /// <summary>A farm trailer with straw bales: free from the farmer, room for a duo.</summary>
-    FarmTrailer,
-
-    /// <summary>A wooden deck under a striped canvas roof: the village fete bandstand.</summary>
-    Bandstand,
-
-    /// <summary>A hired stage with a steel frame, a roof, lights and proper speakers.</summary>
-    HiredStage,
-}
-
-/// <summary>The kinds of fence.</summary>
-public enum FenceKind
-{
-    /// <summary>Wooden stakes and rope: marks a line, stops nobody who means it.</summary>
-    Rope,
-
-    /// <summary>Chestnut paling: waist-high slats on wire.</summary>
-    Paling,
-
-    /// <summary>Low steel crowd barriers that hook together: for queues and the front of a stage.</summary>
-    CrowdBarrier,
-
-    /// <summary>Tall steel mesh panels in blocks: the proper festival fence.</summary>
-    SteelMesh,
-}
-
-/// <summary>The kinds of way in.</summary>
-public enum GateKind
-{
-    /// <summary>Two posts, a painted board and a table to check tickets at.</summary>
-    VillageGate,
-
-    /// <summary>A steel arch with a banner, two lanes and a ticket hut.</summary>
-    ArchGate,
-}
 
 /// <summary>
 /// Builds the things the player puts in the field: stages, fences and gates. Each is made of simple
@@ -73,34 +35,9 @@ public static class SiteProps
         new("#E94F7B"), new("#F6B93B"), new("#F6F0E2"), new("#4FA8D8"), new("#8FD3A8"),
     };
 
-    /// <summary>How much ground each stage covers, in metres: width across the front, and depth.</summary>
-    public static (float Width, float Depth) StageSize(StageKind kind) => kind switch
-    {
-        StageKind.FarmTrailer => (7f, 2.5f),
-        StageKind.Bandstand => (6f, 4.5f),
-        _ => (9f, 6f),
-    };
-
-    public static string StageName(StageKind kind) => kind switch
-    {
-        StageKind.FarmTrailer => "Farm trailer",
-        StageKind.Bandstand => "Bandstand",
-        _ => "Hired stage",
-    };
-
-    public static string FenceName(FenceKind kind) => kind switch
-    {
-        FenceKind.Rope => "Rope and stakes",
-        FenceKind.Paling => "Chestnut paling",
-        FenceKind.CrowdBarrier => "Crowd barrier",
-        _ => "Steel mesh fence",
-    };
-
-    public static string GateName(GateKind kind) => kind == GateKind.VillageGate ? "Village gate" : "Arch gate";
-
     public static Node3D Stage(StageKind kind, string festivalName)
     {
-        var node = new Node3D { Name = StageName(kind) };
+        var node = new Node3D { Name = Catalogue.Of(kind).Name };
         var b = new MeshBuilder();
         switch (kind)
         {
@@ -116,6 +53,17 @@ public static class SiteProps
         }
 
         node.AddChild(b.BuildNode("Shapes"));
+
+        // Sit the model at the back of its ground, so steps and bales at the front are inside it.
+        var shift = kind switch { StageKind.FarmTrailer => -0.25f, StageKind.Bandstand => -0.5f, _ => 0f };
+        foreach (var child in node.GetChildren())
+        {
+            if (child is Node3D part)
+            {
+                part.Position += new Vector3(0, 0, shift);
+            }
+        }
+
         return node;
     }
 
@@ -135,8 +83,8 @@ public static class SiteProps
         }
 
         // Drawbar and a stand at the front of the trailer (the west end).
-        b.Box(new Vector3((-w / 2) - 0.9f, 0.62f, 0), new Vector3(1.9f, 0.14f, 0.2f), TrailerGreen);
-        b.Box(new Vector3((-w / 2) - 1.7f, 0.3f, 0), new Vector3(0.1f, 0.6f, 0.1f), SteelDark);
+        b.Box(new Vector3((-w / 2) - 0.2f, 0.62f, 0), new Vector3(0.5f, 0.14f, 0.2f), TrailerGreen);
+        b.Box(new Vector3((-w / 2) - 0.4f, 0.3f, 0), new Vector3(0.1f, 0.6f, 0.1f), SteelDark);
         b.Box(new Vector3((-w / 2) + 0.6f, 0.4f, 0), new Vector3(0.12f, 0.8f, 1.6f), SteelDark);
 
         // A tall board at the back with the name painted on.
@@ -151,9 +99,8 @@ public static class SiteProps
             Bale(b, new Vector3(-2.6f + (i * 1.04f), 0.22f, (d / 2) + 0.3f), i % 2 == 0);
         }
 
-        Bale(b, new Vector3((w / 2) + 0.35f, 0.22f, 0.2f), true, 90);
-        Bale(b, new Vector3((w / 2) + 0.35f, 0.66f, 0.2f), false, 90);
-        Bale(b, new Vector3((w / 2) + 0.85f, 0.22f, 0.2f), false, 90);
+        Bale(b, new Vector3((w / 2) + 0.22f, 0.22f, 0.2f), true, 90);
+        Bale(b, new Vector3((w / 2) + 0.22f, 0.66f, 0.2f), false, 90);
 
         // Poles at the corners with bunting strung between.
         Bunting(b, new Vector3((-w / 2) + 0.1f, top + 2.3f, (-d / 2) + 0.16f), new Vector3((w / 2) - 0.1f, top + 2.3f, (-d / 2) + 0.16f), 0.3f);
@@ -300,7 +247,7 @@ public static class SiteProps
     {
         var b = new MeshBuilder();
         AddFence(b, kind, from, to);
-        return b.BuildNode(FenceName(kind));
+        return b.BuildNode(Catalogue.Of(kind).Name);
     }
 
     /// <summary>Adds a run of fence to a builder, so many runs can share one mesh.</summary>
@@ -415,7 +362,7 @@ public static class SiteProps
     /// <summary>A way in, built round the middle of its opening, facing south to meet people arriving.</summary>
     public static Node3D Gate(GateKind kind, string festivalName)
     {
-        var node = new Node3D { Name = GateName(kind) };
+        var node = new Node3D { Name = Catalogue.Of(kind).Name };
         var b = new MeshBuilder();
         if (kind == GateKind.VillageGate)
         {
@@ -462,7 +409,7 @@ public static class SiteProps
         else
         {
             // A steel arch over two lanes, with a banner across.
-            const float half = 3.2f, high = 4.4f;
+            const float half = 3.0f, high = 4.4f;
             Truss(b, new Vector3(-half, 0, 0), new Vector3(-half, high, 0));
             Truss(b, new Vector3(half, 0, 0), new Vector3(half, high, 0));
             Truss(b, new Vector3(-half, high, 0), new Vector3(half, high, 0));
@@ -482,9 +429,9 @@ public static class SiteProps
             }
 
             // Barriers that split the way in into two lanes and funnel the queue.
-            AddFence(b, FenceKind.CrowdBarrier, new Vector3(0, 0, -1.2f), new Vector3(0, 0, 5.7f));
-            AddFence(b, FenceKind.CrowdBarrier, new Vector3(-half + 0.5f, 0, 0.4f), new Vector3(-half + 0.5f, 0, 5f));
-            AddFence(b, FenceKind.CrowdBarrier, new Vector3(half - 0.5f, 0, 0.4f), new Vector3(half - 0.5f, 0, 5f));
+            AddFence(b, FenceKind.CrowdBarrier, new Vector3(0, 0, 0.3f), new Vector3(0, 0, 5.7f));
+            AddFence(b, FenceKind.CrowdBarrier, new Vector3(-half + 0.1f, 0, 0.4f), new Vector3(-half + 0.1f, 0, 5f));
+            AddFence(b, FenceKind.CrowdBarrier, new Vector3(half - 0.1f, 0, 0.4f), new Vector3(half - 0.1f, 0, 5f));
 
             // A striped ticket hut beside the arch.
             var hut = new Vector3(half + 2.1f, 0, 0.6f);

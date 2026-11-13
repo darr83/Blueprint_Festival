@@ -8,7 +8,7 @@ It is a sister game to Blueprint Hospital and shares its look and its way of wor
 code here is written new for this game. Everything is fictional: no real festivals, artists,
 brands or sponsors.
 
-![The field in the afternoon](docs/screenshots/step-02/4_field_afternoon.jpg)
+![A first festival with a bandstand and a gate](docs/screenshots/step-03/6_first_festival.jpg)
 
 ## Where it is up to
 
@@ -16,8 +16,8 @@ brands or sponsors.
 |---|---|
 | 1. An empty field: menu, field, turning camera, clock, day and night | Done |
 | 2. People: festival-goers who arrive, walk about and go home | Done |
-| 3. Building: fence, gate and a small stage | Next |
-| 4. The show: an act plays and the crowd watches | |
+| 3. Building: three stages, four fences and two gates, with prices, and a queue at the gate | Done |
+| 4. The show: an act plays and the crowd watches | Next |
 | 5. Needs and money: food, bar, toilets, tickets | |
 | 6. The festival year: plan, build, run, tidy, results, grow | |
 | 7. Staff and first aid | |
@@ -34,6 +34,9 @@ brands or sponsors.
 | Turn the view a quarter turn | Q / E, or the turn buttons bottom right |
 | Show the whole field | Home |
 | Pause / resume | Space |
+| Build | Pick from the build bar, click to place, drag for fence |
+| Turn the piece being placed | R |
+| Stop building | Right-click or Esc |
 | Speed 1x / 2x / 4x / 8x | 1 / 2 / 3 / 4 |
 | Menu (save, main menu) | Esc |
 
