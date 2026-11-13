@@ -116,7 +116,7 @@ public static class Catalogue
 
     public static readonly IReadOnlyList<StallInfo> Stalls = new[]
     {
-        new StallInfo(StallKind.TeaAndCake, "Tea and cake table", 6, 6, 30, Need.Food, 3, 40, 1, "Run by the village hall committee. Cheap, slow, one queue."),
+        new StallInfo(StallKind.TeaAndCake, "Tea and cake table", 6, 6, 30, Need.Food, 3, 60, 1, "Run by the village hall committee. Cheap, slow, one queue."),
         new StallInfo(StallKind.FoodVan, "Food van", 12, 5, 120, Need.Food, 6, 45, 2, "Hot food from a hatch. Serves two at a time."),
         new StallInfo(StallKind.Bar, "Bar tent", 12, 8, 200, Need.Drink, 4, 25, 3, "Drinks from a long bar. Serves three at a time."),
         new StallInfo(StallKind.Toilets, "Toilets", 8, 3, 40, Need.Toilet, 0, 75, 3, "Three cabins. People will not wait for ever."),

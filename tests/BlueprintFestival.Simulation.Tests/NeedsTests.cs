@@ -142,17 +142,27 @@ public class NeedsTests
     [Fact]
     public void With_too_little_food_the_queue_grows_and_people_give_up()
     {
+        // One slow tea table to feed a whole festival.
         var game = new FestivalGame("One Table", seed: 8);
         var f = game.Field.Field;
         Assert.True(game.BuildStall(StallKind.TeaAndCake, f.X + 40, f.Y + 20, Facing.South).Ok);
         var longest = 0;
-        while (game.Now < Day.AddHours(17))
+        var gaveUpAt = DateTime.MaxValue;
+        while (game.Now < Day.AddHours(18))
         {
             game.Clock.Step();
             longest = Math.Max(longest, game.Crowd.StallQueueLength(0, 0));
+            if (game.Crowd.GaveUpQueuing > 0 && gaveUpAt == DateTime.MaxValue)
+            {
+                gaveUpAt = game.Now;
+                var quitter = game.Crowd.Parties.First(p => p.GaveUp > 0);
+                Assert.Equal(PartyState.Standing, quitter.State);
+                Assert.True(quitter.NeedRetryAt > game.Now);
+                Assert.True(quitter.Mood < Crowd.StartingMood + 0.05);
+            }
         }
 
-        Assert.True(longest >= 6 && game.Crowd.GaveUpQueuing > 0, $"longest queue {longest}, gave up {game.Crowd.GaveUpQueuing}");
+        Assert.True(longest >= 5 && game.Crowd.GaveUpQueuing > 0, $"longest queue {longest}, gave up {game.Crowd.GaveUpQueuing}");
     }
 
     [Fact]

@@ -120,9 +120,21 @@ public partial class SmokeTest : Node
                     Check(!opened.Build.Vertical, "Two turns should bring a gate back to lying across.");
                     Check(opened.Build.ClickAt(new TilePoint(gap.X + 6, gap.Y + 1)).Ok, "A gate should go in the fence.");
                     Check(site.HasWorkingGate, "The gate should be the only way in.");
+                    Check(opened.Game.Money == 2000 - 400 - 18 - 40 + 12, $"The money should add up, not be £{opened.Game.Money}.");
+
+                    // Somewhere to eat, drink and go to the toilet.
+                    opened.BuildBar.Toggle(BuildMode.Stall);
+                    Check(opened.BuildBar.ChoiceCount == 5, "The build bar should offer five stalls.");
+                    Check(opened.BuildBar.Choose("stallFoodVan") && opened.Build.Mode == BuildMode.Stall, "The food van should be on the build bar.");
+                    opened.Build.ShowGhost(new TilePoint(grass.X + 20, grass.Y + 18));
+                    Check(opened.Build.Status.Contains("£120"), $"The bar should show the hire price, not '{opened.Build.Status}'.");
+                    Check(opened.Build.ClickAt(new TilePoint(grass.X + 20, grass.Y + 18)).Ok, "A food van should go on the grass.");
+                    Check(!opened.Build.ClickAt(new TilePoint(grass.X + 22, grass.Y + 18)).Ok, "One stall should not go on top of another.");
+                    Check(opened.BuildBar.Choose("stallBar") && opened.Build.ClickAt(new TilePoint(grass.X + 20, grass.Y + 36)).Ok, "A bar should go on the grass.");
+                    Check(opened.BuildBar.Choose("stallToilets") && opened.Build.ClickAt(new TilePoint(grass.X + 20, grass.Y + 52)).Ok, "Toilets should go on the grass.");
                     opened.BuildBar.Close();
                     Check(opened.Build.Mode == BuildMode.None, "Closing the bar should put the tool down.");
-                    Check(opened.Game.Money == 2000 - 400 - 18 - 40 + 12, $"The money should add up, not be £{opened.Game.Money}.");
+                    Check(opened.Game.Money == 1554 - 120 - 200 - 40, $"The money should add up after the stalls, not be £{opened.Game.Money}.");
                     _savedMoney = opened.Game.Money;
                     opened.Game.Clock.SetSpeed(GameSpeed.Fastest);
                     _mark = opened.Game.Now;
@@ -147,7 +159,9 @@ public partial class SmokeTest : Node
 
                     Check(running.Site.StageCount == 1 && running.Site.GateCount == 1 && running.Site.FenceRunCount == 2, "The stage, the gate and the fence either side should be drawn.");
                     Check(crowd.ThroughGates >= 6 && crowd.WalkedInFree == 0, "Everyone should have come in through the gate.");
-                    Check(running.TopBar.MoneyText == $"£{_savedMoney:N0}", "The top bar should show the money left.");
+                    Check(running.Game.Money > _savedMoney, "Tickets sold at the gate should have brought money in.");
+                    Check(running.TopBar.MoneyText == $"£{running.Game.Money:N0}", "The top bar should show the money in the bank.");
+                    Check(running.Site.StallCount == 3, "The three stalls should be drawn.");
                     Check(running.TopBar.TimeText != "08:00", "The clock in the top bar should have moved on.");
                     Check(running.Acts.PerformerCount == 0, "Nobody should be on stage before midday.");
                     Check(running.TopBar.ShowText.StartsWith("Next: ", StringComparison.Ordinal) && running.TopBar.ShowText.EndsWith("at 12:00", StringComparison.Ordinal), $"The top bar should say who is on at midday, not '{running.TopBar.ShowText}'.");
@@ -176,6 +190,12 @@ public partial class SmokeTest : Node
                     Check(show.Game.Crowd.Watching > 0, "Some people should be watching the act.");
                     Check(music.SongNow(show.Game.Now) is not null, "The act should be playing one of its songs.");
                     Check(show.Acts.LightStrength < 0.05f, "The stage lights should be off by day.");
+                    Check(show.Game.Income.Count >= 3, $"Tickets, food and drink should all have earned something by now, not {show.Game.Income.Count} lines.");
+                    Check(show.TopBar.MoodText == $"Happy {show.Game.Crowd.Happiness}%", $"The top bar should say how happy people are, not '{show.TopBar.MoodText}'.");
+                    Check(!show.Money.Visible, "The money panel should start shut.");
+                    show.ToggleMoney();
+                    Check(show.Money.Visible && show.Money.LineCount >= 5, $"The money panel should list the day's takings and spending, not {show.Money.LineCount} lines.");
+                    show.ToggleMoney();
                     show.TogglePause();
                     Check(show.Game.Clock.IsPaused, "Space should pause the game.");
                     _mark = show.Game.Now;
@@ -207,6 +227,7 @@ public partial class SmokeTest : Node
                     turned.Game.Clock.SetSpeed(GameSpeed.Paused);
                     Check(manager.Save(Slot) is null, "Saving should work.");
                     _saved = turned.Game.Now;
+                    _savedMoney = turned.Game.Money;
                     _savedTicks = turned.Game.Clock.TickCount;
                     _savedPeople = turned.Game.Crowd.OnSite;
                     manager.ReturnToMenu();
@@ -238,6 +259,7 @@ public partial class SmokeTest : Node
                     Check(loaded.Game.Money == _savedMoney, "The loaded festival should keep its money.");
                     Check(loaded.Site.StageCount == 1 && loaded.Site.GateCount == 1, "The loaded festival should keep what was built.");
                     Check(loaded.Game.Site.HasWorkingGate, "The loaded gate should still be the way in.");
+                    Check(loaded.Site.StallCount == 3 && loaded.Game.Income.Count >= 3, "The loaded festival should keep its stalls and its takings.");
                     DirAccess.RemoveAbsolute($"{GameManager.SaveDirectory}/{Slot}.json");
                     Next(Stage.Done);
                     GD.Print("[smoke] PASSED.");

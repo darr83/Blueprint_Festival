@@ -8,7 +8,7 @@ It is a sister game to Blueprint Hospital and shares its look and its way of wor
 code here is written new for this game. Everything is fictional: no real festivals, artists,
 brands or sponsors.
 
-![The headline act at night](docs/screenshots/step-04/7_headline_set_at_night.jpg)
+![A village festival with stalls](docs/screenshots/step-05/1_village_festival_with_stalls.jpg)
 
 ## Where it is up to
 
@@ -18,8 +18,8 @@ brands or sponsors.
 | 2. People: festival-goers who arrive, walk about and go home | Done |
 | 3. Building: three stages, four fences and two gates, with prices, and a queue at the gate | Done |
 | 4. The show: seven made-up acts a day, a crowd that gathers and cheers, stage lights after dark | Done |
-| 5. Needs and money: food, bar, toilets, tickets | Next |
-| 6. The festival year: plan, build, run, tidy, results, grow | |
+| 5. Needs and money: five stalls, queues, tickets at the gate, a money panel and a happiness score | Done |
+| 6. The festival year: plan, build, run, tidy, results, grow | Next |
 | 7. Staff and first aid | |
 | 8. Crowd density and crush | |
 | 9. Weather and mud | |

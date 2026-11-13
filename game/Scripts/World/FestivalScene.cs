@@ -31,6 +31,8 @@ public partial class FestivalScene : Node3D
 
     public ShowView Acts { get; private set; } = null!;
 
+    public MoneyPanel Money { get; private set; } = null!;
+
     public BuildBar BuildBar { get; private set; } = null!;
 
     public override void _Ready()
@@ -73,6 +75,10 @@ public partial class FestivalScene : Node3D
         TopBar = new TopBar { Name = "TopBar" };
         _hud.AddChild(TopBar);
         TopBar.Initialise(Game, OpenMenu);
+        Money = new MoneyPanel { Name = "MoneyPanel" };
+        _hud.AddChild(Money);
+        Money.Initialise(Game);
+        TopBar.MoneyPressed += ToggleMoney;
         var view = new ViewButtons { Name = "ViewButtons" };
         _hud.AddChild(view);
         view.Initialise(Camera);
@@ -134,6 +140,16 @@ public partial class FestivalScene : Node3D
         {
             _speedBeforePause = Game.Clock.Speed;
             Game.Clock.SetSpeed(GameSpeed.Paused);
+        }
+    }
+
+    /// <summary>Opens or shuts the money panel.</summary>
+    public void ToggleMoney()
+    {
+        Money.Visible = !Money.Visible;
+        if (Money.Visible)
+        {
+            Money.Refresh();
         }
     }
 

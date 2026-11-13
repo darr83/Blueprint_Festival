@@ -196,8 +196,8 @@ public sealed class Crowd
     public const double Pressing = 0.85;
 
     /// <summary>How long a need takes to go from nothing to desperate, in hours.</summary>
-    private const double HoursToHungry = 5;
-    private const double HoursToThirsty = 3;
+    private const double HoursToHungry = 7;
+    private const double HoursToThirsty = 3.5;
     private const double HoursToToilet = 4.5;
 
     /// <summary>How long people will stand in a stall queue before walking away, in minutes.</summary>
@@ -332,7 +332,8 @@ public sealed class Crowd
 
                 foreach (var m in party.Members)
                 {
-                    yield return new PersonOnSite(m.Id, m.Look, party.X + m.OffsetX, party.Y + m.OffsetY, party.Heading, party.IsWalking, party.State == PartyState.Watching, party.Wants);
+                    yield return new PersonOnSite(m.Id, m.Look, party.X + m.OffsetX, party.Y + m.OffsetY, party.Heading, party.IsWalking, party.State == PartyState.Watching,
+                        ReferenceEquals(m, party.Members[0]) ? party.Wants : null);
                 }
             }
         }
@@ -826,7 +827,7 @@ public sealed class Crowd
         party.Thirst = Math.Min(1.2, party.Thirst + (party.Appetite * perHour / HoursToThirsty));
         party.Toilet = Math.Min(1.2, party.Toilet + (party.Appetite * perHour / HoursToToilet));
 
-        var change = party.State == PartyState.Watching ? 0.1 * perHour : 0;
+        var change = party.State == PartyState.Watching ? 0.05 * perHour : 0;
         foreach (var need in new[] { party.Hunger, party.Thirst, party.Toilet })
         {
             if (need >= Pressing)
@@ -1021,7 +1022,7 @@ public sealed class Crowd
 
             var paid = info.Price * party.Members.Count;
             party.Spent += paid;
-            party.Mood = Math.Min(1, party.Mood + 0.04);
+            party.Mood = Math.Min(1, party.Mood + 0.012);
             party.State = PartyState.Standing;
             party.RetryAt = default;
             party.WaitUntil = now + TimeSpan.FromMinutes(party.Random.Between(1, 5));

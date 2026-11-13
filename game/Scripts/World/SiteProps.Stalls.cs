@@ -1,17 +1,8 @@
 using BlueprintFestival.Simulation.People;
+using BlueprintFestival.Simulation.Site;
 using Godot;
 
 namespace BlueprintFestival.World;
-
-/// <summary>The stalls and services of step 5, as first drawn for the mock-ups.</summary>
-public enum StallKind
-{
-    TeaAndCake,
-    FoodVan,
-    Bar,
-    Toilets,
-    WaterPoint,
-}
 
 public static partial class SiteProps
 {
@@ -20,19 +11,10 @@ public static partial class SiteProps
     private static readonly Color Cream = new("#FFF6DD");
     private static readonly Color Glass = new("#9CCBE0");
 
-    public static string StallName(StallKind kind) => kind switch
-    {
-        StallKind.TeaAndCake => "Tea and cake table",
-        StallKind.FoodVan => "Food van",
-        StallKind.Bar => "Bar tent",
-        StallKind.Toilets => "Toilets",
-        _ => "Water point",
-    };
-
     /// <summary>A stall built round its own middle, serving towards the south (+Z).</summary>
     public static Node3D Stall(StallKind kind)
     {
-        var node = new Node3D { Name = StallName(kind) };
+        var node = new Node3D { Name = Catalogue.Of(kind).Name };
         var b = new MeshBuilder();
         switch (kind)
         {
@@ -54,6 +36,60 @@ public static partial class SiteProps
         }
 
         node.AddChild(b.BuildNode("Shapes"));
+        if (kind == StallKind.FoodVan)
+        {
+            // The cab sticks out at one end: slide the van along so the whole of it sits on its ground.
+            foreach (var child in node.GetChildren())
+            {
+                if (child is Node3D part)
+                {
+                    part.Position += new Vector3(-0.55f, 0, -0.15f);
+                }
+            }
+        }
+
+        return node;
+    }
+
+    /// <summary>Where the people serving stand, in metres from the stall's middle, the stall facing south.</summary>
+    public static Vector3[] StaffSpots(StallKind kind) => kind switch
+    {
+        StallKind.TeaAndCake => new[] { new Vector3(0.3f, 0, 0) },
+        StallKind.FoodVan => new[] { new Vector3(-1.45f, 0.55f, 0.4f), new Vector3(-0.15f, 0.55f, 0.4f) },
+        StallKind.Bar => new[] { new Vector3(-1.4f, 0, 0.55f), new Vector3(1.3f, 0, 0.55f) },
+        _ => System.Array.Empty<Vector3>(),
+    };
+
+    /// <summary>A thought bubble with a simple picture of what someone wants. It sits this high above the ground.</summary>
+    public static MeshInstance3D NeedBubble(Need need, float headHeight)
+    {
+        var b = new MeshBuilder();
+        var top = headHeight + 0.75f;
+        b.Ball(new Vector3(0, top, 0), new Vector3(0.62f, 0.56f, 0.2f), Colors.White);
+        b.Ball(new Vector3(0.14f, top - 0.36f, 0), 0.12f, Colors.White);
+        b.Ball(new Vector3(0.2f, top - 0.5f, 0), 0.07f, Colors.White);
+        var at = new Vector3(0, top, 0.1f);
+        switch (need)
+        {
+            case Need.Food:
+                b.Ball(at + new Vector3(0, 0.08f, 0), new Vector3(0.34f, 0.2f, 0.1f), new Color("#D9963B"));
+                b.Box(at, new Vector3(0.36f, 0.06f, 0.1f), new Color("#7A4A2A"));
+                b.Box(at + new Vector3(0, 0.04f, 0.01f), new Vector3(0.38f, 0.025f, 0.1f), new Color("#5DAE4B"));
+                b.Ball(at + new Vector3(0, -0.07f, 0), new Vector3(0.34f, 0.12f, 0.1f), new Color("#D9963B"));
+                break;
+            case Need.Drink:
+                b.Ball(at + new Vector3(0, -0.05f, 0), new Vector3(0.26f, 0.26f, 0.1f), new Color("#3C8DD8"));
+                b.Cone(at + new Vector3(0, 0.11f, 0), new Vector3(0.2f, 0.22f, 0.1f), new Color("#3C8DD8"));
+                break;
+            default:
+                b.Tube(at, new Vector3(0.3f, 0.1f, 0.3f), Teal, new Vector3(90, 0, 0));
+                b.Tube(at + new Vector3(0, 0, 0.02f), new Vector3(0.12f, 0.1f, 0.12f), Colors.White, new Vector3(90, 0, 0));
+                b.Box(at + new Vector3(0.13f, -0.14f, 0), new Vector3(0.05f, 0.2f, 0.09f), Teal);
+                break;
+        }
+
+        var node = b.BuildNode("Bubble");
+        node.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
         return node;
     }
 
