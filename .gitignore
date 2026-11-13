@@ -1,0 +1,15 @@
+# Godot
+.godot/
+*.import.tmp
+/builds/
+
+# .NET
+bin/
+obj/
+*.user
+.vs/
+TestResults/
+
+# OS
+.DS_Store
+Thumbs.db

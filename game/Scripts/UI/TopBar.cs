@@ -1,0 +1,98 @@
+using System.Collections.Generic;
+using System.Globalization;
+using BlueprintFestival.Simulation;
+using BlueprintFestival.Simulation.Core;
+using Godot;
+
+namespace BlueprintFestival.UI;
+
+/// <summary>The bar along the top: the festival's name, the day and time, and the speed buttons.</summary>
+public partial class TopBar : PanelContainer
+{
+    private static readonly CultureInfo British = CultureInfo.GetCultureInfo("en-GB");
+
+    private static readonly (GameSpeed Speed, string Text, string Tip)[] Speeds =
+    {
+        (GameSpeed.Paused, "Pause", "Pause (Space)"),
+        (GameSpeed.Normal, "1x", "Normal speed (1)"),
+        (GameSpeed.Fast, "2x", "Double speed (2)"),
+        (GameSpeed.VeryFast, "4x", "Four times speed (3)"),
+        (GameSpeed.Fastest, "8x", "Eight times speed (4)"),
+    };
+
+    private readonly Dictionary<GameSpeed, Button> _speedButtons = new();
+    private FestivalGame _game = null!;
+    private Label _name = null!;
+    private Label _date = null!;
+    private Label _time = null!;
+    private Label _light = null!;
+
+    public string NameText => _name.Text;
+
+    public string TimeText => _time.Text;
+
+    public void Initialise(FestivalGame game, System.Action openMenu)
+    {
+        _game = game;
+        Theme = UiStyle.Theme;
+        var box = UiStyle.Card(margin: 0, radius: 0);
+        box.ContentMarginLeft = box.ContentMarginRight = 18;
+        box.ContentMarginTop = box.ContentMarginBottom = 8;
+        AddThemeStyleboxOverride("panel", box);
+
+        var row = new HBoxContainer();
+        row.AddThemeConstantOverride("separation", 14);
+        AddChild(row);
+
+        var flag = new ColorRect { Color = UiStyle.StagePink, CustomMinimumSize = new Vector2(6, 34), SizeFlagsVertical = SizeFlags.ShrinkCenter };
+        row.AddChild(flag);
+        _name = UiStyle.Heading(game.Name, 22);
+        row.AddChild(_name);
+
+        row.AddChild(new Control { SizeFlagsHorizontal = SizeFlags.ExpandFill });
+
+        _light = UiStyle.Body("", muted: true, size: 14);
+        row.AddChild(_light);
+        _date = UiStyle.Body("", muted: true);
+        row.AddChild(_date);
+        _time = UiStyle.Heading("", 26);
+        _time.CustomMinimumSize = new Vector2(78, 0);
+        _time.HorizontalAlignment = HorizontalAlignment.Center;
+        row.AddChild(_time);
+
+        row.AddChild(new Control { SizeFlagsHorizontal = SizeFlags.ExpandFill });
+
+        var speeds = new HBoxContainer();
+        speeds.AddThemeConstantOverride("separation", 6);
+        row.AddChild(speeds);
+        foreach (var (speed, text, tip) in Speeds)
+        {
+            var button = UiStyle.SecondaryButton(text, () => _game.Clock.SetSpeed(speed));
+            button.ToggleMode = true;
+            button.TooltipText = tip;
+            speeds.AddChild(button);
+            _speedButtons[speed] = button;
+        }
+
+        var menu = UiStyle.SecondaryButton("Menu", openMenu);
+        menu.TooltipText = "Menu (Esc)";
+        row.AddChild(menu);
+        SetAnchorsAndOffsetsPreset(LayoutPreset.TopWide, LayoutPresetMode.Minsize);
+        Refresh();
+    }
+
+    public override void _Process(double delta) => Refresh();
+
+    private void Refresh()
+    {
+        var now = _game.Now;
+        _date.Text = now.ToString("dddd d MMMM yyyy", British);
+        _time.Text = now.ToString("HH:mm", British);
+        var light = _game.Light;
+        _light.Text = light >= 1 ? "Daylight" : light <= 0 ? "Night" : now.Hour < 12 ? "Dawn" : "Dusk";
+        foreach (var (speed, button) in _speedButtons)
+        {
+            button.SetPressedNoSignal(_game.Clock.Speed == speed);
+        }
+    }
+}
