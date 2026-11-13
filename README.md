@@ -8,15 +8,15 @@ It is a sister game to Blueprint Hospital and shares its look and its way of wor
 code here is written new for this game. Everything is fictional: no real festivals, artists,
 brands or sponsors.
 
-![The empty field in the morning](docs/screenshots/step-01/2_field_morning.jpg)
+![The field in the afternoon](docs/screenshots/step-02/4_field_afternoon.jpg)
 
 ## Where it is up to
 
 | Step | State |
 |---|---|
 | 1. An empty field: menu, field, turning camera, clock, day and night | Done |
-| 2. People: festival-goers who arrive and walk about | Next |
-| 3. Building: fence, gate and a small stage | |
+| 2. People: festival-goers who arrive, walk about and go home | Done |
+| 3. Building: fence, gate and a small stage | Next |
 | 4. The show: an act plays and the crowd watches | |
 | 5. Needs and money: food, bar, toilets, tickets | |
 | 6. The festival year: plan, build, run, tidy, results, grow | |
@@ -44,7 +44,7 @@ game/                               Godot project (open this folder in Godot)
   Scenes/                           Main menu and festival scenes
   Scripts/Core/                     Game manager, saves, launch test, screenshot tool
   Scripts/UI/                       Look and feel, menus, top bar, view buttons
-  Scripts/World/                    The 3D site, camera and daylight
+  Scripts/World/                    The 3D site, camera, daylight and people
 src/BlueprintFestival.Simulation/   The rules of the game in plain C# (no Godot)
 tests/BlueprintFestival.Simulation.Tests/   Unit tests for the rules
 docs/handoff/                       The original brief and mock-ups
@@ -65,8 +65,9 @@ You need **Godot 4.7.2 .NET** (the "mono" download) and the **.NET 8 SDK**.
 
 - `dotnet test tests/BlueprintFestival.Simulation.Tests` runs the unit tests.
 - `godot --headless --path game -- --smoke-test` starts the game with no window, starts a festival,
-  lets time pass, pauses, turns the view, saves, loads and compares.
+  lets time pass until people arrive, pauses, turns the view, saves, loads and compares.
 - `godot --path game -- --shots=DIR` writes review screenshots to a folder.
+- `godot --path game -- --people-shots=DIR` writes line-up pictures of the people.
 
 The tests and the launch test run on every pull request.
 

@@ -26,10 +26,13 @@ public partial class TopBar : PanelContainer
     private Label _date = null!;
     private Label _time = null!;
     private Label _light = null!;
+    private Label _people = null!;
 
     public string NameText => _name.Text;
 
     public string TimeText => _time.Text;
+
+    public string PeopleText => _people.Text;
 
     public void Initialise(FestivalGame game, System.Action openMenu)
     {
@@ -48,6 +51,12 @@ public partial class TopBar : PanelContainer
         row.AddChild(flag);
         _name = UiStyle.Heading(game.Name, 22);
         row.AddChild(_name);
+
+        _people = UiStyle.Body("", size: 16);
+        _people.TooltipText = "People on the site now, out of everyone expected today";
+        _people.MouseFilter = MouseFilterEnum.Stop;
+        row.AddChild(new Control { CustomMinimumSize = new Vector2(10, 0) });
+        row.AddChild(_people);
 
         row.AddChild(new Control { SizeFlagsHorizontal = SizeFlags.ExpandFill });
 
@@ -88,6 +97,7 @@ public partial class TopBar : PanelContainer
         var now = _game.Now;
         _date.Text = now.ToString("dddd d MMMM yyyy", British);
         _time.Text = now.ToString("HH:mm", British);
+        _people.Text = $"On site {_game.Crowd.OnSite} of {_game.Crowd.Expected}";
         var light = _game.Light;
         _light.Text = light >= 1 ? "Daylight" : light <= 0 ? "Night" : now.Hour < 12 ? "Dawn" : "Dusk";
         foreach (var (speed, button) in _speedButtons)
