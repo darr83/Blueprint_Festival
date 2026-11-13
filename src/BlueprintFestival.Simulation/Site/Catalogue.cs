@@ -91,6 +91,17 @@ public sealed record GateInfo(GateKind Kind, string Name, int Width, int Lanes, 
 public sealed record StallInfo(StallKind Kind, string Name, int Width, int Depth, int Cost, Need Serves, int Price, int SecondsPerPerson, int Servers, string About);
 
 /// <summary>Everything the player can build, with its size and what it costs to hire for the day.</summary>
+/// <summary>The kinds of staff a festival hires for the day.</summary>
+public enum StaffKind
+{
+    TicketStaff,
+    Security,
+    FirstAider,
+}
+
+/// <summary>One kind of staff: what they are called, what they cost for the day, and what they do.</summary>
+public sealed record StaffInfo(StaffKind Kind, string Name, int Wage, string About);
+
 public static class Catalogue
 {
     public static readonly IReadOnlyList<StageInfo> Stages = new[]
@@ -130,6 +141,15 @@ public static class Catalogue
     public const int TicketPrice = 5;
 
     public static StallInfo Of(StallKind kind) => Stalls[(int)kind];
+
+    public static readonly IReadOnlyList<StaffInfo> Staff = new[]
+    {
+        new StaffInfo(StaffKind.TicketStaff, "Ticket staff", 40, "Checks tickets at a gate. One for each lane."),
+        new StaffInfo(StaffKind.Security, "Security", 60, "Stands where you put them and deals with trouble nearby."),
+        new StaffInfo(StaffKind.FirstAider, "First-aider", 50, "Goes to anyone taken ill or hurt and looks after them."),
+    };
+
+    public static StaffInfo Of(StaffKind kind) => Staff[(int)kind];
 
     public static StageInfo Of(StageKind kind) => Stages[(int)kind];
 
