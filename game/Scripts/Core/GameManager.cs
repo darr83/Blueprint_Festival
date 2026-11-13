@@ -30,6 +30,10 @@ public partial class GameManager : Node
             {
                 AddChild(new SmokeTest { Name = "SmokeTest" });
             }
+            else if (arg.StartsWith("--people-shots=", StringComparison.Ordinal))
+            {
+                AddChild(new PeopleShots(arg["--people-shots=".Length..]) { Name = "PeopleShots" });
+            }
             else if (arg.StartsWith("--shots=", StringComparison.Ordinal))
             {
                 AddChild(new Shots(arg["--shots=".Length..]) { Name = "Shots" });
