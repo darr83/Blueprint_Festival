@@ -76,20 +76,24 @@ public partial class CrowdView : Node3D
         foreach (var person in _game.Crowd.People)
         {
             _seen.Add(person.Id);
-            var target = new Vector3((float)person.X, 0, (float)person.Y);
+            // Someone unwell lies on the ground, or on a bed if they have been taken to the first aid tent.
+            var lift = !person.Unwell ? 0f
+                : _game.Site.StallAt(Simulation.World.FieldMap.TileAt(person.X, person.Y))?.Kind == StallKind.FirstAidTent ? 0.62f : 0.14f;
+            var tilt = person.Unwell ? -Mathf.Pi / 2 : 0f;
+            var target = new Vector3((float)person.X, lift, (float)person.Y);
             var heading = (float)person.Heading;
             if (!_views.TryGetValue(person.Id, out var view))
             {
                 view = PersonView.Build(person.Look);
                 view.Position = target;
-                view.Rotation = new Vector3(0, heading, 0);
+                view.Rotation = new Vector3(tilt, heading, 0);
                 _views[person.Id] = view;
                 AddChild(view);
             }
             else
             {
                 view.Position = view.Position.Lerp(target, glide);
-                view.Rotation = new Vector3(0, Mathf.LerpAngle(view.Rotation.Y, heading, glide), 0);
+                view.Rotation = new Vector3(tilt, Mathf.LerpAngle(view.Rotation.Y, heading, glide), 0);
             }
 
             // People watching the stage put their arms up now and then, each in their own time;

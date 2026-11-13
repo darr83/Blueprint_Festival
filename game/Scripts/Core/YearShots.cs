@@ -56,6 +56,7 @@ public partial class YearShots : Node
                 Arrange(f);
                 f.Site.Rebuild();
                 f.Litter.Refresh();
+                f.Staff.Snap();
                 f.Crowd.Snap();
                 f.Camera.Snap();
                 _ready = true;
@@ -124,6 +125,12 @@ public partial class YearShots : Node
                 game.BuildStall(StallKind.Toilets, f.X + 26, f.Y + 5, Facing.South);
                 game.BuildStall(StallKind.Toilets, f.X + 36, f.Y + 5, Facing.South);
                 game.BuildStall(StallKind.WaterPoint, f.X + 48, f.Y + 5, Facing.South);
+                game.BuildStall(StallKind.FirstAidTent, f.X + 56, f.Y + 4, Facing.South);
+                game.HireStaff(StaffKind.TicketStaff, new TilePoint(gap.X + 4, gap.Y + 1));
+                game.HireStaff(StaffKind.FirstAider, new TilePoint(f.X + 60, f.Y + 13));
+                game.HireStaff(StaffKind.FirstAider, new TilePoint(f.X + 40, f.Y + 44));
+                game.HireStaff(StaffKind.Security, new TilePoint(f.X + 72, f.Y + 24));
+                game.HireStaff(StaffKind.Security, new TilePoint(f.X + 20, f.Y + 50));
                 break;
 
             case "3_the_morning_after":
@@ -160,6 +167,7 @@ public partial class YearShots : Node
                 game.BuildFence(FenceKind.Paling, new TilePoint(gap.X, gap.Y + 1), new TilePoint(gap.Right - 1, gap.Y + 1));
                 game.BuildGate(GateKind.VillageGate, gap.X + 2, gap.Y + 1, false);
                 game.BuildStall(StallKind.TeaAndCake, f.X + 7, f.Y + 21, Facing.East);
+                game.HireStaff(StaffKind.TicketStaff, new TilePoint(gap.X + 4, gap.Y + 1));
                 RunTheDay(game);
                 festival.Year.HandBack();
                 GD.Print($"[year] Poor year: {game.Crowd.Arrived} came, {game.Crowd.Happiness}% happy, {game.Crowd.WentHomeUnhappy} went home, bank £{game.Money}, {game.Phase}.");

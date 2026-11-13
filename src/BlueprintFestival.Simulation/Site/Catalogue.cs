@@ -56,6 +56,9 @@ public enum StallKind
 
     /// <summary>A standpipe with two taps. Free.</summary>
     WaterPoint,
+
+    /// <summary>A white tent with a green cross, where people who are unwell can lie down.</summary>
+    FirstAidTent,
 }
 
 /// <summary>What a person can need during the day.</summary>
@@ -88,9 +91,20 @@ public sealed record GateInfo(GateKind Kind, string Name, int Width, int Lanes, 
 /// What there is to know about a kind of stall: its size in tiles, what it costs to hire, the need
 /// it answers, what each person pays, how long each takes to serve and how many are served at once.
 /// </summary>
-public sealed record StallInfo(StallKind Kind, string Name, int Width, int Depth, int Cost, Need Serves, int Price, int SecondsPerPerson, int Servers, string About);
+public sealed record StallInfo(StallKind Kind, string Name, int Width, int Depth, int Cost, Need? Serves, int Price, int SecondsPerPerson, int Servers, string About);
 
 /// <summary>Everything the player can build, with its size and what it costs to hire for the day.</summary>
+/// <summary>The kinds of staff a festival hires for the day.</summary>
+public enum StaffKind
+{
+    TicketStaff,
+    Security,
+    FirstAider,
+}
+
+/// <summary>One kind of staff: what they are called, what they cost for the day, and what they do.</summary>
+public sealed record StaffInfo(StaffKind Kind, string Name, int Wage, string About);
+
 public static class Catalogue
 {
     public static readonly IReadOnlyList<StageInfo> Stages = new[]
@@ -121,6 +135,7 @@ public static class Catalogue
         new StallInfo(StallKind.Bar, "Bar tent", 12, 8, 200, Need.Drink, 4, 25, 3, "Drinks from a long bar. Serves three at a time."),
         new StallInfo(StallKind.Toilets, "Toilets", 8, 3, 40, Need.Toilet, 0, 75, 3, "Three cabins. People will not wait for ever."),
         new StallInfo(StallKind.WaterPoint, "Water point", 3, 2, 15, Need.Drink, 0, 20, 2, "Two taps. Free, so it earns nothing."),
+        new StallInfo(StallKind.FirstAidTent, "First aid tent", 8, 6, 80, null, 0, 1200, 2, "Two beds under a green cross. First-aiders bring people here to rest."),
     };
 
     /// <summary>The festival's share of what a stall takes, in pounds out of every hundred.</summary>
@@ -130,6 +145,15 @@ public static class Catalogue
     public const int TicketPrice = 5;
 
     public static StallInfo Of(StallKind kind) => Stalls[(int)kind];
+
+    public static readonly IReadOnlyList<StaffInfo> Staff = new[]
+    {
+        new StaffInfo(StaffKind.TicketStaff, "Ticket staff", 40, "Checks tickets at a gate. One for each lane."),
+        new StaffInfo(StaffKind.Security, "Security", 60, "Stands where you put them and deals with trouble nearby."),
+        new StaffInfo(StaffKind.FirstAider, "First-aider", 50, "Goes to anyone taken ill or hurt and looks after them."),
+    };
+
+    public static StaffInfo Of(StaffKind kind) => Staff[(int)kind];
 
     public static StageInfo Of(StageKind kind) => Stages[(int)kind];
 

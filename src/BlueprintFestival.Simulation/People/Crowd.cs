@@ -32,6 +32,9 @@ public enum PartyState
     /// <summary>Walking back out to the lane to go home.</summary>
     Leaving,
 
+    /// <summary>Taken ill or hurt, and staying put until someone helps.</summary>
+    Unwell,
+
     /// <summary>Gone home.</summary>
     Gone,
 }
@@ -169,7 +172,7 @@ public sealed class Party
 }
 
 /// <summary>One person as the game draws them: who they are, where they are, which way they face.</summary>
-public readonly record struct PersonOnSite(int Id, PersonLook Look, double X, double Y, double Heading, bool Walking, bool Watching = false, Need? Wants = null);
+public readonly record struct PersonOnSite(int Id, PersonLook Look, double X, double Y, double Heading, bool Walking, bool Watching = false, Need? Wants = null, bool Unwell = false);
 
 /// <summary>
 /// Everyone who comes to the festival. The whole day's comings and goings are worked out from the
@@ -205,6 +208,9 @@ public sealed class Crowd
 
     /// <summary>How long people will stand in a stall queue before walking away, in minutes.</summary>
     public const double PatienceMinutes = 10;
+
+    /// <summary>How long people wait at a gate with nobody checking tickets before they go home.</summary>
+    public const double GatePatienceMinutes = 30;
     private const int QueuePlaces = 16;
 
     private readonly FieldMap _map;
@@ -216,6 +222,13 @@ public sealed class Crowd
     private readonly List<TilePoint> _standable = new();
     private readonly HashSet<TilePoint> _standableSet = new();
     private readonly DateTime _day;
+    private DateTime _now;
+
+    /// <summary>
+    /// How many lanes of a gate have someone checking tickets, by the gate's number. Left unset,
+    /// every lane of every gate is open.
+    /// </summary>
+    public Func<int, int>? OpenLanes { get; set; }
 
     public Crowd(FieldMap map, int seed, DateTime festivalDay)
         : this(map, new SiteLayout(map), seed, festivalDay)
@@ -344,7 +357,8 @@ public sealed class Crowd
                 foreach (var m in party.Members)
                 {
                     yield return new PersonOnSite(m.Id, m.Look, party.X + m.OffsetX, party.Y + m.OffsetY, party.Heading, party.IsWalking, party.State == PartyState.Watching,
-                        ReferenceEquals(m, party.Members[0]) ? party.Wants : null);
+                        ReferenceEquals(m, party.Members[0]) && party.State != PartyState.Unwell ? party.Wants : null,
+                        party.State == PartyState.Unwell && ReferenceEquals(m, party.Members[0]));
                 }
             }
         }
@@ -596,7 +610,8 @@ public sealed class Crowd
                 continue;
             }
 
-            for (var lane = 0; lane < _queues[g].Length; lane++)
+            // People join a lane with someone checking tickets; if nobody is, they wait at the first.
+            for (var lane = 0; lane < Math.Max(1, Math.Min(_queues[g].Length, OpenLanes?.Invoke(g) ?? int.MaxValue)); lane++)
             {
                 if (_queues[g][lane].Count < bestLength)
                 {
@@ -610,6 +625,7 @@ public sealed class Crowd
         {
             party.Gate = best;
             party.Lane = bestLane;
+            party.QueuedSince = _now;
             _queues[best][bestLane].Add(party);
             var (x, y) = QueuePlace(best, bestLane, bestLength);
             party.Target = FieldMap.TileAt(x, y);
@@ -692,6 +708,18 @@ public sealed class Crowd
             return;
         }
 
+        if (OpenLanes is not null && party.Lane >= OpenLanes(party.Gate))
+        {
+            // Nobody is on this lane to check tickets. People will not stand here all day.
+            if (_now - party.QueuedSince > TimeSpan.FromMinutes(GatePatienceMinutes))
+            {
+                LeaveQueue(party);
+                GoHome(party, unhappy: true);
+            }
+
+            return;
+        }
+
         // At the front: tickets are checked, one person at a time.
         if (party.ServiceLeft < 0)
         {
@@ -709,6 +737,7 @@ public sealed class Crowd
     /// <summary>Moves everyone on by one tick.</summary>
     public void Tick(DateTime now)
     {
+        _now = now;
         var closing = now.TimeOfDay >= EveryoneOut;
         foreach (var party in _parties)
         {
@@ -719,11 +748,16 @@ public sealed class Crowd
 
             if (party.LitterAt != default && now >= party.LitterAt && party.IsOnSite)
             {
-                var pieces = Math.Max(1, party.Members.Count / 2);
+                // Anyone already on their way out takes it home with them.
+                var pieces = _map.Field.Contains(FieldMap.TileAt(party.X, party.Y)) ? Math.Max(1, party.Members.Count / 2) : 0;
                 for (var i = 0; i < pieces; i++)
                 {
                     var angle = (party.Id * 2.4) + (party.Spent * 0.7) + (i * 2.1);
-                    Dropped?.Invoke(party.X + (Math.Cos(angle) * 0.6), party.Y + (Math.Sin(angle) * 0.6));
+                    var (lx, ly) = (party.X + (Math.Cos(angle) * 0.6), party.Y + (Math.Sin(angle) * 0.6));
+                    if (_map.Field.Contains(FieldMap.TileAt(lx, ly)))
+                    {
+                        Dropped?.Invoke(lx, ly);
+                    }
                 }
 
                 party.LitterAt = default;
@@ -751,6 +785,15 @@ public sealed class Crowd
                     else
                     {
                         Queue(party);
+                    }
+
+                    break;
+
+                case PartyState.Unwell:
+                    if (closing)
+                    {
+                        // Nobody is left lying in the field at the end of the night.
+                        GoHome(party, unhappy: true);
                     }
 
                     break;
@@ -1119,6 +1162,81 @@ public sealed class Crowd
         }
 
         return null;
+    }
+
+    /// <summary>Someone in the party is taken ill or hurt. They stop where they are until helped.</summary>
+    public void TakeIll(Party party)
+    {
+        party.State = PartyState.Unwell;
+        party.Watch = -1;
+        party.Path = null;
+        party.Moving = false;
+    }
+
+    /// <summary>Moves a party that is unwell, as a first-aider walks them somewhere.</summary>
+    public void Carry(Party party, double x, double y)
+    {
+        if (party.State == PartyState.Unwell)
+        {
+            (party.X, party.Y) = (x, y);
+        }
+    }
+
+    /// <summary>They are better, and go back to their day a little happier for being looked after.</summary>
+    public void Recover(Party party)
+    {
+        if (party.State == PartyState.Unwell)
+        {
+            party.State = PartyState.Standing;
+            party.RetryAt = default;
+            party.WaitUntil = _now + TimeSpan.FromMinutes(2);
+            party.Mood = Math.Min(1, party.Mood + 0.04);
+            if (!_map.IsWalkable(FieldMap.TileAt(party.X, party.Y)))
+            {
+                (party.X, party.Y) = FieldMap.CentreOf(NearestWalkable(FieldMap.TileAt(party.X, party.Y)));
+            }
+        }
+    }
+
+    /// <summary>Sends a party home now. An unhappy one counts against the festival.</summary>
+    public void GoHome(Party party, bool unhappy)
+    {
+        if (!party.IsOnSite)
+        {
+            return;
+        }
+
+        if (unhappy)
+        {
+            party.LeftUnhappy = true;
+            party.Mood = Math.Min(party.Mood, 0.1);
+        }
+
+        party.Leaves = _now;
+        party.Watch = -1;
+        if (!_map.IsWalkable(FieldMap.TileAt(party.X, party.Y)))
+        {
+            (party.X, party.Y) = FieldMap.CentreOf(NearestWalkable(FieldMap.TileAt(party.X, party.Y)));
+        }
+
+        Send(party, LaneEnd(party), PartyState.Leaving);
+        if (party.State != PartyState.Leaving)
+        {
+            // No way out just now: stand and try again as anyone else would.
+            party.State = PartyState.Standing;
+        }
+    }
+
+    /// <summary>Everyone within so many metres of a spot is put out by what happened there.</summary>
+    public void Upset(double x, double y, double metres, double amount)
+    {
+        foreach (var party in _parties)
+        {
+            if (party.IsOnSite && ((party.X - x) * (party.X - x)) + ((party.Y - y) * (party.Y - y)) <= metres * metres)
+            {
+                party.Mood = Math.Max(0, party.Mood - amount);
+            }
+        }
     }
 
     /// <summary>Sets a party walking somewhere. If there is no way there, they stand where they are.</summary>

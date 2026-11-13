@@ -14,6 +14,7 @@ public enum BuildMode
     Fence,
     Gate,
     Stall,
+    Staff,
     Remove,
 }
 
@@ -47,6 +48,8 @@ public partial class BuildTool : Node3D
 
     public StallKind Stall { get; private set; }
 
+    public StaffKind Hire { get; private set; }
+
     public Facing Facing { get; private set; } = Facing.South;
 
     public bool Vertical { get; private set; }
@@ -79,6 +82,8 @@ public partial class BuildTool : Node3D
 
     public void PickStall(StallKind kind) => Pick(BuildMode.Stall, () => Stall = kind);
 
+    public void PickStaff(StaffKind kind) => Pick(BuildMode.Staff, () => Hire = kind);
+
     public void PickRemove() => Pick(BuildMode.Remove, () => { });
 
     public void Stop() => Pick(BuildMode.None, () => { });
@@ -95,7 +100,8 @@ public partial class BuildTool : Node3D
             BuildMode.Fence => "Hold the mouse button and drag to run a fence.",
             BuildMode.Gate => "Click to put the gate up. R turns it. Close the fence either side so it is the only way in.",
             BuildMode.Stall => "Click on the grass to put it up. R turns it. People queue at the front.",
-            BuildMode.Remove => "Click a stage, a stall, a gate or a stretch of fence to take it down. You get the money back.",
+            BuildMode.Staff => Hire == StaffKind.TicketStaff ? "Click a gate to put them on it. One for each lane." : "Click on the grass to post them there.",
+            BuildMode.Remove => "Click a stage, a stall, a gate or a stretch of fence to take it down. You get the money back. Click staff to send them home.",
             _ => "",
         };
         ClearGhost();
@@ -161,6 +167,19 @@ public partial class BuildTool : Node3D
                 var (x, y) = StallCorner(at);
                 result = _game.BuildStall(Stall, x, y, Facing);
                 break;
+            }
+
+            case BuildMode.Staff:
+                result = _game.HireStaff(Hire, at);
+                Said(result, "Hired");
+                return result;
+
+            case BuildMode.Remove when _game.StaffAt(at) is { } member:
+            {
+                var back = _game.DismissStaff(member);
+                Refused = false;
+                Status = back > 0 ? $"Sent home. £{back:N0} back." : "Sent home. They are still paid for today.";
+                return new BuildCheck(true, -back, null);
             }
 
             case BuildMode.Remove:
@@ -288,6 +307,16 @@ public partial class BuildTool : Node3D
                 break;
             }
 
+            case BuildMode.Staff:
+            {
+                check = _game.CheckStaff(Hire, at);
+                pad = Hire == StaffKind.TicketStaff && _game.Site.GateAt(at) is { } on ? on.Rect : new TileRect(at.X - 1, at.Y - 1, 3, 3);
+                Ghost($"staff{Hire}", () => SiteProps.Staff(Hire, 0));
+                _ghost!.Position = new Vector3((at.X + 0.5f) * T, 0, (at.Y + 0.5f) * T);
+                _ghost.RotationDegrees = Vector3.Zero;
+                break;
+            }
+
             case BuildMode.Fence:
             {
                 var from = _dragFrom ?? at;
@@ -318,7 +347,7 @@ public partial class BuildTool : Node3D
                 var site = _game.Site;
                 pad = site.StageAt(at)?.Rect ?? site.StallAt(at)?.Rect ?? site.GateAt(at)?.Rect ?? new TileRect(at.X, at.Y, 1, 1);
                 var refund = site.RefundAt(at);
-                check = refund > 0 ? new BuildCheck(true, -refund, null) : BuildCheck.No("");
+                check = refund > 0 || _game.StaffAt(at) is not null ? new BuildCheck(true, -refund, null) : BuildCheck.No("");
                 ClearGhostOnly();
                 break;
             }
@@ -352,6 +381,7 @@ public partial class BuildTool : Node3D
         BuildMode.Stage => Catalogue.Of(Stage).Name,
         BuildMode.Gate => Catalogue.Of(Gate).Name,
         BuildMode.Stall => Catalogue.Of(Stall).Name,
+        BuildMode.Staff => Catalogue.Of(Hire).Name,
         _ => Catalogue.Of(Fence).Name,
     };
 

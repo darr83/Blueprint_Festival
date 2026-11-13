@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using BlueprintFestival.Simulation;
 using BlueprintFestival.Simulation.Core;
 using BlueprintFestival.Simulation.Site;
@@ -308,6 +309,18 @@ public partial class SmokeTest : Node
                     Check(game.BuildStall(StallKind.Bar, grass.X + 7, grass.Y + 52, Facing.East).Ok, "A bar should go up.");
                     Check(game.BuildStall(StallKind.Toilets, grass.X + 26, grass.Y + 5, Facing.South).Ok, "Toilets should go up.");
                     Check(game.BuildStall(StallKind.Toilets, grass.X + 36, grass.Y + 5, Facing.South).Ok, "More toilets should go up.");
+
+                    // Staff from the build bar: someone on the gate, a first-aider, security, and a first aid tent.
+                    build.BuildBar.Toggle(BuildMode.Staff);
+                    Check(build.BuildBar.ChoiceCount == 4, "The Staff tab should offer three kinds of staff and the first aid tent.");
+                    Check(build.BuildBar.Choose("staffTicketStaff") && build.Build.Mode == BuildMode.Staff, "Ticket staff should be on the build bar.");
+                    Check(!build.Build.ClickAt(new TilePoint(grass.X + 40, grass.Y + 40)).Ok && build.Build.Refused, "Ticket staff should only go on a gate.");
+                    Check(build.Build.ClickAt(new TilePoint(gap.X + 4, gap.Y + 1)).Ok && game.OpenLanes(0) == 1, "Ticket staff should open the gate's lane.");
+                    Check(build.BuildBar.Choose("staffFirstAider") && build.Build.ClickAt(new TilePoint(grass.X + 50, grass.Y + 30)).Ok, "A first-aider should be posted on the grass.");
+                    Check(build.BuildBar.Choose("staffSecurity") && build.Build.ClickAt(new TilePoint(grass.X + 70, grass.Y + 28)).Ok, "Security should be posted on the grass.");
+                    Check(build.BuildBar.Choose("stallFirstAidTent") && build.Build.ClickAt(new TilePoint(grass.X + 56, grass.Y + 8)).Ok, "The first aid tent should go up.");
+                    build.BuildBar.Close();
+                    Check(game.Staff.Count == 3 && game.Spending.Any(l => l.What == "Staff wages" && l.Amount == 150), "Three staff should be hired for £150.");
                     build.Year.OpenGates();
                     Check(game.Phase == Phase.Day, "Opening the gates should start the day.");
 
@@ -334,6 +347,9 @@ public partial class SmokeTest : Node
                     Check(!tidy.BuildBar.Visible, "Nothing should be built on the morning after.");
                     Check(game.Litter.Count > 10 && tidy.Litter.Count == game.Litter.Count, $"The litter should be drawn: {tidy.Litter.Count} drawn, {game.Litter.Count} dropped.");
                     Check(tidy.Crowd.Count == 0, "Everyone should have gone home.");
+                    Check(tidy.Staff.Count == 3 && tidy.Staff.MarkerCount == 0, $"The three staff should be drawn at their posts, not {tidy.Staff.Count}.");
+                    Check(tidy.Site.StallCount == 5, "The first aid tent should be drawn with the stalls.");
+                    Check(game.Treated + game.Untreated + game.TroubleSorted + game.TroubleIgnored > 0, "Somebody should have needed the staff during the day.");
                     var first = game.Litter[0];
                     var before = game.Litter.Count;
                     Check(tidy.Year.PickAt(first.X, first.Y) >= 1 && game.Litter.Count < before, "Clicking litter should pick it up.");
