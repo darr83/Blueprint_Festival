@@ -38,6 +38,10 @@ public partial class GameManager : Node
             {
                 AddChild(new BuildShots(arg["--build-shots=".Length..]) { Name = "BuildShots" });
             }
+            else if (arg.StartsWith("--show-shots=", StringComparison.Ordinal))
+            {
+                AddChild(new ShowShots(arg["--show-shots=".Length..]) { Name = "ShowShots" });
+            }
             else if (arg.StartsWith("--shots=", StringComparison.Ordinal))
             {
                 AddChild(new Shots(arg["--shots=".Length..]) { Name = "Shots" });
