@@ -16,6 +16,19 @@ public sealed record PlacedStage(StageKind Kind, int X, int Y, Facing Facing)
     }
 }
 
+/// <summary>A stall that has been put up. It serves out of its front, the way it faces.</summary>
+public sealed record PlacedStall(StallKind Kind, int X, int Y, Facing Facing)
+{
+    public TileRect Rect
+    {
+        get
+        {
+            var info = Catalogue.Of(Kind);
+            return Facing is Facing.South or Facing.North ? new TileRect(X, Y, info.Width, info.Depth) : new TileRect(X, Y, info.Depth, info.Width);
+        }
+    }
+}
+
 /// <summary>A gate that has been put up: a line of tiles one tile thick that people walk through.</summary>
 public sealed record PlacedGate(GateKind Kind, int X, int Y, bool Vertical)
 {
@@ -63,6 +76,7 @@ public sealed class SiteLayout
     private readonly FieldMap _map;
     private readonly List<PlacedStage> _stages = new();
     private readonly List<PlacedGate> _gates = new();
+    private readonly List<PlacedStall> _stalls = new();
     private readonly Dictionary<TilePoint, FenceKind> _fence = new();
     private readonly List<GateUse> _gateUses = new();
     private Side[] _sides;
@@ -80,6 +94,8 @@ public sealed class SiteLayout
     public IReadOnlyList<PlacedStage> Stages => _stages;
 
     public IReadOnlyList<PlacedGate> Gates => _gates;
+
+    public IReadOnlyList<PlacedStall> Stalls => _stalls;
 
     /// <summary>How each gate is being used, in the same order as <see cref="Gates"/>.</summary>
     public IReadOnlyList<GateUse> GateUses => _gateUses;
@@ -101,7 +117,64 @@ public sealed class SiteLayout
 
     public PlacedGate? GateAt(TilePoint p) => _gates.FirstOrDefault(g => g.Rect.Contains(p));
 
-    public bool IsEmpty(TilePoint p) => !_fence.ContainsKey(p) && StageAt(p) is null && GateAt(p) is null;
+    public PlacedStall? StallAt(TilePoint p) => _stalls.FirstOrDefault(s => s.Rect.Contains(p));
+
+    public bool IsEmpty(TilePoint p) => !_fence.ContainsKey(p) && StageAt(p) is null && GateAt(p) is null && StallAt(p) is null;
+
+    /// <summary>The middle of the front edge of something in metres, and the way it faces.</summary>
+    public static (double X, double Y, int DirX, int DirY) Front(TileRect r, Facing facing)
+    {
+        const double t = FieldMap.TileMetres;
+        var midX = (r.X + (r.Width / 2.0)) * t;
+        var midY = (r.Y + (r.Height / 2.0)) * t;
+        return facing switch
+        {
+            Facing.North => (midX, r.Y * t, 0, -1),
+            Facing.East => (r.Right * t, midY, 1, 0),
+            Facing.West => (r.X * t, midY, -1, 0),
+            _ => (midX, r.Bottom * t, 0, 1),
+        };
+    }
+
+    /// <summary>Where someone stands in a stall's queue, in metres: which server's line, and how far out from the counter.</summary>
+    public static (double X, double Y) ServingPlace(PlacedStall stall, int lane, double metresOut)
+    {
+        var info = Catalogue.Of(stall.Kind);
+        var (fx, fy, dx, dy) = Front(stall.Rect, stall.Facing);
+        var across = (((lane + 0.5) / info.Servers) - 0.5) * info.Width * FieldMap.TileMetres * 0.75;
+        return (fx + (dx * metresOut) - (dy * across), fy + (dy * metresOut) + (dx * across));
+    }
+
+    public BuildCheck CheckStall(StallKind kind, int x, int y, Facing facing)
+    {
+        var stall = new PlacedStall(kind, x, y, facing);
+        foreach (var p in TilesOf(stall.Rect))
+        {
+            if (!_map.Field.Contains(p) || !IsBuildable(p))
+            {
+                return BuildCheck.No("A stall must stand on the grass inside the hedge.");
+            }
+
+            if (!IsEmpty(p))
+            {
+                return BuildCheck.No("Something is already built there.");
+            }
+        }
+
+        return new BuildCheck(true, Catalogue.Of(kind).Cost, null);
+    }
+
+    public BuildCheck AddStall(StallKind kind, int x, int y, Facing facing)
+    {
+        var check = CheckStall(kind, x, y, facing);
+        if (check.Ok)
+        {
+            _stalls.Add(new PlacedStall(kind, x, y, facing));
+            Refresh();
+        }
+
+        return check;
+    }
 
     private bool IsBuildable(TilePoint p) => _map[p] == Ground.Grass;
 
@@ -166,7 +239,7 @@ public sealed class SiteLayout
                 return BuildCheck.No("Fence can only go on the grass.");
             }
 
-            if (StageAt(p) is not null || GateAt(p) is not null)
+            if (StageAt(p) is not null || GateAt(p) is not null || StallAt(p) is not null)
             {
                 return BuildCheck.No("Something is already built there.");
             }
@@ -195,7 +268,7 @@ public sealed class SiteLayout
                 return BuildCheck.No("A gate can only go on the grass.");
             }
 
-            if (StageAt(p) is not null || GateAt(p) is not null)
+            if (StageAt(p) is not null || GateAt(p) is not null || StallAt(p) is not null)
             {
                 return BuildCheck.No("Something is already built there.");
             }
@@ -264,6 +337,11 @@ public sealed class SiteLayout
             return Catalogue.Of(gate.Kind).Cost;
         }
 
+        if (StallAt(p) is { } stall)
+        {
+            return Catalogue.Of(stall.Kind).Cost;
+        }
+
         return _fence.TryGetValue(p, out var kind) ? FenceCost(kind, FenceRunThrough(p).Count) : 0;
     }
 
@@ -299,6 +377,10 @@ public sealed class SiteLayout
         else if (GateAt(p) is { } gate)
         {
             _gates.Remove(gate);
+        }
+        else if (StallAt(p) is { } stall)
+        {
+            _stalls.Remove(stall);
         }
         else if (_fence.ContainsKey(p))
         {
@@ -369,7 +451,7 @@ public sealed class SiteLayout
         return (x + (use.OutX * metresOut), y + (use.OutY * metresOut));
     }
 
-    public SiteSave Save() => new(_stages.ToList(), _gates.ToList(), FenceRuns());
+    public SiteSave Save() => new(_stages.ToList(), _gates.ToList(), FenceRuns(), _stalls.ToList());
 
     /// <summary>Puts back a saved layout, skipping anything that no longer fits.</summary>
     public void Restore(SiteSave save)
@@ -377,6 +459,7 @@ public sealed class SiteLayout
         _stages.Clear();
         _gates.Clear();
         _fence.Clear();
+        _stalls.Clear();
         foreach (var s in save.Stages ?? new())
         {
             if (CheckStage(s.Kind, s.X, s.Y, s.Facing).Ok)
@@ -385,12 +468,20 @@ public sealed class SiteLayout
             }
         }
 
+        foreach (var s in save.Stalls ?? new())
+        {
+            if (CheckStall(s.Kind, s.X, s.Y, s.Facing).Ok)
+            {
+                _stalls.Add(s);
+            }
+        }
+
         foreach (var r in save.Fences ?? new())
         {
             for (var i = 0; i < r.Length; i++)
             {
                 var p = new TilePoint(r.X + (r.Vertical ? 0 : i), r.Y + (r.Vertical ? i : 0));
-                if (IsBuildable(p) && StageAt(p) is null)
+                if (IsBuildable(p) && StageAt(p) is null && StallAt(p) is null)
                 {
                     _fence.TryAdd(p, r.Kind);
                 }
@@ -416,7 +507,7 @@ public sealed class SiteLayout
     /// <summary>Works out again what is blocked and which ground is inside the gates.</summary>
     private void Refresh()
     {
-        _map.SetBlocked(_stages.SelectMany(s => TilesOf(s.Rect)).Concat(_fence.Keys));
+        _map.SetBlocked(_stages.SelectMany(s => TilesOf(s.Rect)).Concat(_stalls.SelectMany(s => TilesOf(s.Rect))).Concat(_fence.Keys));
 
         var width = _map.Width;
         _sides = new Side[width * _map.Height];
@@ -484,4 +575,4 @@ public sealed class SiteLayout
 }
 
 /// <summary>The layout as written to a save file.</summary>
-public sealed record SiteSave(List<PlacedStage>? Stages, List<PlacedGate>? Gates, List<FenceRun>? Fences);
+public sealed record SiteSave(List<PlacedStage>? Stages, List<PlacedGate>? Gates, List<FenceRun>? Fences, List<PlacedStall>? Stalls = null);

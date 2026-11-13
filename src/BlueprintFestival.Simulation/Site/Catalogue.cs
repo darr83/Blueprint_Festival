@@ -39,6 +39,33 @@ public enum GateKind
     ArchGate,
 }
 
+/// <summary>The stalls and services people use.</summary>
+public enum StallKind
+{
+    /// <summary>A trestle table under a garden gazebo, run by the village hall committee.</summary>
+    TeaAndCake,
+
+    /// <summary>A catering van with a hatch: hot food.</summary>
+    FoodVan,
+
+    /// <summary>A striped marquee with a wooden bar across the front.</summary>
+    Bar,
+
+    /// <summary>Three portable cabins in a row.</summary>
+    Toilets,
+
+    /// <summary>A standpipe with two taps. Free.</summary>
+    WaterPoint,
+}
+
+/// <summary>What a person can need during the day.</summary>
+public enum Need
+{
+    Food,
+    Drink,
+    Toilet,
+}
+
 /// <summary>Which way something faces. A stage faces its audience.</summary>
 public enum Facing
 {
@@ -56,6 +83,12 @@ public sealed record FenceInfo(FenceKind Kind, string Name, int CostPerMetre, st
 
 /// <summary>What there is to know about a kind of gate: how wide, how many lanes, how fast each lane checks one person.</summary>
 public sealed record GateInfo(GateKind Kind, string Name, int Width, int Lanes, int SecondsPerPerson, int Cost, string About);
+
+/// <summary>
+/// What there is to know about a kind of stall: its size in tiles, what it costs to hire, the need
+/// it answers, what each person pays, how long each takes to serve and how many are served at once.
+/// </summary>
+public sealed record StallInfo(StallKind Kind, string Name, int Width, int Depth, int Cost, Need Serves, int Price, int SecondsPerPerson, int Servers, string About);
 
 /// <summary>Everything the player can build, with its size and what it costs to hire for the day.</summary>
 public static class Catalogue
@@ -80,6 +113,20 @@ public static class Catalogue
         new GateInfo(GateKind.VillageGate, "Village gate", 8, 1, 30, 40, "Two posts and a ticket table. One queue."),
         new GateInfo(GateKind.ArchGate, "Arch gate", 12, 2, 10, 600, "A steel arch with two lanes and a ticket hut."),
     };
+
+    public static readonly IReadOnlyList<StallInfo> Stalls = new[]
+    {
+        new StallInfo(StallKind.TeaAndCake, "Tea and cake table", 6, 6, 30, Need.Food, 3, 40, 1, "Run by the village hall committee. Cheap, slow, one queue."),
+        new StallInfo(StallKind.FoodVan, "Food van", 12, 5, 120, Need.Food, 6, 45, 2, "Hot food from a hatch. Serves two at a time."),
+        new StallInfo(StallKind.Bar, "Bar tent", 12, 8, 200, Need.Drink, 4, 25, 3, "Drinks from a long bar. Serves three at a time."),
+        new StallInfo(StallKind.Toilets, "Toilets", 8, 3, 40, Need.Toilet, 0, 75, 3, "Three cabins. People will not wait for ever."),
+        new StallInfo(StallKind.WaterPoint, "Water point", 3, 2, 15, Need.Drink, 0, 20, 2, "Two taps. Free, so it earns nothing."),
+    };
+
+    /// <summary>What one person pays at the gate.</summary>
+    public const int TicketPrice = 5;
+
+    public static StallInfo Of(StallKind kind) => Stalls[(int)kind];
 
     public static StageInfo Of(StageKind kind) => Stages[(int)kind];
 

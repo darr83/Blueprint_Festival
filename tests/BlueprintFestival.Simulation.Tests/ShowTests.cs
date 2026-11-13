@@ -167,6 +167,7 @@ public class ShowTests
     public void The_headliner_pulls_a_bigger_share_of_the_people_still_there_than_an_afternoon_act()
     {
         var game = WithStage(StageKind.HiredStage);
+        Amenities.Add(game);
         RunUntil(game, 14.9);
         var afternoon = game.Crowd.Watching / (double)game.Crowd.OnSite;
         RunUntil(game, 21.2);
