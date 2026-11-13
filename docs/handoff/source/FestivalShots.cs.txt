@@ -1,0 +1,1648 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using BlueprintHospital.Hospital;
+using BlueprintHospital.Simulation.Core;
+using BlueprintHospital.Simulation.Patients;
+using BlueprintHospital.Simulation.Staff;
+using BlueprintHospital.World3D;
+using Godot;
+
+namespace BlueprintHospital.Core;
+
+/// <summary>Mock-up scenes for Blueprint Festival: godot --path game -- --festival-shots=DIR</summary>
+public partial class FestivalShots : Node
+{
+    private string _directory = "";
+    private int _frame;
+    private int _shot;
+    private HospitalScene? _hospital;
+    private Node3D _site = null!;
+    private Node3D _dry = null!;
+    private Node3D _wet = null!;
+    private Node3D _nightOnly = null!;
+    private Node3D _lineup = null!;
+    private Node3D _density = null!;
+    private Node3D _medRoof = null!;
+    private readonly List<Person3D> _crowd = new();
+    private string _mood = "day";
+    private readonly Random _rng = new(7);
+
+    public static bool Begin()
+    {
+        foreach (var arg in OS.GetCmdlineUserArgs())
+        {
+            if (arg.StartsWith("--festival-shots=", StringComparison.Ordinal))
+            {
+                var shots = new FestivalShots { Name = "FestivalShots", ProcessMode = ProcessModeEnum.Always, ProcessPriority = 100, _directory = arg["--festival-shots=".Length..] };
+                GameManager.Instance.AddChild(shots);
+                Callable.From(() => GameManager.Instance.StartNewGame("Festival Mock General")).CallDeferred();
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static Color C(string hex) => new(hex);
+    private static float Hm(double metres) => Kit3D.M(metres);
+    private double R() => _rng.NextDouble();
+    private T Pick<T>(params T[] items) => items[_rng.Next(items.Length)];
+
+    // (name, x, y, zoom, mood, rotation)
+    private static readonly (string Name, double X, double Y, float Zoom, string Mood)[] Views =
+    {
+        ("1_overview_day", 62, 54, 0.36f, "day"),
+        ("2_main_stage_night", 47, 47, 0.78f, "night"),
+        ("3_medical_tent", 91.5, 58.5, 1.75f, "medical"),
+        ("4_campsite_rain", 40, 96, 0.95f, "rain"),
+        ("5_food_and_bar", 85.3, 13.1, 1.3f, "dusk"),
+        ("6_crowd_density", 49, 49, 0.9f, "density"),
+        ("7_people", 120.6, 82.6, 2.0f, "day"),
+        ("8_people_b", 120.6, 82.6, 2.0f, "day2"),
+    };
+
+    public override void _Process(double delta)
+    {
+        _frame++;
+        if (_hospital is null)
+        {
+            if (GetTree().CurrentScene is HospitalScene h && h.IsNodeReady())
+            {
+                _hospital = h;
+                h.Hud.Visible = false;
+                if (h.GetNodeOrNull<CanvasItem>("TileCursor") is { } cursor)
+                {
+                    cursor.Visible = false;
+                }
+
+                foreach (var child in h.GetChildren())
+                {
+                    if (child is CanvasItem ci && child is not Camera2D)
+                    {
+                        ci.Visible = false;
+                    }
+                }
+
+                h.Session.Clock.SetSpeed(SimulationSpeed.Paused);
+                foreach (var child in h.View3D.GetChildren())
+                {
+                    if (child is Node3D n && child is not Camera3D && child is not Light3D)
+                    {
+                        n.Visible = false;
+                    }
+                }
+
+                _site = new Node3D { Name = "Festival" };
+                h.View3D.AddChild(_site);
+                Build();
+                RenderingServer.FramePreDraw += ApplyMood;
+                _frame = 0;
+            }
+
+            return;
+        }
+
+        if (_frame % 8 != 0)
+        {
+            return;
+        }
+
+        var only = OS.GetCmdlineUserArgs().FirstOrDefault(a => a.StartsWith("--only=", StringComparison.Ordinal))?[7..];
+        var views = Views.Where(v => only is null || only.Split(',').Any(o => v.Name.StartsWith(o, StringComparison.Ordinal))).ToArray();
+        var index = _shot / 2;
+        if (index >= views.Length)
+        {
+            GetTree().Quit(0);
+            return;
+        }
+
+        var view = views[index];
+        if (_shot % 2 == 0)
+        {
+            _mood = view.Mood;
+            _wet.Visible = _mood == "rain";
+            _dry.Visible = _mood != "rain";
+            _medRoof.Visible = _mood != "medical";
+            _nightOnly.Visible = _mood is "night" or "dusk";
+            _density.Visible = _mood == "density";
+            _lineup.Rotation = new Vector3(0, _mood == "day2" ? Mathf.Pi : 0, 0);
+            var hour = _mood switch { "night" => 23, "dusk" => 20, _ => 14 };
+            var clock = _hospital.Session.Clock;
+            clock.RestoreState(new ClockState(new DateTime(2027, 7, 3, hour, 20, 0), clock.TickCount, SimulationSpeed.Paused));
+            foreach (var p in _crowd)
+            {
+                p.Visible = true;
+            }
+
+            _hospital.Camera.SnapTo(IsoDraw.ToScreen(view.X, view.Y), view.Zoom);
+        }
+        else
+        {
+            var image = GetViewport().GetTexture().GetImage();
+            DirAccess.MakeDirRecursiveAbsolute(_directory);
+            image.SavePng($"{_directory}/{view.Name}.png");
+            GD.Print($"[festival] Saved {view.Name}");
+        }
+
+        _shot++;
+    }
+
+    private void ApplyMood()
+    {
+        if (_hospital is null || !IsInstanceValid(_hospital))
+        {
+            return;
+        }
+
+        var view = _hospital!.View3D;
+        var env = view.GetChildren().OfType<WorldEnvironment>().First().Environment;
+        var lights = view.GetChildren().OfType<DirectionalLight3D>().ToList();
+        foreach (var l in lights)
+        {
+            l.DirectionalShadowMaxDistance = 260;
+        }
+
+        var sun = lights.OrderByDescending(l => l.LightEnergy).First();
+        env.GlowEnabled = _mood is "night" or "dusk";
+        env.GlowIntensity = 0.7f;
+        env.GlowBloom = _mood == "night" ? 0.02f : 0.08f;
+        env.GlowHdrThreshold = 1.0f;
+        switch (_mood)
+        {
+            case "night":
+                sun.LightEnergy = 0.1f;
+                sun.LightColor = C("#7F96D8");
+                env.AmbientLightEnergy = 0.2f;
+                foreach (var l in lights.Where(l => l != sun))
+                {
+                    l.LightEnergy = 0;
+                }
+
+                env.AmbientLightColor = C("#9DAEE6");
+                env.BackgroundColor = C("#0A0E18");
+                break;
+            case "dusk":
+                sun.LightEnergy = 0.5f;
+                sun.LightColor = C("#FFB877");
+                env.AmbientLightEnergy = 0.42f;
+                env.AmbientLightColor = C("#D7C3E6");
+                break;
+            case "rain":
+                sun.LightEnergy = 0.42f;
+                sun.LightColor = C("#C9D3DC");
+                env.AmbientLightEnergy = 0.8f;
+                env.AmbientLightColor = C("#B9C6D2");
+                env.AdjustmentSaturation = 0.92f;
+                break;
+            default:
+                env.AdjustmentSaturation = 1.12f;
+                break;
+        }
+    }
+
+    // ------------------------------------------------------------------ helpers
+
+    /// <summary>A holder at a grid point, turned so its local +Z faces the camera side by <paramref name="turn"/> eighths.</summary>
+    private Node3D Holder(Node3D parent, double x, double y, double turnDeg = 45)
+    {
+        var n = new Node3D { Position = Kit3D.At(x, y), Rotation = new Vector3(0, Mathf.DegToRad((float)turnDeg), 0) };
+        parent.AddChild(n);
+        return n;
+    }
+
+    private static void Glow(Node3D parent, Mesh mesh, Vector3 centre, Vector3 size, Color colour, float energy = 2.5f, float alpha = 1f)
+    {
+        var m = new StandardMaterial3D
+        {
+            AlbedoColor = new Color(colour, alpha), EmissionEnabled = true, Emission = colour, EmissionEnergyMultiplier = energy,
+            ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+            Transparency = alpha < 1 ? BaseMaterial3D.TransparencyEnum.Alpha : BaseMaterial3D.TransparencyEnum.Disabled,
+            CullMode = BaseMaterial3D.CullModeEnum.Disabled,
+        };
+        if (alpha < 1)
+        {
+            m.BlendMode = BaseMaterial3D.BlendModeEnum.Add;
+        }
+
+        parent.AddChild(new MeshInstance3D { Mesh = mesh, Position = centre, Scale = size, MaterialOverride = m, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
+    }
+
+    private static void Sign(Node3D parent, string text, Vector3 at, Color colour, float size = 0.012f, Color? outline = null, bool billboard = false)
+    {
+        parent.AddChild(new Label3D
+        {
+            Text = text, Position = at, FontSize = 64, PixelSize = size, Modulate = colour, OutlineModulate = outline ?? new Color(0, 0, 0, 0), OutlineSize = outline is null ? 0 : 14,
+            Billboard = billboard ? BaseMaterial3D.BillboardModeEnum.Enabled : BaseMaterial3D.BillboardModeEnum.Disabled, Shaded = false, DoubleSided = true,
+            Font = ThemeDB.FallbackFont, NoDepthTest = billboard, RenderPriority = billboard ? 5 : 0,
+        });
+    }
+
+    /// <summary>A pitched roof over a rectangle: ridge along X.</summary>
+    private static void Pitched(MeshBatch b, float x0, float x1, float z0, float z1, float eave, float ridge, Color colour, Color? end = null)
+    {
+        var zm = (z0 + z1) / 2;
+        Vector3 a = new(x0, eave, z0), bb = new(x1, eave, z0), c = new(x1, eave, z1), d = new(x0, eave, z1), r0 = new(x0, ridge, zm), r1 = new(x1, ridge, zm);
+        Quad(b, d, c, r1, r0, colour);
+        Quad(b, bb, a, r0, r1, colour.Darkened(0.08f));
+        b.Tri(a, d, r0, end ?? colour.Darkened(0.04f));
+        b.Tri(c, bb, r1, end ?? colour.Darkened(0.04f));
+    }
+
+    private static void Quad(MeshBatch b, Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, Color colour)
+    {
+        b.Tri(p0, p1, p2, colour);
+        b.Tri(p0, p2, p3, colour);
+        b.Tri(p2, p1, p0, colour);
+        b.Tri(p3, p2, p0, colour);
+    }
+
+    /// <summary>A pyramid (marquee peak) over a rectangle.</summary>
+    private static void Peak(MeshBatch b, float x0, float x1, float z0, float z1, float eave, float top, Color colour, Color? alt = null)
+    {
+        Vector3 a = new(x0, eave, z0), bb = new(x1, eave, z0), c = new(x1, eave, z1), d = new(x0, eave, z1), t = new((x0 + x1) / 2, top, (z0 + z1) / 2);
+        var o = alt ?? colour.Darkened(0.07f);
+        foreach (var (p, q, col) in new[] { (d, c, colour), (c, bb, o), (bb, a, colour.Darkened(0.1f)), (a, d, o) })
+        {
+            b.Tri(p, q, t, col);
+            b.Tri(q, p, t, col);
+        }
+    }
+
+    private static void Truss(MeshBatch b, Vector3 from, Vector3 to, float w, Color colour)
+    {
+        var up = Mathf.Abs((to - from).Normalized().Y) > 0.9f;
+        var o1 = up ? new Vector3(w, 0, 0) : new Vector3(0, w, 0);
+        var o2 = new Vector3(0, 0, w);
+        foreach (var o in new[] { o1 + o2, o1 - o2, -o1 + o2, -o1 - o2 })
+        {
+            b.Rod(from + (o / 2), to + (o / 2), 0.045f, colour, true);
+        }
+
+        var len = (to - from).Length();
+        var steps = Math.Max(1, (int)(len / (w * 1.4f)));
+        for (var i = 0; i < steps; i++)
+        {
+            var p = from.Lerp(to, i / (float)steps);
+            var q = from.Lerp(to, (i + 1) / (float)steps);
+            b.Rod(p + ((o1 + o2) / 2), q + ((-o1 + o2) / 2), 0.03f, colour, true);
+            b.Rod(p + ((o1 - o2) / 2), q + ((-o1 - o2) / 2), 0.03f, colour, true);
+        }
+    }
+
+    // ------------------------------------------------------------------ people
+
+    private static readonly string[] Brights = { "#F2517A", "#F6B93B", "#36B5A2", "#7A5CE0", "#EE6C4D", "#3D8BFD", "#F7F3E8", "#22262B", "#9BD770", "#FF8FB1", "#58C4DD", "#E84A5F" };
+    private static readonly string[] Wellies = { "#2F6B3F", "#1F2328", "#F2C230", "#D94A6A", "#2E4E8C", "#7A4A2E" };
+
+    private PersonLook Goer(int seed, bool rain = false)
+    {
+        var age = Pick(19, 22, 24, 27, 29, 31, 34, 38, 43, 48, 55, 17, 23, 26);
+        var look = Looks.Preview(seed, seed % 2 == 0 ? Sex.Female : Sex.Male, age);
+        if (R() < 0.75)
+        {
+            look = look with { Top = C(Pick(Brights)), Kind = Pick(TopKind.Tee, TopKind.Tee, TopKind.Stripes, TopKind.Hoodie, TopKind.Shirt), Motif = R() < 0.4 ? C(Pick(Brights)) : null, Trim = C(Pick(Brights)) };
+        }
+
+        if (R() < 0.45 && !rain)
+        {
+            look = look with { Legs = LegKind.Shorts };
+        }
+
+        if (R() < (rain ? 0.9 : 0.4))
+        {
+            look = look with { ShoeColour = C(Pick(Wellies)) };
+        }
+
+        if (rain && R() < 0.75)
+        {
+            look = look with { Jacket = C(Pick("#F2C230", "#58C4DD", "#F2517A", "#E9F1F2", "#9BD770", "#EE6C4D")), LongSleeves = true };
+        }
+
+        return look;
+    }
+
+    private static PersonLook Base(int seed, int age = 30) => Looks.Preview(seed, seed % 2 == 0 ? Sex.Female : Sex.Male, age) with { Motif = null, Jacket = null, Legs = LegKind.Trousers };
+
+    private static PersonLook Steward(int seed) => Base(seed, 26) with { Top = C("#F47B20"), Kind = TopKind.Polo, Trousers = C("#22262B"), HiVis = true, Radio = true, Lanyard = true, ShoeColour = C("#1F2328") };
+    private static PersonLook Security(int seed) => Base(seed, 38) with { Top = C("#1B1E24"), Kind = TopKind.Polo, Trousers = C("#1B1E24"), Jacket = C("#D8E82E"), HiVis = true, Radio = true, Badge = C("#FFFFFF"), ShoeColour = C("#111316") };
+    private static PersonLook Medic(int seed) => Looks.Paramedic(seed);
+    private static PersonLook FirstAider(int seed) => Base(seed, 29) with { Top = C("#2FA05A"), Kind = TopKind.Polo, Trim = C("#FFFFFF"), Trousers = C("#1E2A26"), Lanyard = true, Badge = C("#FFFFFF"), ShoeColour = C("#1F2328") };
+    private static PersonLook Welfare(int seed) => Base(seed, 44) with { Top = C("#8E5BD0"), Kind = TopKind.Tee, Trousers = C("#3B4252"), Lanyard = true };
+    private static PersonLook BarStaff(int seed) => Base(seed, 23) with { Top = C("#22262B"), Kind = TopKind.Tee, Trousers = C("#2B2F36"), Apron = C("#C8452E") };
+    private static PersonLook Vendor(int seed) => Base(seed, 35) with { Top = C("#F7F3E8"), Kind = TopKind.Tee, Trousers = C("#3B4252"), Apron = C("#2E6FB7"), Cap = C("#2E6FB7") };
+    private static PersonLook Crew(int seed) => Base(seed, 33) with { Top = C("#22262B"), Kind = TopKind.Tee, Trousers = C("#2B2F36"), Legs = LegKind.Shorts, Gloves = C("#D9A441"), Radio = true, Lanyard = true, ShoeColour = C("#4A3626") };
+    private static PersonLook Litter(int seed) => Base(seed, 21) with { Top = C("#58B947"), Kind = TopKind.Tee, Trousers = C("#3B4252"), HiVis = true, Gloves = C("#3D8BFD"), ShoeColour = C("#2F6B3F") };
+    private static PersonLook Sparky(int seed) => Base(seed, 41) with { Top = C("#2E4E8C"), Kind = TopKind.Polo, Trousers = C("#2B3A55"), HiVis = true, Radio = true, ShoeColour = C("#4A3626") };
+    private static PersonLook Manager(int seed) => Base(seed, 47) with { Top = C("#F7F3E8"), Kind = TopKind.Shirt, Trousers = C("#3B4252"), Jacket = C("#1D3A6E"), Lanyard = true, Radio = true };
+    private static PersonLook Artist(int seed, string top, TopKind kind = TopKind.Shirt) => Base(seed, 27) with { Top = C(top), Kind = kind, Trousers = C("#16181C"), Jacket = null, Trim = C("#F6B93B"), ShoeColour = C("#F7F3E8") };
+
+    private Person3D Put(Node3D parent, PersonLook look, double x, double y, double faceDeg, Pose pose = Pose.Standing, double stride = 0)
+    {
+        var p = Person3D.Build(look);
+        p.Position = Kit3D.At(x, y);
+        p.Rotation = new Vector3(0, Mathf.DegToRad((float)faceDeg), 0);
+        p.SetPose(pose, stride);
+        parent.AddChild(p);
+        return p;
+    }
+
+    private static float HeadY(PersonLook l) => Person3D.V((43.2f * l.Scale) + (6.45f * l.HeadScale) + 1);
+
+    private void Hat(Person3D p, Color colour, bool cowboy = false)
+    {
+        var b = new MeshBatch();
+        var r = Person3D.W(7.5f * p.Look.HeadScale);
+        var y = HeadY(p.Look);
+        b.Cylinder(new Vector3(0, y + (r * 0.62f), 0), r * (cowboy ? 1.75f : 1.45f), 0.03f, r * (cowboy ? 1.75f : 1.45f), colour.Darkened(0.06f));
+        b.Cylinder(new Vector3(0, y + (r * 0.85f), 0), r * 0.98f, r * 0.55f, r * 0.98f, colour);
+        b.AddTo(p);
+    }
+
+    private void Hood(Person3D p, Color colour)
+    {
+        var b = new MeshBatch();
+        var r = Person3D.W(7.5f * p.Look.HeadScale);
+        var y = HeadY(p.Look);
+        b.Ball(new Vector3(0, y + (r * 0.12f), -r * 0.2f), new Vector3(r * 2.25f, r * 2.3f, r * 2.1f), colour);
+        // Poncho cape.
+        b.Cylinder(new Vector3(0, Person3D.V(30 * p.Look.Scale), 0), Person3D.W(13.5f), Person3D.V(26), Person3D.W(11), colour, null, true);
+        b.AddTo(p);
+    }
+
+    private static void ArmsUp(Person3D p, double t, int kind)
+    {
+        var s = (float)Math.Sin(t);
+        switch (kind)
+        {
+            case 0: p.SetArms(new Vector3(-2.75f + (s * 0.2f), 0, -0.25f), new Vector3(-2.75f - (s * 0.2f), 0, 0.25f)); break;
+            case 1: p.SetArms(new Vector3(-0.1f, 0, 0.06f), new Vector3(-2.6f + (s * 0.25f), 0, 0.15f)); break;
+            case 2: p.SetArms(new Vector3(-1.5f, 0, -0.5f), new Vector3(-1.5f, 0, 0.5f)); break;
+        }
+    }
+
+    private void Crowd(Node3D parent, double cx, double cy, Func<double, double, double> density, int tries, double halfW, double depth, double faceDeg, bool cheer, bool rain = false)
+    {
+        // Local: u across, v away from the stage (stage faces +v). World = centre + u*(1,-1)/√2 + v*(1,1)/√2.
+        var placed = new List<(double X, double Y)>();
+        for (var i = 0; i < tries; i++)
+        {
+            var u = (R() - 0.5) * 2 * halfW;
+            var v = R() * depth;
+            if (R() > density(u, v))
+            {
+                continue;
+            }
+
+            var x = cx + ((u + v) * 0.7071);
+            var y = cy + ((v - u) * 0.7071);
+            if (placed.Any(q => Math.Abs(q.X - x) + Math.Abs(q.Y - y) < 0.72))
+            {
+                continue;
+            }
+
+            placed.Add((x, y));
+            var look = Goer(1000 + i, rain);
+            var p = Put(parent, look, x, y, faceDeg + ((R() - 0.5) * 30));
+            if (cheer && R() < 0.55)
+            {
+                ArmsUp(p, R() * 6, Pick(0, 0, 1, 1, 2));
+            }
+
+            if (R() < 0.13)
+            {
+                Hat(p, C(Pick("#F7F3E8", "#F2517A", "#F6B93B", "#36B5A2", "#D9C29A", "#58C4DD")), R() < 0.3);
+            }
+
+            _crowd.Add(p);
+        }
+    }
+
+    // ------------------------------------------------------------------ site
+
+    private void Build()
+    {
+        _dry = new Node3D();
+        _wet = new Node3D { Visible = false };
+        _nightOnly = new Node3D { Visible = false };
+        _density = new Node3D { Visible = false };
+        _site.AddChild(_dry);
+        _site.AddChild(_wet);
+        _site.AddChild(_nightOnly);
+        _site.AddChild(_density);
+        Ground();
+        MainStage();
+        FohTower();
+        BigTop();
+        FoodRow();
+        BarTent();
+        Toilets();
+        Medical();
+        Campsite();
+        Entrance();
+        Wheel();
+        Dressing();
+        Lineup();
+        DensityOverlay();
+    }
+
+    private void Ground()
+    {
+        var b = new MeshBatch();
+        b.Box(new Vector3(130, -0.26f, 130), new Vector3(620, 0.5f, 620), C("#5E9C4E"));
+
+        // Mown stripes, diagonal to the grid so they run across the screen.
+        var g = new Node3D { Rotation = new Vector3(0, Mathf.Pi / 4, 0), Position = Kit3D.At(62, 62) };
+        _site.AddChild(g);
+        var s = new MeshBatch();
+        for (var i = -40; i < 40; i += 2)
+        {
+            s.Box(new Vector3(0, 0.002f, i * 4f), new Vector3(420, 0.012f, 4f), C("#66A655"));
+        }
+
+        s.AddTo(g, shadow: false);
+
+        // Worn grass in front of the stage, and trackway paths.
+        var w = new MeshBatch();
+        w.Cylinder(new Vector3(0, 0.01f, 16), 20, 0.02f, 12, C("#86A85A"));
+        w.Cylinder(new Vector3(0, 0.014f, 10), 13, 0.02f, 5.5f, C("#9AA864"));
+        w.AddTo(Holder(_dry, 36, 36), shadow: false);
+        var mud = new MeshBatch();
+        mud.Cylinder(new Vector3(0, 0.01f, 16), 20, 0.02f, 12, C("#7A6A46"));
+        mud.Cylinder(new Vector3(0, 0.014f, 10), 13, 0.02f, 5.5f, C("#6A5638"));
+        mud.AddTo(Holder(_wet, 36, 36), shadow: false);
+
+        // Trackway: the main avenue from the entrance past the food row, and a spur to the campsite.
+        Track(b, 100, 96, 100, 44, 3.2f);
+        Track(b, 100, 70, 58, 78, 2.6f);
+        Track(b, 58, 78, 30, 84, 2.6f);
+        Track(b, 100, 58, 84, 58, 2.6f);
+        b.AddTo(_site, shadow: false);
+    }
+
+    private static void Track(MeshBatch b, double x0, double y0, double x1, double y1, float width)
+    {
+        var a = Kit3D.At(x0, y0, 0.02f);
+        var c = Kit3D.At(x1, y1, 0.02f);
+        var len = (c - a).Length();
+        var d = (c - a).Normalized();
+        var basis = new Basis(Vector3.Up, Mathf.Atan2(d.X, d.Z));
+        var n = (int)(len / 1.2f);
+        for (var i = 0; i <= n; i++)
+        {
+            var p = a.Lerp(c, i / (float)Math.Max(1, n));
+            b.Box(p, new Vector3(width * 2, 0.03f, 1.12f), i % 2 == 0 ? C("#C4C8BE") : C("#B5BAB0"), basis);
+        }
+    }
+
+    private void MainStage()
+    {
+        var h = Holder(_site, 36, 36);
+        var b = new MeshBatch();
+        var steel = C("#8E99A3");
+        var black = C("#1B1E24");
+        float deckH = Hm(1.9), roofH = Hm(11.5), W = 19, D = 13;
+
+        // Deck with a skirt and steps.
+        b.Box(new Vector3(0, deckH / 2, -D / 2), new Vector3(W * 2, deckH, D), C("#2A2E36"));
+        b.Box(new Vector3(0, deckH + 0.02f, -D / 2), new Vector3((W * 2) - 0.4f, 0.04f, D - 0.4f), C("#3A3F49"));
+        b.Box(new Vector3(0, deckH / 2, 0.03f), new Vector3(W * 2, deckH * 0.9f, 0.06f), C("#16181C"));
+
+        // Four towers, roof grid and a curved-look roof skin.
+        foreach (var x in new[] { -W + 0.6f, W - 0.6f })
+        {
+            foreach (var z in new[] { -D + 0.6f, -0.6f })
+            {
+                Truss(b, new Vector3(x, 0, z), new Vector3(x, roofH, z), 0.7f, steel);
+            }
+        }
+
+        foreach (var z in new[] { -D + 0.6f, -D / 2, -0.6f })
+        {
+            Truss(b, new Vector3(-W, roofH, z), new Vector3(W, roofH, z), 0.7f, steel);
+        }
+
+        foreach (var x in new[] { -W + 0.6f, -W / 2, 0, W / 2, W - 0.6f })
+        {
+            Truss(b, new Vector3(x, roofH, -D), new Vector3(x, roofH, 0), 0.6f, steel);
+        }
+
+        Pitched(b, -W - 0.8f, W + 0.8f, -D - 0.6f, 1.6f, roofH + 0.45f, roofH + Hm(2.6), C("#F4F1EA"), C("#E2DED4"));
+        b.Box(new Vector3(0, roofH + 0.1f, 1.5f), new Vector3((W * 2) + 1.6f, 0.9f, 0.12f), C("#E94F7B"));
+
+        // Backdrop and side wings.
+        b.Box(new Vector3(0, (deckH + roofH) / 2, -D + 0.3f), new Vector3((W * 2) - 1.6f, roofH - deckH, 0.15f), black);
+        foreach (var side in new[] { -1f, 1f })
+        {
+            b.Box(new Vector3(side * (W - 0.4f), (deckH + roofH) / 2, -D / 2 - 2), new Vector3(0.15f, roofH - deckH, D - 4.6f), black);
+
+            // PA wings with hanging line arrays, and a screen each side.
+            var wx = side * (W + 4.2f);
+            Truss(b, new Vector3(wx - 2.4f, 0, -2), new Vector3(wx - 2.4f, roofH - 0.6f, -2), 0.6f, steel);
+            Truss(b, new Vector3(wx + 2.4f, 0, -2), new Vector3(wx + 2.4f, roofH - 0.6f, -2), 0.6f, steel);
+            Truss(b, new Vector3(wx - 2.7f, roofH - 0.6f, -2), new Vector3(wx + 2.7f, roofH - 0.6f, -2), 0.6f, steel);
+            for (var i = 0; i < 7; i++)
+            {
+                b.Box(new Vector3(side * (W + 1.0f), roofH - 0.9f - (i * 0.52f), -0.8f + (i * i * 0.012f)), new Vector3(1.5f, 0.46f, 0.9f), i % 2 == 0 ? black : C("#2A2E36"));
+            }
+
+            b.Box(new Vector3(wx, Hm(6.6), -2.05f), new Vector3(4.6f, Hm(5.2), 0.2f), black);
+
+            // Subs on the ground.
+            for (var i = 0; i < 4; i++)
+            {
+                b.Box(new Vector3(side * (4 + (i * 3.4f)), 0.42f, 1.0f), new Vector3(2.4f, 0.84f, 1.1f), black);
+                b.Cylinder(new Vector3(side * (4 + (i * 3.4f)), 0.42f, 1.56f), 0.34f, 0.04f, 0.34f, C("#3A3F49"), new Basis(Vector3.Right, Mathf.Pi / 2));
+            }
+        }
+
+        // Lights on the front and mid trusses.
+        var lampColours = new[] { "#F2517A", "#F6B93B", "#58C4DD", "#7A5CE0", "#F7F3E8" };
+        for (var i = -8; i <= 8; i++)
+        {
+            foreach (var z in new[] { -0.6f, -D / 2 })
+            {
+                b.Cylinder(new Vector3(i * 2.1f, roofH - 0.55f, z), 0.26f, 0.42f, 0.26f, black);
+                Glow(h, Kit3D.SmallSphere, new Vector3(i * 2.1f, roofH - 0.8f, z + 0.05f), Vector3.One * 0.34f, C(lampColours[Math.Abs(i + (z < -1 ? 2 : 0)) % 5]), 2.2f);
+            }
+        }
+
+        // Backline: drum riser, amps, monitors, mics.
+        b.Box(new Vector3(0, deckH + 0.25f, -8.4f), new Vector3(6, 0.5f, 4.6f), C("#16181C"));
+        var kit = new Vector3(0, deckH + 0.5f, -8.4f);
+        b.Cylinder(kit + new Vector3(0, 0.42f, 0.5f), 0.62f, 0.7f, 0.62f, C("#C8452E"), new Basis(Vector3.Right, Mathf.Pi / 2));
+        foreach (var (dx, dz, r) in new[] { (-0.95f, 0.1f, 0.38f), (0.95f, 0.1f, 0.38f), (-0.5f, -0.5f, 0.3f), (0.55f, -0.55f, 0.42f) })
+        {
+            b.Cylinder(kit + new Vector3(dx, 0.62f, dz), r, 0.36f, r, C("#C8452E"));
+            b.Cylinder(kit + new Vector3(dx, 0.81f, dz), r, 0.02f, r, C("#F4F1EA"));
+        }
+
+        foreach (var (dx, dz) in new[] { (-1.6f, -0.2f), (1.6f, -0.3f), (1.2f, 0.9f) })
+        {
+            b.Rod(kit + new Vector3(dx, 0, dz), kit + new Vector3(dx, 1.25f, dz), 0.025f, steel, true);
+            b.Cylinder(kit + new Vector3(dx, 1.25f, dz), 0.42f, 0.02f, 0.42f, C("#D9A441"));
+        }
+
+        foreach (var x in new[] { -10f, -7.6f, 7.6f, 10f })
+        {
+            b.Box(new Vector3(x, deckH + 0.75f, -9.6f), new Vector3(2.0f, 1.5f, 0.9f), black);
+            b.Box(new Vector3(x, deckH + 0.75f, -9.13f), new Vector3(1.8f, 1.3f, 0.02f), C("#3A3F49"));
+        }
+
+        foreach (var x in new[] { -6f, -2f, 2f, 6f })
+        {
+            b.Box(new Vector3(x, deckH + 0.2f, -1.4f), new Vector3(1.3f, 0.4f, 0.8f), black, new Basis(Vector3.Right, -0.35f));
+        }
+
+        foreach (var x in new[] { -5f, 0f, 5f })
+        {
+            b.Rod(new Vector3(x, deckH, -2.6f), new Vector3(x, deckH + Hm(1.5), -2.6f), 0.025f, steel, true);
+            b.Ball(new Vector3(x, deckH + Hm(1.55), -2.55f), Vector3.One * 0.12f, black, true);
+        }
+
+        // Crowd barrier with a pit, and the cable ramp to FOH.
+        for (var i = -13; i <= 13; i++)
+        {
+            b.Box(new Vector3(i * 2f, 0.42f, 4.6f), new Vector3(1.92f, 0.84f, 0.06f), C("#C9D0D6"));
+            b.Box(new Vector3(i * 2f, 0.03f, 4.2f), new Vector3(1.92f, 0.05f, 0.9f), C("#AEB6BD"));
+            b.Box(new Vector3(i * 2f, 0.84f, 4.6f), new Vector3(1.96f, 0.07f, 0.1f), C("#E3E8EC"));
+        }
+
+        foreach (var side in new[] { -1f, 1f })
+        {
+            for (var i = 0; i < 3; i++)
+            {
+                b.Box(new Vector3(side * 27, 0.42f, 3.6f - (i * 2f)), new Vector3(0.06f, 0.84f, 1.92f), C("#C9D0D6"));
+            }
+        }
+
+        b.AddTo(h);
+
+        // Screens: backdrop LED and the two side screens.
+        Glow(h, Kit3D.UnitBox, new Vector3(0, deckH + Hm(5.2), -D + 0.42f), new Vector3(22, Hm(6.2), 0.05f), C("#3B1E66"), 1.0f);
+        foreach (var (x, c) in new[] { (-7.5f, "#F2517A"), (-2.5f, "#F6B93B"), (2.5f, "#58C4DD"), (7.5f, "#9BD770") })
+        {
+            Glow(h, Kit3D.UnitBox, new Vector3(x, deckH + Hm(5.2), -D + 0.46f), new Vector3(3.6f, Hm(4.6), 0.05f), C(c), 1.3f);
+        }
+
+        Glow(h, Kit3D.UnitSphere, new Vector3(0, deckH + Hm(5.2), -D + 0.5f), new Vector3(4.6f, 4.6f * 0.72f, 0.05f), C("#F7F3E8"), 1.6f);
+        foreach (var side in new[] { -1f, 1f })
+        {
+            Glow(h, Kit3D.UnitBox, new Vector3(side * (W + 4.2f), Hm(6.6), -1.92f), new Vector3(4.3f, Hm(4.8), 0.05f), C("#2B86C5"), 1.2f);
+            Glow(h, Kit3D.UnitSphere, new Vector3(side * (W + 4.2f), Hm(7.2), -1.86f), new Vector3(1.6f, 1.3f, 0.05f), C("#F3C9A5"), 1.2f);
+            Glow(h, Kit3D.UnitBox, new Vector3(side * (W + 4.2f), Hm(5.2), -1.86f), new Vector3(2.4f, 1.2f, 0.05f), C("#E94F7B"), 1.2f);
+        }
+
+        Sign(h, "LARKMOOR  MAIN STAGE", new Vector3(0, roofH + 0.1f, 1.6f), C("#FFFFFF"), 0.011f);
+
+        // The band.
+        var stageNode = new Node3D { Position = new Vector3(0, deckH + 0.04f, 0) };
+        h.AddChild(stageNode);
+        var singer = Put(stageNode, Artist(31, "#E94F7B") with { Jacket = C("#F6B93B") }, 0, 0, 0);
+        singer.Position = new Vector3(0, 0, -3.1f);
+        ArmsUp(singer, 1, 1);
+        var gtr = Put(stageNode, Artist(34, "#F7F3E8", TopKind.Tee), 0, 0, 10);
+        gtr.Position = new Vector3(-5, 0, -3.2f);
+        Guitar(gtr, C("#C8452E"));
+        var bass = Put(stageNode, Artist(37, "#7A5CE0"), 0, 0, -10);
+        bass.Position = new Vector3(5, 0, -3.2f);
+        Guitar(bass, C("#F6B93B"));
+        var drummer = Put(stageNode, Artist(39, "#22262B", TopKind.Tee), 0, 0, 0, Pose.Seated);
+        drummer.Position = new Vector3(0, 0.5f, -9.3f);
+        var keys = Put(stageNode, Artist(42, "#36B5A2"), 0, 0, -60);
+        keys.Position = new Vector3(-8.6f, 0, -6.2f);
+        var kb = new MeshBatch();
+        kb.Box(new Vector3(-9.6f, 0.82f, -6.9f), new Vector3(0.8f, 0.1f, 2.4f), C("#16181C"), new Basis(Vector3.Up, -0.5f));
+        kb.Box(new Vector3(-9.6f, 0.88f, -6.9f), new Vector3(0.5f, 0.02f, 2.2f), C("#F4F1EA"), new Basis(Vector3.Up, -0.5f));
+        kb.Rod(new Vector3(-9.6f, 0, -6.9f), new Vector3(-9.6f, 0.8f, -6.9f), 0.05f, C("#8E99A3"), true);
+        kb.AddTo(stageNode);
+
+        // Pit: security facing the crowd, a medic team with a chair.
+        for (var i = -4; i <= 4; i++)
+        {
+            Put(h, Security(60 + i), 0, 0, 0).Position = new Vector3(i * 5.2f, 0, 3.2f);
+        }
+
+        Put(h, Medic(80), 0, 0, 0).Position = new Vector3(-23.5f, 0, 2.6f);
+        Put(h, FirstAider(81), 0, 0, -20).Position = new Vector3(-24.8f, 0, 2.2f);
+        Put(h, Crew(83), 0, 0, 70).Position = new Vector3(22.5f, 0, 1.2f);
+
+        // The crowd: packed at the barrier, thinning back.
+        Crowd(_site, 36 + (5.6 * 0.7071), 36 + (5.6 * 0.7071), (u, v) => (Math.Abs(u) < 5.5 && v > 19.5 && v < 29.5) || (Math.Abs(u - 15.5) < 11 && v > 25.5) ? 0 : Math.Clamp((1.25 - (v / 34)) * (1.1 - Math.Pow(Math.Abs(u) / 30, 2)), 0, 1), 5200, 27, 38, 225, true);
+
+        // Night: beams and coloured light on the stage and the front of the crowd.
+        var beamCols = new[] { "#F2517A", "#58C4DD", "#F6B93B", "#9B7BFF", "#58C4DD", "#F2517A", "#F6B93B", "#9B7BFF" };
+        for (var i = 0; i < 8; i++)
+        {
+            var from = new Vector3(-14.7f + (i * 4.2f), roofH - 0.7f, -0.6f);
+            var to = new Vector3(from.X * 1.9f + ((i % 3) - 1) * 6f, 0.2f, 12 + ((i * 7) % 5) * 5f);
+            var mid = (from + to) / 2;
+            var len = (to - from).Length();
+            var beam = new MeshInstance3D
+            {
+                Mesh = new CylinderMesh { TopRadius = 0.12f, BottomRadius = 1.9f, Height = 1, RadialSegments = 14, Rings = 1, CapTop = false, CapBottom = false },
+                Position = mid,
+                MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(C(beamCols[i]), 0.16f), ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, Transparency = BaseMaterial3D.TransparencyEnum.Alpha, BlendMode = BaseMaterial3D.BlendModeEnum.Add, CullMode = BaseMaterial3D.CullModeEnum.Disabled },
+                CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+            };
+            var by = (from - to).Normalized();
+            var bx = by.Cross(Vector3.Back).Normalized();
+            beam.Basis = new Basis(bx, by * len, bx.Cross(by));
+            var nh = new Node3D { Position = h.Position, Rotation = h.Rotation };
+            _nightOnly.AddChild(nh);
+            nh.AddChild(beam);
+            var spot = new SpotLight3D { Position = from, LightColor = C(beamCols[i]), LightEnergy = 14, SpotRange = 70, SpotAngle = 14, SpotAttenuation = 0.4f, ShadowEnabled = false };
+            nh.AddChild(spot);
+            spot.LookAtFromPosition(from, to, Vector3.Up);
+        }
+
+        var wash = new Node3D { Position = h.Position, Rotation = h.Rotation };
+        _nightOnly.AddChild(wash);
+        wash.AddChild(new OmniLight3D { Position = new Vector3(0, roofH - 2, -5), LightColor = C("#FFD9F0"), LightEnergy = 9, OmniRange = 30, OmniAttenuation = 0.8f });
+        wash.AddChild(new OmniLight3D { Position = new Vector3(-10, 5, 9), LightColor = C("#F2517A"), LightEnergy = 2.4f, OmniRange = 24 });
+        wash.AddChild(new OmniLight3D { Position = new Vector3(10, 5, 9), LightColor = C("#58C4DD"), LightEnergy = 2.4f, OmniRange = 24 });
+        wash.AddChild(new OmniLight3D { Position = new Vector3(0, 6, 22), LightColor = C("#F6B93B"), LightEnergy = 1.6f, OmniRange = 30 });
+    }
+
+    private static void Guitar(Person3D p, Color colour)
+    {
+        var b = new MeshBatch();
+        var y = Person3D.V(27);
+        b.Cylinder(new Vector3(-0.08f, y, 0.2f), 0.2f, 0.07f, 0.24f, colour, new Basis(Vector3.Right, Mathf.Pi / 2));
+        b.Box(new Vector3(0.28f, y + 0.12f, 0.2f), new Vector3(0.62f, 0.05f, 0.04f), C("#4A3626"), new Basis(Vector3.Back, 0.35f));
+        b.AddTo(p);
+        p.SetArms(new Vector3(-0.9f, 0, -0.5f), new Vector3(-0.6f, 0, 0.55f));
+    }
+
+    private void FohTower()
+    {
+        var h = Holder(_site, 36 + (30 * 0.7071), 36 + (30 * 0.7071));
+        var b = new MeshBatch();
+        var steel = C("#8E99A3");
+        foreach (var x in new[] { -3f, 3f })
+        {
+            foreach (var z in new[] { -2.2f, 2.2f })
+            {
+                Truss(b, new Vector3(x, 0, z), new Vector3(x, Hm(5.2), z), 0.5f, steel);
+            }
+        }
+
+        b.Box(new Vector3(0, Hm(1.2), 0), new Vector3(6.4f, 0.14f, 4.8f), C("#2A2E36"));
+        b.Box(new Vector3(0, Hm(1.2) + 0.5f, -2.0f), new Vector3(5, 0.7f, 0.9f), C("#16181C"));
+        Pitched(b, -3.6f, 3.6f, -2.8f, 2.8f, Hm(5.2), Hm(6.4), C("#22262B"));
+        for (var i = -3; i <= 3; i++)
+        {
+            b.Box(new Vector3(i * 1.4f, 0.42f, 3.4f), new Vector3(1.36f, 0.84f, 0.06f), C("#C9D0D6"));
+            b.Box(new Vector3(i * 1.4f, 0.42f, -3.4f), new Vector3(1.36f, 0.84f, 0.06f), C("#C9D0D6"));
+        }
+
+        b.AddTo(h);
+        var deck = new Node3D { Position = new Vector3(0, Hm(1.2) + 0.07f, 0) };
+        h.AddChild(deck);
+        Put(deck, Crew(90), 0, 0, 180).Position = new Vector3(-1.2f, 0, -0.9f);
+        Put(deck, Crew(91), 0, 0, 180).Position = new Vector3(1.3f, 0, -0.9f);
+        Glow(h, Kit3D.UnitBox, new Vector3(0, Hm(1.2) + 0.87f, -2.0f), new Vector3(4.6f, 0.03f, 0.7f), C("#58C4DD"), 0.9f);
+    }
+
+    private void BigTop()
+    {
+        var h = Holder(_site, 14, 74, 60);
+        var b = new MeshBatch();
+        const int N = 20;
+        float r = 10, wall = Hm(3.2), top = Hm(9.5);
+        for (var i = 0; i < N; i++)
+        {
+            float a0 = i * Mathf.Tau / N, a1 = (i + 1) * Mathf.Tau / N;
+            var col = i % 2 == 0 ? C("#E94F7B") : C("#F7F3E8");
+            Vector3 p0 = new(Mathf.Cos(a0) * r, 0, Mathf.Sin(a0) * r), p1 = new(Mathf.Cos(a1) * r, 0, Mathf.Sin(a1) * r);
+            var up = new Vector3(0, wall, 0);
+            var open = i is 3 or 4 or 5;
+            if (!open)
+            {
+                Quad(b, p0, p1, p1 + up, p0 + up, col.Darkened(0.05f));
+            }
+
+            b.Tri(p1 + up, p0 + up, new Vector3(0, top, 0), col);
+            b.Tri(p0 + up, p1 + up, new Vector3(0, top, 0), col);
+            b.Rod(p0, p0 + up, 0.06f, C("#F7F3E8"), true);
+        }
+
+        b.Rod(new Vector3(0, 0, 0), new Vector3(0, top + 1.2f, 0), 0.09f, C("#8E99A3"), true);
+        b.Box(new Vector3(0.5f, top + 0.9f, 0), new Vector3(1.0f, 0.5f, 0.03f), C("#F6B93B"));
+        b.Box(new Vector3(0, 0.5f, -5.5f), new Vector3(9, 1.0f, 4), C("#2A2E36"));
+        b.AddTo(h);
+        Sign(h, "THE BIG TOP", new Vector3(Mathf.Cos(1.41f) * 10.1f, wall + 0.45f, Mathf.Sin(1.41f) * 10.1f), C("#1D2B36"), 0.012f, C("#FFFFFF"), true);
+        for (var i = 0; i < 26; i++)
+        {
+            var p = Put(h, Goer(3000 + i), 0, 0, 180 + ((R() - 0.5) * 30));
+            p.Position = new Vector3((float)(R() - 0.5) * 9, 0, (float)(R() * 12) - 1.5f);
+            if (R() < 0.4)
+            {
+                ArmsUp(p, R() * 6, 0);
+            }
+        }
+
+        var dj = Put(h, Artist(47, "#F6B93B", TopKind.Hoodie), 0, 0, 0);
+        dj.Position = new Vector3(0, 1.0f, -5.2f);
+        ArmsUp(dj, 0, 1);
+    }
+
+    private static readonly (string Name, string Body, string Trim, string Sign)[] Trucks =
+    {
+        ("WOOD-FIRED PIZZA", "#C8452E", "#F7F3E8", "#FFFFFF"), ("FISH & CHIPS", "#2E6FB7", "#F7F3E8", "#FFFFFF"), ("LOADED FRIES", "#F6B93B", "#22262B", "#1D2B36"),
+        ("VEGAN BOWLS", "#58B947", "#F7F3E8", "#FFFFFF"), ("COFFEE + DONUTS", "#7A4A2E", "#F2D9B0", "#FFFFFF"), ("CURRY HOUSE", "#E07A1E", "#7A1E3A", "#FFFFFF"),
+    };
+
+    private void Truck(Node3D h, int kind)
+    {
+        var t = Trucks[kind];
+        var b = new MeshBatch();
+        Color body = C(t.Body), trim = C(t.Trim);
+        float L = 5.6f, Wd = 2.5f, H0 = 0.55f, H1 = Hm(2.9);
+
+        // Box body, cab, wheels.
+        b.Box(new Vector3(0, (H0 + H1) / 2, 0), new Vector3(L, H1 - H0, Wd), body);
+        b.Box(new Vector3(0, H1 + 0.04f, 0), new Vector3(L + 0.1f, 0.08f, Wd + 0.1f), trim);
+        b.Box(new Vector3((L / 2) + 0.85f, H0 + 0.62f, 0), new Vector3(1.7f, 1.24f, Wd - 0.1f), body.Darkened(0.08f));
+        b.Box(new Vector3((L / 2) + 1.1f, H0 + 0.9f, 0), new Vector3(1.24f, 0.55f, Wd - 0.06f), C("#BFE3F2"));
+        foreach (var x in new[] { -L / 2 + 1.0f, (L / 2) + 0.8f })
+        {
+            foreach (var z in new[] { -Wd / 2, Wd / 2 })
+            {
+                b.Cylinder(new Vector3(x, 0.36f, z), 0.36f, 0.24f, 0.36f, C("#1B1E24"), new Basis(Vector3.Right, Mathf.Pi / 2));
+            }
+        }
+
+        // Serving hatch on the +Z side: dark opening, counter, striped awning.
+        b.Box(new Vector3(-0.2f, H0 + 1.05f, (Wd / 2) + 0.01f), new Vector3(3.6f, 0.9f, 0.04f), C("#2A2E36"));
+        b.Box(new Vector3(-0.2f, H0 + 0.58f, (Wd / 2) + 0.28f), new Vector3(3.8f, 0.07f, 0.6f), C("#D9C29A"));
+        for (var i = 0; i < 8; i++)
+        {
+            var x = -0.2f - 1.8f + 0.225f + (i * 0.45f);
+            Quad(b, new Vector3(x - 0.225f, H1 - 0.12f, Wd / 2), new Vector3(x + 0.225f, H1 - 0.12f, Wd / 2), new Vector3(x + 0.225f, H1 - 0.55f, (Wd / 2) + 1.3f), new Vector3(x - 0.225f, H1 - 0.55f, (Wd / 2) + 1.3f), i % 2 == 0 ? trim : body.Lightened(0.15f));
+        }
+
+        // Menu board and a bin.
+        b.Box(new Vector3(2.5f, 0.6f, (Wd / 2) + 1.2f), new Vector3(0.7f, 1.2f, 0.08f), C("#22262B"), new Basis(Vector3.Right, -0.2f));
+        b.Box(new Vector3(-2.7f, 0.42f, (Wd / 2) + 0.7f), new Vector3(0.6f, 0.84f, 0.6f), C("#3F8F4E"));
+        b.Box(new Vector3(-2.7f, 0.86f, (Wd / 2) + 0.7f), new Vector3(0.66f, 0.06f, 0.66f), C("#2D6B3A"));
+        b.Cylinder(new Vector3(-1.2f, H0 + 0.75f, (Wd / 2) + 0.3f), 0.1f, 0.26f, 0.1f, C("#C8452E"));
+        b.Cylinder(new Vector3(-0.9f, H0 + 0.75f, (Wd / 2) + 0.3f), 0.1f, 0.26f, 0.1f, C("#F6B93B"));
+        b.AddTo(h);
+        Sign(h, t.Name, new Vector3(-0.2f, H1 - 0.28f, (Wd / 2) + 0.03f) + new Vector3(0, 0.55f, 0), C(t.Sign), 0.0062f, C("#1D2B36"));
+        Glow(h, Kit3D.UnitBox, new Vector3(-0.2f, H0 + 1.42f, (Wd / 2) + 0.03f), new Vector3(3.4f, 0.08f, 0.02f), C("#FFE9B0"), 2f);
+
+        var inside = Put(h, Vendor(700 + kind), 0, 0, 0);
+        inside.Position = new Vector3(-0.6f, H0 + 0.05f, 0.75f);
+        inside.Scale = Vector3.One * 0.92f;
+        var n = 2 + (kind * 3 % 4);
+        for (var i = 0; i < n; i++)
+        {
+            Put(h, Goer(720 + (kind * 10) + i), 0, 0, 180 + ((R() - 0.5) * 20)).Position = new Vector3(-0.4f + (float)((R() - 0.5) * 0.3), 0, (Wd / 2) + 1.5f + (i * 0.9f));
+        }
+    }
+
+    private static (double X, double Y) P(double u, double v) => (40 + ((u + v) * 0.7071), 40 + ((v - u) * 0.7071));
+
+    private void FoodRow()
+    {
+        // A food street across the screen to the right of the arena: trucks on the far side, facing us.
+        for (var i = 0; i < 6; i++)
+        {
+            var (x, y) = P(34.5 + (i * 6.6), 8.2);
+            Truck(Holder(_site, x, y, 45), i);
+        }
+
+        var tb = new MeshBatch();
+        var (sx0, sy0) = P(29, 14);
+        var (sx1, sy1) = P(72, 14);
+        Track(tb, sx0, sy0, sx1, sy1, 2.7f);
+        var (jx, jy) = P(44, 14);
+        Track(tb, 100, 44, jx, jy, 3.2f);
+        tb.AddTo(_site, shadow: false);
+
+        // Picnic benches on the near side.
+        var b = new MeshBatch();
+        for (var i = 0; i < 8; i++)
+        {
+            var (bx, by) = P(33 + (i * 4.6) + (i > 2 ? 4 : 0), 20.2 + ((i % 2) * 1.6));
+            var basis = new Basis(Vector3.Up, 0.69f + ((i % 3) * 0.2f));
+            var c = Kit3D.At(bx, by);
+            b.Box(c + new Vector3(0, 0.55f, 0), new Vector3(2.6f, 0.07f, 1.1f), C("#B98A56"), basis);
+            b.Box(c + (basis * new Vector3(0, 0.33f, 0.85f)), new Vector3(2.6f, 0.06f, 0.4f), C("#A87B4A"), basis);
+            b.Box(c + (basis * new Vector3(0, 0.33f, -0.85f)), new Vector3(2.6f, 0.06f, 0.4f), C("#A87B4A"), basis);
+            b.Box(c + (basis * new Vector3(-1.0f, 0.27f, 0)), new Vector3(0.1f, 0.55f, 1.9f), C("#8E6A40"), basis);
+            b.Box(c + (basis * new Vector3(1.0f, 0.27f, 0)), new Vector3(0.1f, 0.55f, 1.9f), C("#8E6A40"), basis);
+            foreach (var sd in new[] { -1, 1 })
+            {
+                for (var k = 0; k < 2; k++)
+                {
+                    if (R() < 0.7)
+                    {
+                        var sit = Put(_site, Goer(800 + (i * 4) + (sd + 1) + k), 0, 0, 0, Pose.Seated);
+                        sit.Seat = new Person3D.SeatShape(0.36f, -0.05f, 0.2f);
+                        sit.SetPose(Pose.Seated, 0);
+                        sit.Position = c + (basis * new Vector3(-0.6f + (k * 1.2f), 0, sd * 0.85f));
+                        sit.Basis = basis * new Basis(Vector3.Up, sd > 0 ? Mathf.Pi : 0);
+                    }
+                }
+            }
+        }
+
+        b.AddTo(_site);
+        Festoon(sx0, sy0, sx1, sy1, -3.6f);
+        Festoon(100, 96, 100, 44, 2.6f);
+
+        // Walkers on the street and the avenue.
+        for (var i = 0; i < 44; i++)
+        {
+            var (x, y) = P(31 + (R() * 38), 12.2 + (R() * 3.6));
+            Put(_site, Goer(900 + i), x, y, R() < 0.5 ? 135 : -45, Pose.Walking, R() * 6);
+        }
+
+        for (var i = 0; i < 16; i++)
+        {
+            var t = R();
+            Put(_site, Goer(945 + i), 100 + ((jx - 100) * t) + ((R() - 0.5) * 3), 44 + ((jy - 44) * t) + ((R() - 0.5) * 3), R() < 0.5 ? 225 : 45, Pose.Walking, R() * 6);
+        }
+
+        for (var i = 0; i < 30; i++)
+        {
+            Put(_site, Goer(960 + i), 100 + ((R() - 0.5) * 2.4), 46 + (R() * 48), R() < 0.5 ? 0 : 180, Pose.Walking, R() * 6);
+        }
+
+        var (lx, ly) = P(47, 17.5);
+        Put(_site, Litter(990), lx, ly, 120);
+        var (stx, sty) = P(60, 17);
+        Put(_site, Steward(991), stx, sty, 60);
+        var (ex, ey) = P(41, 17.6);
+        Put(_site, Sparky(992), ex, ey, 20);
+    }
+
+    private void Festoon(double x0, double y0, double x1, double y1, float side)
+    {
+        var a = Kit3D.At(x0, y0);
+        var c = Kit3D.At(x1, y1);
+        var dir = (c - a).Normalized();
+        var n = new Vector3(-dir.Z, 0, dir.X) * side;
+        var len = (c - a).Length();
+        var b = new MeshBatch();
+        var poles = (int)(len / 7);
+        var cols = new[] { "#FFE9B0", "#F2517A", "#58C4DD", "#F6B93B", "#9BD770" };
+        for (var i = 0; i <= poles; i++)
+        {
+            var p = a + (dir * (i * len / poles)) + n;
+            b.Rod(p, p + new Vector3(0, Hm(4), 0), 0.05f, C("#6B5237"), true);
+            if (i == poles)
+            {
+                break;
+            }
+
+            var q = a + (dir * ((i + 1) * len / poles)) + n;
+            for (var k = 1; k < 8; k++)
+            {
+                var f = k / 8f;
+                var at = p.Lerp(q, f) + new Vector3(0, Hm(4) - (Mathf.Sin(f * Mathf.Pi) * 0.5f), 0);
+                Glow(_site, Kit3D.SmallSphere, at, Vector3.One * 0.2f, C(cols[(i + k) % 5]), 2.4f);
+            }
+
+            _nightOnly.AddChild(new OmniLight3D { Position = p.Lerp(q, 0.5f) + new Vector3(0, Hm(3.4), 0), LightColor = C("#FFD9A0"), LightEnergy = 1.5f, OmniRange = 9 });
+        }
+
+        b.AddTo(_site);
+    }
+
+    private void Marquee(MeshBatch b, float w, float d, float eave, float top, Color roof, Color? alt = null, bool back = true, bool sides = true)
+    {
+        Peak(b, (-w / 2) - 0.2f, (w / 2) + 0.2f, (-d / 2) - 0.2f, (d / 2) + 0.2f, eave, top, roof, alt);
+        MarqueeFrame(b, w, d, eave, roof, back, sides);
+    }
+
+    private void MarqueeFrame(MeshBatch b, float w, float d, float eave, Color roof, bool back = true, bool sides = true)
+    {
+        foreach (var x in new[] { -w / 2, w / 2 })
+        {
+            foreach (var z in new[] { -d / 2, d / 2 })
+            {
+                b.Rod(new Vector3(x, 0, z), new Vector3(x, eave, z), 0.06f, C("#E3E8EC"), true);
+            }
+        }
+
+        b.Box(new Vector3(0, eave - 0.14f, d / 2 + 0.2f), new Vector3(w + 0.4f, 0.3f, 0.04f), roof.Darkened(0.04f));
+        b.Box(new Vector3(0, eave - 0.14f, -d / 2 - 0.2f), new Vector3(w + 0.4f, 0.3f, 0.04f), roof.Darkened(0.04f));
+        b.Box(new Vector3(w / 2 + 0.2f, eave - 0.14f, 0), new Vector3(0.04f, 0.3f, d + 0.4f), roof.Darkened(0.08f));
+        b.Box(new Vector3(-w / 2 - 0.2f, eave - 0.14f, 0), new Vector3(0.04f, 0.3f, d + 0.4f), roof.Darkened(0.08f));
+        if (back)
+        {
+            b.Box(new Vector3(0, eave / 2, -d / 2), new Vector3(w, eave, 0.05f), roof.Darkened(0.06f));
+        }
+
+        if (sides)
+        {
+            b.Box(new Vector3(-w / 2, eave / 2, -d / 4), new Vector3(0.05f, eave, d / 2), roof.Darkened(0.1f));
+        }
+    }
+
+    private void BarTent()
+    {
+        var h = Holder(_site, 74, 52, 45);
+        var b = new MeshBatch();
+        Marquee(b, 16, 7, Hm(3), Hm(5.6), C("#F7F3E8"), C("#F6B93B"));
+        b.Box(new Vector3(0, 0.55f, 2.4f), new Vector3(15, 1.1f, 0.9f), C("#7A4A2E"));
+        b.Box(new Vector3(0, 1.13f, 2.4f), new Vector3(15.3f, 0.07f, 1.1f), C("#D9C29A"));
+        for (var i = -3; i <= 3; i++)
+        {
+            b.Cylinder(new Vector3(i * 2.1f, 1.35f, 2.3f), 0.07f, 0.4f, 0.07f, C("#C9D0D6"));
+            b.Ball(new Vector3(i * 2.1f, 1.58f, 2.3f), Vector3.One * 0.16f, C(Brights[(i + 3) % 6]), true);
+        }
+
+        for (var i = 0; i < 6; i++)
+        {
+            b.Cylinder(new Vector3(-6.5f + (i * 0.9f), 0.5f, -2.6f), 0.4f, 1.0f, 0.4f, C("#AEB6BD"));
+        }
+
+        // Barrier queue lanes.
+        for (var i = -2; i <= 2; i++)
+        {
+            b.Box(new Vector3(i * 3.2f, 0.42f, 5.4f), new Vector3(0.06f, 0.84f, 3.6f), C("#C9D0D6"));
+        }
+
+        b.AddTo(h);
+        Sign(h, "THE THIRSTY LARK  ·  BAR", new Vector3(0, Hm(3) - 0.13f, 3.73f), C("#1D2B36"), 0.0085f);
+        for (var i = 0; i < 5; i++)
+        {
+            Put(h, BarStaff(1100 + i), 0, 0, 0).Position = new Vector3(-6 + (i * 3), 0, 1.4f);
+        }
+
+        for (var i = 0; i < 22; i++)
+        {
+            Put(h, Goer(1120 + i), 0, 0, 180 + ((R() - 0.5) * 20)).Position = new Vector3(-6.4f + ((i % 4) * 3.2f) + (float)((R() - 0.5) * 0.5), 0, 3.5f + ((i / 4) * 0.85f));
+        }
+
+        Put(h, Security(1150), 0, 0, 30).Position = new Vector3(-9.4f, 0, 4.5f);
+    }
+
+    private void Toilets()
+    {
+        var h = Holder(_site, 62, 92, 90);
+        var b = new MeshBatch();
+        for (var i = 0; i < 12; i++)
+        {
+            var x = -11f + (i * 2.0f);
+            var col = i < 10 ? C("#2E86C5") : C("#58B947");
+            b.Box(new Vector3(x, Hm(1.15), 0), new Vector3(1.8f, Hm(2.3), 1.9f), col);
+            b.Box(new Vector3(x, Hm(2.3) + 0.06f, 0), new Vector3(1.9f, 0.12f, 2.0f), C("#E9EEF2"));
+            b.Box(new Vector3(x, Hm(1.1), 0.96f), new Vector3(1.3f, Hm(1.9), 0.03f), col.Lightened(0.14f));
+            b.Box(new Vector3(x + 0.45f, Hm(1.1), 0.99f), new Vector3(0.12f, 0.12f, 0.03f), i % 3 == 0 ? C("#D94A4A") : C("#58B947"));
+        }
+
+        // Handwash station and a sign.
+        b.Box(new Vector3(14.6f, 0.55f, 0.2f), new Vector3(3.0f, 1.1f, 1.0f), C("#E9EEF2"));
+        b.Box(new Vector3(14.6f, 1.12f, 0.2f), new Vector3(3.1f, 0.06f, 1.1f), C("#AEB6BD"));
+        b.Rod(new Vector3(-12.6f, 0, 1.4f), new Vector3(-12.6f, Hm(3.4), 1.4f), 0.05f, C("#8E99A3"), true);
+        b.Box(new Vector3(-12.6f, Hm(3.1), 1.4f), new Vector3(1.8f, 0.7f, 0.06f), C("#2E86C5"));
+        b.AddTo(h);
+        Sign(h, "TOILETS", new Vector3(-12.6f, Hm(3.1), 1.44f), C("#FFFFFF"), 0.0055f);
+        for (var i = 0; i < 9; i++)
+        {
+            Put(h, Goer(1200 + i), 0, 0, 180 + ((R() - 0.5) * 25)).Position = new Vector3(-8 + (i * 1.9f) + (float)(R() * 0.4), 0, 2.2f + (i % 3 * 0.9f));
+        }
+
+        Put(h, Litter(1220), 0, 0, 200).Position = new Vector3(12, 0, 2.4f);
+    }
+
+    private void Medical()
+    {
+        var h = Holder(_site, 92, 57, 45);
+        var b = new MeshBatch();
+        var white = C("#F7F9FA");
+        var roof = new MeshBatch();
+        Peak(roof, -6.7f, 6.7f, -4.2f, 4.2f, Hm(2.8), Hm(4.9), white, C("#E6ECEF"));
+        _medRoof = new Node3D();
+        h.AddChild(_medRoof);
+        roof.AddTo(_medRoof);
+        MarqueeFrame(b, 13, 8, Hm(2.8), white);
+
+        // Groundsheet, a half-height canvas front either side of the way in.
+        b.Box(new Vector3(0, 0.03f, 0), new Vector3(12.6f, 0.05f, 7.6f), C("#C9D6D0"));
+        b.Box(new Vector3(6.5f, Hm(1.4), 0), new Vector3(0.05f, Hm(2.8), 8), white.Darkened(0.08f));
+
+        // Green cross flags and the board.
+        b.Rod(new Vector3(-7.4f, 0, 4.6f), new Vector3(-7.4f, Hm(4.6), 4.6f), 0.05f, C("#8E99A3"), true);
+        b.Box(new Vector3(-7.4f, Hm(4.0), 4.63f), new Vector3(1.9f, 1.25f, 0.05f), C("#FFFFFF"));
+        b.Box(new Vector3(-7.4f, Hm(4.0), 4.67f), new Vector3(0.36f, 0.9f, 0.03f), C("#1E9E52"));
+        b.Box(new Vector3(-7.4f, Hm(4.0), 4.67f), new Vector3(1.25f, 0.27f, 0.03f), C("#1E9E52"));
+
+        // Screens between bays, kit trolley, oxygen, a desk at the front, chairs.
+        foreach (var x in new[] { -2.2f, 2.0f })
+        {
+            b.Box(new Vector3(x, 0.75f, -1.9f), new Vector3(0.06f, 1.5f, 3.6f), C("#8CC7B0"));
+        }
+
+        b.Box(new Vector3(5.4f, 0.5f, -3.0f), new Vector3(1.2f, 1.0f, 0.7f), C("#D94A4A"));
+        b.Box(new Vector3(5.4f, 1.03f, -3.0f), new Vector3(1.26f, 0.05f, 0.76f), C("#AEB6BD"));
+        b.Cylinder(new Vector3(4.3f, 0.5f, -3.3f), 0.16f, 1.0f, 0.16f, C("#2D3A40"));
+        b.Cylinder(new Vector3(4.3f, 1.05f, -3.3f), 0.1f, 0.12f, 0.1f, C("#F7F9FA"));
+        b.Box(new Vector3(-4.8f, 0.52f, 3.0f), new Vector3(2.6f, 0.07f, 1.1f), C("#D9C29A"));
+        b.Box(new Vector3(-5.9f, 0.26f, 3.0f), new Vector3(0.08f, 0.52f, 1.0f), C("#8E99A3"));
+        b.Box(new Vector3(-3.7f, 0.26f, 3.0f), new Vector3(0.08f, 0.52f, 1.0f), C("#8E99A3"));
+        b.Box(new Vector3(-4.4f, 0.64f, 3.0f), new Vector3(0.5f, 0.18f, 0.4f), C("#1E9E52"));
+        for (var i = 0; i < 4; i++)
+        {
+            var c = new Vector3(1.4f + (i * 1.1f), 0, 3.2f);
+            b.Box(c + new Vector3(0, 0.34f, 0), new Vector3(0.8f, 0.06f, 0.8f), C("#2E6FB7"));
+            b.Box(c + new Vector3(0, 0.62f, -0.38f), new Vector3(0.8f, 0.56f, 0.05f), C("#2E6FB7"));
+            foreach (var (dx, dz) in new[] { (-0.35f, -0.35f), (0.35f, -0.35f), (-0.35f, 0.35f), (0.35f, 0.35f) })
+            {
+                b.Rod(c + new Vector3(dx, 0, dz), c + new Vector3(dx, 0.34f, dz), 0.025f, C("#8E99A3"), true);
+            }
+        }
+
+        b.AddTo(h);
+        Sign(h, "MEDICAL  +  FIRST AID", new Vector3(0, Hm(2.8) - 0.13f, 4.23f), C("#1E9E52"), 0.0078f);
+
+        // Three bays with trolleys: amber heat exhaustion, green sprain, red on monitor.
+        var bays = new[] { (-4.4f, "#F2A33A", 51), (-0.1f, "#3BA55C", 52), (4.0f, "#D94A4A", 53) };
+        foreach (var (x, band, seed) in bays)
+        {
+            var t = new Node3D { Position = new Vector3(x, 0.05f, -1.9f) };
+            h.AddChild(t);
+            var tb = new MeshBatch();
+            var top = Carriers3D.Trolley(tb);
+            tb.AddTo(t);
+            var lying = Lying3D.Build(Goer(seed) with { Jacket = null }, C("#BFD9EC"), C(band), null, awake: seed != 53);
+            lying.Position = new Vector3(0, top, 0);
+            t.AddChild(lying);
+        }
+
+        // Obs monitor on a stand by the red bay.
+        var m = new MeshBatch();
+        m.Rod(new Vector3(5.2f, 0, -1.2f), new Vector3(5.2f, 1.25f, -1.2f), 0.035f, C("#8E99A3"), true);
+        m.Box(new Vector3(5.2f, 1.42f, -1.2f), new Vector3(0.62f, 0.46f, 0.12f), C("#2D3A40"));
+        m.AddTo(h);
+        Glow(h, Kit3D.UnitBox, new Vector3(5.2f, 1.42f, -1.13f), new Vector3(0.52f, 0.36f, 0.01f), C("#D94A4A"), 1.3f);
+        h.AddChild(Alert3D.Make(AlertKind.Emergency, 1.25f, 53).With(n => n.Position = new Vector3(4.0f, 0.3f, -1.9f)));
+
+        Put(h, Medic(1300), 0, 0, 100).Position = new Vector3(2.9f, 0.05f, -1.6f);
+        Put(h, Looks.Staff(new StaffMember { Id = 12, Name = "N", Role = StaffRole.Nurse, Grade = "Band 6 nurse", DepartmentId = "ed", Age = 34 }), 0, 0, -90).Position = new Vector3(5.1f, 0.05f, -2.2f);
+        Put(h, Looks.Staff(new StaffMember { Id = 21, Name = "D", Role = StaffRole.Doctor, Grade = "Doctor", DepartmentId = "ed", Age = 41 }), 0, 0, 180).Position = new Vector3(3.9f, 0.05f, -0.6f);
+        Put(h, FirstAider(1303), 0, 0, 100).Position = new Vector3(-5.5f, 0.05f, -1.7f);
+        Put(h, FirstAider(1304), 0, 0, -80).Position = new Vector3(0.95f, 0.05f, -1.7f);
+        Put(h, FirstAider(1306), 0, 0, 0).Position = new Vector3(-4.8f, 0.05f, 2.2f);
+        for (var i = 0; i < 3; i++)
+        {
+            var sit = Put(h, Goer(1310 + i), 0, 0, 0, Pose.Seated);
+            sit.Seat = new Person3D.SeatShape(0.37f, -0.05f, 0.2f);
+            sit.SetPose(Pose.Seated, 0);
+            sit.Position = new Vector3(1.4f + (i * 1.1f) + (i == 2 ? 1.1f : 0), 0.05f, 3.2f);
+        }
+
+        Put(h, Goer(1320), 0, 0, 180).Position = new Vector3(-4.7f, 0, 4.6f);
+        Put(h, Goer(1321), 0, 0, 170).Position = new Vector3(-3.8f, 0, 4.9f);
+
+        // Welfare tent next door, and the ambulance on standby on the trackway.
+        var w = Holder(_site, 92 - (11.5 * 0.7071), 57 + (11.5 * 0.7071), 45);
+        var wb = new MeshBatch();
+        Marquee(wb, 7, 6, Hm(2.6), Hm(4.4), C("#B79AE6"), C("#F7F3E8"));
+        wb.Box(new Vector3(0, 0.03f, 0), new Vector3(6.6f, 0.05f, 5.6f), C("#E6D9C2"));
+        foreach (var (x, z, c) in new[] { (-1.6f, -0.6f, "#F2517A"), (0.2f, -1.2f, "#F6B93B"), (1.8f, -0.3f, "#58C4DD") })
+        {
+            wb.Ball(new Vector3(x, 0.26f, z), new Vector3(1.2f, 0.52f, 1.2f), C(c));
+        }
+
+        wb.AddTo(w);
+        Sign(w, "WELFARE", new Vector3(0, Hm(2.6) - 0.13f, 3.23f), C("#FFFFFF"), 0.0078f);
+        Put(w, Welfare(1330), 0, 0, 20).Position = new Vector3(-0.6f, 0.05f, 0.8f);
+        var rest = Put(w, Goer(1331), 0, 0, 0, Pose.Seated);
+        rest.Seat = new Person3D.SeatShape(0.3f, -0.05f, 0.2f);
+        rest.SetPose(Pose.Seated, 0);
+        rest.Position = new Vector3(0.2f, 0.05f, -1.2f);
+
+        var amb = Ambulance3D.Make(_site);
+        amb.Position = Kit3D.At(100.2, 47.5);
+        amb.Rotation = new Vector3(0, Mathf.Pi, 0);
+        Put(_site, Medic(1340), 97.6, 50.0, 80);
+
+        // A casualty being wheeled in from the arena.
+        var chair = new Node3D { Position = Kit3D.At(86.3, 62.2), Rotation = new Vector3(0, Mathf.DegToRad(100), 0) };
+        _site.AddChild(chair);
+        var cb = new MeshBatch();
+        Carriers3D.Wheelchair(cb);
+        cb.AddTo(chair);
+        var rider = Person3D.Build(Goer(1350));
+        rider.Seat = Person3D.SeatShape.Wheelchair(rider.Look.Scale);
+        rider.SetPose(Pose.Seated, 0);
+        chair.AddChild(rider);
+        var pusher = Put(chair, FirstAider(1351), 0, 0, 0, Pose.Walking, 1.2);
+        pusher.Position = new Vector3(0, 0, -0.75f);
+        pusher.SetArms(new Vector3(-1.1f, 0, 0.1f), new Vector3(-1.1f, 0, -0.1f));
+    }
+
+    private void Tent(MeshBatch b, Vector3 c, float yaw, int kind, Color col, bool wet)
+    {
+        var basis = new Basis(Vector3.Up, yaw);
+        var trim = col.Darkened(0.18f);
+        switch (kind)
+        {
+            case 0: // dome
+                b.Ball(c + new Vector3(0, 0.05f, 0), new Vector3(3.0f, 2.3f, 3.0f), basis, col);
+                b.Ball(c + (basis * new Vector3(0, 0.0f, 1.0f)), new Vector3(1.5f, 1.5f, 1.5f), basis, trim);
+                break;
+            case 1: // tunnel
+                b.Ball(c + new Vector3(0, 0.0f, 0), new Vector3(2.8f, 2.4f, 5.4f), basis, col);
+                b.Ball(c + (basis * new Vector3(0, 0, 2.0f)), new Vector3(2.2f, 1.9f, 1.8f), basis, trim);
+                break;
+            case 2: // bell tent
+                b.Cylinder(c + new Vector3(0, 0.45f, 0), 2.1f, 0.9f, 2.1f, C("#EFE6D2"));
+                b.Cylinder(c + new Vector3(0, 0.9f + 0.9f, 0), 2.25f, 1.8f, 2.25f, C("#F7F0DE"), null, true);
+                b.Box(c + (basis * new Vector3(0, 0.45f, 2.06f)), new Vector3(0.9f, 0.9f, 0.1f), C("#B9A27A"), basis);
+                break;
+            default: // ridge
+                var x0 = -1.2f;
+                var x1 = 1.2f;
+                var pts = new[] { new Vector3(x0, 0, -1.6f), new Vector3(x1, 0, -1.6f), new Vector3(x1, 0, 1.6f), new Vector3(x0, 0, 1.6f), new Vector3(0, 1.25f, -1.6f), new Vector3(0, 1.25f, 1.6f) }.Select(p => c + (basis * p)).ToArray();
+                Quad(b, pts[0], pts[3], pts[5], pts[4], col);
+                Quad(b, pts[2], pts[1], pts[4], pts[5], col.Darkened(0.08f));
+                b.Tri(pts[3], pts[2], pts[5], trim);
+                b.Tri(pts[1], pts[0], pts[4], trim);
+                break;
+        }
+
+        _ = wet;
+    }
+
+    private void Campsite()
+    {
+        var b = new MeshBatch();
+        var cols = new[] { "#F2517A", "#F6B93B", "#36B5A2", "#7A5CE0", "#EE6C4D", "#3D8BFD", "#9BD770", "#58C4DD", "#E84A5F", "#4C6A8C", "#D9A441", "#5C8A4A" };
+        var spots = new List<Vector3>();
+        var chairs = new MeshBatch();
+        for (var row = 0; row < 7; row++)
+        {
+            for (var i = 0; i < 11; i++)
+            {
+                // Pitches in loose diagonal rows across the screen.
+                var u = -34 + (i * 6.4) + ((R() - 0.5) * 2.2);
+                var v = (row * 6.3) + ((R() - 0.5) * 1.8);
+                var x = 38 + ((u + v) * 0.7071);
+                var y = 96 + ((v - u) * 0.7071);
+
+                // Keep the camping field clear of the toilets, the track and the big top.
+                if (Math.Abs(x - 62) < 3.5 && Math.Abs(y - 92) < 15)
+                {
+                    continue;
+                }
+
+                if (y < 87 - ((x - 30) * 0.2) || (x < 27 && y < 90))
+                {
+                    continue;
+                }
+
+                var c = Kit3D.At(x, y);
+                Tent(b, c, (float)(R() * Mathf.Tau), Pick(0, 0, 0, 1, 1, 2, 3), C(Pick(cols)), false);
+                spots.Add(c);
+                if (R() < 0.5)
+                {
+                    var cc = c + new Vector3(2.2f, 0, 1.6f);
+                    chairs.Box(cc + new Vector3(0, 0.3f, 0), new Vector3(0.7f, 0.05f, 0.7f), C(Pick(cols)));
+                    chairs.Box(cc + new Vector3(0, 0.55f, -0.32f), new Vector3(0.7f, 0.5f, 0.05f), C(Pick(cols)));
+                }
+            }
+        }
+
+        // Flags on tall poles, a water point and a fire lane sign.
+        for (var i = 0; i < 9; i++)
+        {
+            var c = spots[(i * 7) % spots.Count] + new Vector3(1.6f, 0, -1.2f);
+            b.Rod(c, c + new Vector3(0, Hm(6.5), 0), 0.04f, C("#D9D2C0"), true);
+            Quad(b, c + new Vector3(0, Hm(6.5), 0), c + new Vector3(0.9f, Hm(6.3), 0.9f), c + new Vector3(0.9f, Hm(4.2), 0.9f), c + new Vector3(0, Hm(4.4), 0), C(cols[i % cols.Length]));
+        }
+
+        var wp = Kit3D.At(54, 84);
+        b.Cylinder(wp + new Vector3(0, 0.6f, 0), 0.9f, 1.2f, 0.9f, C("#2E86C5"));
+        b.Box(wp + new Vector3(0, 1.5f, 0), new Vector3(1.6f, 0.5f, 0.06f), C("#FFFFFF"), new Basis(Vector3.Up, Mathf.Pi / 4));
+        b.AddTo(_site);
+        chairs.AddTo(_site);
+        Sign(_site, "WATER", wp + new Vector3(0.03f, 1.5f, 0.03f), C("#2E86C5"), 0.005f, null, true);
+        Sign(_site, "MEADOW CAMPING", Kit3D.At(51, 81, Hm(4.2)), C("#FFFFFF"), 0.013f, C("#1D2B36"), true);
+
+        // Dry weather: campers sitting about and wandering. Wet: mud, puddles, ponchos, rain.
+        for (var i = 0; i < spots.Count; i++)
+        {
+            foreach (var (root, rain) in new[] { (_dry, false), (_wet, true) })
+            {
+                if (R() < (rain ? 0.55 : 0.8))
+                {
+                    var p = Put(root, Goer(2000 + (i * 2) + (rain ? 1 : 0), rain), 0, 0, R() * 360, R() < 0.5 ? Pose.Walking : Pose.Standing, R() * 6);
+                    p.Position = spots[i] + new Vector3((float)(R() - 0.5) * 3 + 2.4f, 0, (float)(R() - 0.5) * 3 + 2.2f);
+                    if (rain && R() < 0.7)
+                    {
+                        Hood(p, p.Look.Jacket ?? C("#F2C230"));
+                    }
+                    else if (!rain && R() < 0.3)
+                    {
+                        Hat(p, C(Pick("#F7F3E8", "#F2517A", "#D9C29A")));
+                    }
+                }
+            }
+        }
+
+        var mud = new MeshBatch();
+        var water = new MeshBatch();
+        var rainB = new MeshBatch();
+        // The muddy lanes between the rows, churned worst by the track.
+        for (var i = 0; i < 150; i++)
+        {
+            var u = -34 + (R() * 68);
+            var row = _rng.Next(0, 7);
+            var v = (row * 6.3) + 3.1 + ((R() - 0.5) * 1.6);
+            var x = 38 + ((u + v) * 0.7071);
+            var y = 96 + ((v - u) * 0.7071);
+            var c = Kit3D.At(x, y, 0.012f + (i * 0.0001f));
+            float rx = 1.6f + (float)(R() * 2.6), rz = 0.9f + (float)(R() * 1.2);
+            mud.Cylinder(c, rx, 0.02f, rz, C(Pick("#6E5A3C", "#7A6646", "#655236", "#80704C")), new Basis(Vector3.Up, Mathf.Pi / 4 + (float)(R() - 0.5) * 0.4f));
+            if (R() < 0.33)
+            {
+                water.Cylinder(c + new Vector3(0.2f, 0.016f, 0.1f), rx * 0.5f, 0.012f, rz * 0.5f, C("#9FB6C4"), new Basis(Vector3.Up, Mathf.Pi / 4));
+            }
+        }
+
+        for (var i = 0; i < 40; i++)
+        {
+            var t = i / 39f;
+            var c = Kit3D.At(58 - (28 * t) + ((R() - 0.5) * 3), 78 + (6 * t) + ((R() - 0.5) * 3), 0.05f);
+            mud.Cylinder(c, 2.2f + (float)R() * 2, 0.02f, 1.5f + (float)R(), C(Pick("#5E4B30", "#6E5A3C")), new Basis(Vector3.Up, (float)R() * 3));
+        }
+
+        for (var i = 0; i < 1500; i++)
+        {
+            var c = Kit3D.At(40 + ((R() - 0.5) * 95), 96 + ((R() - 0.5) * 95), (float)(R() * 9));
+            rainB.Box(c, new Vector3(0.022f, 0.55f + (float)R() * 0.4f, 0.022f), C("#DCE8F2"), new Basis(new Vector3(1, 0, -1).Normalized(), 0.14f));
+        }
+
+        mud.AddTo(_wet, shadow: false);
+        var wm = water.AddTo(_wet, shadow: false);
+        if (wm is not null)
+        {
+            wm.MaterialOverride = new StandardMaterial3D { VertexColorUseAsAlbedo = true, Roughness = 0.08f, Metallic = 0.3f };
+        }
+
+        var rm = rainB.AddTo(_wet, alpha: true, shadow: false);
+        if (rm is not null)
+        {
+            rm.MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.9f, 0.95f, 1f, 0.5f), ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, Transparency = BaseMaterial3D.TransparencyEnum.Alpha };
+        }
+
+        // A stuck trolley of camping gear and a steward laying straw.
+        Put(_wet, Steward(2400), 47, 86, 200);
+        Put(_wet, Litter(2401), 43.5, 88.5, 130);
+        var straw = new MeshBatch();
+        foreach (var (x, y) in new[] { (45.5, 86.5), (46.3, 87.6), (44.6, 87.7) })
+        {
+            straw.Box(Kit3D.At(x, y, 0.3f), new Vector3(1.5f, 0.6f, 0.8f), C("#E0C36A"), new Basis(Vector3.Up, (float)(x * 2)));
+        }
+
+        straw.Cylinder(Kit3D.At(47.2, 88.6, 0.03f), 2.2f, 0.03f, 1.4f, C("#D9BC62"));
+        straw.AddTo(_wet);
+    }
+
+    private void Entrance()
+    {
+        var h = Holder(_site, 100, 100, 0);
+        var b = new MeshBatch();
+        var steel = C("#8E99A3");
+        Truss(b, new Vector3(-6, 0, 0), new Vector3(-6, Hm(7), 0), 0.7f, steel);
+        Truss(b, new Vector3(6, 0, 0), new Vector3(6, Hm(7), 0), 0.7f, steel);
+        Truss(b, new Vector3(-6.4f, Hm(7), 0), new Vector3(6.4f, Hm(7), 0), 0.7f, steel);
+        b.Box(new Vector3(0, Hm(6.0), 0.1f), new Vector3(11, 1.5f, 0.1f), C("#E94F7B"));
+        b.Box(new Vector3(0, Hm(6.0) - 0.85f, 0.1f), new Vector3(11, 0.16f, 0.12f), C("#F6B93B"));
+
+        // Wristband lanes and the ticket cabin.
+        for (var i = -2; i <= 2; i++)
+        {
+            b.Box(new Vector3(i * 2.1f, 0.42f, 3), new Vector3(0.06f, 0.84f, 5), C("#C9D0D6"));
+        }
+
+        b.Box(new Vector3(-10.5f, Hm(1.3), 2), new Vector3(5, Hm(2.6), 3), C("#F7F3E8"));
+        b.Box(new Vector3(-10.5f, Hm(2.6) + 0.06f, 2), new Vector3(5.3f, 0.12f, 3.3f), C("#36B5A2"));
+        b.Box(new Vector3(-10.5f, Hm(1.5), 0.48f), new Vector3(3.2f, 0.8f, 0.04f), C("#2A2E36"));
+        b.AddTo(h);
+        Sign(h, "LARKMOOR FESTIVAL", new Vector3(0, Hm(6.0), 0.17f), C("#FFFFFF"), 0.0125f);
+        Sign(h, "BOX OFFICE", new Vector3(-10.5f, Hm(2.25), 0.49f), C("#1D2B36"), 0.006f);
+        for (var i = 0; i < 4; i++)
+        {
+            Put(h, Steward(1500 + i), 0, 0, 0).Position = new Vector3(-3.15f + (i * 2.1f), 0, 1.0f);
+        }
+
+        Put(h, Security(1510), 0, 0, 0).Position = new Vector3(5.0f, 0, 0.8f);
+        for (var i = 0; i < 24; i++)
+        {
+            Put(h, Goer(1520 + i), 0, 0, 180).Position = new Vector3(-3.15f + ((i % 4) * 2.1f) + (float)((R() - 0.5) * 0.4), 0, 2.2f + ((i / 4) * 0.95f) + (float)(R() * 0.3));
+        }
+
+        // Perimeter fence: steel panels along two sides that the camera sees.
+        var f = new MeshBatch();
+        void Fence(double x0, double y0, double x1, double y1)
+        {
+            var a = Kit3D.At(x0, y0);
+            var c = Kit3D.At(x1, y1);
+            var n = (int)((c - a).Length() / 3.5f);
+            var dd = (c - a).Normalized();
+            var along = new Basis(Vector3.Up, Mathf.Atan2(dd.X, dd.Z) + (Mathf.Pi / 2));
+            for (var i = 0; i < n; i++)
+            {
+                var p = a.Lerp(c, (i + 0.5f) / n);
+                f.Box(p + new Vector3(0, Hm(1.15), 0), new Vector3(3.45f, Hm(2.1), 0.05f), C("#3F8F6E"), along);
+                f.Box(p + new Vector3(0, 0.08f, 0), new Vector3(0.7f, 0.16f, 0.5f), C("#8A8F94"), along);
+            }
+        }
+
+        Fence(106.5, 100, 136, 100);
+        Fence(93.5, 100, 78, 100);
+        Fence(78, 100, 78, 136);
+        Fence(136, 100, 136, -10);
+        f.AddTo(_site);
+    }
+
+    private void Wheel()
+    {
+        var h = Holder(_site, 119, 47, 30);
+        var b = new MeshBatch();
+        float r = 8.2f, hub = r + 1.4f;
+        var steel = C("#F7F3E8");
+        foreach (var z in new[] { -0.9f, 0.9f })
+        {
+            for (var k = 0; k < 36; k++)
+            {
+                float a0 = k * Mathf.Tau / 36, a1 = (k + 1) * Mathf.Tau / 36;
+                b.Rod(new Vector3(Mathf.Cos(a0) * r, hub + (Mathf.Sin(a0) * r), z), new Vector3(Mathf.Cos(a1) * r, hub + (Mathf.Sin(a1) * r), z), 0.13f, C("#E94F7B"), true);
+            }
+
+            b.Rod(new Vector3(-4.2f, 0, z * 2.2f), new Vector3(0, hub, z), 0.14f, steel);
+            b.Rod(new Vector3(4.2f, 0, z * 2.2f), new Vector3(0, hub, z), 0.14f, steel);
+            for (var i = 0; i < 12; i++)
+            {
+                var a = i * Mathf.Tau / 12;
+                b.Rod(new Vector3(0, hub, z), new Vector3(Mathf.Cos(a) * r, hub + (Mathf.Sin(a) * r), z), 0.05f, steel, true);
+            }
+        }
+
+        var cols = new[] { "#F6B93B", "#36B5A2", "#7A5CE0", "#EE6C4D", "#3D8BFD", "#F2517A" };
+        for (var i = 0; i < 12; i++)
+        {
+            var a = (i * Mathf.Tau / 12) + 0.13f;
+            var p = new Vector3(Mathf.Cos(a) * r, hub + (Mathf.Sin(a) * r), 0);
+            b.Rod(p + new Vector3(0, 0, -0.9f), p + new Vector3(0, 0, 0.9f), 0.05f, steel, true);
+            b.Box(p + new Vector3(0, -0.85f, 0), new Vector3(1.3f, 0.8f, 1.3f), C(cols[i % 6]));
+            b.Box(p + new Vector3(0, -0.2f, 0), new Vector3(1.5f, 0.08f, 1.5f), C(cols[i % 6]).Lightened(0.25f));
+            Glow(h, Kit3D.SmallSphere, p + new Vector3(0, 0, 1.0f), Vector3.One * 0.3f, C("#FFE9B0"), 2.2f);
+        }
+
+        b.Cylinder(new Vector3(0, hub, 0), 0.6f, 2.2f, 0.6f, C("#F6B93B"), new Basis(Vector3.Right, Mathf.Pi / 2));
+        b.Box(new Vector3(0, 0.25f, 3.2f), new Vector3(7, 0.5f, 3), C("#7A5CE0"));
+        b.AddTo(h);
+        for (var i = 0; i < 7; i++)
+        {
+            Put(h, Goer(1600 + i), 0, 0, 180).Position = new Vector3(-3 + (i * 0.9f), 0, 5.6f);
+        }
+
+        // Merch stall and a helter-skelter style info tower near by.
+        var m = Holder(_site, 108, 66, 45);
+        var mb = new MeshBatch();
+        Marquee(mb, 7, 4, Hm(2.6), Hm(4.2), C("#22262B"), C("#E94F7B"));
+        mb.Box(new Vector3(0, 0.5f, 1.4f), new Vector3(6.6f, 1.0f, 0.7f), C("#3A3F49"));
+        for (var i = 0; i < 5; i++)
+        {
+            mb.Box(new Vector3(-2.6f + (i * 1.3f), 1.75f, -1.9f), new Vector3(0.95f, 1.0f, 0.04f), C(Brights[i * 2 % Brights.Length]));
+        }
+
+        mb.AddTo(m);
+        Sign(m, "MERCH", new Vector3(0, Hm(2.6) - 0.13f, 2.23f), C("#FFFFFF"), 0.0078f);
+        Put(m, BarStaff(1650) with { Apron = null, Top = C("#E94F7B") }, 0, 0, 0).Position = new Vector3(-1, 0, 0.5f);
+        Put(m, Goer(1651), 0, 0, 180).Position = new Vector3(-1.2f, 0, 2.6f);
+        Put(m, Goer(1652), 0, 0, 190).Position = new Vector3(0.6f, 0, 2.8f);
+    }
+
+    private void Dressing()
+    {
+        var b = new MeshBatch();
+
+        // Flag avenue behind the crowd, hay bales, recycling points, light towers, trees at the edge.
+        var cols = new[] { "#F2517A", "#F6B93B", "#36B5A2", "#7A5CE0", "#EE6C4D", "#3D8BFD" };
+        for (var i = 0; i < 12; i++)
+        {
+            var u = -33 + (i * 6);
+            var v = 47.0;
+            var c = Kit3D.At(36 + ((u + v) * 0.7071), 36 + ((v - u) * 0.7071));
+            b.Rod(c, c + new Vector3(0, Hm(8), 0), 0.05f, C("#D9D2C0"), true);
+            Quad(b, c + new Vector3(0, Hm(8), 0), c + new Vector3(0.75f, Hm(7.8), -0.75f), c + new Vector3(0.75f, Hm(4.2), -0.75f), c + new Vector3(0, Hm(4.0), 0), C(cols[i % 6]));
+        }
+
+        for (var i = 0; i < 16; i++)
+        {
+            var c = Kit3D.At(70 + (R() * 14), 60 + (R() * 12), 0.3f);
+            b.Box(c, new Vector3(1.5f, 0.6f, 0.8f), C("#E0C36A"), new Basis(Vector3.Up, (float)(R() * 3)));
+            if (R() < 0.6)
+            {
+                var sit = Put(_site, Goer(4000 + i), 0, 0, 0, Pose.Seated);
+                sit.Seat = new Person3D.SeatShape(0.6f, -0.02f, 0.3f);
+                sit.SetPose(Pose.Seated, 0);
+                sit.Position = c - new Vector3(0, 0.3f, 0);
+                sit.Rotation = new Vector3(0, (float)(R() * 6), 0);
+            }
+        }
+
+        foreach (var (x, y) in new[] { (96.5, 66.0), (96.5, 82.0), (70.0, 62.0), (60.0, 80.5), (93.0, 38.0) })
+        {
+            for (var k = 0; k < 3; k++)
+            {
+                var c = Kit3D.At(x, y + (k * 0.85));
+                b.Box(c + new Vector3(0, 0.5f, 0), new Vector3(0.75f, 1.0f, 0.75f), C(new[] { "#3F8F4E", "#2E6FB7", "#3A3F49" }[k]));
+                b.Box(c + new Vector3(0, 1.03f, 0), new Vector3(0.8f, 0.07f, 0.8f), C(new[] { "#2D6B3A", "#1F4E86", "#22262B" }[k]));
+            }
+        }
+
+        // Tower lights.
+        foreach (var (x, y) in new[] { (64.0, 70.0), (92.0, 74.0), (50.0, 78.0), (108.0, 62.0) })
+        {
+            var c = Kit3D.At(x, y);
+            b.Box(c + new Vector3(0, 0.45f, 0), new Vector3(1.6f, 0.9f, 1.0f), C("#F6B93B"));
+            b.Rod(c + new Vector3(0, 0.9f, 0), c + new Vector3(0, Hm(8), 0), 0.07f, C("#8E99A3"), true);
+            b.Box(c + new Vector3(0, Hm(8), 0), new Vector3(1.6f, 0.5f, 0.2f), C("#2A2E36"), new Basis(Vector3.Up, Mathf.Pi / 4));
+            Glow(_nightOnly, Kit3D.UnitBox, c + new Vector3(0.08f, Hm(8), 0.08f), new Vector3(1.4f, 0.4f, 0.2f), C("#FFF3D0"), 3f);
+            _nightOnly.AddChild(new OmniLight3D { Position = c + new Vector3(0, Hm(7.4), 0), LightColor = C("#FFF0CF"), LightEnergy = 1.6f, OmniRange = 17, OmniAttenuation = 1.2f });
+        }
+
+        // Trees along the far edges.
+        for (var i = 0; i < 70; i++)
+        {
+            var far = i % 2 == 0;
+            var c = far ? Kit3D.At(-8 + (i * 2.4) + (R() * 3), -6 - (R() * 16)) : Kit3D.At(-10 - (R() * 16), -8 + (i * 2.2) + (R() * 3));
+            var s = 0.8f + (float)R() * 0.7f;
+            b.Cylinder(c + new Vector3(0, 1.0f * s, 0), 0.3f * s, 2.0f * s, 0.3f * s, C("#6B5237"));
+            b.Ball(c + new Vector3(0, 3.3f * s, 0), new Vector3(4.6f, 4.2f, 4.6f) * s, C(Pick("#3F8A45", "#4A9A4E", "#357A3E")), true);
+            b.Ball(c + new Vector3(0.9f * s, 4.3f * s, 0.4f), new Vector3(3.0f, 2.8f, 3.0f) * s, C(Pick("#4A9A4E", "#57A859")), true);
+        }
+
+        b.AddTo(_site);
+
+        // People drifting between the arena and the bars, and resting on the grass.
+        for (var i = 0; i < 150; i++)
+        {
+            var x = 58 + (R() * 38);
+            var y = 56 + (R() * 28);
+            if ((Math.Abs(x - 74) < 13 && Math.Abs(y - 54) < 10) || (x > 82 && y < 68) || (x > 78 && y > 66 && y < 72))
+            {
+                continue;
+            }
+
+            var walking = R() < 0.6;
+            var p = Put(_site, Goer(5000 + i), x, y, R() * 360, walking ? Pose.Walking : Pose.Standing, R() * 6);
+            if (R() < 0.25)
+            {
+                Hat(p, C(Pick("#F7F3E8", "#F2517A", "#F6B93B", "#D9C29A")), R() < 0.3);
+            }
+        }
+
+        Put(_site, Steward(5200), 66, 66, 30);
+        Put(_site, Steward(5201), 84, 72, 250);
+        Put(_site, Security(5202), 79, 64, 200);
+        Put(_site, Litter(5203), 72, 70, 100);
+    }
+
+    private void Lineup()
+    {
+        _lineup = new Node3D { Position = Kit3D.At(120, 82) };
+        _site.AddChild(_lineup);
+        var pad = new MeshBatch();
+        pad.AddTo(_lineup);
+        var rows = new (string Label, Func<int, PersonLook> Make, Action<Person3D>? Extra)[][]
+        {
+            new (string, Func<int, PersonLook>, Action<Person3D>?)[]
+            {
+                ("Steward", Steward, null), ("Security", Security, null), ("Paramedic", Medic, null), ("First aider", FirstAider, null), ("Welfare", Welfare, null),
+                ("Bar staff", BarStaff, null), ("Food trader", Vendor, null), ("Stage crew", Crew, null), ("Litter picker", Litter, null), ("Electrician", Sparky, null), ("Manager", Manager, null),
+            },
+            new (string, Func<int, PersonLook>, Action<Person3D>?)[]
+            {
+                ("Headliner", s => Artist(s, "#E94F7B") with { Jacket = C("#F6B93B") }, null), ("Guitarist", s => Artist(s, "#F7F3E8", TopKind.Tee), p => Guitar(p, C("#C8452E"))), ("DJ", s => Artist(s, "#F6B93B", TopKind.Hoodie), null),
+                ("Festival-goer", s => Goer(s), null), ("Bucket hat", s => Goer(s), p => Hat(p, C("#F2517A"))), ("Cowboy hat", s => Goer(s), p => Hat(p, C("#D9C29A"), true)),
+                ("Arms up", s => Goer(s), p => ArmsUp(p, 1, 0)), ("Rain poncho", s => Goer(s, true) with { Jacket = C("#F2C230") }, p => Hood(p, C("#F2C230"))), ("Teenager", s => Looks.Preview(s, Sex.Female, 15), null),
+                ("Family", s => Looks.Preview(s, Sex.Male, 39), null), ("Child", s => Looks.Preview(s, Sex.Female, 8), p => Hat(p, C("#9BD770"))),
+            },
+        };
+        for (var r = 0; r < rows.Length; r++)
+        {
+            for (var i = 0; i < rows[r].Length; i++)
+            {
+                var (label, make, extra) = rows[r][i];
+                var u = (i - 5) * 1.5;
+                var v = (r * 4.4) - 2.6;
+                var p = Put(_lineup, make(300 + (r * 40) + (i * 3)), (u + v) * 0.7071, (v - u) * 0.7071, 45);
+                extra?.Invoke(p);
+                Sign(_lineup, label, Kit3D.At(((u + v + 1.15) * 0.7071), ((v + 1.15 - u) * 0.7071), 0.03f), C("#FFFFFF"), 0.0036f, C("#1D2B36"), true);
+            }
+        }
+    }
+
+    private void DensityOverlay()
+    {
+        // Crowd density painted on the ground in front of the main stage: green, amber, red by people per square metre.
+        var cx = 36 + (5.6 * 0.7071);
+        var cy = 36 + (5.6 * 0.7071);
+        var g = new MeshBatch();
+        const double cell = 2.5;
+        for (var u = -27.5; u < 27.5; u += cell)
+        {
+            for (var v = 0.0; v < 38; v += cell)
+            {
+                var count = 0;
+                foreach (var p in _crowd)
+                {
+                    var dx = p.Position.X - cx;
+                    var dy = p.Position.Z - cy;
+                    var pu = (dx - dy) * 0.7071;
+                    var pv = (dx + dy) * 0.7071;
+                    if (pu >= u && pu < u + cell && pv >= v && pv < v + cell)
+                    {
+                        count++;
+                    }
+                }
+
+                if (count == 0)
+                {
+                    continue;
+                }
+
+                // Each mock-up figure stands for several people: scale up so the front reads as a real pinch point.
+                var perM2 = count * 0.5 * (v < 5 && Math.Abs(u + 4) < 9 ? 1.4 : 1);
+                var col = perM2 >= 4.9 ? C("#D94A4A") : perM2 >= 3.9 ? C("#F2A33A") : C("#2FA05A");
+                var mu = u + (cell / 2);
+                var mv = v + (cell / 2);
+                g.Box(Kit3D.At(cx + ((mu + mv) * 0.7071), cy + ((mv - mu) * 0.7071), Hm(2.4)), new Vector3((float)cell - 0.12f, 0.02f, (float)cell - 0.12f), new Color(col, perM2 >= 4.9 ? 0.6f : perM2 >= 3.9 ? 0.48f : 0.3f), new Basis(Vector3.Up, Mathf.Pi / 4));
+            }
+        }
+
+        var (wx, wy) = P(-4, 3 + 5.6);
+        Sign(_density, "CRUSH RISK  4.8 per m²", Kit3D.At(wx, wy, Hm(4.6)), C("#FFFFFF"), 0.016f, C("#B3261E"), true);
+        var (ox, oy) = P(17, 14);
+        Sign(_density, "Busy  3.1 per m²", Kit3D.At(ox, oy, Hm(4.2)), C("#FFFFFF"), 0.012f, C("#B56A00"), true);
+        var (gx, gy) = P(-14, 33);
+        Sign(_density, "Comfortable  1.4 per m²", Kit3D.At(gx, gy, Hm(4.2)), C("#FFFFFF"), 0.012f, C("#1E7A42"), true);
+        var mi = g.AddTo(_density, alpha: true, shadow: false);
+        if (mi is not null)
+        {
+            mi.MaterialOverride = new StandardMaterial3D { VertexColorUseAsAlbedo = true, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, Transparency = BaseMaterial3D.TransparencyEnum.Alpha, NoDepthTest = false };
+        }
+    }
+}
+
+internal static class NodeExt
+{
+    public static T With<T>(this T node, Action<T> act)
+        where T : Node
+    {
+        act(node);
+        return node;
+    }
+}

@@ -1,0 +1,245 @@
+<title>Blueprint Festival Plan</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Figtree:wght@400;500;600;700;800&display=swap">
+<style>
+/* Layout: one reading column (~760px) with wide figure bands for the Godot renders; same house layout as the School and Supermarket plans, in festival pink and sunflower. */
+:root {
+  --bg: #F7F4F6; --surface: #FFFFFF; --fg: #1D2B36; --mute: #5B6470; --line: #E0D8DE;
+  --pink: #C7285B; --pink-soft: #FBE4EC; --sun: #B77A00; --sun-fill: #F6B93B; --sun-soft: #FDF1D3;
+  --ok: #1E7A42; --amber: #B56A00; --red: #B3261E; --ok-soft: #DDF1E4; --amber-soft: #FBEAD0; --red-soft: #F8DEDB;
+  --display: "Bricolage Grotesque", "Figtree", system-ui, sans-serif;
+  --body: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #15121A; --surface: #1E1A25; --fg: #EDE8F0; --mute: #A9A2B3; --line: #322C3B;
+  --pink: #FF7FA6; --pink-soft: #3A1C2A; --sun: #F6B93B; --sun-fill: #F6B93B; --sun-soft: #3A2E14;
+  --ok: #6FD197; --amber: #F2B25A; --red: #FF8A80; --ok-soft: #17301F; --amber-soft: #3A2A12; --red-soft: #3D1B19; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #15121A; --surface: #1E1A25; --fg: #EDE8F0; --mute: #A9A2B3; --line: #322C3B;
+  --pink: #FF7FA6; --pink-soft: #3A1C2A; --sun: #F6B93B; --sun-fill: #F6B93B; --sun-soft: #3A2E14;
+  --ok: #6FD197; --amber: #F2B25A; --red: #FF8A80; --ok-soft: #17301F; --amber-soft: #3A2A12; --red-soft: #3D1B19; color-scheme: dark }
+body { background: var(--bg); color: var(--fg); font: 16px/1.6 var(--body); }
+.wrap { max-width: 1120px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 28px 64px; }
+.col { max-width: 760px; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; line-height: 1.15; margin: 0; }
+h1 { font-size: clamp(2.2rem, 5vw, 3.4rem); font-weight: 800; letter-spacing: -0.02em; }
+h2 { font-size: 1.7rem; font-weight: 800; }
+h3 { font-size: 1.08rem; font-weight: 700; }
+p { margin: 0; }
+.eyebrow { font-size: .75rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--pink); }
+.lede { font-size: 1.15rem; color: var(--mute); max-width: 62ch; }
+header.hero { display: grid; gap: 10px; padding-bottom: 20px; border-bottom: 3px solid var(--sun-fill); margin-bottom: 22px; }
+section { margin-top: 56px; display: grid; gap: 14px; }
+figure { margin: 0; display: grid; gap: 8px; }
+figure img { border-radius: 10px; border: 1px solid var(--line); display: block; width: 100%; height: auto; }
+figcaption { font-size: .88rem; color: var(--mute); }
+.two { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+ul { margin: 0; padding-left: 1.15rem; display: grid; gap: 6px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }
+.cell { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; display: grid; gap: 6px; align-content: start; min-width: 0; }
+.cell p, .cell li { font-size: .95rem; }
+.loop { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; counter-reset: step; }
+.loop .cell { counter-increment: step; }
+.loop h3::before { content: counter(step) ". "; color: var(--pink); }
+.when { font-size: .78rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--sun); }
+.swatches { display: flex; flex-wrap: wrap; gap: 10px; }
+.sw { display: grid; gap: 4px; font-size: .8rem; color: var(--mute); }
+.sw i { width: 92px; height: 44px; border-radius: 8px; border: 1px solid var(--line); display: block; }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: .93rem; min-width: 560px; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: .76rem; letter-spacing: .08em; text-transform: uppercase; color: var(--mute); }
+.pill { display: inline-block; font-size: .78rem; font-weight: 700; padding: 1px 9px; border-radius: 999px; white-space: nowrap; }
+.pill.g { background: var(--ok-soft); color: var(--ok); } .pill.a { background: var(--amber-soft); color: var(--amber); } .pill.r { background: var(--red-soft); color: var(--red); }
+.note { background: var(--sun-soft); border-radius: 10px; padding: 12px 16px; font-size: .95rem; }
+.q { background: var(--pink-soft); border-radius: 10px; padding: 14px 18px; }
+.q ol { margin: 0; padding-left: 1.2rem; display: grid; gap: 8px; }
+</style>
+
+<div class="wrap">
+<header class="hero">
+  <span class="eyebrow">Blueprint series · design plan · nothing built yet</span>
+  <h1>Blueprint Festival</h1>
+  <p class="lede">Run a UK music festival across a three-day weekend. Lay out the site on a farm, book the bill, then keep sixty thousand people fed, dry, safe and happy when the rain comes in on Saturday night.</p>
+</header>
+
+<figure>
+  <img src="overview_day.jpg" alt="3D mock-up of a festival site: main stage with a packed crowd, striped big top, bar marquee, food street, toilets, medical and welfare tents, camping field and entrance gate" width="1600" height="900">
+  <figcaption>Saturday afternoon at the fictional Larkmoor Festival. Every picture on this page is a real 3D render from Godot 4.7.2, built with Blueprint Hospital's own style A people and lighting, so this is how the game would actually look.</figcaption>
+</figure>
+
+<section class="col">
+  <h2>What the player does</h2>
+  <p>You are the festival director. A year is one festival: months of planning squeezed into a few screens, a build week, then the three show days played out in real time like a hospital shift. Each year the licence, the site and the crowd get bigger.</p>
+</section>
+<div class="loop">
+  <div class="cell"><span class="when">Winter</span><h3>Plan</h3><p>Set the capacity you are applying for, ticket prices and tiers, and book acts against a budget.</p></div>
+  <div class="cell"><span class="when">Build week</span><h3>Lay out</h3><p>Drag out stages, camping fields, trader rows, toilets, trackway and fencing. Hire crews and stewards.</p></div>
+  <div class="cell"><span class="when">Fri to Sun</span><h3>Run the show</h3><p>Gates, queues, crowd flow, weather, medical calls, set changeovers and curfew, hour by hour.</p></div>
+  <div class="cell"><span class="when">Monday</span><h3>Tear down</h3><p>Litter pick, damage to the farmer's fields, the final accounts and the reviews.</p></div>
+  <div class="cell"><span class="when">Next year</span><h3>Grow</h3><p>A good year earns a bigger licence, better acts returning your calls and a second site option.</p></div>
+</div>
+
+<section class="col">
+  <h2>Festival colours, same house style</h2>
+  <p>The layout stays the "Clinical light" one from the hospital: light panels, top bar, bottom build bar. Only the colours change, as School went green and gold and Supermarket teal and tangerine. Festival takes stage pink and sunflower, with red, amber and green kept strictly for safety status.</p>
+  <div class="swatches">
+    <span class="sw"><i style="background:#E94F7B"></i>Stage pink</span>
+    <span class="sw"><i style="background:#F6B93B"></i>Sunflower</span>
+    <span class="sw"><i style="background:#1D2B36"></i>Night ink</span>
+    <span class="sw"><i style="background:#5E9C4E"></i>Meadow</span>
+    <span class="sw"><i style="background:#7A6646"></i>Mud</span>
+    <span class="sw"><i style="background:#1E9E52"></i>First aid green</span>
+  </div>
+</section>
+
+<section>
+  <div class="col"><h2>Crew and crowd in people style A</h2>
+  <p>Every role gets its own clear colour and kit, following the standing rule from the hospital. Festival-goers reuse the patient and visitor generator (ages, faces, hair, clothes) with festival extras on top: bucket hats, wellies, ponchos and arms in the air.</p></div>
+  <figure>
+    <img src="people.jpg" alt="Line-up of 3D characters: steward, security, paramedic, first aider, welfare, bar staff, food trader, stage crew, litter picker, electrician, manager, then performers and festival-goers" width="1600" height="450">
+    <figcaption>Top row is staff you hire. Stewards in orange, security in black and yellow, medical in two greens, welfare in purple. Bottom row is performers and the public, including the rain poncho look.</figcaption>
+  </figure>
+</section>
+
+<section>
+  <div class="col"><h2>Laying out the site</h2>
+  <p>Building works like the hospital: drag to size, minimum sizes per type, furniture placed for you. Rooms become zones and corridors become trackway. Nothing comes staffed.</p></div>
+  <div class="grid">
+    <div class="cell"><h3>Arena</h3><ul><li>Main stage, big top, small stages</li><li>Front barrier and pit, sound desk tower</li><li>Each stage has a safe capacity from its field size</li></ul></div>
+    <div class="cell"><h3>Camping</h3><ul><li>General, family, quiet and glamping fields</li><li>Fire lanes, water points, showers</li><li>Pitches fill by ticket type from Thursday</li></ul></div>
+    <div class="cell"><h3>Traders</h3><ul><li>Food trucks, bars, merch, market stalls</li><li>You rent pitches; busy spots earn more</li><li>Needs power, water and waste runs</li></ul></div>
+    <div class="cell"><h3>Welfare</h3><ul><li>Toilets and handwash by headcount</li><li>Medical tent, welfare tent, lost children</li><li>Free water, shade and info points</li></ul></div>
+    <div class="cell"><h3>Back of house</h3><ul><li>Artist area, production office, crew catering</li><li>Generators, cable runs, water tanks</li><li>Emergency vehicle routes kept clear</li></ul></div>
+    <div class="cell"><h3>Edges</h3><ul><li>Perimeter fence, entrance lanes, box office</li><li>Car parks and shuttle bus stop</li><li>Flags, lights and signs for wayfinding</li></ul></div>
+  </div>
+  <figure>
+    <img src="food_and_bar.jpg" alt="3D mock-up at dusk of a food street: six food trucks with striped awnings and queues, festoon lights, people walking on metal trackway, picnic benches" width="1600" height="900">
+    <figcaption>The food street at dusk. Trackway keeps the main routes walkable. Queue length at each truck is the feedback for whether you rented enough pitches.</figcaption>
+  </figure>
+</section>
+
+<section class="col">
+  <h2>Booking the bill</h2>
+  <p>Acts are fictional, generated with a genre, a fee, a draw (how many ticket-holders want to see them) and an energy level. The timetable is a grid of stages against hours, the festival's version of the hospital rota.</p>
+  <ul>
+    <li><strong>Draw against field size.</strong> A big name on a small stage overfills the field. That is the main cause of crush risk, and it is your own doing.</li>
+    <li><strong>Clashes.</strong> Two popular acts at once splits the crowd, which is safer but annoys fans of both. One act alone moves everyone at once.</li>
+    <li><strong>Changeovers and curfew.</strong> Stage crew numbers set changeover time. Overrun past the licence curfew and the council fines you.</li>
+    <li><strong>Riders and no-shows.</strong> Late acts, storms and illness force a reshuffle on the day.</li>
+  </ul>
+</section>
+
+<section>
+  <figure>
+    <img src="main_stage_night.jpg" alt="3D mock-up of the main stage at night with coloured light beams over a dense cheering crowd, band on stage, security in the pit" width="1600" height="900">
+    <figcaption>The headline set. Day and night follow the clock as they do in the hospital, with stage lighting on top.</figcaption>
+  </figure>
+  <div class="col"><h2>Crowd flow and safety</h2>
+  <p>This is the heart of the game, the equivalent of triage. Every person walks the site using the hospital's pathfinding, and the game measures people per square metre everywhere, live.</p></div>
+  <figure>
+    <img src="crowd_density.jpg" alt="The same crowd with a red, amber and green grid overlaid showing density, red at the front barrier labelled crush risk 4.8 per square metre" width="1600" height="900">
+    <figcaption>Density view, a toggle like the hospital's Routes view. The front left of the barrier has gone red.</figcaption>
+  </figure>
+  <div class="col tablewrap">
+    <table>
+      <thead><tr><th>Status</th><th>People per m²</th><th>What happens</th><th>What you can do</th></tr></thead>
+      <tbody>
+        <tr><td><span class="pill g">Comfortable</span></td><td>under 2</td><td>People move freely and reach bars and toilets</td><td>Nothing</td></tr>
+        <tr><td><span class="pill a">Busy</span></td><td>2 to 4</td><td>Slow movement, more faints, tempers shorten</td><td>Send stewards, open a relief exit, show a screen message</td></tr>
+        <tr><td><span class="pill r">Crush risk</span></td><td>over 4</td><td>Injuries start; left alone it becomes a major incident</td><td>Close the field, pause the act, pull people over the barrier</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="col">Pinch points matter as much as stages: a narrow gate between two fields at changeover, the bridge to the campsite at 11pm, the entrance on Friday morning. Barrier layout, one-way routes and steward posts are the tools.</p>
+</section>
+
+<section>
+  <div class="col"><h2>Weather: rain, mud and heat</h2>
+  <p>A forecast arrives a week out and gets more accurate each day, so you choose how much trackway and straw to pay for before you know. Ground has a wetness value per tile, and footfall turns wet grass into mud.</p></div>
+  <div class="two">
+    <figure>
+      <img src="campsite_rain.jpg" alt="3D mock-up of a camping field in the rain: colourful dome and bell tents, brown mud between the rows with puddles, campers in ponchos" width="1600" height="900">
+      <figcaption>The meadow campsite on a wet Saturday. Mud slows walking, raises slips and sprains, and drags the mood down.</figcaption>
+    </figure>
+    <div class="cell">
+      <h3>What each kind of weather does</h3>
+      <ul>
+        <li><strong>Rain.</strong> Mud on busy routes, stuck vehicles, tents flooding in low ground, more people sheltering in bars and big tops.</li>
+        <li><strong>Heat.</strong> Dehydration and heat exhaustion, water points overwhelmed, bar income up.</li>
+        <li><strong>Wind.</strong> Above a set speed, high stages and the wheel must close.</li>
+        <li><strong>Lightning.</strong> Show stop and shelter. The hardest call in the game.</li>
+      </ul>
+      <p>Counter-moves: trackway, straw, woodchip, pumps, free ponchos, shade sails, extra water.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="col"><h2>The medical tent borrows from the hospital</h2>
+  <p>The medical tent is a small A&amp;E under canvas, running on Blueprint Hospital's existing rules: red, amber and green triage, live observations on monitors, staff walking to patients, and conditions kept in the same JSON format so the medical editor still works.</p></div>
+  <figure>
+    <img src="medical_tent.jpg" alt="3D cutaway mock-up of a medical tent with three patients on trolleys wearing coloured triage bands, first aiders, a paramedic, a doctor and nurse, a waiting area, a welfare tent next door and an ambulance" width="1600" height="900">
+    <figcaption>Roof cut away, as walls are in the hospital. Three bays with amber, green and red patients; the red bay has a monitor, a doctor and a nurse from the hospital's own cast. Welfare is next door and the ambulance waits on the trackway.</figcaption>
+  </figure>
+  <div class="grid">
+    <div class="cell"><h3>Festival conditions</h3><p>Dehydration, heat exhaustion, sprains and fractures from mud, cuts, sunburn, bee stings, asthma, allergic reactions, too much alcohol, hypothermia on a wet night, crush injuries.</p></div>
+    <div class="cell"><h3>Who works there</h3><p>First aiders handle green. Paramedics, nurses and a doctor take amber and red. Roving response teams bring casualties in by wheelchair or stretcher from the pit.</p></div>
+    <div class="cell"><h3>Transfer out</h3><p>Anything the tent cannot treat goes by ambulance to the local hospital. Each transfer takes a vehicle off site for a while and counts in the council's debrief.</p></div>
+    <div class="cell"><h3>Welfare, not medical</h3><p>Lost children, lost phones, people who are cold, upset or overwhelmed. A good welfare tent keeps them out of the medical queue.</p></div>
+  </div>
+  <p class="note col">Possible later link: load a saved Blueprint Hospital as "the local hospital" so festival transfers arrive at your own A&amp;E. Nice to have, not part of the first version.</p>
+</section>
+
+<section class="col">
+  <h2>Money and reputation</h2>
+  <div class="grid">
+    <div class="cell"><h3>Income</h3><ul><li>Tickets: early bird, general, day, family, glamping</li><li>Trader pitch fees and a share of bar sales</li><li>Parking, lockers, merch, sponsors</li></ul></div>
+    <div class="cell"><h3>Costs</h3><ul><li>Act fees, usually the largest</li><li>Staging, power, toilets, fencing hire</li><li>Staff, security, medical cover, licence</li><li>Land rent and repair of the fields</li></ul></div>
+    <div class="cell"><h3>Scores</h3><ul><li>Crowd happiness, hour by hour</li><li>Safety record and council rating</li><li>Neighbours: noise, traffic, litter</li><li>Press reviews and next year's sales</li></ul></div>
+  </div>
+  <p>Most of the money is committed before the gates open, so a festival can be lost in winter and only found out in July. Weather insurance is an optional cost each year.</p>
+</section>
+
+<section class="col">
+  <h2>What carries over from Blueprint Hospital</h2>
+  <ul>
+    <li><strong>The 3D world.</strong> Orthographic camera, four view angles, day and night lighting, cutaway.</li>
+    <li><strong>People.</strong> Style A characters, the look generator, walking, sitting, carrying, wheelchairs and stretchers.</li>
+    <li><strong>The simulation core.</strong> Plain C# tested outside Godot, the clock and speeds, tile pathfinding, save and load.</li>
+    <li><strong>Systems with a new skin.</strong> Triage and observations, hiring panel and shifts, toilets, cafeteria and vending as food traders, cleaners as litter pickers, tannoy as stage and site announcements, career levels as festival years.</li>
+    <li><strong>The UI kit.</strong> Top bar, bottom build bar, panels, notifications, finances.</li>
+  </ul>
+  <p>New work: outdoor terrain with wetness and mud, crowd density, the act booking and timetable screens, weather, stages and sound, and large crowds drawn cheaply. The mock-ups here drew about 1,800 people without special tricks; real festival numbers will need crowd figures simplified at a distance.</p>
+</section>
+
+<section class="col">
+  <h2>Vertical slice first, like the hospital</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Stage</th><th>What you can play</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>A field, one stage, a fence and a gate. People arrive, walk in and watch an act.</td></tr>
+        <tr><td>2</td><td>Toilets, food trucks and a bar with queues, needs and money.</td></tr>
+        <tr><td>3</td><td>Crowd density view, barriers, stewards and the first crush warnings.</td></tr>
+        <tr><td>4</td><td>Medical and welfare tents using the hospital's triage rules.</td></tr>
+        <tr><td>5</td><td>Weather, mud and trackway. Camping fields and the overnight.</td></tr>
+        <tr><td>6</td><td>Booking, timetable, tickets and the year-on-year career.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>As with School, the simplest route is a new repo that starts as a copy of the hospital code, so the two games can change independently.</p>
+</section>
+
+<section class="col">
+  <h2>Questions before anything is built</h2>
+  <div class="q"><ol>
+    <li><strong>Scale.</strong> Start as a 5,000 person boutique festival and grow, or go straight to a 60,000 person giant?</li>
+    <li><strong>How real should the bad days be?</strong> Crushes and serious injuries shown plainly as in the hospital, or kept lighter?</li>
+    <li><strong>Player role.</strong> Festival director doing everything, or hire a site manager who recommends, as the Headteacher does in School?</li>
+    <li><strong>Camping.</strong> In the first version, or a later stage?</li>
+    <li><strong>Colours and name.</strong> Happy with pink and sunflower, and "Larkmoor" as the default festival name?</li>
+    <li><strong>Order.</strong> Where does this sit against School and Supermarket?</li>
+  </ol></div>
+</section>
+</div>
