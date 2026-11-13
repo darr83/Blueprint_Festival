@@ -106,7 +106,6 @@ public static class SiteProps
         Bunting(b, new Vector3((-w / 2) + 0.1f, top + 2.3f, (-d / 2) + 0.16f), new Vector3((w / 2) - 0.1f, top + 2.3f, (-d / 2) + 0.16f), 0.3f);
         Speaker(b, new Vector3((-w / 2) + 0.7f, top, 0.5f), 0.9f, onStand: true);
         Speaker(b, new Vector3((w / 2) - 0.7f, top, 0.5f), 0.9f, onStand: true);
-        MicStand(b, new Vector3(0, top, 0.6f));
     }
 
     private static void Bandstand(MeshBuilder b, Node3D node, string name)
@@ -166,7 +165,6 @@ public static class SiteProps
         Bunting(b, new Vector3((-w / 2) + 0.12f, eaves - 0.35f, (d / 2) - 0.1f), new Vector3((w / 2) - 0.12f, eaves - 0.35f, (d / 2) - 0.1f), 0.4f);
         Speaker(b, new Vector3((-w / 2) + 0.6f, top, (d / 2) - 0.6f), 0.8f, onStand: true);
         Speaker(b, new Vector3((w / 2) - 0.6f, top, (d / 2) - 0.6f), 0.8f, onStand: true);
-        MicStand(b, new Vector3(0, top, 1.1f));
     }
 
     private static void HiredStage(MeshBuilder b, Node3D node, string name)
@@ -227,13 +225,8 @@ public static class SiteProps
         }
 
         b.Box(new Vector3(-0.2f, top + 0.35f, -1.4f), new Vector3(1.9f, 0.3f, 1.5f), Charcoal);
-        b.Tube(new Vector3(-0.2f, top + 0.8f, -1.4f), new Vector3(0.7f, 0.5f, 0.7f), Pink, new Vector3(80, 0, 0));
-        b.Tube(new Vector3(-0.85f, top + 1.0f, -1.2f), new Vector3(0.42f, 0.22f, 0.42f), Canvas);
-        b.Tube(new Vector3(0.45f, top + 1.0f, -1.2f), new Vector3(0.42f, 0.22f, 0.42f), Canvas);
-        b.Tube(new Vector3(0.75f, top + 1.45f, -1.6f), new Vector3(0.5f, 0.03f, 0.5f), Sunflower);
         b.Box(new Vector3(-2.9f, top + 0.4f, -1.7f), new Vector3(0.8f, 0.8f, 0.5f), Black);
         b.Box(new Vector3(2.9f, top + 0.4f, -1.7f), new Vector3(0.8f, 0.8f, 0.5f), Black);
-        MicStand(b, new Vector3(0, top, 1.6f));
         MicStand(b, new Vector3(-2.2f, top, 1.2f));
         MicStand(b, new Vector3(2.2f, top, 1.2f));
         foreach (var x in new[] { -1.1f, 1.1f })

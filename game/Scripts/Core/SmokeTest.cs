@@ -19,7 +19,7 @@ public partial class SmokeTest : Node
     private const string FestivalName = "Smoke Test Fayre";
     private const double TimeoutSeconds = 120;
 
-    private enum Stage { Menu, Opening, Running, Paused, Turning, BackToMenu, Loading, Done }
+    private enum Stage { Menu, Opening, Running, ShowTime, Paused, Turning, BackToMenu, Loading, Done }
 
     private Stage _stage = Stage.Menu;
     private double _elapsed;
@@ -149,9 +149,36 @@ public partial class SmokeTest : Node
                     Check(crowd.ThroughGates >= 6 && crowd.WalkedInFree == 0, "Everyone should have come in through the gate.");
                     Check(running.TopBar.MoneyText == $"£{_savedMoney:N0}", "The top bar should show the money left.");
                     Check(running.TopBar.TimeText != "08:00", "The clock in the top bar should have moved on.");
-                    running.TogglePause();
-                    Check(running.Game.Clock.IsPaused, "Space should pause the game.");
-                    _mark = running.Game.Now;
+                    Check(running.Acts.PerformerCount == 0, "Nobody should be on stage before midday.");
+                    Check(running.TopBar.ShowText.StartsWith("Next: ", StringComparison.Ordinal) && running.TopBar.ShowText.EndsWith("at 12:00", StringComparison.Ordinal), $"The top bar should say who is on at midday, not '{running.TopBar.ShowText}'.");
+
+                    // Skip on to a quarter past twelve, when the first act is well into its set.
+                    var quarterPast = running.Game.Now.Date.AddHours(12.25);
+                    while (running.Game.Now < quarterPast)
+                    {
+                        running.Game.Clock.Step();
+                    }
+
+                    running.Crowd.Snap();
+                    Next(Stage.ShowTime);
+                }
+
+                break;
+
+            case Stage.ShowTime:
+                if (_stageTime > 0.4 && Festival is { } show)
+                {
+                    var music = show.Game.Show;
+                    var onStage = music.OnStage(show.Game.Now);
+                    Check(music.Playing(show.Game.Now) is not null && onStage.Count > 0, "An act should be playing at a quarter past twelve.");
+                    Check(show.Acts.PerformerCount == onStage.Count, $"The act should be drawn on the stage: {show.Acts.PerformerCount} drawn, {onStage.Count} playing.");
+                    Check(show.TopBar.ShowText.StartsWith($"Now: {music.Playing(show.Game.Now)!.Act.Name}", StringComparison.Ordinal), $"The top bar should say who is on, not '{show.TopBar.ShowText}'.");
+                    Check(show.Game.Crowd.Watching > 0, "Some people should be watching the act.");
+                    Check(music.SongNow(show.Game.Now) is not null, "The act should be playing one of its songs.");
+                    Check(show.Acts.LightStrength < 0.05f, "The stage lights should be off by day.");
+                    show.TogglePause();
+                    Check(show.Game.Clock.IsPaused, "Space should pause the game.");
+                    _mark = show.Game.Now;
                     Next(Stage.Paused);
                 }
 

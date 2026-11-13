@@ -29,6 +29,10 @@ public partial class TopBar : PanelContainer
     private Label _people = null!;
     private Label _money = null!;
     private Label _queue = null!;
+    private Label _show = null!;
+
+    /// <summary>What the bar says about the music: who is on now, or who is next.</summary>
+    public string ShowText => _show.Text;
 
     public string MoneyText => _money.Text;
 
@@ -72,6 +76,11 @@ public partial class TopBar : PanelContainer
         _money.MouseFilter = MouseFilterEnum.Stop;
         row.AddChild(new Control { CustomMinimumSize = new Vector2(10, 0) });
         row.AddChild(_money);
+        _show = UiStyle.Body("", size: 15);
+        _show.TooltipText = "Who is on stage now, or who is on next";
+        _show.MouseFilter = MouseFilterEnum.Stop;
+        row.AddChild(new Control { CustomMinimumSize = new Vector2(10, 0) });
+        row.AddChild(_show);
 
         row.AddChild(new Control { SizeFlagsHorizontal = SizeFlags.ExpandFill });
 
@@ -115,6 +124,11 @@ public partial class TopBar : PanelContainer
         _people.Text = $"On site {_game.Crowd.OnSite} of {_game.Crowd.Expected}";
         _queue.Text = _game.Crowd.Queuing > 0 ? $"Queuing {_game.Crowd.Queuing}" : "";
         _money.Text = $"£{_game.Money:N0}";
+        var music = _game.Show;
+        _show.Text = music.Stage is null ? "No stage, no music"
+            : music.Playing(now) is { } on ? $"Now: {on.Act.Name} until {on.End.ToString("HH:mm", British)}"
+            : music.Next(now) is { } next ? $"Next: {next.Act.Name} at {next.Start.ToString("HH:mm", British)}"
+            : "The music has finished";
         var light = _game.Light;
         _light.Text = light >= 1 ? "Daylight" : light <= 0 ? "Night" : now.Hour < 12 ? "Dawn" : "Dusk";
         foreach (var (speed, button) in _speedButtons)
