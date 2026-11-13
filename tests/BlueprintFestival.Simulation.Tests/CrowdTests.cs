@@ -71,6 +71,7 @@ public class CrowdTests
     public void Nobody_is_there_before_the_gates_open_and_the_field_fills_by_the_afternoon()
     {
         var game = new FestivalGame("Crowd Test");
+        Amenities.Add(game);
         Assert.Equal(0, game.Crowd.OnSite);
 
         RunUntil(game, 8.5);
@@ -114,6 +115,7 @@ public class CrowdTests
     public void Everyone_has_gone_home_by_midnight()
     {
         var game = new FestivalGame("Home Time");
+        Amenities.Add(game);
         RunUntil(game, 19);
         var evening = game.Crowd.OnSite;
         RunUntil(game, 21.5);

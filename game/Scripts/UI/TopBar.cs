@@ -30,6 +30,13 @@ public partial class TopBar : PanelContainer
     private Label _money = null!;
     private Label _queue = null!;
     private Label _show = null!;
+    private Label _mood = null!;
+
+    /// <summary>How happy people are, as the bar says it.</summary>
+    public string MoodText => _mood.Text;
+
+    /// <summary>Raised when the money is clicked.</summary>
+    public event System.Action? MoneyPressed;
 
     /// <summary>What the bar says about the music: who is on now, or who is next.</summary>
     public string ShowText => _show.Text;
@@ -72,10 +79,22 @@ public partial class TopBar : PanelContainer
         _queue.MouseFilter = MouseFilterEnum.Stop;
         row.AddChild(_queue);
         _money = UiStyle.Heading("", 20);
-        _money.TooltipText = "Money in the festival's bank account";
+        _money.TooltipText = "Money in the festival's bank account. Click to see today's takings.";
         _money.MouseFilter = MouseFilterEnum.Stop;
+        _money.MouseDefaultCursorShape = CursorShape.PointingHand;
+        _money.GuiInput += e =>
+        {
+            if (e is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left })
+            {
+                MoneyPressed?.Invoke();
+            }
+        };
+        _mood = UiStyle.Body("", size: 15);
+        _mood.TooltipText = "How happy the people who have come today are";
+        _mood.MouseFilter = MouseFilterEnum.Stop;
         row.AddChild(new Control { CustomMinimumSize = new Vector2(10, 0) });
         row.AddChild(_money);
+        row.AddChild(_mood);
         _show = UiStyle.Body("", size: 15);
         _show.TooltipText = "Who is on stage now, or who is on next";
         _show.MouseFilter = MouseFilterEnum.Stop;
@@ -85,8 +104,10 @@ public partial class TopBar : PanelContainer
         row.AddChild(new Control { SizeFlagsHorizontal = SizeFlags.ExpandFill });
 
         _light = UiStyle.Body("", muted: true, size: 14);
+        _light.Visible = false;
         row.AddChild(_light);
         _date = UiStyle.Body("", muted: true);
+        _date.MouseFilter = MouseFilterEnum.Stop;
         row.AddChild(_date);
         _time = UiStyle.Heading("", 26);
         _time.CustomMinimumSize = new Vector2(78, 0);
@@ -119,11 +140,13 @@ public partial class TopBar : PanelContainer
     private void Refresh()
     {
         var now = _game.Now;
-        _date.Text = now.ToString("dddd d MMMM yyyy", British);
+        _date.Text = now.ToString("ddd d MMM", British);
+        _date.TooltipText = now.ToString("dddd d MMMM yyyy", British);
         _time.Text = now.ToString("HH:mm", British);
         _people.Text = $"On site {_game.Crowd.OnSite} of {_game.Crowd.Expected}";
         _queue.Text = _game.Crowd.Queuing > 0 ? $"Queuing {_game.Crowd.Queuing}" : "";
         _money.Text = $"£{_game.Money:N0}";
+        _mood.Text = $"Happy {_game.Crowd.Happiness}%";
         var music = _game.Show;
         _show.Text = music.Stage is null ? "No stage, no music"
             : music.Playing(now) is { } on ? $"Now: {on.Act.Name} until {on.End.ToString("HH:mm", British)}"

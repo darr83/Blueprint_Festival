@@ -19,6 +19,9 @@ public partial class SiteView : Node3D
     /// <summary>How many gates are drawn.</summary>
     public int GateCount { get; private set; }
 
+    /// <summary>How many stalls are drawn.</summary>
+    public int StallCount { get; private set; }
+
     /// <summary>How many straight runs of fence are drawn.</summary>
     public int FenceRunCount { get; private set; }
 
@@ -83,6 +86,23 @@ public partial class SiteView : Node3D
             AddChild(node);
         }
 
+        for (var i = 0; i < site.Stalls.Count; i++)
+        {
+            var stall = site.Stalls[i];
+            var node = SiteProps.Stall(stall.Kind);
+            node.Position = Middle(stall.Rect);
+            node.RotationDegrees = new Vector3(0, Turn(stall.Facing), 0);
+            var spots = SiteProps.StaffSpots(stall.Kind);
+            for (var j = 0; j < spots.Length; j++)
+            {
+                var person = SiteProps.Stallholder((stall.X * 31) + (stall.Y * 7) + j);
+                person.Position = spots[j] + (stall.Kind == StallKind.FoodVan ? new Vector3(0, 0, 0) : Vector3.Zero);
+                node.AddChild(person);
+            }
+
+            AddChild(node);
+        }
+
         for (var i = 0; i < site.Gates.Count; i++)
         {
             var node = SiteProps.Gate(site.Gates[i].Kind, _game.Name);
@@ -105,6 +125,7 @@ public partial class SiteView : Node3D
 
         StageCount = site.Stages.Count;
         GateCount = site.Gates.Count;
+        StallCount = site.Stalls.Count;
         FenceRunCount = runs.Count;
     }
 }

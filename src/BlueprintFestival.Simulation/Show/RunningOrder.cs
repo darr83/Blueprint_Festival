@@ -65,18 +65,5 @@ public sealed class RunningOrder
     }
 
     /// <summary>The middle of the front edge of the stage in metres, and the way it faces.</summary>
-    public static (double X, double Y, int DirX, int DirY) Front(PlacedStage stage)
-    {
-        var r = stage.Rect;
-        const double t = FieldMap.TileMetres;
-        var midX = (r.X + (r.Width / 2.0)) * t;
-        var midY = (r.Y + (r.Height / 2.0)) * t;
-        return stage.Facing switch
-        {
-            Facing.North => (midX, r.Y * t, 0, -1),
-            Facing.East => (r.Right * t, midY, 1, 0),
-            Facing.West => (r.X * t, midY, -1, 0),
-            _ => (midX, r.Bottom * t, 0, 1),
-        };
-    }
+    public static (double X, double Y, int DirX, int DirY) Front(PlacedStage stage) => SiteLayout.Front(stage.Rect, stage.Facing);
 }

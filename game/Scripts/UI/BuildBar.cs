@@ -7,7 +7,7 @@ using Godot;
 namespace BlueprintFestival.UI;
 
 /// <summary>
-/// The build bar along the bottom: Stages, Fences, Gates and Take down. Picking a group opens its
+/// The build bar along the bottom: Stages, Fences, Gates, Stalls and Take down. Picking a group opens its
 /// choices with their prices; picking a choice hands it to the mouse.
 /// </summary>
 public partial class BuildBar : VBoxContainer
@@ -65,6 +65,7 @@ public partial class BuildBar : VBoxContainer
         AddTab(row, BuildMode.Stage, "Stages", "Somewhere for the acts to play");
         AddTab(row, BuildMode.Fence, "Fences", "Keep people in, out, or in a line");
         AddTab(row, BuildMode.Gate, "Gates", "Where tickets are checked");
+        AddTab(row, BuildMode.Stall, "Stalls", "Food, drink, toilets and water");
         AddTab(row, BuildMode.Remove, "Take down", "Remove something and get the money back");
 
         SetAnchorsAndOffsetsPreset(LayoutPreset.BottomWide, LayoutPresetMode.Minsize, 14);
@@ -117,6 +118,14 @@ public partial class BuildBar : VBoxContainer
                 foreach (var g in Catalogue.Gates)
                 {
                     AddChoice($"gate{g.Kind}", g.Name, $"£{g.Cost:N0}", $"{g.About}\n{g.Width / 2f:0.#} m wide. Checks one person every {g.SecondsPerPerson} seconds in each lane.", () => _tool.PickGate(g.Kind));
+                }
+
+                break;
+            case BuildMode.Stall:
+                foreach (var s in Catalogue.Stalls)
+                {
+                    var takes = s.Price > 0 ? $"People pay £{s.Price} each." : "Free to use.";
+                    AddChoice($"stall{s.Kind}", s.Name, $"£{s.Cost:N0}", $"{s.About}\n{takes} {s.Width / 2f:0.#} m wide, {s.Depth / 2f:0.#} m deep.", () => _tool.PickStall(s.Kind));
                 }
 
                 break;
@@ -179,6 +188,7 @@ public partial class BuildBar : VBoxContainer
             BuildMode.Stage => $"stage{_tool.Stage}",
             BuildMode.Fence => $"fence{_tool.Fence}",
             BuildMode.Gate => $"gate{_tool.Gate}",
+            BuildMode.Stall => $"stall{_tool.Stall}",
             _ => "",
         };
         foreach (var (key, button) in _choices)

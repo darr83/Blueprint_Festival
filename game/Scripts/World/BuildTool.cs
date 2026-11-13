@@ -13,6 +13,7 @@ public enum BuildMode
     Stage,
     Fence,
     Gate,
+    Stall,
     Remove,
 }
 
@@ -44,6 +45,8 @@ public partial class BuildTool : Node3D
 
     public GateKind Gate { get; private set; }
 
+    public StallKind Stall { get; private set; }
+
     public Facing Facing { get; private set; } = Facing.South;
 
     public bool Vertical { get; private set; }
@@ -74,6 +77,8 @@ public partial class BuildTool : Node3D
 
     public void PickGate(GateKind kind) => Pick(BuildMode.Gate, () => Gate = kind);
 
+    public void PickStall(StallKind kind) => Pick(BuildMode.Stall, () => Stall = kind);
+
     public void PickRemove() => Pick(BuildMode.Remove, () => { });
 
     public void Stop() => Pick(BuildMode.None, () => { });
@@ -89,7 +94,8 @@ public partial class BuildTool : Node3D
             BuildMode.Stage => "Click on the grass to put the stage up. R turns it.",
             BuildMode.Fence => "Hold the mouse button and drag to run a fence.",
             BuildMode.Gate => "Click to put the gate up. R turns it. Close the fence either side so it is the only way in.",
-            BuildMode.Remove => "Click a stage, a gate or a stretch of fence to take it down. You get the money back.",
+            BuildMode.Stall => "Click on the grass to put it up. R turns it. People queue at the front.",
+            BuildMode.Remove => "Click a stage, a stall, a gate or a stretch of fence to take it down. You get the money back.",
             _ => "",
         };
         ClearGhost();
@@ -118,6 +124,12 @@ public partial class BuildTool : Node3D
         return (at.X - (rect.Width / 2), at.Y - (rect.Height / 2));
     }
 
+    private (int X, int Y) StallCorner(TilePoint at)
+    {
+        var rect = new PlacedStall(Stall, 0, 0, Facing).Rect;
+        return (at.X - (rect.Width / 2), at.Y - (rect.Height / 2));
+    }
+
     private (int X, int Y) GateCorner(TilePoint at)
     {
         var width = Catalogue.Of(Gate).Width;
@@ -141,6 +153,13 @@ public partial class BuildTool : Node3D
             {
                 var (x, y) = GateCorner(at);
                 result = _game.BuildGate(Gate, x, y, Vertical);
+                break;
+            }
+
+            case BuildMode.Stall:
+            {
+                var (x, y) = StallCorner(at);
+                result = _game.BuildStall(Stall, x, y, Facing);
                 break;
             }
 
@@ -258,6 +277,17 @@ public partial class BuildTool : Node3D
                 break;
             }
 
+            case BuildMode.Stall:
+            {
+                var (x, y) = StallCorner(at);
+                check = _game.CheckStall(Stall, x, y, Facing);
+                pad = new PlacedStall(Stall, x, y, Facing).Rect;
+                Ghost($"stall{Stall}", () => SiteProps.Stall(Stall));
+                _ghost!.Position = SiteView.Middle(pad);
+                _ghost.RotationDegrees = new Vector3(0, SiteView.Turn(Facing), 0);
+                break;
+            }
+
             case BuildMode.Fence:
             {
                 var from = _dragFrom ?? at;
@@ -286,7 +316,7 @@ public partial class BuildTool : Node3D
             default:
             {
                 var site = _game.Site;
-                pad = site.StageAt(at)?.Rect ?? site.GateAt(at)?.Rect ?? new TileRect(at.X, at.Y, 1, 1);
+                pad = site.StageAt(at)?.Rect ?? site.StallAt(at)?.Rect ?? site.GateAt(at)?.Rect ?? new TileRect(at.X, at.Y, 1, 1);
                 var refund = site.RefundAt(at);
                 check = refund > 0 ? new BuildCheck(true, -refund, null) : BuildCheck.No("");
                 ClearGhostOnly();
@@ -321,6 +351,7 @@ public partial class BuildTool : Node3D
     {
         BuildMode.Stage => Catalogue.Of(Stage).Name,
         BuildMode.Gate => Catalogue.Of(Gate).Name,
+        BuildMode.Stall => Catalogue.Of(Stall).Name,
         _ => Catalogue.Of(Fence).Name,
     };
 

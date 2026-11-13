@@ -9,7 +9,7 @@ namespace BlueprintFestival.World;
 /// coloured shapes, in the same chunky style as the people. A thing is built round its own middle,
 /// facing south (towards +Z), so the caller only has to place and turn it.
 /// </summary>
-public static class SiteProps
+public static partial class SiteProps
 {
     private static readonly Color Pink = new("#E94F7B");
     private static readonly Color PinkDark = new("#C73A64");

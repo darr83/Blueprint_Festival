@@ -28,6 +28,8 @@ public sealed class FestivalGame
         Crowd = new Crowd(Field, Site, Seed, Clock.Now);
         Show = new RunningOrder(Site, Seed, Clock.Now);
         Crowd.Show = Show;
+        Crowd.TicketsSold += people => Earn("Tickets", people * Catalogue.TicketPrice);
+        Crowd.Served += (kind, _, paid) => Earn(Catalogue.Of(kind).Name, paid);
         Clock.Ticked += clock => Crowd.Tick(clock.Now);
     }
 
@@ -50,6 +52,66 @@ public sealed class FestivalGame
     /// <summary>What a first village festival has to spend: the parish council's float.</summary>
     public const int StartingMoney = 2000;
 
+    /// <summary>What has come in today, line by line, in the order it first came in.</summary>
+    public IReadOnlyList<LedgerLine> Income => _income;
+
+    /// <summary>What has been spent today, line by line.</summary>
+    public IReadOnlyList<LedgerLine> Spending => _spending;
+
+    public int TotalIncome => _income.Sum(l => l.Amount);
+
+    public int TotalSpending => _spending.Sum(l => l.Amount);
+
+    private readonly List<LedgerLine> _income = new();
+    private readonly List<LedgerLine> _spending = new();
+
+    private static void Note(List<LedgerLine> lines, string what, int amount)
+    {
+        var i = lines.FindIndex(l => l.What == what);
+        if (i < 0)
+        {
+            lines.Add(new LedgerLine(what, amount));
+        }
+        else
+        {
+            lines[i] = lines[i] with { Amount = lines[i].Amount + amount };
+        }
+
+        lines.RemoveAll(l => l.Amount == 0);
+    }
+
+    private void Earn(string what, int amount)
+    {
+        if (amount != 0)
+        {
+            Money += amount;
+            Note(_income, what, amount);
+        }
+    }
+
+    /// <summary>Pays for something, or with a negative amount takes a refund.</summary>
+    private void Spend(string what, int amount)
+    {
+        Money -= amount;
+        Note(_spending, what, amount);
+    }
+
+    /// <summary>Whether a stall could go here, counting the money.</summary>
+    public BuildCheck CheckStall(StallKind kind, int x, int y, Facing facing) => Afford(Site.CheckStall(kind, x, y, facing));
+
+    /// <summary>Puts up a stall and pays its hire, if it fits and there is the money.</summary>
+    public BuildCheck BuildStall(StallKind kind, int x, int y, Facing facing)
+    {
+        var check = CheckStall(kind, x, y, facing);
+        if (check.Ok)
+        {
+            Spend("Stalls and toilets", check.Cost);
+            Site.AddStall(kind, x, y, facing);
+        }
+
+        return check;
+    }
+
     private BuildCheck Afford(BuildCheck check) =>
         check.Ok && check.Cost > Money ? new BuildCheck(false, check.Cost, $"That costs £{check.Cost:N0} and there is £{Money:N0} in the bank.") : check;
 
@@ -66,7 +128,7 @@ public sealed class FestivalGame
         var check = CheckStage(kind, x, y, facing);
         if (check.Ok)
         {
-            Money -= check.Cost;
+            Spend("Stage", check.Cost);
             Site.AddStage(kind, x, y, facing);
         }
 
@@ -78,7 +140,7 @@ public sealed class FestivalGame
         var check = CheckFence(kind, from, to);
         if (check.Ok)
         {
-            Money -= check.Cost;
+            Spend("Fences and gates", check.Cost);
             Site.AddFence(kind, from, to);
         }
 
@@ -100,8 +162,7 @@ public sealed class FestivalGame
                 }
             }
 
-            Money += replaced.Sum(r => r.Value * Catalogue.Of(r.Key).CostPerMetre / 2);
-            Money -= check.Cost;
+            Spend("Fences and gates", check.Cost - replaced.Sum(r => r.Value * Catalogue.Of(r.Key).CostPerMetre / 2));
             Site.AddGate(kind, x, y, vertical);
         }
 
@@ -111,8 +172,13 @@ public sealed class FestivalGame
     /// <summary>Takes down whatever stands on a tile and gives the money back. Returns how much.</summary>
     public int Remove(TilePoint tile)
     {
+        var line = Site.StageAt(tile) is not null ? "Stage" : Site.StallAt(tile) is not null ? "Stalls and toilets" : "Fences and gates";
         var refund = Site.RemoveAt(tile);
-        Money += refund;
+        if (refund != 0)
+        {
+            Spend(line, -refund);
+        }
+
         return refund;
     }
 
@@ -155,7 +221,7 @@ public sealed class FestivalGame
         }
     }
 
-    public SaveData Save() => new(SaveData.CurrentVersion, Name, Clock.CaptureState(), Seed, Crowd.Save(), Site.Save(), Money);
+    public SaveData Save() => new(SaveData.CurrentVersion, Name, Clock.CaptureState(), Seed, Crowd.Save(), Site.Save(), Money, _income.ToList(), _spending.ToList());
 
     public static FestivalGame Load(SaveData data)
     {
@@ -174,6 +240,8 @@ public sealed class FestivalGame
         }
 
         game.Money = data.Money ?? StartingMoney;
+        game._income.AddRange(data.Income ?? new());
+        game._spending.AddRange(data.Spending ?? new());
         if (data.Parties is not null)
         {
             game.Crowd.Restore(data.Parties);
@@ -184,10 +252,14 @@ public sealed class FestivalGame
 }
 
 /// <summary>What is written to a save file.</summary>
-public sealed record SaveData(int Version, string Name, ClockState Clock, int? Seed = null, List<PartySave>? Parties = null, SiteSave? Site = null, int? Money = null)
+/// <summary>One line of the day's money: what it was for and how many pounds.</summary>
+public sealed record LedgerLine(string What, int Amount);
+
+public sealed record SaveData(int Version, string Name, ClockState Clock, int? Seed = null, List<PartySave>? Parties = null, SiteSave? Site = null, int? Money = null,
+    List<LedgerLine>? Income = null, List<LedgerLine>? Spending = null)
 {
-    /// <summary>Version 1 had the name and clock. Version 2 added the seed and the people. Version 3 added what is built, and money.</summary>
-    public const int CurrentVersion = 3;
+    /// <summary>Version 1 had the name and clock. Version 2 added the seed and the people. Version 3 added what is built, and money. Version 4 added stalls, needs and the day's takings.</summary>
+    public const int CurrentVersion = 4;
 
     private static readonly JsonSerializerOptions Options = new()
     {
