@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using BlueprintFestival.Simulation.Core;
+using BlueprintFestival.Simulation.People;
 using BlueprintFestival.Simulation.World;
 
 namespace BlueprintFestival.Simulation;
@@ -15,14 +16,22 @@ public sealed class FestivalGame
 
     public const int MaxNameLength = 40;
 
-    public FestivalGame(string? name = null, DateTime? start = null)
+    public FestivalGame(string? name = null, DateTime? start = null, int? seed = null)
     {
         Name = CleanName(name);
+        Seed = seed ?? StableHash(Name);
         Clock = new GameClock(start);
         Field = FieldMap.Village();
+        Crowd = new Crowd(Field, Seed, Clock.Now);
+        Clock.Ticked += clock => Crowd.Tick(clock.Now);
     }
 
     public string Name { get; }
+
+    /// <summary>The number everything random in this festival grows from: who comes, and when.</summary>
+    public int Seed { get; }
+
+    public Crowd Crowd { get; }
 
     public GameClock Clock { get; }
 
@@ -48,7 +57,22 @@ public sealed class FestivalGame
         return clean.Length > MaxNameLength ? clean[..MaxNameLength].TrimEnd() : clean;
     }
 
-    public SaveData Save() => new(SaveData.CurrentVersion, Name, Clock.CaptureState());
+    /// <summary>The same name always gives the same number, on every computer.</summary>
+    private static int StableHash(string text)
+    {
+        unchecked
+        {
+            var hash = (int)2166136261;
+            foreach (var c in text)
+            {
+                hash = (hash ^ c) * 16777619;
+            }
+
+            return hash & 0x7FFFFFFF;
+        }
+    }
+
+    public SaveData Save() => new(SaveData.CurrentVersion, Name, Clock.CaptureState(), Seed, Crowd.Save());
 
     public static FestivalGame Load(SaveData data)
     {
@@ -58,16 +82,23 @@ public sealed class FestivalGame
             throw new InvalidDataException($"This save is version {data.Version}; this game reads up to version {SaveData.CurrentVersion}.");
         }
 
-        var game = new FestivalGame(data.Name, data.Clock.Now);
+        // The crowd's plan is for the day the festival is on, whatever time it was saved at.
+        var game = new FestivalGame(data.Name, data.Clock.Now.Date + GameClock.DefaultStart.TimeOfDay, data.Seed);
         game.Clock.RestoreState(data.Clock);
+        if (data.Parties is not null)
+        {
+            game.Crowd.Restore(data.Parties);
+        }
+
         return game;
     }
 }
 
 /// <summary>What is written to a save file.</summary>
-public sealed record SaveData(int Version, string Name, ClockState Clock)
+public sealed record SaveData(int Version, string Name, ClockState Clock, int? Seed = null, List<PartySave>? Parties = null)
 {
-    public const int CurrentVersion = 1;
+    /// <summary>Version 1 had the name and clock. Version 2 added the seed and the people.</summary>
+    public const int CurrentVersion = 2;
 
     private static readonly JsonSerializerOptions Options = new()
     {

@@ -21,6 +21,8 @@ public partial class FestivalScene : Node3D
 
     public FieldView Field { get; private set; } = null!;
 
+    public CrowdView Crowd { get; private set; } = null!;
+
     public TopBar TopBar { get; private set; } = null!;
 
     public override void _Ready()
@@ -34,6 +36,10 @@ public partial class FestivalScene : Node3D
         Field = new FieldView { Name = "Field" };
         AddChild(Field);
         Field.Initialise(Game.Field, Game.Name);
+
+        Crowd = new CrowdView { Name = "Crowd" };
+        AddChild(Crowd);
+        Crowd.Initialise(Game);
 
         Camera = new CameraRig { Name = "CameraRig" };
         AddChild(Camera);

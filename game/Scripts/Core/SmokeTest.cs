@@ -8,8 +8,8 @@ namespace BlueprintFestival.Core;
 
 /// <summary>
 /// Automated launch check, run with: godot --headless --path game -- --smoke-test
-/// Opens the menu, starts a festival, checks the site was drawn, lets the clock run, pauses, turns
-/// the view, saves, goes back to the menu, loads and compares. Exits with code 0 if all is well and
+/// Opens the menu, starts a festival, checks the site was drawn, lets the clock run until people
+/// have arrived, pauses, turns the view, saves, goes back to the menu, loads and compares. Exits with code 0 if all is well and
 /// 1 if anything is wrong, so every pull request proves the game really starts and plays.
 /// </summary>
 public partial class SmokeTest : Node
@@ -26,6 +26,7 @@ public partial class SmokeTest : Node
     private DateTime _mark;
     private DateTime _saved;
     private long _savedTicks;
+    private int _savedPeople;
 
     public override void _Ready() => GD.Print("[smoke] Starting.");
 
@@ -86,6 +87,9 @@ public partial class SmokeTest : Node
                     Check(opened.Field.TreeCount >= 8, "There should be trees round the field.");
                     Check(opened.Camera.Camera.Projection == Camera3D.ProjectionType.Orthogonal, "The camera should have no perspective.");
                     Check(opened.Sky.Night < 0.01f, "Eight in the morning should be full daylight.");
+                    Check(opened.Game.Crowd.OnSite == 0 && opened.Crowd.Count == 0, "Nobody should be there before the gates open.");
+                    Check(opened.Game.Crowd.Expected is >= 100 and <= 200, "A village festival should expect 100 to 200 people.");
+                    Check(opened.TopBar.PeopleText == $"On site 0 of {opened.Game.Crowd.Expected}", $"The top bar should count people, not say '{opened.TopBar.PeopleText}'.");
                     opened.Game.Clock.SetSpeed(GameSpeed.Fastest);
                     _mark = opened.Game.Now;
                     Next(Stage.Running);
@@ -94,8 +98,19 @@ public partial class SmokeTest : Node
                 break;
 
             case Stage.Running:
-                if (Festival is { } running && running.Game.Now - _mark >= TimeSpan.FromMinutes(2))
+                if (Festival is { } running && running.Game.Now - _mark >= TimeSpan.FromMinutes(2) && running.Game.Crowd.InField >= 6)
                 {
+                    var crowd = running.Game.Crowd;
+                    Check(running.Crowd.Count == crowd.OnSite, $"Everyone on site should be drawn: {running.Crowd.Count} drawn, {crowd.OnSite} on site.");
+                    Check(running.TopBar.PeopleText == $"On site {crowd.OnSite} of {crowd.Expected}", "The top bar should show the headcount.");
+                    foreach (var party in crowd.Parties)
+                    {
+                        if (party.IsOnSite)
+                        {
+                            Check(running.Game.Field.IsWalkable(Simulation.World.FieldMap.TileAt(party.X, party.Y)), $"Party {party.Id} should be on ground people can walk on.");
+                        }
+                    }
+
                     Check(running.TopBar.TimeText != "08:00", "The clock in the top bar should have moved on.");
                     running.TogglePause();
                     Check(running.Game.Clock.IsPaused, "Space should pause the game.");
@@ -129,6 +144,7 @@ public partial class SmokeTest : Node
                     Check(manager.Save(Slot) is null, "Saving should work.");
                     _saved = turned.Game.Now;
                     _savedTicks = turned.Game.Clock.TickCount;
+                    _savedPeople = turned.Game.Crowd.OnSite;
                     manager.ReturnToMenu();
                     Next(Stage.BackToMenu);
                 }
@@ -153,6 +169,8 @@ public partial class SmokeTest : Node
                     Check(loaded.Game.Now == _saved, $"The loaded festival should be at {_saved:HH:mm:ss}, not {loaded.Game.Now:HH:mm:ss}.");
                     Check(loaded.Game.Clock.TickCount == _savedTicks, "The loaded festival should keep its tick count.");
                     Check(loaded.Game.Clock.IsPaused, "The loaded festival should still be paused.");
+                    Check(loaded.Game.Crowd.OnSite == _savedPeople, $"The loaded festival should have {_savedPeople} people on site, not {loaded.Game.Crowd.OnSite}.");
+                    Check(loaded.Crowd.Count == _savedPeople, "Everyone in the loaded festival should be drawn.");
                     DirAccess.RemoveAbsolute($"{GameManager.SaveDirectory}/{Slot}.json");
                     Next(Stage.Done);
                     GD.Print("[smoke] PASSED.");
