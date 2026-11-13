@@ -35,6 +35,10 @@ public partial class FestivalScene : Node3D
 
     public BuildBar BuildBar { get; private set; } = null!;
 
+    public LitterView Litter { get; private set; } = null!;
+
+    public YearScreen Year { get; private set; } = null!;
+
     public override void _Ready()
     {
         // Run straight from the editor (F6) and there is no game yet: start a default one.
@@ -54,6 +58,10 @@ public partial class FestivalScene : Node3D
         Acts = new ShowView { Name = "Show" };
         AddChild(Acts);
         Acts.Initialise(Game);
+
+        Litter = new LitterView { Name = "Litter" };
+        AddChild(Litter);
+        Litter.Initialise(Game);
 
         Crowd = new CrowdView { Name = "Crowd" };
         AddChild(Crowd);
@@ -79,6 +87,10 @@ public partial class FestivalScene : Node3D
         _hud.AddChild(Money);
         Money.Initialise(Game);
         TopBar.MoneyPressed += ToggleMoney;
+        Year = new YearScreen { Name = "YearScreen" };
+        _hud.AddChild(Year);
+        Year.Initialise(Game, this);
+        BuildBar.Visible = Game.CanBuild;
         var view = new ViewButtons { Name = "ViewButtons" };
         _hud.AddChild(view);
         view.Initialise(Camera);
@@ -98,6 +110,12 @@ public partial class FestivalScene : Node3D
     {
         Game.Advance(delta);
         Sky.Apply(Game, Camera.Yaw);
+        if (BuildBar.Visible != Game.CanBuild)
+        {
+            // Nothing is built while planning, tidying or reading the results.
+            BuildBar.Close();
+            BuildBar.Visible = Game.CanBuild;
+        }
     }
 
     public override void _UnhandledInput(InputEvent @event)

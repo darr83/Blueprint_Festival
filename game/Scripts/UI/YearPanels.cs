@@ -36,9 +36,22 @@ public static class YearPanels
         return label;
     }
 
-    private static PanelContainer Tile(bool picked, int width)
+    private static PanelContainer Tile(bool picked, int width, System.Action? pressed = null)
     {
         var tile = new PanelContainer { CustomMinimumSize = new Vector2(width, 0), SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+        if (pressed is not null)
+        {
+            tile.MouseFilter = Control.MouseFilterEnum.Stop;
+            tile.MouseDefaultCursorShape = Control.CursorShape.PointingHand;
+            tile.GuiInput += e =>
+            {
+                if (e is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left })
+                {
+                    pressed();
+                }
+            };
+        }
+
         var box = UiStyle.Box(picked ? UiStyle.PinkTint : UiStyle.Surface, 12, picked ? UiStyle.StagePink : UiStyle.Border, 14);
         if (picked)
         {
@@ -60,7 +73,7 @@ public static class YearPanels
     }
 
     /// <summary>The planning screen: ticket price, headline act, and what is left to build with.</summary>
-    public static Control Plan(PlanView view, System.Action? start = null)
+    public static Control Plan(PlanView view, System.Action? start = null, System.Action<int>? pickTicket = null, System.Action<int>? pickHeadliner = null)
     {
         var panel = Card(820);
         var box = new VBoxContainer();
@@ -76,8 +89,9 @@ public static class YearPanels
         tickets.AddThemeConstantOverride("separation", 10);
         for (var i = 0; i < view.Tickets.Count; i++)
         {
-            var tile = Tile(i == view.TicketPicked, 150);
-            var inner = new VBoxContainer();
+            var index = i;
+            var tile = Tile(i == view.TicketPicked, 150, pickTicket is null ? null : () => pickTicket(index));
+            var inner = new VBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
             inner.AddChild(UiStyle.Heading($"£{view.Tickets[i].Price}", 24));
             inner.AddChild(UiStyle.Body($"About {view.Tickets[i].Expected} come", muted: true, size: 14));
             tile.AddChild(inner);
@@ -93,8 +107,9 @@ public static class YearPanels
         for (var i = 0; i < view.Headliners.Count; i++)
         {
             var offer = view.Headliners[i];
-            var tile = Tile(i == view.HeadlinerPicked, 220);
-            var inner = new VBoxContainer();
+            var index = i;
+            var tile = Tile(i == view.HeadlinerPicked, 220, pickHeadliner is null ? null : () => pickHeadliner(index));
+            var inner = new VBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
             inner.AddChild(UiStyle.Heading(offer.Name, 19));
             inner.AddChild(UiStyle.Body(offer.Kind, muted: true, size: 14));
             var pull = new HBoxContainer();
@@ -130,13 +145,20 @@ public static class YearPanels
         box.AddChild(new Control { CustomMinimumSize = new Vector2(0, 8) });
 
         var buttons = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.End };
-        buttons.AddChild(UiStyle.Button("Start building", start ?? (() => { })));
+        var go = UiStyle.Button("Start building", start ?? (() => { }));
+        if (fees > view.Bank)
+        {
+            go.Disabled = true;
+            buttons.AddChild(UiStyle.Body("There is not the money for these acts.  ", muted: true, size: 14));
+        }
+
+        buttons.AddChild(go);
         box.AddChild(buttons);
         return panel;
     }
 
     /// <summary>The results screen: how the day went, the money, the field, and what next year's licence is.</summary>
-    public static Control Results(ResultsView view, System.Action? next = null)
+    public static Control Results(ResultsView view, System.Action? next = null, bool closed = false)
     {
         var panel = Card(760);
         var box = new VBoxContainer();
@@ -213,14 +235,33 @@ public static class YearPanels
         var said = UiStyle.Body(view.Verdict, size: 16);
         said.AutowrapMode = TextServer.AutowrapMode.WordSmart;
         words.AddChild(said);
-        words.AddChild(UiStyle.Heading(grew ? $"Next year: licence for up to {view.LicenceNext:N0} people" : $"Next year: licence stays at {view.LicenceNext:N0} people", 19));
+        words.AddChild(UiStyle.Heading(closed ? "The festival has closed" : grew ? $"Next year: licence for up to {view.LicenceNext:N0} people" : $"Next year: licence stays at {view.LicenceNext:N0} people", 19));
         verdict.AddChild(words);
         box.AddChild(verdict);
         box.AddChild(new Control { CustomMinimumSize = new Vector2(0, 6) });
 
         var buttons = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.End };
-        buttons.AddChild(UiStyle.Button($"Plan year {view.Year + 1}", next ?? (() => { })));
+        buttons.AddChild(UiStyle.Button(closed ? "Back to the menu" : $"Plan year {view.Year + 1}", next ?? (() => { })));
         box.AddChild(buttons);
+        return panel;
+    }
+
+    /// <summary>The small panel shown on the build day, before the gates open.</summary>
+    public static Control BuildDay(int expected, int bank, System.Action? open = null)
+    {
+        var panel = Card(360);
+        var box = new VBoxContainer();
+        box.AddThemeConstantOverride("separation", 8);
+        panel.AddChild(box);
+        box.AddChild(UiStyle.Heading("Build day", 22));
+        var words = UiStyle.Body("Friday. Nobody is here yet and the clock is stopped. Put up what you need, then open the gates.", muted: true, size: 14);
+        words.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        words.CustomMinimumSize = new Vector2(300, 0);
+        box.AddChild(words);
+        box.AddChild(MoneyRow("Expected tomorrow", $"about {expected}"));
+        box.AddChild(MoneyRow("Left to build with", $"£{bank:N0}"));
+        box.AddChild(new Control { CustomMinimumSize = new Vector2(0, 4) });
+        box.AddChild(UiStyle.Button("Open the gates", open ?? (() => { })));
         return panel;
     }
 
@@ -242,7 +283,11 @@ public static class YearPanels
         bar.AddThemeStyleboxOverride("background", UiStyle.Box(UiStyle.Border, 7));
         box.AddChild(bar);
         box.AddChild(new Control { CustomMinimumSize = new Vector2(0, 4) });
-        box.AddChild(UiStyle.SecondaryButton($"Pay the scouts £{scoutsFee} to finish", pay ?? (() => { })));
+        if (litterLeft > 0)
+        {
+            box.AddChild(UiStyle.SecondaryButton($"Pay the scouts £{scoutsFee} to finish", pay ?? (() => { })));
+        }
+
         box.AddChild(UiStyle.Button("Hand the field back", done ?? (() => { })));
         return panel;
     }

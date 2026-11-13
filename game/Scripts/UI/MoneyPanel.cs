@@ -65,7 +65,7 @@ public partial class MoneyPanel : PanelContainer
         Row("In", "", muted: true);
         foreach (var line in _game.Income)
         {
-            var what = line.What == "Tickets" ? $"Tickets  {crowd.ThroughGates} at £{Catalogue.TicketPrice}" : line.What;
+            var what = line.What == "Tickets" ? $"Tickets  {crowd.ThroughGates} at £{_game.TicketPrice}" : line.What;
             Row(what, $"£{line.Amount:N0}");
             LineCount++;
         }

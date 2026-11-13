@@ -1,5 +1,7 @@
 using System;
+using BlueprintFestival.Simulation;
 using BlueprintFestival.Simulation.Core;
+using BlueprintFestival.Simulation.Site;
 using BlueprintFestival.UI;
 using BlueprintFestival.World;
 using BlueprintFestival.Simulation.World;
@@ -10,7 +12,8 @@ namespace BlueprintFestival.Core;
 /// <summary>
 /// Automated launch check, run with: godot --headless --path game -- --smoke-test
 /// Opens the menu, starts a festival, checks the site was drawn, lets the clock run until people
-/// have arrived, pauses, turns the view, saves, goes back to the menu, loads and compares. Exits with code 0 if all is well and
+/// have arrived, pauses, turns the view, saves, goes back to the menu, loads and compares, then plays a
+/// whole festival year from the planning screen to next year. Exits with code 0 if all is well and
 /// 1 if anything is wrong, so every pull request proves the game really starts and plays.
 /// </summary>
 public partial class SmokeTest : Node
@@ -19,7 +22,7 @@ public partial class SmokeTest : Node
     private const string FestivalName = "Smoke Test Fayre";
     private const double TimeoutSeconds = 120;
 
-    private enum Stage { Menu, Opening, Running, ShowTime, Paused, Turning, BackToMenu, Loading, Done }
+    private enum Stage { Menu, Opening, Running, ShowTime, Paused, Turning, BackToMenu, Loading, Planning, Building, Tidying, Results, NextYear, Done }
 
     private Stage _stage = Stage.Menu;
     private double _elapsed;
@@ -261,6 +264,110 @@ public partial class SmokeTest : Node
                     Check(loaded.Game.Site.HasWorkingGate, "The loaded gate should still be the way in.");
                     Check(loaded.Site.StallCount == 3 && loaded.Game.Income.Count >= 3, "The loaded festival should keep its stalls and its takings.");
                     DirAccess.RemoveAbsolute($"{GameManager.SaveDirectory}/{Slot}.json");
+
+                    // Now a whole festival year, the way the menu starts one.
+                    manager.StartNewFestival(FestivalName);
+                    Next(Stage.Planning);
+                }
+
+                break;
+
+            case Stage.Planning:
+                if (_stageTime > 0.3 && Festival is { Game.Planned: true } plan)
+                {
+                    var game = plan.Game;
+                    Check(game.Phase == Phase.Plan && plan.Year.Showing == Phase.Plan && plan.Year.HasCentrePanel, "A new festival should open on the planning screen.");
+                    Check(!plan.BuildBar.Visible, "Nothing should be built while planning.");
+                    Check(game.Headliners.Count == 3, "Three headliners should be on offer.");
+                    Check(plan.TopBar.TimeText == "08:00", "The clock should be stopped while planning.");
+                    plan.Year.PickTicket(2);
+                    plan.Year.PickHeadliner(0);
+                    Check(game.TicketPrice == 8 && game.HeadlinerPicked == 0, "Clicking a ticket price and a headliner should choose them.");
+                    var fees = game.ActFees;
+                    plan.Year.StartBuilding();
+                    Check(game.Phase == Phase.Build && game.Money == 2000 - fees, $"Starting to build should pay the acts £{fees}, leaving £{2000 - fees}, not £{game.Money}.");
+                    Check(game.Show.Slots[^1].Act == game.Headliners[0].Act, "The headliner picked should close the show.");
+                    Next(Stage.Building);
+                }
+
+                break;
+
+            case Stage.Building:
+                if (_stageTime > 0.4 && Festival is { } build)
+                {
+                    var game = build.Game;
+                    var grass = game.Field.Field;
+                    var gap = game.Field.Gap;
+                    Check(build.Year.Showing == Phase.Build && build.Year.HasSidePanel && !build.Year.HasCentrePanel, "The build day panel should be up.");
+                    Check(build.BuildBar.Visible, "The build bar should be there on the build day.");
+                    Check(build.TopBar.TimeText == "08:00" && game.Crowd.OnSite == 0, "The clock should wait until the gates open.");
+                    Check(game.BuildStage(StageKind.Bandstand, grass.X + 74, grass.Y + 10, Facing.South).Ok, "A bandstand should go up on the build day.");
+                    Check(game.BuildFence(FenceKind.Paling, new TilePoint(gap.X, gap.Y + 1), new TilePoint(gap.Right - 1, gap.Y + 1)).Ok, "A fence should close the gap.");
+                    Check(game.BuildGate(GateKind.VillageGate, gap.X + 2, gap.Y + 1, false).Ok, "A gate should go in the fence.");
+                    Check(game.BuildStall(StallKind.FoodVan, grass.X + 7, grass.Y + 34, Facing.East).Ok, "A food van should go up.");
+                    Check(game.BuildStall(StallKind.Bar, grass.X + 7, grass.Y + 52, Facing.East).Ok, "A bar should go up.");
+                    Check(game.BuildStall(StallKind.Toilets, grass.X + 26, grass.Y + 5, Facing.South).Ok, "Toilets should go up.");
+                    Check(game.BuildStall(StallKind.Toilets, grass.X + 36, grass.Y + 5, Facing.South).Ok, "More toilets should go up.");
+                    build.Year.OpenGates();
+                    Check(game.Phase == Phase.Day, "Opening the gates should start the day.");
+
+                    // Run the whole day in one go.
+                    var guard = 0;
+                    while (game.Phase == Phase.Day && guard++ < 70000)
+                    {
+                        game.Clock.Step();
+                    }
+
+                    Check(game.Phase == Phase.Tidy, "The day should end with the morning after.");
+                    Check(game.Crowd.ThroughGates > 50 && game.Income.Count >= 3, "People should have come, paid and eaten.");
+                    Next(Stage.Tidying);
+                }
+
+                break;
+
+            case Stage.Tidying:
+                if (_stageTime > 0.8 && Festival is { } tidy)
+                {
+                    var game = tidy.Game;
+                    Check(tidy.Year.Showing == Phase.Tidy && tidy.Year.HasSidePanel, "The morning-after panel should be up.");
+                    Check(tidy.TopBar.TimeText == "06:00", $"The morning after should be at 06:00, not {tidy.TopBar.TimeText}.");
+                    Check(!tidy.BuildBar.Visible, "Nothing should be built on the morning after.");
+                    Check(game.Litter.Count > 10 && tidy.Litter.Count == game.Litter.Count, $"The litter should be drawn: {tidy.Litter.Count} drawn, {game.Litter.Count} dropped.");
+                    Check(tidy.Crowd.Count == 0, "Everyone should have gone home.");
+                    var first = game.Litter[0];
+                    var before = game.Litter.Count;
+                    Check(tidy.Year.PickAt(first.X, first.Y) >= 1 && game.Litter.Count < before, "Clicking litter should pick it up.");
+                    Check(tidy.Year.PayScouts() && game.Litter.Count == 0 && game.LitterCleared == 100, "The scouts should clear the rest.");
+                    tidy.Year.HandBack();
+                    Check(game.Phase == Phase.Results && game.Result is not null, "Handing the field back should bring the results.");
+                    Check(manager.Save(Slot) is null, "Saving on the results screen should work.");
+                    _savedMoney = game.Money;
+                    Next(Stage.Results);
+                }
+
+                break;
+
+            case Stage.Results:
+                if (_stageTime > 0.4 && Festival is { } results)
+                {
+                    Check(results.Year.Showing == Phase.Results && results.Year.HasCentrePanel, "The results screen should be up.");
+                    Check(results.Litter.Count == 0, "The cleared litter should be gone from the field.");
+                    var again = FestivalGame.Load(SaveData.FromJson(results.Game.Save().ToJson()));
+                    Check(again.Phase == Phase.Results && again.Result == results.Game.Result, "The results should save and load.");
+                    DirAccess.RemoveAbsolute($"{GameManager.SaveDirectory}/{Slot}.json");
+                    results.Year.NextYear();
+                    Next(Stage.NextYear);
+                }
+
+                break;
+
+            case Stage.NextYear:
+                if (_stageTime > 0.3 && Festival is { Game.Year: 2 } next)
+                {
+                    Check(next.Game.Phase == Phase.Plan && next.Year.HasCentrePanel, "Next year should open on the planning screen.");
+                    Check(next.Game.Money == _savedMoney, "The bank should carry over to next year.");
+                    Check(next.Game.Site.Stages.Count == 0 && next.Site.StageCount == 0 && next.Site.StallCount == 0, "Next year should start on an empty field.");
+                    Check(next.TopBar.MoneyText == $"£{_savedMoney:N0}", "The top bar should show the bank carried over.");
                     Next(Stage.Done);
                     GD.Print("[smoke] PASSED.");
                     GetTree().Quit(0);

@@ -66,7 +66,7 @@ public sealed partial class FestivalGame
     private static readonly double[] TurnoutAtPrice = { 1.0, 0.9, 0.65, 0.4 };
 
     /// <summary>Person-seconds on one patch of grass that wear it to bare earth.</summary>
-    public const int WornOut = 40000;
+    public const int WornOut = 60000;
 
     /// <summary>The side of one patch of grass in tiles (2 metres).</summary>
     public const int WearTiles = 4;
@@ -165,6 +165,8 @@ public sealed partial class FestivalGame
             var act = ActGenerator.Make(random, true, taken) with { Draw = 0.55 + (0.08 * s) };
             _offers.Add(new HeadlinerOffer(act, s, Scaled(FeeFor(s))));
         }
+
+        Crowd.Replan(ExpectedAt(TicketPrice));
     }
 
     /// <summary>How many people would probably come at a ticket price, with the headliner picked.</summary>
@@ -186,6 +188,7 @@ public sealed partial class FestivalGame
         Need(Phase.Plan);
         ExpectedAt(price);
         TicketPrice = price;
+        Crowd.Replan(ExpectedAt(TicketPrice));
     }
 
     public void ChooseHeadliner(int index)
@@ -197,6 +200,7 @@ public sealed partial class FestivalGame
         }
 
         HeadlinerPicked = index;
+        Crowd.Replan(ExpectedAt(TicketPrice));
     }
 
     /// <summary>Books the acts and puts the tickets on sale. False if the bank cannot cover the fees.</summary>
@@ -376,6 +380,10 @@ public sealed partial class FestivalGame
         if (Phase != Phase.Plan)
         {
             ApplyPlan(Math.Clamp(year.Turnout, 1, Math.Max(1, Licence)));
+        }
+        else
+        {
+            Crowd.Replan(ExpectedAt(TicketPrice));
         }
 
         BailedOut = year.BailedOut;

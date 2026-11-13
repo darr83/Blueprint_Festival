@@ -64,6 +64,25 @@ public partial class GameManager : Node
         GetTree().ChangeSceneToFile(FestivalScene);
     }
 
+    /// <summary>A new festival that runs through whole years, opening on the planning screen.</summary>
+    public void StartNewFestival(string? name)
+    {
+        Game = FestivalGame.NewFestival(name);
+        GetTree().Paused = false;
+        GetTree().ChangeSceneToFile(FestivalScene);
+    }
+
+    /// <summary>Moves on from the results to planning next year, on a clean field.</summary>
+    public void StartNextYear()
+    {
+        if (Game is { Phase: Phase.Results } game)
+        {
+            Game = game.NextYear();
+            GetTree().Paused = false;
+            GetTree().ChangeSceneToFile(FestivalScene);
+        }
+    }
+
     public void ReturnToMenu()
     {
         Game = null;
