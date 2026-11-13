@@ -49,9 +49,9 @@ public partial class GameManager : Node
         }
     }
 
-    public void StartNewGame(string? name, DateTime? start = null)
+    public void StartNewGame(string? name, DateTime? start = null, int? seed = null)
     {
-        Game = new FestivalGame(name, start);
+        Game = new FestivalGame(name, start, seed);
         GetTree().Paused = false;
         GetTree().ChangeSceneToFile(FestivalScene);
     }

@@ -1,19 +1,8 @@
 using BlueprintFestival.Simulation.People;
+using BlueprintFestival.Simulation.Show;
 using Godot;
 
 namespace BlueprintFestival.World;
-
-/// <summary>What someone does in a band.</summary>
-public enum BandRole
-{
-    Singer,
-    Guitarist,
-    Bassist,
-    Drummer,
-    Keys,
-    Fiddler,
-    Dj,
-}
 
 /// <summary>
 /// Builds the acts: a style A person in a stage outfit with their instrument. Acts are made up;
@@ -42,6 +31,7 @@ public static class Performers
     public static Node3D Build(BandRole role, int seed)
     {
         var node = new Node3D { Name = Name(role) };
+        seed = System.Math.Abs(seed % 100000);
         var outfit = Outfits[(seed * 7 + (int)role) % Outfits.Length];
         var look = LookGenerator.FestivalGoer(seed * 31 + 900, AgeGroup.Adult) with
         {
@@ -58,6 +48,7 @@ public static class Performers
             FeetColour = "#2E2E33",
         };
         var person = PersonView.Build(look);
+        person.Name = "Person";
         person.SetPose(role == BandRole.Singer ? Pose.Cheering : Pose.Standing);
         node.AddChild(person);
 

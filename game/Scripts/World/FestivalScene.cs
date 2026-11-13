@@ -29,6 +29,8 @@ public partial class FestivalScene : Node3D
 
     public BuildTool Build { get; private set; } = null!;
 
+    public ShowView Acts { get; private set; } = null!;
+
     public BuildBar BuildBar { get; private set; } = null!;
 
     public override void _Ready()
@@ -46,6 +48,10 @@ public partial class FestivalScene : Node3D
         Site = new SiteView { Name = "Site" };
         AddChild(Site);
         Site.Initialise(Game);
+
+        Acts = new ShowView { Name = "Show" };
+        AddChild(Acts);
+        Acts.Initialise(Game);
 
         Crowd = new CrowdView { Name = "Crowd" };
         AddChild(Crowd);

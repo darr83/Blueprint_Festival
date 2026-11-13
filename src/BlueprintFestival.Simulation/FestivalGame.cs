@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using BlueprintFestival.Simulation.Core;
 using BlueprintFestival.Simulation.People;
+using BlueprintFestival.Simulation.Show;
 using BlueprintFestival.Simulation.Site;
 using BlueprintFestival.Simulation.World;
 
@@ -25,6 +26,8 @@ public sealed class FestivalGame
         Field = FieldMap.Village();
         Site = new SiteLayout(Field);
         Crowd = new Crowd(Field, Site, Seed, Clock.Now);
+        Show = new RunningOrder(Site, Seed, Clock.Now);
+        Crowd.Show = Show;
         Clock.Ticked += clock => Crowd.Tick(clock.Now);
     }
 
@@ -34,6 +37,9 @@ public sealed class FestivalGame
     public int Seed { get; }
 
     public Crowd Crowd { get; }
+
+    /// <summary>The day's music: who plays when.</summary>
+    public RunningOrder Show { get; }
 
     /// <summary>What the player has built on the field.</summary>
     public SiteLayout Site { get; }

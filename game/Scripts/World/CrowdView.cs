@@ -15,6 +15,8 @@ public partial class CrowdView : Node3D
     private readonly HashSet<int> _seen = new();
     private readonly List<int> _gone = new();
     private FestivalGame _game = null!;
+    private double _time;
+    private int _cheerOutOfTen = 3;
 
     /// <summary>How many people are being drawn.</summary>
     public int Count => _views.Count;
@@ -34,6 +36,12 @@ public partial class CrowdView : Node3D
     {
         var speed = (int)_game.Clock.Speed;
         var glide = snap ? 1f : Mathf.Min(1f, (float)delta * (6f + (2f * speed)));
+        if (speed > 0)
+        {
+            _time += delta;
+        }
+
+        _cheerOutOfTen = _game.Show.Playing(_game.Now) is { Headliner: true } ? 5 : 3;
         _seen.Clear();
         foreach (var person in _game.Crowd.People)
         {
@@ -54,7 +62,10 @@ public partial class CrowdView : Node3D
                 view.Rotation = new Vector3(0, Mathf.LerpAngle(view.Rotation.Y, heading, glide), 0);
             }
 
-            view.Pose = person.Walking && speed > 0 ? Pose.Walking : Pose.Standing;
+            // People watching the stage put their arms up now and then, each in their own time;
+            // more of them, more often, for the headline act.
+            var cheering = person.Watching && ((person.Id * 7) + (int)(_time / 2.5)) % 10 < _cheerOutOfTen;
+            view.Pose = person.Walking && speed > 0 ? Pose.Walking : cheering ? Pose.Cheering : Pose.Standing;
             if (snap)
             {
                 view.SetPose(view.Pose, (person.Id % 8) / 8f);

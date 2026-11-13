@@ -1,4 +1,5 @@
 using BlueprintFestival.Simulation.Core;
+using BlueprintFestival.Simulation.Show;
 using BlueprintFestival.Simulation.Site;
 using BlueprintFestival.Simulation.World;
 
@@ -21,6 +22,9 @@ public enum PartyState
 
     /// <summary>Walking to somewhere else in the field.</summary>
     Strolling,
+
+    /// <summary>Standing in front of the stage watching an act.</summary>
+    Watching,
 
     /// <summary>Walking back out to the lane to go home.</summary>
     Leaving,
@@ -93,6 +97,12 @@ public sealed class Party
     /// <summary>True if they came in through a gate, false if they walked in unchecked, null if they are not in yet.</summary>
     public bool? Ticketed { get; internal set; }
 
+    /// <summary>The set they are watching or walking to watch, or -1.</summary>
+    public int Watch { get; internal set; } = -1;
+
+    /// <summary>The last set they made their mind up about, so they only decide once for each.</summary>
+    public int Decided { get; internal set; } = -1;
+
     internal bool Moving { get; set; }
 
     internal DateTime RetryAt { get; set; }
@@ -107,7 +117,7 @@ public sealed class Party
 }
 
 /// <summary>One person as the game draws them: who they are, where they are, which way they face.</summary>
-public readonly record struct PersonOnSite(int Id, PersonLook Look, double X, double Y, double Heading, bool Walking);
+public readonly record struct PersonOnSite(int Id, PersonLook Look, double X, double Y, double Heading, bool Walking, bool Watching = false);
 
 /// <summary>
 /// Everyone who comes to the festival. The whole day's comings and goings are worked out from the
@@ -136,6 +146,7 @@ public sealed class Crowd
     private readonly List<Party> _parties = new();
     private readonly List<List<Party>[]> _queues = new();
     private readonly List<TilePoint> _standable = new();
+    private readonly HashSet<TilePoint> _standableSet = new();
 
     public Crowd(FieldMap map, int seed, DateTime festivalDay)
         : this(map, new SiteLayout(map), seed, festivalDay)
@@ -152,6 +163,12 @@ public sealed class Crowd
         SiteChanged();
         site.Changed += SiteChanged;
     }
+
+    /// <summary>The day's music, if there is any. People go and watch the acts they fancy.</summary>
+    public RunningOrder? Show { get; set; }
+
+    /// <summary>How many people are standing watching the act that is on.</summary>
+    public int Watching => _parties.Where(p => p.State == PartyState.Watching).Sum(p => p.Members.Count);
 
     /// <summary>How many people are queuing at gates or waiting outside.</summary>
     public int Queuing => _parties.Where(p => p.State == PartyState.Queuing).Sum(p => p.Members.Count);
@@ -195,7 +212,7 @@ public sealed class Crowd
 
                 foreach (var m in party.Members)
                 {
-                    yield return new PersonOnSite(m.Id, m.Look, party.X + m.OffsetX, party.Y + m.OffsetY, party.Heading, party.IsWalking);
+                    yield return new PersonOnSite(m.Id, m.Look, party.X + m.OffsetX, party.Y + m.OffsetY, party.Heading, party.IsWalking, party.State == PartyState.Watching);
                 }
             }
         }
@@ -277,6 +294,9 @@ public sealed class Crowd
             }
         }
 
+        _standableSet.Clear();
+        _standableSet.UnionWith(_standable);
+
         _queues.Clear();
         foreach (var gate in _site.Gates)
         {
@@ -315,10 +335,22 @@ public sealed class Crowd
                     break;
                 case PartyState.WalkingIn:
                 case PartyState.Strolling:
-                    Send(party, _standable.Contains(party.Target) ? party.Target : SomewhereInField(party.Random), party.State);
+                    if (party.Watch >= 0)
+                    {
+                        party.Watch = -1;
+                        party.Decided = -1;
+                    }
+
+                    Send(party, _standableSet.Contains(party.Target) ? party.Target : SomewhereInField(party.Random), party.State);
                     break;
                 case PartyState.Leaving:
                     Send(party, LaneEnd(party), PartyState.Leaving);
+                    break;
+                case PartyState.Watching:
+                    // The stage may have moved or gone: think again.
+                    party.Watch = -1;
+                    party.Decided = -1;
+                    party.State = PartyState.Standing;
                     break;
             }
         }
@@ -532,6 +564,22 @@ public sealed class Crowd
 
                     break;
 
+                case PartyState.Watching:
+                    if (now >= party.Leaves || closing)
+                    {
+                        party.Watch = -1;
+                        Send(party, LaneEnd(party), PartyState.Leaving);
+                    }
+                    else if (Show?.Playing(now)?.Index != party.Watch)
+                    {
+                        // The set is over: hang about for a bit, then wander off.
+                        party.Watch = -1;
+                        party.State = PartyState.Standing;
+                        party.WaitUntil = now + TimeSpan.FromMinutes(party.Random.Between(0.5, 4));
+                    }
+
+                    break;
+
                 case PartyState.Standing:
                     if (now < party.RetryAt)
                     {
@@ -540,7 +588,12 @@ public sealed class Crowd
 
                     if (now >= party.Leaves || closing)
                     {
+                        party.Watch = -1;
                         Send(party, LaneEnd(party), PartyState.Leaving);
+                    }
+                    else if (GoAndWatch(party, now))
+                    {
+                        // Off to the stage.
                     }
                     else if (now >= party.WaitUntil)
                     {
@@ -564,8 +617,16 @@ public sealed class Crowd
                         {
                             party.State = PartyState.Gone;
                         }
+                        else if (party.Watch >= 0 && Show?.Playing(now) is { } on && on.Index == party.Watch && Show.Stage is { } stage)
+                        {
+                            // Got to the stage: stand and face it.
+                            var (fx, fy, _, _) = RunningOrder.Front(stage);
+                            party.State = PartyState.Watching;
+                            party.Heading = Math.Atan2(fx - party.X, fy - party.Y) + party.Random.Between(-0.15, 0.15);
+                        }
                         else
                         {
+                            party.Watch = -1;
                             party.State = PartyState.Standing;
                             party.RetryAt = default;
                             party.WaitUntil = now + TimeSpan.FromMinutes(party.Random.Between(2, 12));
@@ -576,6 +637,55 @@ public sealed class Crowd
                     break;
             }
         }
+    }
+
+    /// <summary>
+    /// When a set is on, a party that has not yet made up its mind about it decides whether to go
+    /// and watch. True if they set off for the stage.
+    /// </summary>
+    private bool GoAndWatch(Party party, DateTime now)
+    {
+        if (Show?.Playing(now) is not { } slot || Show.Stage is not { } stage || party.Decided == slot.Index)
+        {
+            return false;
+        }
+
+        party.Decided = slot.Index;
+        if (party.Random.NextDouble() >= slot.Act.Draw || PlaceToWatch(stage, party.Random) is not { } spot)
+        {
+            return false;
+        }
+
+        party.Watch = slot.Index;
+        Send(party, spot, PartyState.Strolling);
+        if (party.State != PartyState.Strolling)
+        {
+            party.Watch = -1;
+            return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>A place in front of a stage: close in more often than far back, in a fan that widens with distance.</summary>
+    private TilePoint? PlaceToWatch(PlacedStage stage, GameRandom random)
+    {
+        var (fx, fy, dx, dy) = RunningOrder.Front(stage);
+        var rect = stage.Rect;
+        var half = (dx == 0 ? rect.Width : rect.Height) * FieldMap.TileMetres / 2;
+        var reach = 5 + (Expected / 14.0);
+        for (var attempt = 0; attempt < 24; attempt++)
+        {
+            var deep = 1.2 + (Math.Pow(random.NextDouble(), 1.3) * reach);
+            var across = random.Between(-1, 1) * ((half * 0.6) + (deep * 0.55));
+            var tile = FieldMap.TileAt(fx + (dx * deep) - (dy * across), fy + (dy * deep) + (dx * across));
+            if (_standableSet.Contains(tile))
+            {
+                return tile;
+            }
+        }
+
+        return null;
     }
 
     /// <summary>Sets a party walking somewhere. If there is no way there, they stand where they are.</summary>
@@ -632,7 +742,7 @@ public sealed class Crowd
     public List<PartySave> Save() => _parties
         .Where(p => p.State != PartyState.Expected)
         .Select(p => new PartySave(p.Id, p.State, p.X, p.Y, p.Heading, p.Target.X, p.Target.Y, p.WaitUntil, p.Random.State, p.Path?.Skip(p.PathIndex).ToList(),
-            p.Gate, p.Lane, p.Gate >= 0 && p.Gate < _queues.Count ? _queues[p.Gate][p.Lane].IndexOf(p) : 0, p.ServiceLeft, p.Ticketed))
+            p.Gate, p.Lane, p.Gate >= 0 && p.Gate < _queues.Count ? _queues[p.Gate][p.Lane].IndexOf(p) : 0, p.ServiceLeft, p.Ticketed, p.Watch, p.Decided))
         .ToList();
 
     /// <summary>Puts back parties from a save. Anyone not in the save has not arrived yet.</summary>
@@ -659,6 +769,8 @@ public sealed class Crowd
             party.State = s.State;
             party.Target = new TilePoint(s.TargetX, s.TargetY);
             party.Ticketed = s.Ticketed;
+            party.Watch = s.Watch;
+            party.Decided = s.Decided;
             party.Gate = -1;
             party.ServiceLeft = s.ServiceLeft;
             if (s.State == PartyState.Queuing)
@@ -706,4 +818,4 @@ public sealed class Crowd
 
 /// <summary>One party as written to a save file.</summary>
 public sealed record PartySave(int Id, PartyState State, double X, double Y, double Heading, int TargetX, int TargetY, DateTime WaitUntil, ulong Random, List<TilePoint>? Path = null,
-    int Gate = -1, int Lane = 0, int QueuePlace = 0, int ServiceLeft = -1, bool? Ticketed = null);
+    int Gate = -1, int Lane = 0, int QueuePlace = 0, int ServiceLeft = -1, bool? Ticketed = null, int Watch = -1, int Decided = -1);

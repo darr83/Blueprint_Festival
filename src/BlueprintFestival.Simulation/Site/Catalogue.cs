@@ -49,7 +49,7 @@ public enum Facing
 }
 
 /// <summary>What there is to know about a kind of stage. Sizes are in half-metre tiles.</summary>
-public sealed record StageInfo(StageKind Kind, string Name, int Width, int Depth, int Cost, string About);
+public sealed record StageInfo(StageKind Kind, string Name, int Width, int Depth, int Cost, int Performers, string About);
 
 /// <summary>What there is to know about a kind of fence. The cost is for each metre.</summary>
 public sealed record FenceInfo(FenceKind Kind, string Name, int CostPerMetre, string About);
@@ -62,9 +62,9 @@ public static class Catalogue
 {
     public static readonly IReadOnlyList<StageInfo> Stages = new[]
     {
-        new StageInfo(StageKind.FarmTrailer, "Farm trailer", 16, 6, 50, "Lent by the farmer for the price of the diesel. Room for a duo."),
-        new StageInfo(StageKind.Bandstand, "Bandstand", 12, 11, 400, "A deck under a striped roof. Room for a small band."),
-        new StageInfo(StageKind.HiredStage, "Hired stage", 24, 12, 1500, "A proper stage with a roof, lights and big speakers."),
+        new StageInfo(StageKind.FarmTrailer, "Farm trailer", 16, 6, 50, 2, "Lent by the farmer for the price of the diesel. Room for a duo."),
+        new StageInfo(StageKind.Bandstand, "Bandstand", 12, 11, 400, 4, "A deck under a striped roof. Room for a small band."),
+        new StageInfo(StageKind.HiredStage, "Hired stage", 24, 12, 1500, 5, "A proper stage with a roof, lights and big speakers."),
     };
 
     public static readonly IReadOnlyList<FenceInfo> Fences = new[]
