@@ -102,10 +102,13 @@ public class NeedsTests
         Assert.True(served[StallKind.FoodVan] > 40, $"{served[StallKind.FoodVan]} fed");
         Assert.True(served[StallKind.Bar] + served[StallKind.WaterPoint] > 60);
         Assert.True(served[StallKind.Toilets] > 40);
-        Assert.Contains(game.Income, l => l.What == "Food van" && l.Amount == served[StallKind.FoodVan] * 6);
-        Assert.Contains(game.Income, l => l.What == "Bar tent" && l.Amount == served[StallKind.Bar] * 4);
+        // The stallholders keep most of it: the festival's share is 30p in the pound.
+        var van = game.Income.Single(l => l.What == "Food van").Amount;
+        var bar = game.Income.Single(l => l.What == "Bar tent").Amount;
+        Assert.InRange(van, served[StallKind.FoodVan] * 6 * 0.27, served[StallKind.FoodVan] * 6 * 0.33);
+        Assert.InRange(bar, served[StallKind.Bar] * 4 * 0.27, served[StallKind.Bar] * 4 * 0.33);
         Assert.DoesNotContain(game.Income, l => l.What is "Toilets" or "Water point");
-        Assert.Equal(game.Crowd.Parties.Sum(p => p.Spent), game.TotalIncome);
+        Assert.Equal(van + bar, game.TotalIncome);
         Assert.Equal(FestivalGame.StartingMoney - game.TotalSpending + game.TotalIncome, game.Money);
         Assert.True(game.Crowd.Content(Need.Food) > 80 && game.Crowd.Content(Need.Drink) > 80 && game.Crowd.Content(Need.Toilet) > 80);
     }

@@ -12,25 +12,52 @@ namespace BlueprintFestival.Simulation;
 /// One game of Blueprint Festival: the festival's name, its clock and its field. Everything that
 /// happens in the game happens through this class, and nothing here knows about Godot.
 /// </summary>
-public sealed class FestivalGame
+public sealed partial class FestivalGame
 {
     public const string DefaultName = "Larkmoor Festival";
 
     public const int MaxNameLength = 40;
 
+    /// <summary>A festival that opens straight on the morning of the day, with nothing to plan.</summary>
     public FestivalGame(string? name = null, DateTime? start = null, int? seed = null)
+        : this(name, start, seed, null)
+    {
+    }
+
+    private FestivalGame(string? name, DateTime? start, int? seed, YearSetup? setup)
     {
         Name = CleanName(name);
+        if (setup is not null)
+        {
+            Year = Math.Max(1, setup.Year);
+            Licence = Math.Max(50, setup.Licence);
+            Money = setup.Bank;
+            BailedOut = setup.BailedOut;
+            LastHappiness = setup.LastHappiness;
+            Planned = true;
+            Phase = Phase.Plan;
+            start ??= FestivalDay(Year) + GameClock.DefaultStart.TimeOfDay;
+            seed ??= (StableHash(Name) + ((Year - 1) * 7919)) & 0x7FFFFFFF;
+        }
+
         Seed = seed ?? StableHash(Name);
         Clock = new GameClock(start);
+        Day = Clock.Now.Date;
         Field = FieldMap.Village();
         Site = new SiteLayout(Field);
         Crowd = new Crowd(Field, Site, Seed, Clock.Now);
         Show = new RunningOrder(Site, Seed, Clock.Now);
         Crowd.Show = Show;
-        Crowd.TicketsSold += people => Earn("Tickets", people * Catalogue.TicketPrice);
-        Crowd.Served += (kind, _, paid) => Earn(Catalogue.Of(kind).Name, paid);
-        Clock.Ticked += clock => Crowd.Tick(clock.Now);
+        Crowd.TicketsSold += people => Earn("Tickets", people * TicketPrice);
+        // The stallholders keep most of what they take; the festival gets its share for the pitch.
+        Crowd.Served += (kind, _, paid) => Earn(Catalogue.Of(kind).Name, ((paid * Catalogue.PitchShare) + 50) / 100);
+        Crowd.Dropped += (x, y) => _litter.Add(new LitterPiece(Math.Round(x, 2), Math.Round(y, 2)));
+        Clock.Ticked += Tick;
+        _wear = new int[WearColumns * WearRows];
+        if (Planned)
+        {
+            MakeOffers();
+        }
     }
 
     public string Name { get; }
@@ -113,6 +140,7 @@ public sealed class FestivalGame
     }
 
     private BuildCheck Afford(BuildCheck check) =>
+        check.Ok && !CanBuild ? new BuildCheck(false, check.Cost, "Nothing can be built just now.") :
         check.Ok && check.Cost > Money ? new BuildCheck(false, check.Cost, $"That costs £{check.Cost:N0} and there is £{Money:N0} in the bank.") : check;
 
     /// <summary>Whether a stage could go here, counting the money.</summary>
@@ -172,6 +200,11 @@ public sealed class FestivalGame
     /// <summary>Takes down whatever stands on a tile and gives the money back. Returns how much.</summary>
     public int Remove(TilePoint tile)
     {
+        if (!CanBuild)
+        {
+            return 0;
+        }
+
         var line = Site.StageAt(tile) is not null ? "Stage" : Site.StallAt(tile) is not null ? "Stalls and toilets" : "Fences and gates";
         var refund = Site.RemoveAt(tile);
         if (refund != 0)
@@ -192,7 +225,7 @@ public sealed class FestivalGame
     public double Light => Daylight.At(Clock.Now);
 
     /// <summary>Moves the game on by an amount of real time. Returns the number of ticks run.</summary>
-    public int Advance(double realSeconds) => Clock.Advance(realSeconds);
+    public int Advance(double realSeconds) => Phase == Phase.Day ? Clock.Advance(realSeconds) : 0;
 
     /// <summary>Tidies a name the player typed; an empty one becomes the default.</summary>
     public static string CleanName(string? name)
@@ -221,7 +254,10 @@ public sealed class FestivalGame
         }
     }
 
-    public SaveData Save() => new(SaveData.CurrentVersion, Name, Clock.CaptureState(), Seed, Crowd.Save(), Site.Save(), Money, _income.ToList(), _spending.ToList());
+    public SaveData Save() => new(SaveData.CurrentVersion, Name, Clock.CaptureState(), Seed, Crowd.Save(), Site.Save(), Money, _income.ToList(), _spending.ToList())
+    {
+        Year = Planned ? SaveYear() : null,
+    };
 
     public static FestivalGame Load(SaveData data)
     {
@@ -232,7 +268,14 @@ public sealed class FestivalGame
         }
 
         // The crowd's plan is for the day the festival is on, whatever time it was saved at.
-        var game = new FestivalGame(data.Name, data.Clock.Now.Date + GameClock.DefaultStart.TimeOfDay, data.Seed);
+        var game = data.Year is { } year
+            ? new FestivalGame(data.Name, year.Day.Date + GameClock.DefaultStart.TimeOfDay, data.Seed, new YearSetup(year.Number, year.Licence, 0, year.BailedOut, year.LastHappiness))
+            : new FestivalGame(data.Name, data.Clock.Now.Date + GameClock.DefaultStart.TimeOfDay, data.Seed);
+        if (data.Year is not null)
+        {
+            game.RestoreYear(data.Year);
+        }
+
         game.Clock.RestoreState(data.Clock);
         if (data.Site is not null)
         {
@@ -258,8 +301,11 @@ public sealed record LedgerLine(string What, int Amount);
 public sealed record SaveData(int Version, string Name, ClockState Clock, int? Seed = null, List<PartySave>? Parties = null, SiteSave? Site = null, int? Money = null,
     List<LedgerLine>? Income = null, List<LedgerLine>? Spending = null)
 {
-    /// <summary>Version 1 had the name and clock. Version 2 added the seed and the people. Version 3 added what is built, and money. Version 4 added stalls, needs and the day's takings.</summary>
-    public const int CurrentVersion = 4;
+    /// <summary>Version 1 had the name and clock. Version 2 added the seed and the people. Version 3 added what is built, and money. Version 4 added stalls, needs and the day's takings. Version 5 added the festival year.</summary>
+    public const int CurrentVersion = 5;
+
+    /// <summary>Where the festival is in its year. Missing from a festival with nothing to plan.</summary>
+    public YearSave? Year { get; init; }
 
     private static readonly JsonSerializerOptions Options = new()
     {
