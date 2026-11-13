@@ -46,6 +46,10 @@ public partial class GameManager : Node
             {
                 AddChild(new StallShots(arg["--stall-shots=".Length..]) { Name = "StallShots" });
             }
+            else if (arg.StartsWith("--year-shots=", StringComparison.Ordinal))
+            {
+                AddChild(new YearShots(arg["--year-shots=".Length..]) { Name = "YearShots" });
+            }
             else if (arg.StartsWith("--shots=", StringComparison.Ordinal))
             {
                 AddChild(new Shots(arg["--shots=".Length..]) { Name = "Shots" });
@@ -58,6 +62,25 @@ public partial class GameManager : Node
         Game = new FestivalGame(name, start, seed);
         GetTree().Paused = false;
         GetTree().ChangeSceneToFile(FestivalScene);
+    }
+
+    /// <summary>A new festival that runs through whole years, opening on the planning screen.</summary>
+    public void StartNewFestival(string? name)
+    {
+        Game = FestivalGame.NewFestival(name);
+        GetTree().Paused = false;
+        GetTree().ChangeSceneToFile(FestivalScene);
+    }
+
+    /// <summary>Moves on from the results to planning next year, on a clean field.</summary>
+    public void StartNextYear()
+    {
+        if (Game is { Phase: Phase.Results } game)
+        {
+            Game = game.NextYear();
+            GetTree().Paused = false;
+            GetTree().ChangeSceneToFile(FestivalScene);
+        }
     }
 
     public void ReturnToMenu()

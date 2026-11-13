@@ -38,6 +38,13 @@ public sealed class RunningOrder
 
     public IReadOnlyList<Slot> Slots => _slots;
 
+    /// <summary>Books a different act for the last set of the night.</summary>
+    public void SetHeadliner(Act act)
+    {
+        ArgumentNullException.ThrowIfNull(act);
+        _slots[^1] = _slots[^1] with { Act = act };
+    }
+
     /// <summary>The stage the acts play on, or null if none has been put up.</summary>
     public PlacedStage? Stage => _site.Stages.Count > 0 ? _site.Stages[0] : null;
 

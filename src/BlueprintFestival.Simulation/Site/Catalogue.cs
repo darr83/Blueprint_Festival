@@ -123,6 +123,9 @@ public static class Catalogue
         new StallInfo(StallKind.WaterPoint, "Water point", 3, 2, 15, Need.Drink, 0, 20, 2, "Two taps. Free, so it earns nothing."),
     };
 
+    /// <summary>The festival's share of what a stall takes, in pounds out of every hundred.</summary>
+    public const int PitchShare = 30;
+
     /// <summary>What one person pays at the gate.</summary>
     public const int TicketPrice = 5;
 

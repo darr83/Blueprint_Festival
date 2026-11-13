@@ -137,6 +137,9 @@ public sealed class Party
     /// <summary>True if they went home early because the day was miserable.</summary>
     public bool LeftUnhappy { get; internal set; }
 
+    /// <summary>When they will drop the rubbish they are holding, if they are holding any.</summary>
+    public DateTime LitterAt { get; internal set; }
+
     /// <summary>How fast their needs grow compared with most people.</summary>
     internal double Appetite { get; set; } = 1;
 
@@ -212,6 +215,7 @@ public sealed class Crowd
     private readonly List<List<Party>[]> _stallQueues = new();
     private readonly List<TilePoint> _standable = new();
     private readonly HashSet<TilePoint> _standableSet = new();
+    private readonly DateTime _day;
 
     public Crowd(FieldMap map, int seed, DateTime festivalDay)
         : this(map, new SiteLayout(map), seed, festivalDay)
@@ -224,7 +228,8 @@ public sealed class Crowd
         _site = site;
         _paths = new PathFinder(map);
         Seed = seed;
-        Plan(festivalDay.Date);
+        _day = festivalDay.Date;
+        Plan(_day, null);
         SiteChanged();
         site.Changed += SiteChanged;
     }
@@ -249,6 +254,12 @@ public sealed class Crowd
 
     /// <summary>Raised when a stall serves a party: which kind of stall, how many people, and what they paid.</summary>
     public event Action<StallKind, int, int>? Served;
+
+    /// <summary>Raised when someone drops a piece of litter: where, in metres.</summary>
+    public event Action<double, double>? Dropped;
+
+    /// <summary>Whether a party is the sort to drop its rubbish. About half are, always the same ones.</summary>
+    public bool Untidy(Party party) => (unchecked((uint)((Seed * 131) + (party.Id * 7919))) % 100) < 55;
 
     /// <summary>How many people are queuing at stalls.</summary>
     public int AtStalls => _parties.Where(p => p.State == PartyState.AtStall).Sum(p => p.Members.Count);
@@ -339,10 +350,23 @@ public sealed class Crowd
         }
     }
 
-    private void Plan(DateTime day)
+    /// <summary>
+    /// Plans the day again for a set number of people. Only for before the gates open: everyone
+    /// planned so far is forgotten.
+    /// </summary>
+    public void Replan(int people)
+    {
+        _parties.Clear();
+        Expected = 0;
+        Plan(_day, Math.Max(1, people));
+        SiteChanged();
+    }
+
+    private void Plan(DateTime day, int? people)
     {
         var random = GameRandom.FromSeed(Seed, 1);
-        var target = 100 + random.Next(101);
+        var guess = 100 + random.Next(101);
+        var target = people ?? guess;
         var personId = 0;
         while (Expected < target)
         {
@@ -693,6 +717,18 @@ public sealed class Crowd
                 Feel(party, now);
             }
 
+            if (party.LitterAt != default && now >= party.LitterAt && party.IsOnSite)
+            {
+                var pieces = Math.Max(1, party.Members.Count / 2);
+                for (var i = 0; i < pieces; i++)
+                {
+                    var angle = (party.Id * 2.4) + (party.Spent * 0.7) + (i * 2.1);
+                    Dropped?.Invoke(party.X + (Math.Cos(angle) * 0.6), party.Y + (Math.Sin(angle) * 0.6));
+                }
+
+                party.LitterAt = default;
+            }
+
             switch (party.State)
             {
                 case PartyState.Expected:
@@ -1026,6 +1062,12 @@ public sealed class Crowd
             party.State = PartyState.Standing;
             party.RetryAt = default;
             party.WaitUntil = now + TimeSpan.FromMinutes(party.Random.Between(1, 5));
+            if (info.Price > 0 && info.Serves != Need.Toilet && Untidy(party))
+            {
+                // The wrapper or the cup lasts a few minutes, then some people just let go of it.
+                party.LitterAt = now + TimeSpan.FromMinutes(4 + ((party.Id + party.Spent) % 14));
+            }
+
             Served?.Invoke(stall.Kind, party.Members.Count, paid);
         }
     }
@@ -1137,7 +1179,7 @@ public sealed class Crowd
             {
                 Hunger = p.Hunger, Thirst = p.Thirst, Toilet = p.Toilet, Mood = p.Mood, Stall = p.Stall, StallLane = p.StallLane,
                 StallPlace = p.Stall >= 0 && p.Stall < _stallQueues.Count ? _stallQueues[p.Stall][p.StallLane].IndexOf(p) : 0,
-                QueuedSince = p.QueuedSince, NeedRetryAt = p.NeedRetryAt, GaveUp = p.GaveUp, Spent = p.Spent, LeftUnhappy = p.LeftUnhappy, Leaves = p.Leaves,
+                QueuedSince = p.QueuedSince, NeedRetryAt = p.NeedRetryAt, GaveUp = p.GaveUp, Spent = p.Spent, LeftUnhappy = p.LeftUnhappy, Leaves = p.Leaves, LitterAt = p.LitterAt,
             })
         .ToList();
 
@@ -1178,6 +1220,7 @@ public sealed class Crowd
             party.GaveUp = s.GaveUp;
             party.Spent = s.Spent;
             party.LeftUnhappy = s.LeftUnhappy;
+            party.LitterAt = s.LitterAt;
             party.NeedRetryAt = s.NeedRetryAt;
             if (s.Mood is { } mood)
             {
@@ -1283,6 +1326,8 @@ public sealed record PartySave(int Id, PartyState State, double X, double Y, dou
     public int Spent { get; init; }
 
     public bool LeftUnhappy { get; init; }
+
+    public DateTime LitterAt { get; init; }
 
     public DateTime? Leaves { get; init; }
 }

@@ -54,13 +54,13 @@ public partial class MainMenu : Control
         _message.AutowrapMode = TextServer.AutowrapMode.WordSmart;
         column.AddChild(_message);
 
-        var version = UiStyle.Body("Step 1: an empty field", muted: true, size: 13);
+        var version = UiStyle.Body("Step 6: the festival year", muted: true, size: 13);
         AddChild(version);
         version.SetAnchorsAndOffsetsPreset(LayoutPreset.BottomLeft, LayoutPresetMode.Minsize, 18);
         version.GrowVertical = GrowDirection.Begin;
     }
 
-    private void StartNew() => GameManager.Instance.StartNewGame(_name.Text);
+    private void StartNew() => GameManager.Instance.StartNewFestival(_name.Text);
 
     private void Continue()
     {

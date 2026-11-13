@@ -10,6 +10,8 @@ brands or sponsors.
 
 ![A village festival with stalls](docs/screenshots/step-05/1_village_festival_with_stalls.jpg)
 
+![Planning the year](docs/screenshots/step-06/1_plan_the_year.jpg)
+
 ## Where it is up to
 
 | Step | State |
@@ -19,8 +21,8 @@ brands or sponsors.
 | 3. Building: three stages, four fences and two gates, with prices, and a queue at the gate | Done |
 | 4. The show: seven made-up acts a day, a crowd that gathers and cheers, stage lights after dark | Done |
 | 5. Needs and money: five stalls, queues, tickets at the gate, a money panel and a happiness score | Done |
-| 6. The festival year: plan, build, run, tidy, results, grow | Next |
-| 7. Staff and first aid | |
+| 6. The festival year: plan the ticket price and headliner, build, run the day, clear the litter, read the results, grow | Done |
+| 7. Staff and first aid | Next |
 | 8. Crowd density and crush | |
 | 9. Weather and mud | |
 | 10. Growing up: more stages, medical tent, big crowds, camping from 5,000 | |
