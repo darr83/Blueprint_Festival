@@ -2,6 +2,7 @@ using System;
 using BlueprintFestival.Simulation.Core;
 using BlueprintFestival.UI;
 using BlueprintFestival.World;
+using BlueprintFestival.Simulation.World;
 using Godot;
 
 namespace BlueprintFestival.Core;
@@ -27,6 +28,7 @@ public partial class SmokeTest : Node
     private DateTime _saved;
     private long _savedTicks;
     private int _savedPeople;
+    private int _savedMoney;
 
     public override void _Ready() => GD.Print("[smoke] Starting.");
 
@@ -90,6 +92,38 @@ public partial class SmokeTest : Node
                     Check(opened.Game.Crowd.OnSite == 0 && opened.Crowd.Count == 0, "Nobody should be there before the gates open.");
                     Check(opened.Game.Crowd.Expected is >= 100 and <= 200, "A village festival should expect 100 to 200 people.");
                     Check(opened.TopBar.PeopleText == $"On site 0 of {opened.Game.Crowd.Expected}", $"The top bar should count people, not say '{opened.TopBar.PeopleText}'.");
+
+                    // Build a first festival with the build bar: a bandstand, the gap fenced, a gate in it.
+                    var site = opened.Game.Site;
+                    var grass = opened.Game.Field.Field;
+                    var gap = opened.Game.Field.Gap;
+                    Check(opened.TopBar.MoneyText == "£2,000", $"A new festival should have £2,000, not {opened.TopBar.MoneyText}.");
+                    opened.BuildBar.Toggle(BuildMode.Stage);
+                    Check(opened.BuildBar.ChoiceCount == 3, "The build bar should offer three stages.");
+                    Check(opened.BuildBar.Choose("stageBandstand"), "The bandstand should be on the build bar.");
+                    Check(opened.Build.Mode == BuildMode.Stage, "Choosing a stage should hand it to the mouse.");
+                    opened.Build.ShowGhost(new TilePoint(grass.X + 70, grass.Y + 18));
+                    Check(opened.Build.Status.Contains("£400"), $"The bar should show the price, not '{opened.Build.Status}'.");
+                    Check(!opened.Build.ClickAt(new TilePoint(grass.X - 2, grass.Y + 18)).Ok && opened.Build.Refused, "A stage should not go on the hedge.");
+                    Check(opened.Build.ClickAt(new TilePoint(grass.X + 70, grass.Y + 18)).Ok, "A stage should go on the grass.");
+                    opened.Build.Turn();
+                    Check(opened.Build.Facing == Simulation.Site.Facing.West, "R should turn the piece a quarter turn.");
+
+                    opened.BuildBar.Toggle(BuildMode.Fence);
+                    Check(opened.BuildBar.ChoiceCount == 4 && opened.BuildBar.Choose("fencePaling"), "The build bar should offer four fences.");
+                    Check(opened.Build.DragFence(new TilePoint(gap.X, gap.Y + 1), new TilePoint(gap.Right - 1, gap.Y + 1)).Ok, "A fence should close the gap.");
+                    Check(!site.OpenWayIn, "With the gap fenced there should be no way in.");
+
+                    opened.BuildBar.Toggle(BuildMode.Gate);
+                    Check(opened.BuildBar.ChoiceCount == 2 && opened.BuildBar.Choose("gateVillageGate"), "The build bar should offer two gates.");
+                    opened.Build.Turn();
+                    Check(!opened.Build.Vertical, "Two turns should bring a gate back to lying across.");
+                    Check(opened.Build.ClickAt(new TilePoint(gap.X + 6, gap.Y + 1)).Ok, "A gate should go in the fence.");
+                    Check(site.HasWorkingGate, "The gate should be the only way in.");
+                    opened.BuildBar.Close();
+                    Check(opened.Build.Mode == BuildMode.None, "Closing the bar should put the tool down.");
+                    Check(opened.Game.Money == 2000 - 400 - 18 - 40 + 12, $"The money should add up, not be £{opened.Game.Money}.");
+                    _savedMoney = opened.Game.Money;
                     opened.Game.Clock.SetSpeed(GameSpeed.Fastest);
                     _mark = opened.Game.Now;
                     Next(Stage.Running);
@@ -111,6 +145,9 @@ public partial class SmokeTest : Node
                         }
                     }
 
+                    Check(running.Site.StageCount == 1 && running.Site.GateCount == 1 && running.Site.FenceRunCount == 2, "The stage, the gate and the fence either side should be drawn.");
+                    Check(crowd.ThroughGates >= 6 && crowd.WalkedInFree == 0, "Everyone should have come in through the gate.");
+                    Check(running.TopBar.MoneyText == $"£{_savedMoney:N0}", "The top bar should show the money left.");
                     Check(running.TopBar.TimeText != "08:00", "The clock in the top bar should have moved on.");
                     running.TogglePause();
                     Check(running.Game.Clock.IsPaused, "Space should pause the game.");
@@ -171,6 +208,9 @@ public partial class SmokeTest : Node
                     Check(loaded.Game.Clock.IsPaused, "The loaded festival should still be paused.");
                     Check(loaded.Game.Crowd.OnSite == _savedPeople, $"The loaded festival should have {_savedPeople} people on site, not {loaded.Game.Crowd.OnSite}.");
                     Check(loaded.Crowd.Count == _savedPeople, "Everyone in the loaded festival should be drawn.");
+                    Check(loaded.Game.Money == _savedMoney, "The loaded festival should keep its money.");
+                    Check(loaded.Site.StageCount == 1 && loaded.Site.GateCount == 1, "The loaded festival should keep what was built.");
+                    Check(loaded.Game.Site.HasWorkingGate, "The loaded gate should still be the way in.");
                     DirAccess.RemoveAbsolute($"{GameManager.SaveDirectory}/{Slot}.json");
                     Next(Stage.Done);
                     GD.Print("[smoke] PASSED.");

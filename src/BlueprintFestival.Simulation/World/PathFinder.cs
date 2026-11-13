@@ -17,6 +17,14 @@ public sealed class PathFinder
     {
         _map = map;
         _crowding = new float[map.Width * map.Height];
+        Refresh();
+    }
+
+    /// <summary>Works out again where the tight spots are. Call after anything is built or removed.</summary>
+    public void Refresh()
+    {
+        var map = _map;
+        Array.Clear(_crowding);
         for (var y = 0; y < map.Height; y++)
         {
             for (var x = 0; x < map.Width; x++)

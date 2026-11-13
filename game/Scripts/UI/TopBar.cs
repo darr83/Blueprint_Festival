@@ -27,6 +27,12 @@ public partial class TopBar : PanelContainer
     private Label _time = null!;
     private Label _light = null!;
     private Label _people = null!;
+    private Label _money = null!;
+    private Label _queue = null!;
+
+    public string MoneyText => _money.Text;
+
+    public string QueueText => _queue.Text;
 
     public string NameText => _name.Text;
 
@@ -57,6 +63,15 @@ public partial class TopBar : PanelContainer
         _people.MouseFilter = MouseFilterEnum.Stop;
         row.AddChild(new Control { CustomMinimumSize = new Vector2(10, 0) });
         row.AddChild(_people);
+        _queue = UiStyle.Body("", muted: true, size: 16);
+        _queue.TooltipText = "People queuing at the gates, or waiting outside because there is no way in";
+        _queue.MouseFilter = MouseFilterEnum.Stop;
+        row.AddChild(_queue);
+        _money = UiStyle.Heading("", 20);
+        _money.TooltipText = "Money in the festival's bank account";
+        _money.MouseFilter = MouseFilterEnum.Stop;
+        row.AddChild(new Control { CustomMinimumSize = new Vector2(10, 0) });
+        row.AddChild(_money);
 
         row.AddChild(new Control { SizeFlagsHorizontal = SizeFlags.ExpandFill });
 
@@ -98,6 +113,8 @@ public partial class TopBar : PanelContainer
         _date.Text = now.ToString("dddd d MMMM yyyy", British);
         _time.Text = now.ToString("HH:mm", British);
         _people.Text = $"On site {_game.Crowd.OnSite} of {_game.Crowd.Expected}";
+        _queue.Text = _game.Crowd.Queuing > 0 ? $"Queuing {_game.Crowd.Queuing}" : "";
+        _money.Text = $"£{_game.Money:N0}";
         var light = _game.Light;
         _light.Text = light >= 1 ? "Daylight" : light <= 0 ? "Night" : now.Hour < 12 ? "Dawn" : "Dusk";
         foreach (var (speed, button) in _speedButtons)

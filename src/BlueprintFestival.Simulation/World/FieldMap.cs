@@ -39,12 +39,14 @@ public sealed class FieldMap
     public const double TileMetres = 0.5;
 
     private readonly Ground[] _tiles;
+    private readonly bool[] _blocked;
 
     private FieldMap(int width, int height)
     {
         Width = width;
         Height = height;
         _tiles = new Ground[width * height];
+        _blocked = new bool[width * height];
     }
 
     /// <summary>Width of the whole map in tiles (west to east).</summary>
@@ -81,7 +83,24 @@ public sealed class FieldMap
 
     public bool InBounds(int x, int y) => x >= 0 && y >= 0 && x < Width && y < Height;
 
-    public bool IsWalkable(int x, int y) => this[x, y] is Ground.Grass or Ground.Lane;
+    /// <summary>True where people can walk: grass or lane with nothing built on it.</summary>
+    public bool IsWalkable(int x, int y) => this[x, y] is Ground.Grass or Ground.Lane && !_blocked[(y * Width) + x];
+
+    /// <summary>True where something built stands in the way.</summary>
+    public bool IsBlocked(TilePoint p) => InBounds(p.X, p.Y) && _blocked[(p.Y * Width) + p.X];
+
+    /// <summary>Says which tiles have something built on them that people must walk round.</summary>
+    public void SetBlocked(IEnumerable<TilePoint> tiles)
+    {
+        Array.Clear(_blocked);
+        foreach (var p in tiles)
+        {
+            if (InBounds(p.X, p.Y))
+            {
+                _blocked[(p.Y * Width) + p.X] = true;
+            }
+        }
+    }
 
     public bool IsWalkable(TilePoint p) => IsWalkable(p.X, p.Y);
 
