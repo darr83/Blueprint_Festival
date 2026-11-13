@@ -13,9 +13,13 @@ public class YearTests
         var y = gap.Y + 1;
         Assert.True(game.BuildFence(FenceKind.Rope, new TilePoint(gap.X, y), new TilePoint(gap.Right - 1, y)).Ok);
         Assert.True(game.BuildGate(GateKind.VillageGate, gap.X, y, false).Ok);
+        Assert.True(game.HireStaff(StaffKind.TicketStaff, new TilePoint(gap.X + 1, y)).Ok);
         var f = game.Field.Field;
-        Assert.True(game.BuildStage(StageKind.Bandstand, f.X + 50, f.Y + 6, Facing.South).Ok);
+        Assert.True(game.BuildStage(StageKind.FarmTrailer, f.X + 50, f.Y + 6, Facing.South).Ok);
         Amenities.Add(game);
+        Assert.True(game.BuildStall(StallKind.FirstAidTent, f.X + 30, f.Y + 6, Facing.South).Ok);
+        Assert.True(game.HireStaff(StaffKind.FirstAider, new TilePoint(f.X + 34, f.Y + 14)).Ok);
+        Assert.True(game.HireStaff(StaffKind.Security, new TilePoint(f.X + 60, f.Y + 30)).Ok);
     }
 
     private static void RunTheDay(FestivalGame game)

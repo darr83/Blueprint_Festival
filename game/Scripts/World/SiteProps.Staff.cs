@@ -148,6 +148,21 @@ public static partial class SiteProps
         return node;
     }
 
+    /// <summary>The marker over trouble that needs security: an amber warning sign. It sits this high above the ground.</summary>
+    public static MeshInstance3D TroubleMarker(float headHeight)
+    {
+        var b = new MeshBuilder();
+        var top = headHeight + 0.7f;
+        b.Ball(new Vector3(0, top, 0), new Vector3(0.62f, 0.62f, 0.16f), Colors.White);
+        b.Cone(new Vector3(0, top - 0.38f, 0), new Vector3(0.2f, 0.22f, 0.1f), Colors.White, new Vector3(180, 0, 0));
+        var amber = new Color("#E8A21C");
+        b.Box(new Vector3(0, top + 0.06f, 0.08f), new Vector3(0.09f, 0.26f, 0.03f), amber);
+        b.Ball(new Vector3(0, top - 0.17f, 0.08f), new Vector3(0.1f, 0.1f, 0.04f), amber);
+        var node = b.BuildNode("Trouble");
+        node.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
+        return node;
+    }
+
     /// <summary>The marker over someone who needs first aid: a green cross on a white board. It sits this high above the ground.</summary>
     public static MeshInstance3D HelpMarker(float headHeight)
     {

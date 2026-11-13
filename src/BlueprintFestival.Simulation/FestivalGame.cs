@@ -54,6 +54,7 @@ public sealed partial class FestivalGame
         Crowd.Dropped += (x, y) => _litter.Add(new LitterPiece(Math.Round(x, 2), Math.Round(y, 2)));
         Clock.Ticked += Tick;
         _wear = new int[WearColumns * WearRows];
+        StartStaff();
         if (Planned)
         {
             MakeOffers();
@@ -257,6 +258,7 @@ public sealed partial class FestivalGame
     public SaveData Save() => new(SaveData.CurrentVersion, Name, Clock.CaptureState(), Seed, Crowd.Save(), Site.Save(), Money, _income.ToList(), _spending.ToList())
     {
         Year = Planned ? SaveYear() : null,
+        Staff = _staff.Count > 0 || _incidents.Count > 0 || Planned ? SaveStaff() : null,
     };
 
     public static FestivalGame Load(SaveData data)
@@ -290,6 +292,11 @@ public sealed partial class FestivalGame
             game.Crowd.Restore(data.Parties);
         }
 
+        if (data.Staff is not null)
+        {
+            game.RestoreStaff(data.Staff);
+        }
+
         return game;
     }
 }
@@ -301,11 +308,14 @@ public sealed record LedgerLine(string What, int Amount);
 public sealed record SaveData(int Version, string Name, ClockState Clock, int? Seed = null, List<PartySave>? Parties = null, SiteSave? Site = null, int? Money = null,
     List<LedgerLine>? Income = null, List<LedgerLine>? Spending = null)
 {
-    /// <summary>Version 1 had the name and clock. Version 2 added the seed and the people. Version 3 added what is built, and money. Version 4 added stalls, needs and the day's takings. Version 5 added the festival year.</summary>
-    public const int CurrentVersion = 5;
+    /// <summary>Version 1 had the name and clock. Version 2 added the seed and the people. Version 3 added what is built, and money. Version 4 added stalls, needs and the day's takings. Version 5 added the festival year. Version 6 added staff and first aid.</summary>
+    public const int CurrentVersion = 6;
 
     /// <summary>Where the festival is in its year. Missing from a festival with nothing to plan.</summary>
     public YearSave? Year { get; init; }
+
+    /// <summary>Who is hired and what they are dealing with.</summary>
+    public StaffSave? Staff { get; init; }
 
     private static readonly JsonSerializerOptions Options = new()
     {

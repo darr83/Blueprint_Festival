@@ -30,6 +30,8 @@ public static partial class SiteProps
             case StallKind.Toilets:
                 Toilets(b, node);
                 break;
+            case StallKind.FirstAidTent:
+                return FirstAidTent();
             default:
                 WaterPoint(b, node);
                 break;

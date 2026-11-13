@@ -145,6 +145,9 @@ public partial class TopBar : PanelContainer
         _time.Text = now.ToString("HH:mm", British);
         _people.Text = $"On site {_game.Crowd.OnSite} of {_game.Crowd.Expected}";
         _queue.Text = _game.Crowd.Queuing > 0 ? $"Queuing {_game.Crowd.Queuing}" : "";
+
+        // There is not room for both: the queue matters more than the date while there is one.
+        _date.Visible = _queue.Text.Length == 0;
         _money.Text = $"£{_game.Money:N0}";
         _mood.Text = $"Happy {_game.Crowd.Happiness}%";
         var music = _game.Show;

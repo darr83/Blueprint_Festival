@@ -37,6 +37,8 @@ public partial class FestivalScene : Node3D
 
     public LitterView Litter { get; private set; } = null!;
 
+    public StaffView Staff { get; private set; } = null!;
+
     public YearScreen Year { get; private set; } = null!;
 
     public override void _Ready()
@@ -66,6 +68,10 @@ public partial class FestivalScene : Node3D
         Crowd = new CrowdView { Name = "Crowd" };
         AddChild(Crowd);
         Crowd.Initialise(Game);
+
+        Staff = new StaffView { Name = "Staff" };
+        AddChild(Staff);
+        Staff.Initialise(Game);
 
         Camera = new CameraRig { Name = "CameraRig" };
         AddChild(Camera);
@@ -113,7 +119,11 @@ public partial class FestivalScene : Node3D
         if (BuildBar.Visible != Game.CanBuild)
         {
             // Nothing is built while planning, tidying or reading the results.
-            BuildBar.Close();
+            if (!Game.CanBuild)
+            {
+                BuildBar.Close();
+            }
+
             BuildBar.Visible = Game.CanBuild;
         }
     }

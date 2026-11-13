@@ -12,6 +12,8 @@ brands or sponsors.
 
 ![Planning the year](docs/screenshots/step-06/1_plan_the_year.jpg)
 
+![A first-aider looking after someone](docs/screenshots/step-07/6_first_aider_at_work.jpg)
+
 ## Where it is up to
 
 | Step | State |
@@ -22,8 +24,8 @@ brands or sponsors.
 | 4. The show: seven made-up acts a day, a crowd that gathers and cheers, stage lights after dark | Done |
 | 5. Needs and money: five stalls, queues, tickets at the gate, a money panel and a happiness score | Done |
 | 6. The festival year: plan the ticket price and headliner, build, run the day, clear the litter, read the results, grow | Done |
-| 7. Staff and first aid | Next |
-| 8. Crowd density and crush | |
+| 7. Staff and first aid: ticket staff on the gate, security, first-aiders and a first aid tent, with people taken ill and trouble to sort out | Done |
+| 8. Crowd density and crush | Next |
 | 9. Weather and mud | |
 | 10. Growing up: more stages, medical tent, big crowds, camping from 5,000 | |
 | 11. Sound and music: each act's own songs, crowd noise, clicks and a menu tune | |

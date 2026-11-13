@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Collections.Generic;
 using BlueprintFestival.Simulation;
 using BlueprintFestival.Simulation.Site;
@@ -66,6 +67,7 @@ public partial class BuildBar : VBoxContainer
         AddTab(row, BuildMode.Fence, "Fences", "Keep people in, out, or in a line");
         AddTab(row, BuildMode.Gate, "Gates", "Where tickets are checked");
         AddTab(row, BuildMode.Stall, "Stalls", "Food, drink, toilets and water");
+        AddTab(row, BuildMode.Staff, "Staff", "Ticket staff, security and first aid");
         AddTab(row, BuildMode.Remove, "Take down", "Remove something and get the money back");
 
         SetAnchorsAndOffsetsPreset(LayoutPreset.BottomWide, LayoutPresetMode.Minsize, 14);
@@ -122,13 +124,25 @@ public partial class BuildBar : VBoxContainer
 
                 break;
             case BuildMode.Stall:
-                foreach (var s in Catalogue.Stalls)
+                foreach (var s in Catalogue.Stalls.Where(s => s.Serves is not null))
                 {
                     var takes = s.Price > 0 ? $"People pay £{s.Price} each." : "Free to use.";
                     AddChoice($"stall{s.Kind}", s.Name, $"£{s.Cost:N0}", $"{s.About}\n{takes} {s.Width / 2f:0.#} m wide, {s.Depth / 2f:0.#} m deep.", () => _tool.PickStall(s.Kind));
                 }
 
                 break;
+            case BuildMode.Staff:
+            {
+                foreach (var s in Catalogue.Staff)
+                {
+                    AddChoice($"staff{s.Kind}", s.Name, $"£{s.Wage:N0} a day", s.About, () => _tool.PickStaff(s.Kind));
+                }
+
+                var tent = Catalogue.Of(StallKind.FirstAidTent);
+                AddChoice($"stall{tent.Kind}", tent.Name, $"£{tent.Cost:N0}", $"{tent.About}\n{tent.Width / 2f:0.#} m wide, {tent.Depth / 2f:0.#} m deep.", () => _tool.PickStall(tent.Kind));
+                break;
+            }
+
             case BuildMode.Remove:
                 _tool.PickRemove();
                 break;

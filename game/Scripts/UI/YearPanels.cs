@@ -15,7 +15,8 @@ public sealed record PlanView(int Year, string Festival, string Date, int Licenc
 
 /// <summary>What the results screen shows.</summary>
 public sealed record ResultsView(int Year, string Festival, int Came, int Expected, int Happy, int WentHome, IReadOnlyList<(string What, int Amount)> In,
-    IReadOnlyList<(string What, int Amount)> Out, int LitterCleared, int GrassWorn, string Verdict, int LicenceNow, int LicenceNext);
+    IReadOnlyList<(string What, int Amount)> Out, int LitterCleared, int GrassWorn, string Verdict, int LicenceNow, int LicenceNext,
+    int Treated = 0, int Untreated = 0, int TroubleSorted = 0, int TroubleIgnored = 0);
 
 /// <summary>
 /// The screens of the festival year that sit over the field: planning before, results after.
@@ -225,6 +226,10 @@ public static class YearPanels
         box.AddChild(Section("The field afterwards"));
         box.AddChild(MoneyRow("Litter cleared", $"{view.LitterCleared}%"));
         box.AddChild(MoneyRow("Grass worn to mud", $"{view.GrassWorn}%"));
+        box.AddChild(new Control { CustomMinimumSize = new Vector2(0, 4) });
+        box.AddChild(Section("People looked after"));
+        box.AddChild(MoneyRow("Taken ill or hurt", view.Untreated > 0 ? $"{view.Treated} treated, {view.Untreated} left with no help" : $"{view.Treated} treated"));
+        box.AddChild(MoneyRow("Trouble", view.TroubleIgnored > 0 ? $"{view.TroubleSorted} sorted out, {view.TroubleIgnored} nobody dealt with" : $"{view.TroubleSorted} sorted out"));
         box.AddChild(new Control { CustomMinimumSize = new Vector2(0, 4) });
 
         var verdict = new PanelContainer();

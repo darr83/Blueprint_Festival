@@ -38,7 +38,7 @@ public readonly record struct LitterPiece(double X, double Y);
 
 /// <summary>How the year went.</summary>
 public sealed record YearResult(int Year, int Came, int Expected, int Happy, int WentHome, int In, int Out, int LitterCleared, int GrassWorn,
-    string Verdict, int LicenceNow, int LicenceNext, bool Loan, bool Closed)
+    string Verdict, int LicenceNow, int LicenceNext, bool Loan, bool Closed, int Treated = 0, int Untreated = 0, int TroubleSorted = 0, int TroubleIgnored = 0)
 {
     public int Profit => In - Out;
 }
@@ -245,6 +245,7 @@ public sealed partial class FestivalGame
     private void Tick(GameClock clock)
     {
         Crowd.Tick(clock.Now);
+        TickStaff(clock.Now);
         if (clock.TickCount % 10 == 0)
         {
             Wear();
@@ -281,6 +282,12 @@ public sealed partial class FestivalGame
     {
         Phase = Phase.Tidy;
         LitterAtStart = _litter.Count;
+        _incidents.Clear();
+        foreach (var member in _staff)
+        {
+            (member.X, member.Y, member.Heading, member.State, member.Incident, member.Path) = (member.PostX, member.PostY, member.PostHeading, StaffState.AtPost, -1, null);
+        }
+
         Clock.RestoreState(new ClockState(Day.AddDays(1).AddHours(6), Clock.TickCount, GameSpeed.Normal));
     }
 
@@ -345,11 +352,12 @@ public sealed partial class FestivalGame
             var cleared = LitterCleared;
             var profit = TotalIncome - TotalSpending;
             var bigger = Math.Min(BiggestLicence, Licence * 2);
-            var good = Phase == Phase.Results && !_loanThisYear && happy >= HappyEnough && cleared >= TidyEnough && profit >= 0;
+            var good = Phase == Phase.Results && !_loanThisYear && happy >= HappyEnough && cleared >= TidyEnough && profit >= 0 && Untreated == 0;
             var next = good && Money >= NeedsFor(bigger) ? bigger : Licence;
             var verdict =
                 Phase == Phase.Closed ? "The money has run out a second time. The parish council will not lend again, and the festival is over." :
                 _loanThisYear ? $"The bank is empty. The parish council lends £{LoanAmount:N0} to try once more. They will not do it twice." :
+                Untreated > 0 ? $"{Untreated} {(Untreated == 1 ? "person was" : "people were")} taken ill and nobody came to help. The licence stays as it is until there is proper first aid." :
                 happy < HappyEnough ? "People did not enjoy it enough. The licence stays as it is until they do." :
                 cleared < TidyEnough ? "The farmer is not happy with the state of the field. The licence stays as it is." :
                 profit < 0 ? "A good day, but it lost money. The licence stays as it is." :
@@ -357,7 +365,7 @@ public sealed partial class FestivalGame
                 next > Licence ? $"A good festival and a tidy field. The parish council raises the licence to {next:N0} people." :
                 "A good festival and a tidy field. The village field can take no more people than this.";
             return new YearResult(Year, Crowd.Arrived, Crowd.Expected, happy, Crowd.WentHomeUnhappy, TotalIncome, TotalSpending, cleared, GrassWorn,
-                verdict, Licence, next, _loanThisYear, Phase == Phase.Closed);
+                verdict, Licence, next, _loanThisYear, Phase == Phase.Closed, Treated, Untreated, TroubleSorted, TroubleIgnored);
         }
     }
 
