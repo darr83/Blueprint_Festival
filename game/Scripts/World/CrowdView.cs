@@ -389,7 +389,9 @@ public partial class CrowdView : Node3D
         Simple = simple;
         Dancers = dancers;
         Clappers = _clappers;
-        _clap.Update(heard, _clappers, held, delta);
+        // The clapping is as near or far as the stage's music.
+        var loud = heard is not null && Music?.For(heard == _secondBeat ? _game.SecondShow : _game.Show) is { } stage ? stage.Place : 1f;
+        _clap.Update(heard, _clappers, held, delta, loud);
         Applauding = _applauding;
         // The clapping under the cheers: louder at the end of a set than between songs, and louder the more people clap.
         var loudest = _mainBeat.Moment == StageMoment.Applause || _secondBeat.Moment == StageMoment.Applause ? 1f : 0.6f;
@@ -451,7 +453,7 @@ internal sealed class CrowdClap
     /// <summary>How loud the claps are for this many people clapping, from 0 to 1.</summary>
     public static float Level(int clappers) => clappers <= 0 ? 0 : Mathf.Clamp(Mathf.Sqrt(clappers / 300f), 0.15f, 1f);
 
-    public void Update(StageBeat? heard, int clappers, bool held, double delta)
+    public void Update(StageBeat? heard, int clappers, bool held, double delta, float loudness = 1f)
     {
         if (heard is null || clappers <= 0 || held || delta <= 0)
         {
@@ -480,7 +482,7 @@ internal sealed class CrowdClap
         {
             // Never the same clap twice running, so the beat does not sound like a drum machine.
             _clap = (_clap + 1 + _random.Next(Sounds.Claps.Count - 1)) % Sounds.Claps.Count;
-            SoundBoard.Instance?.Play(Sounds.Claps[_clap], Level(clappers));
+            SoundBoard.Instance?.Play(Sounds.Claps[_clap], Level(clappers) * Mathf.Clamp(loudness * 1.4f, 0.1f, 1f));
             Played++;
         }
     }

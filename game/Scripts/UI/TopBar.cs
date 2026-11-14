@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using BlueprintFestival.Simulation;
 using BlueprintFestival.Simulation.Core;
+using BlueprintFestival.Simulation.Show;
 using Godot;
 
 namespace BlueprintFestival.UI;
@@ -33,7 +34,9 @@ public partial class TopBar : PanelContainer
     private Label _people = null!;
     private Label _money = null!;
     private Label _queue = null!;
-    private Label _show = null!;
+    private VBoxContainer _showLines = null!;
+    private StyleBoxFlat _showBox = null!;
+    private readonly System.Collections.Generic.List<ShowLine> _lines = [];
     private Label _mood = null!;
     private Button _skip = null!;
 
@@ -62,8 +65,6 @@ public partial class TopBar : PanelContainer
 
     public string PeopleText { get; private set; } = "";
 
-    private Label _showKicker = null!;
-    private Label _showTail = null!;
     private Label _year = null!;
     private Label _peopleCaption = null!;
     private Control _queueCell = null!;
@@ -183,15 +184,11 @@ public partial class TopBar : PanelContainer
         nowBox.ContentMarginLeft = nowBox.ContentMarginRight = 22;
         nowBox.ContentMarginTop = nowBox.ContentMarginBottom = 9;
         now.AddThemeStyleboxOverride("panel", nowBox);
-        var playing = new HBoxContainer();
-        playing.AddThemeConstantOverride("separation", 10);
-        _showKicker = UiStyle.Caps("", pink: true, size: 11);
-        _show = UiStyle.Heading("", 19);
-        _showTail = UiStyle.Body("", muted: true, size: 14);
-        playing.AddChild(_showKicker);
-        playing.AddChild(_show);
-        playing.AddChild(_showTail);
-        now.AddChild(playing);
+        // One line for each stage with music: one line with a single stage, as many as there are stages.
+        _showLines = new VBoxContainer { MouseFilter = MouseFilterEnum.Ignore };
+        _showLines.AddThemeConstantOverride("separation", 2);
+        now.AddChild(_showLines);
+        _showBox = nowBox;
         _showPill = now;
         var nowHolder = new MarginContainer { MouseFilter = MouseFilterEnum.Ignore, SizeFlagsVertical = SizeFlags.ShrinkBegin };
         nowHolder.AddThemeConstantOverride("margin_top", 8);
@@ -237,6 +234,66 @@ public partial class TopBar : PanelContainer
 
     private PanelContainer _showPill = null!;
 
+    /// <summary>Fills the pill in the middle with a line for each stage.</summary>
+    private void ShowLines(System.Collections.Generic.IReadOnlyList<StageLine> lines)
+    {
+        var several = lines.Count > 1;
+        while (_lines.Count < lines.Count)
+        {
+            var line = new ShowLine();
+            _showLines.AddChild(line.Row);
+            _lines.Add(line);
+        }
+
+        for (var i = 0; i < _lines.Count; i++)
+        {
+            _lines[i].Row.Visible = i < lines.Count;
+            if (i < lines.Count)
+            {
+                _lines[i].Set(lines[i], several);
+            }
+        }
+
+        // Two lines fit in the same height of bar with a little less room above and below.
+        _showBox.ContentMarginTop = _showBox.ContentMarginBottom = several ? 5 : 9;
+        ShowText = string.Join("\n", System.Linq.Enumerable.Select(lines, l => l.Text));
+        _showPill.TooltipText = several ? ShowText : "Who is on stage now, or who is on next";
+    }
+
+    /// <summary>One stage's line in the pill: the stage, "On now" or "Next", the act and the time.</summary>
+    private sealed class ShowLine
+    {
+        public readonly HBoxContainer Row = new() { MouseFilter = MouseFilterEnum.Ignore };
+        private readonly Label _stage = UiStyle.Caps("", size: 11);
+        private readonly Label _kicker = UiStyle.Caps("", pink: true, size: 11);
+        private readonly Label _name = UiStyle.Heading("", 19);
+        private readonly Label _tail = UiStyle.Body("", muted: true, size: 14);
+
+        public ShowLine()
+        {
+            Row.AddThemeConstantOverride("separation", 10);
+            foreach (var label in new Label[] { _stage, _kicker, _name, _tail })
+            {
+                label.VerticalAlignment = VerticalAlignment.Center;
+                Row.AddChild(label);
+            }
+
+            _stage.CustomMinimumSize = new Vector2(58, 0);
+        }
+
+        public void Set(StageLine line, bool several)
+        {
+            _stage.Text = line.Stage;
+            _stage.Visible = several && line.Stage.Length > 0;
+            _kicker.Text = line.Kicker;
+            _kicker.Visible = line.Kicker.Length > 0;
+            _name.Text = line.Name;
+            _name.AddThemeFontSizeOverride("font_size", several ? 15 : 19);
+            _tail.Text = line.Tail;
+            _tail.Visible = line.Tail.Length > 0;
+        }
+    }
+
     /// <summary>The weather in a word or two, as the top bar shows it.</summary>
     public static string WeatherWord(FestivalGame game) =>
         game.RainNow > 0.7 ? "Heavy rain" : game.RainNow > 0.05 ? "Raining" :
@@ -268,38 +325,7 @@ public partial class TopBar : PanelContainer
         MoodText = $"Happy {_game.Crowd.Happiness}%";
         _mood.Text = $"{_game.Crowd.Happiness}%";
         var music = _game.Show;
-        var (kicker, name, tail) = music.Stage is null ? ("", "No stage, no music", "")
-            : music.CalledOff is not null ? ("", "The music has been called off", "")
-            : _game.ActPaused && music.Playing(now) is { } stopped ? ("Stopped", stopped.Act.Name, "")
-            : music.Playing(now) is { } on ? ("Now", on.Act.Name, $"until {on.End.ToString("HH:mm", British)}")
-            : music.Next(now) is { } next ? ("Next", next.Act.Name, $"at {next.Start.ToString("HH:mm", British)}")
-            : ("", "The music has finished", "");
-        if (kicker == "Next" && music.Changeover(now))
-        {
-            // The half hour after a set, while people go for a drink and the next act sets up.
-            kicker = "Stage empty. Next";
-        }
-
-        ShowText = kicker.Length == 0 ? name : tail.Length == 0 ? $"{kicker}: {name}" : $"{kicker}: {name} {tail}";
-        var other = _game.SecondShow;
-        if (other.Stage is not null && other.CalledOff is null)
-        {
-            // The second stage gets the line when the main stage is between sets, and the tooltip always.
-            var second = other.Playing(now) is { } playing ? ("Second stage", playing.Act.Name, $"until {playing.End.ToString("HH:mm", British)}")
-                : other.Next(now) is { } coming ? ("Second stage next", coming.Act.Name, $"at {coming.Start.ToString("HH:mm", British)}")
-                : ("", "The second stage has finished", "");
-            _showPill.TooltipText = second.Item1.Length == 0 ? second.Item2 : $"{second.Item1}: {second.Item2} {second.Item3}";
-            if (music.Stage is not null && music.CalledOff is null && music.Playing(now) is null && other.Playing(now) is not null)
-            {
-                (kicker, name, tail) = second;
-                ShowText = _showPill.TooltipText;
-            }
-        }
-        else
-        {
-            _showPill.TooltipText = "Who is on stage now, or who is on next";
-        }
-
+        ShowLines(OnNow.Lines(_game));
         var upNext = _game.Phase == Phase.Day ? _game.NextAct : null;
         _skip.Visible = _game.Phase == Phase.Day && music.Stage is not null;
         _skip.Disabled = upNext is null && _game.SkippingTo is null;
@@ -309,11 +335,6 @@ public partial class TopBar : PanelContainer
             : upNext is null ? "There are no more acts to come today"
             : $"Hurry the day on to {upNext.Act.Name} at {upNext.Start.ToString("HH:mm", British)} (N)";
 
-        _showKicker.Text = kicker == "Now" ? "On now" : kicker;
-        _showKicker.Visible = kicker.Length > 0;
-        _show.Text = name;
-        _showTail.Text = tail;
-        _showTail.Visible = tail.Length > 0;
         _weather.Text = WeatherWord(_game);
         _weather.TooltipText = _game.Weather.Summary + (_game.Wetness > 0.05 ? $" The ground is {(_game.Wetness > 0.6 ? "sodden" : _game.Wetness > 0.3 ? "wet" : "damp")}." : "");
         var light = _game.Light;
