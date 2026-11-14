@@ -54,6 +54,10 @@ public partial class GameManager : Node
             {
                 AddChild(new WeatherShots(arg["--weather-shots=".Length..]) { Name = "WeatherShots" });
             }
+            else if (arg.StartsWith("--stage-shots=", StringComparison.Ordinal))
+            {
+                AddChild(new StageShots(arg["--stage-shots=".Length..]) { Name = "StageShots" });
+            }
             else if (arg.StartsWith("--growth-shots=", StringComparison.Ordinal))
             {
                 AddChild(new GrowthShots(arg["--growth-shots=".Length..]) { Name = "GrowthShots" });

@@ -73,7 +73,7 @@ public partial class YearScreen : Control
         switch (_game.Phase)
         {
             case Phase.Plan:
-                Centre(YearPanels.Plan(PlanOf(_game), StartBuilding, PickTicket, PickHeadliner, TogglePonchos));
+                Centre(YearPanels.Plan(PlanOf(_game), StartBuilding, PickTicket, PickHeadliner, TogglePonchos, ToggleSecondStage));
                 break;
             case Phase.Build:
                 Side(YearPanels.BuildDay(_game.Crowd.Expected, _game.Money, OpenGates, _game.Weather.Summary));
@@ -124,7 +124,8 @@ public partial class YearScreen : Control
         game.Headliners.Select(h => new ActOffer(h.Act.Name, KindText(h.Act), h.Fee, h.Stars)).ToList(),
         game.HeadlinerPicked,
         game.Show.Slots.Take(6).Select(s => s.Act.Name).ToList(),
-        game.SupportFee / 6, game.EarlyForecast, game.PonchosOrdered, game.PonchoCost, game.Ground.Name, game.FieldRent);
+        game.SupportFee / 6, game.EarlyForecast, game.PonchosOrdered, game.PonchoCost, game.Ground.Name, game.FieldRent,
+        game.SecondStageBooked, game.SecondStageFee);
 
     public static ResultsView ResultsOf(FestivalGame game)
     {
@@ -139,6 +140,12 @@ public partial class YearScreen : Control
     public void PickTicket(int index)
     {
         _game.ChooseTicket(FestivalGame.TicketPrices[index]);
+        Rebuild();
+    }
+
+    public void ToggleSecondStage()
+    {
+        _game.BookSecondStage(!_game.SecondStageBooked);
         Rebuild();
     }
 

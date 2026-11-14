@@ -202,7 +202,7 @@ public partial class CrowdView : Node3D
         {
             // Someone unwell lies on the ground, or on a bed if they have been taken to the first aid tent.
             var lift = !person.Unwell ? 0f
-                : _game.Site.StallAt(Simulation.World.FieldMap.TileAt(person.X, person.Y))?.Kind == StallKind.FirstAidTent ? 0.62f : 0.14f;
+                : _game.Site.StallAt(Simulation.World.FieldMap.TileAt(person.X, person.Y)) is { } bed && FestivalGame.HasBeds(bed.Kind) ? 0.62f : 0.14f;
             var tilt = person.Unwell ? -Mathf.Pi / 2 : 0f;
             var target = new Vector3((float)person.X, lift, (float)person.Y);
             var heading = (float)person.Heading;

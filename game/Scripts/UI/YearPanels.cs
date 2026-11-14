@@ -12,7 +12,7 @@ public sealed record TicketChoice(int Price, int Expected);
 /// <summary>What the planning screen shows.</summary>
 public sealed record PlanView(int Year, string Festival, string Date, int Licence, int Bank, IReadOnlyList<TicketChoice> Tickets, int TicketPicked,
     IReadOnlyList<ActOffer> Headliners, int HeadlinerPicked, IReadOnlyList<string> Support, int SupportFee,
-    string Forecast = "", bool Ponchos = false, int PonchoCost = 0, string Field = "", int Rent = 0);
+    string Forecast = "", bool Ponchos = false, int PonchoCost = 0, string Field = "", int Rent = 0, bool SecondStage = false, int SecondStageFee = 0);
 
 /// <summary>What the results screen shows.</summary>
 public sealed record ResultsView(int Year, string Festival, int Came, int Expected, int Happy, int WentHome, IReadOnlyList<(string What, int Amount)> In,
@@ -76,7 +76,7 @@ public static class YearPanels
 
     /// <summary>The planning screen: ticket price, headline act, and what is left to build with.</summary>
     public static Control Plan(PlanView view, System.Action? start = null, System.Action<int>? pickTicket = null, System.Action<int>? pickHeadliner = null,
-        System.Action? togglePonchos = null)
+        System.Action? togglePonchos = null, System.Action? toggleSecondStage = null)
     {
         var panel = Card(820);
         var box = new VBoxContainer();
@@ -134,7 +134,27 @@ public static class YearPanels
         box.AddChild(acts);
         var support = UiStyle.Body($"Also playing: {string.Join(", ", view.Support)}. Local acts, £{view.SupportFee} each.", muted: true, size: 14);
         support.AutowrapMode = TextServer.AutowrapMode.WordSmart;
-        box.AddChild(support);
+        if (view.SecondStageFee > 0)
+        {
+            // Beside the line-up: six more acts for a second stage, which splits the crowd between two fronts.
+            var also = new HBoxContainer();
+            also.AddThemeConstantOverride("separation", 10);
+            support.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+            support.CustomMinimumSize = new Vector2(380, 0);
+            also.AddChild(support);
+            var second = Tile(view.SecondStage, 330, toggleSecondStage);
+            second.SizeFlagsHorizontal = Control.SizeFlags.ShrinkEnd;
+            var offer = new VBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
+            offer.AddChild(UiStyle.Heading(view.SecondStage ? $"Second stage acts booked: £{view.SecondStageFee:N0}" : $"Book second stage acts: £{view.SecondStageFee:N0}", 16));
+            offer.AddChild(UiStyle.Body("Six more local acts. They need a second stage.", muted: true, size: 13));
+            second.AddChild(offer);
+            also.AddChild(second);
+            box.AddChild(also);
+        }
+        else
+        {
+            box.AddChild(support);
+        }
 
         var ponchos = view.Ponchos ? view.PonchoCost : 0;
         if (view.Forecast.Length > 0)
@@ -159,9 +179,10 @@ public static class YearPanels
 
         box.AddChild(Section("Money"));
         var ticket = view.Tickets[view.TicketPicked];
-        var fees = view.Headliners[view.HeadlinerPicked].Fee + (view.Support.Count * view.SupportFee) + ponchos + view.Rent;
+        var secondStage = view.SecondStage ? view.SecondStageFee : 0;
+        var fees = view.Headliners[view.HeadlinerPicked].Fee + (view.Support.Count * view.SupportFee) + secondStage + ponchos + view.Rent;
         box.AddChild(MoneyRow("In the bank now", $"£{view.Bank:N0}"));
-        box.AddChild(MoneyRow($"Act fees, paid today ({view.Support.Count + 1} acts)", $"-£{fees - ponchos - view.Rent:N0}"));
+        box.AddChild(MoneyRow($"Act fees, paid today ({view.Support.Count + 1 + (view.SecondStage ? 6 : 0)} acts)", $"-£{fees - ponchos - view.Rent:N0}"));
         if (view.Rent > 0)
         {
             box.AddChild(MoneyRow("Field rent and licence, £1 a head", $"-£{view.Rent:N0}"));

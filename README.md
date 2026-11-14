@@ -30,8 +30,8 @@ brands or sponsors.
 | 8. Crowd density and crush: a crowd view in green, amber and red, big names that pack the front, a front barrier, pausing the act, and a day called off if people are hurt | Done |
 | 9. Weather and mud: a forecast, rain, heat, ponchos, mud where wet grass is walked on, straw and trackway, and a bill from the farmer for worn-out grass | Done |
 | 10a. Growing up: a licence ladder from 200 to 5,000, three fields, a main stage, turnstiles and a toilet block, and crowds of thousands drawn and run at speed | Done |
-| 10b. A second stage and a medical tent | Next |
-| 10c. Camping, as an option from 5,000 | |
+| 10b. A second stage with its own line-up, booked at planning, and a medical tent with six beds | Done |
+| 10c. Camping, as an option from 5,000 | Next |
 | 11. Sound and music: each act's own songs, crowd noise, clicks and a menu tune | |
 
 ## Controls

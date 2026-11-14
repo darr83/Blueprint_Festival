@@ -118,6 +118,12 @@ public sealed class Incident
     /// <summary>True while the person is resting in the first aid tent.</summary>
     public bool Resting { get; internal set; }
 
+    /// <summary>The tent whose bed has been kept for them (its place in the list of stalls), or -1.</summary>
+    public int Tent { get; internal set; } = -1;
+
+    /// <summary>Which of that tent's beds.</summary>
+    public int Bed { get; internal set; }
+
     /// <summary>True for someone hurt in a crush. They always need more than a sit down.</summary>
     public bool Crush { get; internal init; }
 
@@ -323,7 +329,7 @@ public sealed partial class FestivalGame
 
             var wanted = incident.Kind == IncidentKind.Ill ? StaffKind.FirstAider : StaffKind.Security;
             // Security behind a front barrier stay put while an act is on, and are the last to be sent otherwise.
-            var playing = Show.Playing(now) is not null;
+            var playing = MusicOn;
             var nearest = _staff.Where(s => s.Kind == wanted && s.IsFree && !(playing && InPit(s)))
                 .OrderBy(s => InPit(s) ? 1 : 0).ThenBy(s => Distance(s.X, s.Y, incident.X, incident.Y)).FirstOrDefault();
             if (nearest is not null)
@@ -509,16 +515,17 @@ public sealed partial class FestivalGame
                     if (there)
                     {
                         // Into a bed for a rest. The first-aider goes back to their post.
-                        if (Tent() is { } tent)
+                        var rest = RestTicks;
+                        if (TentOf(incident) is { } tent)
                         {
-                            var bed = _incidents.Count(i => i.Resting) % 2;
-                            var (bx, by) = BedPlace(tent, bed);
+                            var (bx, by) = BedPlace(tent, incident.Bed);
                             Crowd.Carry(patient, bx, by);
                             (incident.X, incident.Y) = (bx, by);
+                            rest = Catalogue.Of(tent.Kind).SecondsPerPerson;
                         }
 
                         incident.Resting = true;
-                        incident.Left = RestTicks;
+                        incident.Left = rest;
                         incident.Staff = -1;
                         member.Incident = -1;
                         Walk(member, member.PostX, member.PostY, StaffState.Returning);
@@ -538,14 +545,58 @@ public sealed partial class FestivalGame
         }
     }
 
-    private PlacedStall? Tent() => Site.Stalls.FirstOrDefault(s => s.Kind == StallKind.FirstAidTent);
+    /// <summary>True for a tent with beds in it: a first aid tent or a medical tent.</summary>
+    public static bool HasBeds(StallKind kind) => kind is StallKind.FirstAidTent or StallKind.MedicalTent;
 
-    /// <summary>Where someone lies on one of the tent's two beds, in metres.</summary>
+    /// <summary>How many beds are free across every first aid and medical tent on the site.</summary>
+    public int FreeBeds => Site.Stalls.Where(s => HasBeds(s.Kind)).Sum(s => Catalogue.Of(s.Kind).Servers) - _incidents.Count(i => TentOf(i) is not null);
+
+    /// <summary>The tent a bed has been kept in for someone, if it is still standing.</summary>
+    private PlacedStall? TentOf(Incident incident) =>
+        incident.Tent >= 0 && incident.Tent < Site.Stalls.Count && HasBeds(Site.Stalls[incident.Tent].Kind) ? Site.Stalls[incident.Tent] : null;
+
+    /// <summary>The nearest tent to a place with a bed free, and which bed, or null if every bed is taken.</summary>
+    private (int Tent, int Bed)? FreeBed(double x, double y)
+    {
+        (int Tent, int Bed)? best = null;
+        var nearest = double.MaxValue;
+        for (var t = 0; t < Site.Stalls.Count; t++)
+        {
+            var stall = Site.Stalls[t];
+            if (!HasBeds(stall.Kind))
+            {
+                continue;
+            }
+
+            var (fx, fy, _, _) = SiteLayout.Front(stall.Rect, stall.Facing);
+            var away = Distance(fx, fy, x, y);
+            if (away >= nearest)
+            {
+                continue;
+            }
+
+            for (var bed = 0; bed < Catalogue.Of(stall.Kind).Servers; bed++)
+            {
+                if (!_incidents.Any(i => i.Tent == t && i.Bed == bed))
+                {
+                    (best, nearest) = ((t, bed), away);
+                    break;
+                }
+            }
+        }
+
+        return best;
+    }
+
+    /// <summary>Where someone lies on one of a tent's beds, in metres.</summary>
     public static (double X, double Y) BedPlace(PlacedStall tent, int bed)
     {
+        ArgumentNullException.ThrowIfNull(tent);
         var (fx, fy, dx, dy) = SiteLayout.Front(tent.Rect, tent.Facing);
-        var across = bed == 0 ? -1.15 : 1.15;
-        return (fx - (dx * 1.6) - (dy * across), fy - (dy * 1.6) + (dx * across));
+        var (across, deep) = tent.Kind == StallKind.MedicalTent
+            ? (((bed % 3) - 1) * 2.4, bed < 3 ? 1.7 : 3.6)
+            : (bed == 0 ? -1.15 : 1.15, 1.6);
+        return (fx - (dx * deep) - (dy * across), fy - (dy * deep) + (dx * across));
     }
 
     private void Finish(StaffMember member, Incident incident)
@@ -567,8 +618,11 @@ public sealed partial class FestivalGame
             Treated++;
             Close(incident);
         }
-        else if (Tent() is { } tent && _incidents.Count(i => i.Resting) < Catalogue.Of(StallKind.FirstAidTent).Servers)
+        else if (FreeBed(incident.X, incident.Y) is { } place)
         {
+            // The bed is kept for them from now, so two first-aiders never set off for the same one.
+            (incident.Tent, incident.Bed) = place;
+            var tent = Site.Stalls[place.Tent];
             var (fx, fy, dx, dy) = SiteLayout.Front(tent.Rect, tent.Facing);
             Walk(member, fx + (dx * 0.6), fy + (dy * 0.6), StaffState.Escorting);
         }
@@ -583,7 +637,7 @@ public sealed partial class FestivalGame
 
     private StaffSave SaveStaff() => new(
         _staff.Select(s => new StaffMemberSave(s.Id, s.Kind, s.Tile, s.PostX, s.PostY, s.PostHeading, s.X, s.Y, s.Heading, s.State, s.Incident)).ToList(),
-        _incidents.Select(i => new IncidentSave(i.Id, i.Kind, i.X, i.Y, i.Party, i.Started, i.Staff, i.Left, i.Resting, i.Crush)).ToList(),
+        _incidents.Select(i => new IncidentSave(i.Id, i.Kind, i.X, i.Y, i.Party, i.Started, i.Staff, i.Left, i.Resting, i.Crush) { Tent = i.Tent, Bed = i.Bed }).ToList(),
         _chance.State, _nextStaff, _nextIncident, Treated, Untreated, TroubleSorted, TroubleIgnored);
 
     private void RestoreStaff(StaffSave save)
@@ -596,7 +650,7 @@ public sealed partial class FestivalGame
 
         foreach (var i in save.Incidents ?? new())
         {
-            _incidents.Add(new Incident(i.Id, i.Kind, i.X, i.Y, i.Party, i.Started) { Staff = i.Staff, Left = i.Left, Resting = i.Resting, Crush = i.Crush });
+            _incidents.Add(new Incident(i.Id, i.Kind, i.X, i.Y, i.Party, i.Started) { Staff = i.Staff, Left = i.Left, Resting = i.Resting, Crush = i.Crush, Tent = i.Tent, Bed = i.Bed });
         }
 
         // Anyone who was walking somewhere works out their way again.
@@ -608,7 +662,7 @@ public sealed partial class FestivalGame
                 case StaffState.Going when incident is not null:
                     Walk(member, incident.X, incident.Y, StaffState.Going);
                     break;
-                case StaffState.Escorting when Tent() is { } tent:
+                case StaffState.Escorting when incident is not null && TentOf(incident) is { } tent:
                     var (fx, fy, dx, dy) = SiteLayout.Front(tent.Rect, tent.Facing);
                     Walk(member, fx + (dx * 0.6), fy + (dy * 0.6), StaffState.Escorting);
                     break;
@@ -629,7 +683,14 @@ public sealed partial class FestivalGame
 public sealed record StaffMemberSave(int Id, StaffKind Kind, TilePoint Tile, double PostX, double PostY, double PostHeading, double X, double Y, double Heading, StaffState State, int Incident);
 
 /// <summary>One incident as written to a save file.</summary>
-public sealed record IncidentSave(int Id, IncidentKind Kind, double X, double Y, int Party, DateTime Started, int Staff, int Left, bool Resting, bool Crush = false);
+public sealed record IncidentSave(int Id, IncidentKind Kind, double X, double Y, int Party, DateTime Started, int Staff, int Left, bool Resting, bool Crush = false)
+{
+    /// <summary>The tent whose bed is kept for them, or -1.</summary>
+    public int Tent { get; init; } = -1;
+
+    /// <summary>Which of that tent's beds.</summary>
+    public int Bed { get; init; }
+}
 
 /// <summary>The staff and what they are dealing with, as written to a save file.</summary>
 public sealed record StaffSave(List<StaffMemberSave>? Staff, List<IncidentSave>? Incidents, ulong Chance, int NextStaff, int NextIncident, int Treated, int Untreated, int TroubleSorted, int TroubleIgnored);

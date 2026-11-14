@@ -171,6 +171,23 @@ public partial class TopBar : PanelContainer
             : music.Playing(now) is { } on ? $"Now: {on.Act.Name} until {on.End.ToString("HH:mm", British)}"
             : music.Next(now) is { } next ? $"Next: {next.Act.Name} at {next.Start.ToString("HH:mm", British)}"
             : "The music has finished";
+        var other = _game.SecondShow;
+        if (other.Stage is not null && other.CalledOff is null)
+        {
+            // The second stage gets the line when the main stage is between sets, and the tooltip always.
+            var second = other.Playing(now) is { } playing ? $"Second stage: {playing.Act.Name} until {playing.End.ToString("HH:mm", British)}"
+                : other.Next(now) is { } coming ? $"Second stage next: {coming.Act.Name} at {coming.Start.ToString("HH:mm", British)}"
+                : "The second stage has finished";
+            _show.TooltipText = second;
+            if (music.Stage is not null && music.CalledOff is null && music.Playing(now) is null && other.Playing(now) is not null)
+            {
+                _show.Text = second;
+            }
+        }
+        else
+        {
+            _show.TooltipText = "";
+        }
         _weather.Text = WeatherWord(_game);
         _weather.TooltipText = _game.Weather.Summary + (_game.Wetness > 0.05 ? $" The ground is {(_game.Wetness > 0.6 ? "sodden" : _game.Wetness > 0.3 ? "wet" : "damp")}." : "");
         var light = _game.Light;

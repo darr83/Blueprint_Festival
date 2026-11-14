@@ -35,6 +35,8 @@ public static partial class SiteProps
                 break;
             case StallKind.FirstAidTent:
                 return FirstAidTent();
+            case StallKind.MedicalTent:
+                return MedicalTent();
             default:
                 WaterPoint(b, node);
                 break;

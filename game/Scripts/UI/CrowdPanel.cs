@@ -134,7 +134,16 @@ public partial class CrowdPanel : Control
             var (fx, fy, _, _) = RunningOrder.Front(stage);
             if (Math.Abs(x - fx) < 18 && Math.Abs(y - fy) < 18)
             {
-                return "at the stage";
+                return _game.SecondShow.Stage is null ? "at the stage" : "at the main stage";
+            }
+        }
+
+        if (_game.SecondShow.Stage is { } other)
+        {
+            var (fx, fy, _, _) = RunningOrder.Front(other);
+            if (Math.Abs(x - fx) < 14 && Math.Abs(y - fy) < 14)
+            {
+                return "at the second stage";
             }
         }
 
@@ -166,7 +175,7 @@ public partial class CrowdPanel : Control
         {
             Warn(DensityView.CrushRed, $"Crush risk {Where(x, y)}",
                 $"{_game.Density.Worst:0.0} people per square metre. {(hurtLine.Length > 0 ? hurtLine : "People will be hurt if it stays like this.")}\nSecurity posted there turn people away before it gets this bad.",
-                pause: _game.Show.Playing(_game.Now) is not null, show: true);
+                pause: _game.MusicOn, show: true);
         }
         else
         {
