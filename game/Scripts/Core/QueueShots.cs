@@ -21,6 +21,7 @@ public partial class QueueShots : Node
     {
         ("1_queuing_at_the_gate", 200), ("2_showing_a_ticket", 200), ("3_the_queue_at_the_bar", 200), ("4_the_queue_at_the_food_van", 200),
         ("5_a_long_queue_folds_back", 200), ("6_two_lanes_at_the_arch_gate", 1500),
+        ("7_queuing_for_the_toilets", 200), ("8_a_door_opens_and_the_sign_turns_red", 200),
     };
 
     private readonly string _directory;
@@ -160,9 +161,35 @@ public partial class QueueShots : Node
         game.BuildGate(GateKind.VillageGate, gap.X + 2, gap.Y + 1, false);
         game.HireStaff(StaffKind.TicketStaff, new TilePoint(gap.X + 4, gap.Y + 1));
         game.BuildStall(StallKind.Toilets, f.X + 30, f.Y + 5, Facing.South);
-        game.BuildStall(StallKind.Toilets, f.X + 40, f.Y + 5, Facing.South);
+        if (name[0] < '7')
+        {
+            game.BuildStall(StallKind.Toilets, f.X + 40, f.Y + 5, Facing.South);
+        }
+
+        else
+        {
+            game.BuildStall(StallKind.Bar, f.X + 7, f.Y + 30, Facing.East);
+            game.BuildStall(StallKind.FoodVan, f.X + 7, f.Y + 50, Facing.East);
+            game.BuildStall(StallKind.TeaAndCake, f.X + 7, f.Y + 14, Facing.East);
+        }
+
+        var cabins = game.Site.Stalls[0].Rect;
+        bool Doing(CubicleLook look) => Enumerable.Range(0, 3).Any(k => game.Crowd.Cubicle(0, k) == look);
         switch (name)
         {
+            case "7_queuing_for_the_toilets":
+                game.OpenGates();
+                RunUntil(game, () => game.Now.Hour >= 12 && game.Crowd.StallLine(0)!.Standing >= 7 && Doing(CubicleLook.Engaged) && Doing(CubicleLook.DoorOpen), 20);
+                festival.Camera.LookAt((cabins.X + 4) * t, (cabins.Bottom + 8) * t, 11f);
+                break;
+
+            case "8_a_door_opens_and_the_sign_turns_red":
+                game.OpenGates();
+                RunUntil(game, () => game.Now.Hour >= 12 && game.Crowd.StallLine(0)!.Standing >= 3 && Doing(CubicleLook.Engaged) && Doing(CubicleLook.DoorOpen)
+                    && game.Crowd.People.Any(p => p.Walking && System.Math.Abs(p.Y - (cabins.Bottom * t) - 0.35) < 0.15 && System.Math.Abs(p.X - ((cabins.X + 4) * t)) < 2), 20);
+                festival.Camera.LookAt((cabins.X + 4) * t, (cabins.Bottom + 3) * t, 6.5f);
+                break;
+
             case "1_queuing_at_the_gate":
             {
                 game.OpenGates();

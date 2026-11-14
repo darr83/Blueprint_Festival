@@ -245,4 +245,159 @@ public class QueueTests
         Assert.Equal(game.TotalIncome, loaded.TotalIncome);
         Assert.Equal(game.Crowd.Happiness, loaded.Crowd.Happiness);
     }
+
+    /// <summary>A festival with one set of toilets and a bar, so a toilet queue is sure to form.</summary>
+    private static FestivalGame WithToilets(StallKind kind = StallKind.Toilets)
+    {
+        var game = new FestivalGame("Toilets", seed: 8);
+        var f = game.Field.Field;
+        Assert.True(game.BuildStall(kind, f.X + 30, f.Y + 20, Facing.South).Ok);
+        Assert.True(game.BuildStall(StallKind.Bar, f.X + 60, f.Y + 20, Facing.South).Ok);
+        return game;
+    }
+
+    [Fact]
+    public void At_the_toilets_each_person_goes_into_a_cubicle_alone_and_the_door_shuts_behind_them()
+    {
+        var game = WithToilets();
+        var cabins = Catalogue.Of(StallKind.Toilets).Servers;
+        var seen = new HashSet<CubicleLook>();
+        var allEngaged = false;
+        var longest = 0;
+        var everyone = game.Crowd.Parties.SelectMany(p => p.Members).Count();
+        while (game.Now < Day.AddHours(16))
+        {
+            game.Clock.Step();
+            var looks = Enumerable.Range(0, cabins).Select(k => game.Crowd.Cubicle(0, k)).ToList();
+            seen.UnionWith(looks);
+            allEngaged |= looks.All(l => l == CubicleLook.Engaged);
+            longest = Math.Max(longest, game.Crowd.StallLine(0)!.Standing);
+
+            // Whoever is behind a shut door cannot be seen; everyone else on site can.
+            var engaged = looks.Count(l => l == CubicleLook.Engaged);
+            Assert.Equal(game.Crowd.OnSite - engaged, game.Crowd.People.Count());
+            Assert.True(game.Crowd.BeingServed(0) <= cabins);
+
+            // Nobody queuing is ever where someone else is standing.
+            if (game.Now.Second == 0)
+            {
+                var people = Waiting(game).Where(p => !p.Walking).ToList();
+                Assert.True(people.Count < 2 || Nearest(people) > 0.45, $"{game.Now:HH:mm}: {Nearest(people):0.00} m apart");
+            }
+        }
+
+        Assert.Equal(3, seen.Count);
+        Assert.True(allEngaged);
+        Assert.True(longest >= 5, $"the longest queue was {longest}");
+    }
+
+    [Fact]
+    public void A_visit_to_the_toilet_takes_the_door_twice_and_the_time_inside()
+    {
+        var game = WithToilets();
+        var seconds = Catalogue.Of(StallKind.Toilets).SecondsPerPerson;
+        Party? one = null;
+        DateTime? opened = null;
+        var looks = new List<CubicleLook>();
+        var cubicle = -1;
+        while (game.Now < Day.AddHours(12))
+        {
+            // Someone on their own, the moment they are given a cubicle.
+            if (one is null)
+            {
+                var before = Enumerable.Range(0, 3).Select(k => game.Crowd.BeingServed(0)).First();
+                game.Clock.Step();
+                one = game.Crowd.Parties.FirstOrDefault(p => p.State == PartyState.AtStall && p.Stall == 0 && p.Members.Count == 1 && p.Checked == 1 && before == 0 && game.Crowd.BeingServed(0) == 1);
+                continue;
+            }
+
+            game.Clock.Step();
+            if (one.State != PartyState.AtStall)
+            {
+                break;
+            }
+
+            cubicle = cubicle >= 0 ? cubicle : Enumerable.Range(0, 3).FirstOrDefault(k => game.Crowd.Cubicle(0, k) != CubicleLook.Vacant, -1);
+            if (cubicle < 0)
+            {
+                continue;
+            }
+
+            opened ??= game.Now;
+            var look = game.Crowd.Cubicle(0, cubicle);
+            if (looks.Count == 0 || looks[^1] != look)
+            {
+                looks.Add(look);
+            }
+        }
+
+        Assert.NotNull(one);
+        Assert.Equal(new[] { CubicleLook.DoorOpen, CubicleLook.Engaged, CubicleLook.DoorOpen }, looks.Take(3));
+        Assert.Equal(0, one!.Toilet);
+        Assert.Equal(PartyState.Standing, one.State);
+
+        // From the door opening to it shutting again is no longer than a visit used to take.
+        Assert.InRange((game.Now - opened!.Value).TotalSeconds, seconds - 15, seconds);
+    }
+
+    [Fact]
+    public void A_family_uses_several_cubicles_at_once_and_waits_for_each_other()
+    {
+        var game = WithToilets(StallKind.ToiletBlock);
+        Party? family = null;
+        var together = 0;
+        while (game.Now < Day.AddHours(16))
+        {
+            game.Clock.Step();
+            family ??= game.Crowd.Parties.FirstOrDefault(p => p.State == PartyState.AtStall && p.Stall == 0 && p.Members.Count >= 3 && p.Checked >= 1);
+            if (family is null)
+            {
+                continue;
+            }
+
+            if (family.State != PartyState.AtStall)
+            {
+                break;
+            }
+
+            var ids = family.Members.Select(m => m.Id).ToHashSet();
+            together = Math.Max(together, family.Members.Count - game.Crowd.People.Count(p => ids.Contains(p.Id)));
+        }
+
+        Assert.NotNull(family);
+        Assert.True(together >= 2, $"only {together} of the family were in cubicles at once");
+        Assert.Equal(0, family!.Toilet);
+        Assert.Equal(PartyState.Standing, family.State);
+    }
+
+    [Fact]
+    public void Toilets_in_use_survive_saving_and_loading()
+    {
+        var game = WithToilets();
+        while (game.Now < Day.AddHours(16)
+            && !(game.Crowd.StallLine(0)!.Standing >= 3 && game.Crowd.Cubicle(0, 0) == CubicleLook.Engaged && Enumerable.Range(0, 3).Any(k => game.Crowd.Cubicle(0, k) == CubicleLook.DoorOpen)))
+        {
+            game.Clock.Step();
+        }
+
+        Assert.Equal(CubicleLook.Engaged, game.Crowd.Cubicle(0, 0));
+        var loaded = FestivalGame.Load(game.Save());
+        for (var k = 0; k < 3; k++)
+        {
+            Assert.Equal(game.Crowd.Cubicle(0, k), loaded.Crowd.Cubicle(0, k));
+        }
+
+        var before = game.Crowd.People.OrderBy(p => p.Id).ToList();
+        var after = loaded.Crowd.People.OrderBy(p => p.Id).ToList();
+        Assert.Equal(before.Select(p => (p.Id, Math.Round(p.X, 4), Math.Round(p.Y, 4))), after.Select(p => (p.Id, Math.Round(p.X, 4), Math.Round(p.Y, 4))));
+        for (var i = 0; i < 1800; i++)
+        {
+            game.Clock.Step();
+            loaded.Clock.Step();
+        }
+
+        Assert.Equal(game.Crowd.Content(Need.Toilet), loaded.Crowd.Content(Need.Toilet));
+        Assert.Equal(game.Crowd.Happiness, loaded.Crowd.Happiness);
+        Assert.Equal(game.Crowd.People.Count(), loaded.Crowd.People.Count());
+    }
 }

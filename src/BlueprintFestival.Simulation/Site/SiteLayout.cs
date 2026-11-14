@@ -145,6 +145,18 @@ public sealed class SiteLayout
         return (fx + (dx * metresOut) - (dy * across), fy + (dy * metresOut) + (dx * across));
     }
 
+    /// <summary>How far apart the cabins of a toilet stand, in metres.</summary>
+    public const double CubicleMetres = 1.25;
+
+    /// <summary>A place in line with the door of one cubicle of a toilet, in metres: so far out from the front (or in, if negative).</summary>
+    public static (double X, double Y) CubicleDoor(PlacedStall stall, int cubicle, double metresOut)
+    {
+        var info = Catalogue.Of(stall.Kind);
+        var (fx, fy, dx, dy) = Front(stall.Rect, stall.Facing);
+        var across = (cubicle - ((info.Servers - 1) / 2.0)) * CubicleMetres;
+        return (fx + (dx * metresOut) - (dy * across), fy + (dy * metresOut) + (dx * across));
+    }
+
     public BuildCheck CheckStall(StallKind kind, int x, int y, Facing facing)
     {
         var stall = new PlacedStall(kind, x, y, facing);

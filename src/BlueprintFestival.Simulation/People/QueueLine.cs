@@ -91,3 +91,48 @@ public sealed class QueueLine
         return (ax + ((bx - ax) * along), ay + ((by - ay) * along), heading);
     }
 }
+
+/// <summary>How a toilet cubicle looks from outside.</summary>
+public enum CubicleLook
+{
+    /// <summary>Door shut, sign green.</summary>
+    Vacant,
+
+    /// <summary>Door open: someone is going in or coming out.</summary>
+    DoorOpen,
+
+    /// <summary>Door shut, sign red.</summary>
+    Engaged,
+}
+
+internal enum CubiclePhase
+{
+    Approaching,
+    Entering,
+    Inside,
+    Leaving,
+}
+
+/// <summary>One person's visit to a toilet cubicle: who, how far through it they are, and where they are standing.</summary>
+internal sealed class CubicleUse
+{
+    public CubicleUse(Party party, int member)
+    {
+        Party = party;
+        Member = member;
+    }
+
+    public Party Party { get; }
+
+    public int Member { get; }
+
+    public CubiclePhase Phase { get; set; }
+
+    public int Left { get; set; }
+
+    public double X { get; set; }
+
+    public double Y { get; set; }
+
+    public double Heading { get; set; }
+}
