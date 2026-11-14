@@ -3,6 +3,7 @@ using BlueprintFestival.Core;
 using BlueprintFestival.Simulation;
 using BlueprintFestival.Simulation.Core;
 using BlueprintFestival.Simulation.People;
+using BlueprintFestival.Simulation.Show;
 using BlueprintFestival.UI;
 using Godot;
 
@@ -18,6 +19,11 @@ public partial class FestivalScene : Node3D
     public FestivalGame Game { get; private set; } = null!;
 
     public CameraRig Camera { get; private set; } = null!;
+
+    /// <summary>The two stage cameras, out front and at the back of the stage.</summary>
+    public StageCam StageCam { get; private set; } = null!;
+
+    public ViewButtons ViewButtons => _viewButtons;
 
     public Sky Sky { get; private set; } = null!;
 
@@ -144,6 +150,9 @@ public partial class FestivalScene : Node3D
         Camera = new CameraRig { Name = "CameraRig" };
         AddChild(Camera);
         Camera.Initialise(Game.Field);
+        StageCam = new StageCam { Name = "StageCam" };
+        AddChild(StageCam);
+        StageCam.Initialise(Game, Camera);
 
         Build = new BuildTool { Name = "BuildTool" };
         AddChild(Build);
@@ -174,7 +183,7 @@ public partial class FestivalScene : Node3D
         {
             _viewFromWarning = false;
             SetCrowdView(on);
-        });
+        }, StageCam);
         CrowdSafety = new CrowdPanel { Name = "CrowdPanel" };
         _hud.AddChild(CrowdSafety);
         CrowdSafety.Initialise(Game, Density);
@@ -182,6 +191,7 @@ public partial class FestivalScene : Node3D
         {
             _viewFromWarning = false;
             SetCrowdView(true);
+            StageCam.Show(null);
             Camera.LookAt((float)x, (float)y, 18f);
         };
         Game.CrushWarning += OnCrushWarning;
@@ -194,13 +204,13 @@ public partial class FestivalScene : Node3D
         _hint.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.BottomLeft, Control.LayoutPresetMode.Minsize, 22);
         _hint.GrowVertical = Control.GrowDirection.Begin;
 
-        Sky.Apply(Game, Camera.Yaw);
+        Sky.Apply(Game, StageCam.Yaw);
     }
 
     public override void _Process(double delta)
     {
         Game.Advance(delta);
-        Sky.Apply(Game, Camera.Yaw);
+        Sky.Apply(Game, StageCam.Yaw);
         CrowdSafety.RightInset = Money.Visible ? Money.Size.X + 14 : 0;
         if (_viewFromWarning && Density.Showing && !Game.CrushBuilding && Game.CrowdStatus != Crowding.CrushRisk)
         {
@@ -260,8 +270,23 @@ public partial class FestivalScene : Node3D
                 _viewFromWarning = false;
                 SetCrowdView(!Density.Showing);
                 break;
+            case Key.F:
+                StageCam.Toggle(StageShot.Front);
+                break;
+            case Key.B:
+                StageCam.Toggle(StageShot.Back);
+                break;
             case Key.Escape:
-                OpenMenu();
+                if (StageCam.Showing is not null)
+                {
+                    // Esc leaves a stage camera first; pressed again it opens the menu.
+                    StageCam.Show(null);
+                }
+                else
+                {
+                    OpenMenu();
+                }
+
                 break;
         }
     }

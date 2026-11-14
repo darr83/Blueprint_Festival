@@ -401,8 +401,9 @@ public partial class BuildTool : Node3D
     private TilePoint? TileUnderMouse()
     {
         var viewport = GetViewport();
-        if (viewport.GuiGetHoveredControl() is not null)
+        if (viewport.GuiGetHoveredControl() is not null || !_camera.Camera.Current)
         {
+            // Nothing is built from a stage camera's view.
             return null;
         }
 

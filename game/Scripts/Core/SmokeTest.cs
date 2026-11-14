@@ -284,6 +284,7 @@ public partial class SmokeTest : Node
                     show.ToggleMoney();
                     Check(show.Money.Visible && show.Money.LineCount >= 5, $"The money panel should list the day's takings and spending, not {show.Money.LineCount} lines.");
                     show.ToggleMoney();
+                    CheckStageCams(show);
                     show.TogglePause();
                     Check(show.Game.Clock.IsPaused, "Space should pause the game.");
                     _mark = show.Game.Now;
@@ -606,6 +607,31 @@ public partial class SmokeTest : Node
         {
             throw new InvalidOperationException(message);
         }
+    }
+
+    /// <summary>The two stage camera buttons take over the view, and pressing again or Esc gives the site view back.</summary>
+    private void CheckStageCams(FestivalScene show)
+    {
+        var buttons = show.ViewButtons;
+        Check(buttons.FrontCamButton is not null && buttons.BackCamButton is not null, "The view buttons should have the two stage cameras.");
+        if (buttons.FrontCamButton is null || buttons.BackCamButton is null)
+        {
+            return;
+        }
+
+        buttons.FrontCamButton.ButtonPressed = true;
+        Check(show.StageCam.Showing == StageShot.Front && show.StageCam.Camera.Current, "The front stage cam should take over the view.");
+        Check(show.StageCam.Camera.GlobalPosition.Y > 1.5f, "The front stage cam should be up above the crowd's heads.");
+        Check(show.StageCam.Filming?.Kind == show.Game.Show.Stage?.Kind, "The stage cam should be on the stage that is playing.");
+        buttons.BackCamButton.ButtonPressed = true;
+        Check(show.StageCam.Showing == StageShot.Back && !buttons.FrontCamButton.ButtonPressed, "The back stage cam should take over from the front one.");
+        buttons.BackCamButton.ButtonPressed = false;
+        Check(show.StageCam.Showing is null && show.Camera.Camera.Current, "Pressing the stage cam again should give the site view back.");
+        buttons.FrontCamButton.ButtonPressed = true;
+        var esc = new InputEventKey { Keycode = Key.Escape, Pressed = true };
+        show._UnhandledInput(esc);
+        Check(show.StageCam.Showing is null && show.Camera.Camera.Current && !buttons.FrontCamButton.ButtonPressed, "Esc should leave the stage cam.");
+        Check(show.GetNodeOrNull("Hud/PauseMenu") is null, "Esc out of a stage cam should not open the menu as well.");
     }
 
     private void Fail(string message)
