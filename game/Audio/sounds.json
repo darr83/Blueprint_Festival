@@ -6,7 +6,7 @@
       "bus": "Ambience",
       "seconds": 20,
       "loop": true,
-      "volume": 0.7,
+      "volume": 0.35,
       "gap": 0.0,
       "prompt": "Quiet English countryside meadow on a summer day, birdsong, a light breeze in the hedgerows, distant sheep. No people, no music, no traffic."
     },
@@ -15,7 +15,7 @@
       "bus": "Ambience",
       "seconds": 20,
       "loop": true,
-      "volume": 0.7,
+      "volume": 0.35,
       "gap": 0.0,
       "prompt": "A summer night in an English field, crickets, a distant owl, a gentle breeze. No people, no music."
     },
@@ -24,7 +24,7 @@
       "bus": "Ambience",
       "seconds": 15,
       "loop": true,
-      "volume": 0.8,
+      "volume": 0.4,
       "gap": 0.0,
       "prompt": "Light steady rain falling on grass and canvas tents. No thunder, no people, no music."
     },
@@ -33,7 +33,7 @@
       "bus": "Ambience",
       "seconds": 15,
       "loop": true,
-      "volume": 0.9,
+      "volume": 0.5,
       "gap": 0.0,
       "prompt": "Heavy rain pouring on a field and on tent roofs, puddles splashing. No thunder, no people, no music."
     },
@@ -42,7 +42,7 @@
       "bus": "Crowd",
       "seconds": 20,
       "loop": true,
-      "volume": 0.6,
+      "volume": 0.3,
       "gap": 0.0,
       "prompt": "About fifty people chatting and laughing outdoors at a village fete, relaxed and friendly. No music, no announcements."
     },
@@ -51,7 +51,7 @@
       "bus": "Crowd",
       "seconds": 20,
       "loop": true,
-      "volume": 0.7,
+      "volume": 0.35,
       "gap": 0.0,
       "prompt": "A few hundred people talking outdoors at a small summer festival, a steady murmur with occasional laughter. No music, no announcements."
     },
@@ -60,7 +60,7 @@
       "bus": "Crowd",
       "seconds": 20,
       "loop": true,
-      "volume": 0.8,
+      "volume": 0.4,
       "gap": 0.0,
       "prompt": "Several thousand people at a big outdoor festival, a constant loud murmur with distant whoops. No music, no announcements."
     },
@@ -69,7 +69,7 @@
       "bus": "Crowd",
       "seconds": 15,
       "loop": true,
-      "volume": 0.5,
+      "volume": 0.25,
       "gap": 0.0,
       "prompt": "A long queue of people waiting outdoors, quiet impatient chatter and shuffling feet. No music."
     },
