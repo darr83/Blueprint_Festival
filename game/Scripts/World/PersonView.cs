@@ -444,8 +444,10 @@ public partial class PersonView : Node3D
         var inBeat = Mathf.PosMod(through * beats, 1f);
         var second = through * beats >= 1f;
 
-        // A sharp hit on the beat that eases away: 1 on the beat, falling towards 0 by the next.
-        var hit = Mathf.Exp(-inBeat * 5f);
+        // The hit: a smooth swell that winds up, peaks at 1 exactly as the beat lands and eases away
+        // again, with no sudden snap. A little narrower than a plain wave, so the beat still reads.
+        var swell = 0.5f + (0.5f * Mathf.Cos(inBeat * Mathf.Tau));
+        var hit = swell * swell * (3f - (2f * swell));
 
         // A smooth rise and fall once a beat: 0 on the beat, 1 halfway between.
         var wave = 0.5f - (0.5f * Mathf.Cos(inBeat * Mathf.Tau));
@@ -476,8 +478,9 @@ public partial class PersonView : Node3D
 
             case DanceMove.Jump:
             {
-                // Off the ground between beats and landing on the beat, alternate fists punching the air.
-                var air = Mathf.Sin(inBeat * Mathf.Pi) * 0.22f * e;
+                // A jump that lands on the hit, alternate fists punching the air.
+                // The jump itself takes one beat of music: up on the beat between, down on the hit.
+                var air = inBeat > 0.5f ? Mathf.Sin((inBeat - 0.5f) * Mathf.Tau) * 0.22f * e : 0f;
                 var punch = 165f - (35f * (1 - hit));
                 return (new Vector3(-10, 0, second ? -punch : -55), new Vector3(-10, 0, second ? 55 : punch), air, new Vector3(-4 * hit, 0, 0), 0);
             }

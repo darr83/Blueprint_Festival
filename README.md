@@ -168,7 +168,8 @@ the first beat falls and the time of every beat, so the crowd keeps time even if
 Edit the numbers if the crowd is ever out of time, or delete the file to have it worked out again.
 `godot --path game -- --work-out-beats` does every song in one go and prints what it found.
 
-Each sort of music has its own move: pop bounces with hands up, rock head-bangs, metal head-bangs
+The crowd moves on every other beat, so each move has time to wind up and land smoothly. Each
+sort of music has its own move: pop bounces with hands up, rock head-bangs, metal head-bangs
 harder with horns, electronic jumps, country sways and claps, and hip hop nods with a hand pumping.
 About one in five does a gentler move that still suits the music, and one in ten just nods along.
 Everyone is a touch ahead of or behind the beat, and some dance harder than others. An act with no

@@ -73,8 +73,9 @@ public static class Dancing
     }
 
     /// <summary>
-    /// How many beats one go of a move takes: a sway goes one way and back over two, a jump punches
-    /// with one fist and then the other, and a hip hop nod leans one way and then the other.
+    /// How many hits one go of a move takes (a hit is every other beat, see <see cref="BeatsAHit"/>):
+    /// a sway goes one way and back over two, a jump punches with one fist and then the other, and
+    /// a hip hop nod leans one way and then the other.
     /// </summary>
     public static int BeatsAMove(DanceMove move) => move is DanceMove.Sway or DanceMove.Jump or DanceMove.Nod or DanceMove.Bounce ? 2 : 1;
 
@@ -88,13 +89,20 @@ public static class Dancing
     public static double Energy(int person) => 0.65 + ((Roll(person, 3) % 51) / 100.0);
 
     /// <summary>
-    /// How far through their move someone is, from 0 to 1, where 0 is the moment the beat lands.
+    /// The crowd moves on every other beat of the music: each nod, clap or bounce then has two beats
+    /// to wind up and land, which looks smooth and unhurried but is still in time.
+    /// </summary>
+    public const int BeatsAHit = 2;
+
+    /// <summary>
+    /// How far through their move someone is, from 0 to 1, where 0 is the moment it lands, on every
+    /// other beat of the music.
     /// </summary>
     /// <param name="beat">How many beats into the song it is (see <see cref="BeatInfo.BeatAt"/>).</param>
     public static double Through(double beat, DanceMove move, int person)
     {
         var length = BeatsAMove(move);
-        var at = (beat - Lateness(person)) / length;
+        var at = (beat - Lateness(person)) / (length * BeatsAHit);
         return at - Math.Floor(at);
     }
 

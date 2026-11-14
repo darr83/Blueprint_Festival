@@ -63,13 +63,16 @@ public class DancingTests
     {
         var person = Enumerable.Range(0, 1000).First(p => Dancing.Lateness(p) == 0);
 
+        // A head-bang lands on every other beat, and is halfway round on the beat between.
+        Assert.Equal(2, Dancing.BeatsAHit);
         Assert.Equal(0, Dancing.Through(8, DanceMove.HeadBang, person), 6);
-        Assert.Equal(0.5, Dancing.Through(8.5, DanceMove.HeadBang, person), 6);
+        Assert.Equal(0.5, Dancing.Through(9, DanceMove.HeadBang, person), 6);
+        Assert.Equal(0, Dancing.Through(10, DanceMove.HeadBang, person), 6);
 
-        // A sway takes two beats: halfway through it on the next beat, and back to the start on the one after.
+        // A sway goes one way on one hit and back on the next: four beats there and back.
         Assert.Equal(0, Dancing.Through(8, DanceMove.Sway, person), 6);
-        Assert.Equal(0.5, Dancing.Through(9, DanceMove.Sway, person), 6);
-        Assert.Equal(0, Dancing.Through(10, DanceMove.Sway, person), 6);
+        Assert.Equal(0.5, Dancing.Through(10, DanceMove.Sway, person), 6);
+        Assert.Equal(0, Dancing.Through(12, DanceMove.Sway, person), 6);
 
         Assert.All(Enumerable.Range(0, 200), b => Assert.InRange(Dancing.Through(b * 0.37, DanceMove.Jump, b), 0, 1 - 1e-12));
     }
