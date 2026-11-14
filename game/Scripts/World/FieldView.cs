@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using BlueprintFestival.Simulation.World;
 using Godot;
 
@@ -126,14 +127,44 @@ public partial class FieldView : Node3D
 
     private void BuildFieldGrass()
     {
-        // Mown in stripes three metres wide, like a village cricket pitch.
+        if (_map.FromPlan)
+        {
+            // Each rented field in its own grass: mown stripes for music and food, rougher for tents and cars.
+            foreach (var field in _map.Fields)
+            {
+                var (fx, fz, fw, fd) = Metres(field.Grass);
+                if (field.Use is FieldUse.Music or FieldUse.Food)
+                {
+                    Striped(field.Info.Name, fx, fz, fw, fd);
+                }
+                else
+                {
+                    Flat(field.Info.Name, fx, fz, fw, fd, field.Use == FieldUse.Camping ? Meadow.Darkened(0.06f) : Meadow.Darkened(0.12f).Lerp(Dirt, 0.18f), 0.01f);
+                }
+            }
+
+            foreach (var gateway in _map.Gateways)
+            {
+                var (gx, gz, gw, gd) = Metres(gateway);
+                Flat("Gateway", gx - 0.5f, gz - 0.5f, gw + 1f, gd + 1f, Dirt, 0.025f);
+            }
+
+            return;
+        }
+
         var (x, z, w, d) = Metres(_map.Field);
+        Striped("Stripe", x, z, w, d);
+    }
+
+    /// <summary>Grass mown in stripes three metres wide, like a village cricket pitch.</summary>
+    private void Striped(string name, float x, float z, float w, float d)
+    {
         const float stripe = 3f;
         var count = (int)Math.Ceiling(w / stripe);
         for (var i = 0; i < count; i++)
         {
             var width = Math.Min(stripe, w - (i * stripe));
-            Flat($"Stripe {i}", x + (i * stripe), z, width, d, i % 2 == 0 ? Meadow : MeadowLight, 0.01f);
+            Flat($"{name} {i}", x + (i * stripe), z, width, d, i % 2 == 0 ? Meadow : MeadowLight, 0.01f);
         }
     }
 
@@ -156,6 +187,19 @@ public partial class FieldView : Node3D
         var (lx, lz, lw, ld) = Metres(_map.Lane);
         Flat("Lane", lx, lz, lw, ld, Tarmac, 0.02f);
 
+        if (_map.FromPlan)
+        {
+            foreach (var t in _map.Tracks)
+            {
+                var (x, z, w, d) = Metres(t);
+                Flat("Track", x, z, w, d, Dirt, 0.025f);
+            }
+
+            var (px, pz, pw, pd) = Metres(_map.Gap);
+            Flat("Way in", px - 0.5f, pz - 0.5f, pw + 1f, pd + 1f, Dirt, 0.025f);
+            return;
+        }
+
         // The track runs from the lane through the gap and fans out a little way onto the grass.
         var (tx, tz, tw, td) = Metres(_map.Track);
         var (_, gz, _, gd) = Metres(_map.Gap);
@@ -166,7 +210,7 @@ public partial class FieldView : Node3D
     {
         var ring = _map.HedgeLine;
         var gap = _map.Gap;
-        var thick = (ring.Width - _map.Field.Width) / 2 * T;
+        float thick = (ring.Width - _map.Field.Width) / 2 * T;
         var (rx, rz, rw, rd) = Metres(ring);
         var gapLeft = gap.X * T;
         var gapRight = gap.Right * T;
@@ -178,7 +222,13 @@ public partial class FieldView : Node3D
             (rx, rz + rd - thick, gapLeft - rx, thick),                  // south, west of the gap
             (gapRight, rz + rd - thick, rx + rw - gapRight, thick),      // south, east of the gap
         };
-        if (_map.HasCamp)
+        if (_map.FromPlan)
+        {
+            // A hedge round every rented field, with the gateways cut through.
+            runs = _map.HedgeRuns().Select(Metres).ToList();
+            thick = Estate.HedgeMetres;
+        }
+        else if (_map.HasCamp)
         {
             // The east hedge has a gateway into the camping field, which has a hedge of its own on three sides.
             var (_, gz, _, gd) = Metres(_map.CampGap);
@@ -259,6 +309,9 @@ public partial class FieldView : Node3D
             spots.Add(new Vector3(x, 0, beyondLane + (float)(random.NextDouble() * 4)));
         }
 
+        // No tree stands on rented grass, on a hedge or in the road.
+        spots.RemoveAll(s => _map[FieldMap.TileAt(s.X, s.Z)] != Ground.Countryside);
+
         var trunk = new CylinderMesh { TopRadius = 0.22f, BottomRadius = 0.3f, Height = 2.4f, RadialSegments = 8 };
         var leaves = new SphereMesh { Radius = 1f, Height = 2f, RadialSegments = 12, Rings = 6 };
         foreach (var spot in spots)
@@ -280,12 +333,24 @@ public partial class FieldView : Node3D
     private void BuildWayIn(string festivalName)
     {
         var (gx, gz, gw, gd) = Metres(_map.Gap);
-        var frontZ = gz + gd + 0.1f;
-        Box("Gatepost west", new Vector3(gx - 0.45f, 1.05f, frontZ + 0.35f), new Vector3(0.34f, 2.1f, 0.34f), Wood);
-        Box("Gatepost east", new Vector3(gx + gw + 0.45f, 1.05f, frontZ + 0.35f), new Vector3(0.34f, 2.1f, 0.34f), Wood);
+        var southOfLane = _map.Gap.Y > _map.Lane.Y;
+        var byTrack = _map.Gap.Height > _map.Gap.Width;
+        if (byTrack)
+        {
+            // A way in off the farm track: a post at each end of the gap, on the track side.
+            var outside = _map.Track.X >= _map.Gap.Right ? gx + gw + 0.35f : gx - 0.35f;
+            Box("Gatepost north", new Vector3(outside, 1.05f, gz - 0.45f), new Vector3(0.34f, 2.1f, 0.34f), Wood);
+            Box("Gatepost south", new Vector3(outside, 1.05f, gz + gd + 0.45f), new Vector3(0.34f, 2.1f, 0.34f), Wood);
+        }
+        else
+        {
+            var frontZ = southOfLane ? gz - 0.45f : gz + gd + 0.45f;
+            Box("Gatepost west", new Vector3(gx - 0.45f, 1.05f, frontZ), new Vector3(0.34f, 2.1f, 0.34f), Wood);
+            Box("Gatepost east", new Vector3(gx + gw + 0.45f, 1.05f, frontZ), new Vector3(0.34f, 2.1f, 0.34f), Wood);
+        }
 
-        var signX = gx + gw + 3.2f;
-        var signZ = (_map.Lane.Y * T) - 1.6f;
+        var signX = byTrack ? (_map.Tracks[^1].Right * T) + 3.2f : gx + gw + 3.2f;
+        var signZ = southOfLane ? (_map.Lane.Bottom * T) + 1.6f : (_map.Lane.Y * T) - 1.6f;
         var sign = new Node3D { Name = "Sign", Position = new Vector3(signX, 0, signZ), RotationDegrees = new Vector3(0, 28f, 0) };
         AddChild(sign);
         var post = new BoxMesh { Size = new Vector3(0.16f, 2.3f, 0.16f) };

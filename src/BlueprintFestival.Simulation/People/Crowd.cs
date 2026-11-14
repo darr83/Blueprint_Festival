@@ -449,7 +449,7 @@ public sealed class Crowd
     public int Arrived => _parties.Where(p => p.State != PartyState.Expected).Sum(p => p.Members.Count);
 
     /// <summary>How many of the people on site are inside the hedge.</summary>
-    public int InField => _parties.Where(p => p.IsOnSite && _map.Field.Contains(FieldMap.TileAt(p.X, p.Y))).Sum(p => p.Members.Count);
+    public int InField => _parties.Where(p => p.IsOnSite && _map.InFestival(FieldMap.TileAt(p.X, p.Y))).Sum(p => p.Members.Count);
 
     /// <summary>Everyone on site, one entry per person.</summary>
     public IEnumerable<PersonOnSite> People
@@ -575,7 +575,8 @@ public sealed class Crowd
     /// </summary>
     public void PitchCamp()
     {
-        var pitches = _map.Pitches();
+        // A tent is not pitched where something has been built.
+        var pitches = _map.Pitches().Where(p => !Enumerable.Range(-3, 7).Any(dx => Enumerable.Range(-3, 7).Any(dy => _map.IsBlocked(new TilePoint(p.X + dx, p.Y + dy))))).ToList();
         var next = 0;
         foreach (var party in _parties)
         {
@@ -646,7 +647,7 @@ public sealed class Crowd
             for (var x = f.X + inset; x < f.Right - inset; x++)
             {
                 var p = new TilePoint(x, y);
-                if (_site.SideOf(p) == wanted && HasRoom(p))
+                if (_site.SideOf(p) == wanted && HasRoom(p) && _map.InFestival(p))
                 {
                     _standable.Add(p);
                 }
@@ -968,12 +969,12 @@ public sealed class Crowd
             if (party.LitterAt != default && now >= party.LitterAt && party.IsOnSite)
             {
                 // Anyone already on their way out takes it home with them.
-                var pieces = _map.Field.Contains(FieldMap.TileAt(party.X, party.Y)) ? Math.Max(1, party.Members.Count / 2) : 0;
+                var pieces = _map.InFestival(FieldMap.TileAt(party.X, party.Y)) ? Math.Max(1, party.Members.Count / 2) : 0;
                 for (var i = 0; i < pieces; i++)
                 {
                     var angle = (party.Id * 2.4) + (party.Spent * 0.7) + (i * 2.1);
                     var (lx, ly) = (party.X + (Math.Cos(angle) * 0.6), party.Y + (Math.Sin(angle) * 0.6));
-                    if (_map.Field.Contains(FieldMap.TileAt(lx, ly)))
+                    if (_map.InFestival(FieldMap.TileAt(lx, ly)))
                     {
                         Dropped?.Invoke(lx, ly);
                     }

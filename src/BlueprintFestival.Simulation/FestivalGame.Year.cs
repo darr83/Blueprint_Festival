@@ -32,7 +32,8 @@ public enum Phase
 }
 
 /// <summary>What a year starts with, carried over from the one before.</summary>
-public sealed record YearSetup(int Year = 1, int Licence = FestivalGame.FirstLicence, int Bank = FestivalGame.StartingMoney, bool BailedOut = false, int? LastHappiness = null);
+public sealed record YearSetup(int Year = 1, int Licence = FestivalGame.FirstLicence, int Bank = FestivalGame.StartingMoney, bool BailedOut = false, int? LastHappiness = null,
+    IReadOnlyList<FieldChoice>? Fields = null);
 
 /// <summary>A headliner who could be booked: how well known (2 to 5 stars) and what they charge.</summary>
 public sealed record HeadlinerOffer(Act Act, int Stars, int Fee);
@@ -72,7 +73,26 @@ public sealed partial class FestivalGame
     /// What the field and the licence cost for the year. The village field is lent for nothing;
     /// a bigger one is rented, at £1 for each person the licence allows.
     /// </summary>
-    public int FieldRent => RentFor(Licence);
+    public int FieldRent => Plan?.Rent ?? RentFor(Licence);
+
+    /// <summary>The fields rented for this year, or null for a year on the one field its licence used to be given.</summary>
+    public FieldPlan? Plan { get; private set; }
+
+    /// <summary>The most tickets there are to sell: the licence, or the room in the music fields if that is less.</summary>
+    public int OnSale => Plan is null ? Licence : Math.Max(10, Math.Min(Licence, Plan.MusicRoom));
+
+    /// <summary>
+    /// The same January with different fields rented: a fresh year on the new site, with the same
+    /// bank, licence and history. Null if the plan cannot be booked; <see cref="FieldPlan.Problems"/> says why.
+    /// </summary>
+    public FestivalGame? WithFields(FieldPlan plan)
+    {
+        ArgumentNullException.ThrowIfNull(plan);
+        Need(Phase.Plan);
+        return plan.Problems(Licence, Year).Count > 0
+            ? null
+            : StartYear(Name, new YearSetup(Year, Licence, Money, BailedOut, LastHappiness, plan.Save()));
+    }
 
     /// <summary>Rent and licence fee for a year at a licence: nothing on the village field, then £1 a head.</summary>
     public static int RentFor(int licence) => licence <= FieldMap.Sizes[0].Holds ? 0 : licence;
@@ -247,7 +267,7 @@ public sealed partial class FestivalGame
     public const int CampingFrom = 5000;
 
     /// <summary>True if this year's field has a camping field next door and the licence is big enough to use it.</summary>
-    public bool CampingOffered => Planned && Licence >= CampingFrom && Field.HasCamp;
+    public bool CampingOffered => Planned && Plan is null && Licence >= CampingFrom && Field.HasCamp;
 
     /// <summary>True if the camping field has been taken for this year.</summary>
     public bool CampingBooked { get; private set; }
@@ -358,7 +378,7 @@ public sealed partial class FestivalGame
 
         var word = LastHappiness is { } h ? 0.6 + (0.5 * h / 100.0) : 1.0;
         var pull = _offers.Count > 0 ? 0.85 + (0.05 * HeadlineStars) : 1.0;
-        return Math.Clamp((int)Math.Round(Licence * TurnoutShare(price) * word * pull * ForecastPull), 10, Licence);
+        return Math.Clamp((int)Math.Round(OnSale * TurnoutShare(price) * word * pull * ForecastPull), 10, OnSale);
     }
 
     public void ChooseTicket(int price)
@@ -387,7 +407,7 @@ public sealed partial class FestivalGame
     }
 
     /// <summary>What has to be paid on the day the plan is agreed: the acts, the field, and anything ordered.</summary>
-    public int PlanCost => ActFees + (PonchosOrdered ? PonchoCost : 0) + FieldRent + (CampingBooked ? CampingCost : 0);
+    public int PlanCost => ActFees + (PonchosOrdered ? PonchoCost : 0) + FieldRent + (CampingBooked && Plan is null ? CampingCost : 0);
 
     private bool PayForPlan()
     {
@@ -408,7 +428,7 @@ public sealed partial class FestivalGame
             Spend("Rain ponchos", ponchos);
         }
 
-        if (CampingBooked)
+        if (CampingBooked && Plan is null)
         {
             Spend("Camping field", CampingCost);
         }
@@ -434,7 +454,7 @@ public sealed partial class FestivalGame
     }
 
     /// <summary>The plan's guess with a little luck either way.</summary>
-    private int Turnout() => Math.Clamp((int)Math.Round(ExpectedAt(TicketPrice) * GameRandom.FromSeed(Seed, 22).Between(0.93, 1.05)), 10, Licence);
+    private int Turnout() => Math.Clamp((int)Math.Round(ExpectedAt(TicketPrice) * GameRandom.FromSeed(Seed, 22).Between(0.93, 1.05)), 10, OnSale);
 
     private void ApplyPlan(int people)
     {
@@ -450,6 +470,12 @@ public sealed partial class FestivalGame
     {
         Need(Phase.Build);
         FinishSales();
+        if (CampingBooked && Plan is not null)
+        {
+            // Tents go up round whatever was built in the camping field during the week.
+            Crowd.PitchCamp();
+        }
+
         if (SoldAhead)
         {
             Crowd.ArriveFeeling(ArrivalMood);
@@ -615,7 +641,7 @@ public sealed partial class FestivalGame
                 cleared < TidyEnough ? "The farmer is not happy with the state of the field. The licence stays as it is." :
                 profit < 0 ? "A good day, but it lost money. The licence stays as it is." :
                 bigger > Licence && next == Licence ? $"A good festival, but there is not yet the money in the bank for a bigger one. The council wants to see £{NeedsToGrowTo(bigger):N0} before it raises the licence to {bigger:N0}." :
-                next > Licence && moving ? $"A good festival and a tidy field. The council raises the licence to {next:N0} people, and next year moves to {FieldMap.SizeFor(next).Name}." :
+                next > Licence && moving && Plan is null ? $"A good festival and a tidy field. The council raises the licence to {next:N0} people, and next year moves to {FieldMap.SizeFor(next).Name}." :
                 next > Licence ? $"A good festival and a tidy field. The council raises the licence to {next:N0} people." :
                 "A good festival and a tidy field. This is as big as a licence gets.";
             return new YearResult(Year, Crowd.Arrived, Crowd.Expected, happy, Crowd.WentHomeUnhappy, TotalIncome, TotalSpending, cleared, GrassWorn,
@@ -629,13 +655,14 @@ public sealed partial class FestivalGame
     {
         Need(Phase.Results);
         var result = Result!;
-        return StartYear(Name, new YearSetup(Year + 1, result.LicenceNext, Money, BailedOut, result.Happy));
+        return StartYear(Name, new YearSetup(Year + 1, result.LicenceNext, Money, BailedOut, result.Happy, Plan?.Save()));
     }
 
     private YearSave SaveYear() => new(Year, Licence, Phase, Day, TicketPrice, HeadlinerPicked, Crowd.Expected, BailedOut, _loanThisYear, LastHappiness,
         LitterAtStart, _litter.ToList(), _wear.ToArray())
     {
         FieldRepair = _fieldRepair,
+        Fields = Plan?.Save(),
         SecondStage = SecondStageBooked,
         Camping = CampingBooked,
         LineUp = Enumerable.Range(0, RunningOrder.SetsAStage).Select(i => Show.At(i)?.Name)
@@ -663,7 +690,7 @@ public sealed partial class FestivalGame
         }
 
         RestoreSales(year.Sales);
-        CampingBooked = year.Camping && CampingOffered;
+        CampingBooked = Plan is null ? year.Camping && CampingOffered : CampingBooked;
         Phase = Enum.IsDefined(year.Phase) ? year.Phase : Phase.Plan;
         if (Phase != Phase.Plan)
         {
@@ -690,6 +717,9 @@ public sealed partial class FestivalGame
 public sealed record YearSave(int Number, int Licence, Phase Phase, DateTime Day, int TicketPrice, int Headliner, int Turnout, bool BailedOut, bool Loan,
     int? LastHappiness, int LitterAtStart, List<LitterPiece>? Litter, int[]? Wear)
 {
+    /// <summary>The fields rented for the year, or null for a year on the field its licence was given.</summary>
+    public List<FieldChoice>? Fields { get; init; }
+
     /// <summary>What the farmer charged for worn-out grass, once the field is handed back.</summary>
     public int FieldRepair { get; init; }
 

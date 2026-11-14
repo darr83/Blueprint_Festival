@@ -1,5 +1,6 @@
 using System;
 using BlueprintFestival.Simulation;
+using BlueprintFestival.Simulation.World;
 using Godot;
 
 namespace BlueprintFestival.Core;
@@ -86,6 +87,10 @@ public partial class GameManager : Node
             {
                 AddChild(new CampShots(arg["--camp-shots=".Length..]) { Name = "CampShots" });
             }
+            else if (arg.StartsWith("--field-shots=", StringComparison.Ordinal))
+            {
+                AddChild(new FieldShots(arg["--field-shots=".Length..]) { Name = "FieldShots" });
+            }
             else if (arg.StartsWith("--shots=", StringComparison.Ordinal))
             {
                 AddChild(new Shots(arg["--shots=".Length..]) { Name = "Shots" });
@@ -103,7 +108,10 @@ public partial class GameManager : Node
     /// <summary>A new festival that runs through whole years, opening on the planning screen.</summary>
     public void StartNewFestival(string? name)
     {
-        Game = FestivalGame.NewFestival(name);
+        // The first year is on the village green; the fields are chosen on the map every January.
+        var first = FestivalGame.NewFestival(name);
+        Game = first.WithFields(FieldPlan.FirstYear()) ?? first;
+        FieldsChosen = false;
         GetTree().Paused = false;
         GetTree().ChangeSceneToFile(FestivalScene);
     }
@@ -112,6 +120,19 @@ public partial class GameManager : Node
     public void Open(FestivalGame game)
     {
         Game = game;
+        FieldsChosen = false;
+        GetTree().Paused = false;
+        GetTree().ChangeSceneToFile(FestivalScene);
+    }
+
+    /// <summary>True once this January's fields have been chosen, so the planning screen moves on to the acts.</summary>
+    public bool FieldsChosen { get; set; }
+
+    /// <summary>The same January on different fields: the site is laid out again and planning carries on with the acts.</summary>
+    public void ChangeFields(FestivalGame game)
+    {
+        Game = game;
+        FieldsChosen = true;
         GetTree().Paused = false;
         GetTree().ChangeSceneToFile(FestivalScene);
     }
@@ -122,6 +143,7 @@ public partial class GameManager : Node
         if (Game is { Phase: Phase.Results } game)
         {
             Game = game.NextYear();
+            FieldsChosen = false;
             GetTree().Paused = false;
             GetTree().ChangeSceneToFile(FestivalScene);
         }

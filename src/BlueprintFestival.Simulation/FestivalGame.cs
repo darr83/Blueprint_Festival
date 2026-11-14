@@ -43,7 +43,13 @@ public sealed partial class FestivalGame
         Seed = seed ?? StableHash(Name);
         Clock = new GameClock(start);
         Day = Clock.Now.Date;
-        Field = Planned ? FieldMap.ForLicence(Licence) : FieldMap.Village();
+        if (setup?.Fields is { } chosen && new FieldPlan(chosen) is { WayIn: not null } plan)
+        {
+            Plan = plan;
+            CampingBooked = Licence >= FieldPlan.CampingFrom && plan.Of(FieldUse.Camping).Any();
+        }
+
+        Field = Plan is not null ? FieldMap.ForPlan(Plan, Licence) : Planned ? FieldMap.ForLicence(Licence) : FieldMap.Village();
         Site = new SiteLayout(Field);
         Crowd = new Crowd(Field, Site, Seed, Clock.Now);
         Show = new RunningOrder(Site, Seed, Clock.Now);
@@ -296,7 +302,7 @@ public sealed partial class FestivalGame
 
         // The crowd's plan is for the day the festival is on, whatever time it was saved at.
         var game = data.Year is { } year
-            ? new FestivalGame(data.Name, year.Day.Date + GameClock.DefaultStart.TimeOfDay, data.Seed, new YearSetup(year.Number, year.Licence, 0, year.BailedOut, year.LastHappiness))
+            ? new FestivalGame(data.Name, year.Day.Date + GameClock.DefaultStart.TimeOfDay, data.Seed, new YearSetup(year.Number, year.Licence, 0, year.BailedOut, year.LastHappiness, year.Fields))
             : new FestivalGame(data.Name, data.Clock.Now.Date + GameClock.DefaultStart.TimeOfDay, data.Seed);
         // The clock comes back first so the rain is right, and the weather before the crowd is planned again.
         game.Clock.RestoreState(data.Clock);

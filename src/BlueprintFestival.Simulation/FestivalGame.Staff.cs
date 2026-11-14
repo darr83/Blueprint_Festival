@@ -219,7 +219,7 @@ public sealed partial class FestivalGame
                 return new BuildCheck(false, wage, "Every lane of this gate has someone on it.");
             }
         }
-        else if (!Field.IsWalkable(tile) || !Field.Field.Contains(tile))
+        else if (!Field.IsWalkable(tile) || !Field.Rented(tile))
         {
             return new BuildCheck(false, wage, "They need a clear bit of the field to stand on.");
         }

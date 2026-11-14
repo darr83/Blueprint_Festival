@@ -3,6 +3,9 @@ namespace BlueprintFestival.Simulation.World;
 /// <summary>One of the fields a festival can be held on: its name, the biggest licence it takes, its size and the width of the way in.</summary>
 public sealed record FieldSize(string Name, int Holds, int MetresWide, int MetresDeep, int GapMetres, int CampMetres = 0);
 
+/// <summary>A rented field on the day's map: which field, what it is for, and its grass in tiles.</summary>
+public sealed record MapField(EstateField Info, FieldUse Use, TileRect Grass);
+
 /// <summary>A position on the tile grid.</summary>
 public readonly record struct TilePoint(int X, int Y);
 
@@ -88,6 +91,189 @@ public sealed class FieldMap
 
     public bool HasCamp => Camp.Width > 0;
 
+    /// <summary>The rented fields this map was made from, or none for a single field made the old way.</summary>
+    public IReadOnlyList<MapField> Fields { get; private init; } = Array.Empty<MapField>();
+
+    /// <summary>True for a map made from a plan of rented fields.</summary>
+    public bool FromPlan => Fields.Count > 0;
+
+    /// <summary>The gateways cut through the hedges between rented fields.</summary>
+    public IReadOnlyList<TileRect> Gateways { get; private init; } = Array.Empty<TileRect>();
+
+    /// <summary>Every stretch of track off the lane: the way in, and the way out of each car park.</summary>
+    public IReadOnlyList<TileRect> Tracks { get; private init; } = Array.Empty<TileRect>();
+
+    private readonly List<(TileRect Camp, TilePoint Door, bool AlongX)> _campDoors = new();
+
+    /// <summary>What the field at a tile is for, or null off the rented grass.</summary>
+    public FieldUse? UseAt(TilePoint p)
+    {
+        if (!FromPlan)
+        {
+            return Field.Contains(p) ? FieldUse.Music : HasCamp && Camp.Contains(p) ? FieldUse.Camping : null;
+        }
+
+        foreach (var f in Fields)
+        {
+            if (f.Grass.Contains(p))
+            {
+                return f.Use;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>True on the grass of the festival itself: the fields for music and food, and the gateways between them.</summary>
+    public bool InFestival(TilePoint p)
+    {
+        if (!FromPlan)
+        {
+            return Field.Contains(p);
+        }
+
+        if (UseAt(p) is { } use)
+        {
+            return use is FieldUse.Music or FieldUse.Food;
+        }
+
+        return this[p] == Ground.Grass && Field.Contains(p) && Gateways.Any(g => g.Contains(p));
+    }
+
+    private readonly List<(int A, int B, TileRect Door)> _doors = new();
+
+    /// <summary>Which rented field a tile is in, counting a gateway as one of the fields it joins; -1 out on the lane.</summary>
+    private int RegionOf(TilePoint p)
+    {
+        for (var i = 0; i < Fields.Count; i++)
+        {
+            if (Fields[i].Grass.Contains(p))
+            {
+                return i;
+            }
+        }
+
+        foreach (var (a, _, door) in _doors)
+        {
+            if (door.Contains(p))
+            {
+                return a;
+            }
+        }
+
+        return -1;
+    }
+
+    /// <summary>
+    /// The gateways to walk through, in order, to get from one tile to another on a map made from
+    /// a plan: none if both are in the same field. Each is crossed where the straight line would
+    /// cross it, kept inside the gateway, so a crowd spreads across its width.
+    /// </summary>
+    public IReadOnlyList<TilePoint> Waypoints(TilePoint from, TilePoint to)
+    {
+        if (!FromPlan)
+        {
+            return Array.Empty<TilePoint>();
+        }
+
+        var (start, end) = (RegionOf(from), RegionOf(to));
+        if (start == end)
+        {
+            return Array.Empty<TilePoint>();
+        }
+
+        // Breadth first over the fields, from the far end, so the doors come out in walking order.
+        var via = new Dictionary<int, (int Next, TileRect Door)>();
+        var waiting = new Queue<int>();
+        waiting.Enqueue(end);
+        var seen = new HashSet<int> { end };
+        while (waiting.Count > 0 && !via.ContainsKey(start))
+        {
+            var at = waiting.Dequeue();
+            foreach (var (a, b, door) in _doors)
+            {
+                var other = a == at ? b : b == at ? a : int.MinValue;
+                if (other != int.MinValue && seen.Add(other))
+                {
+                    via[other] = (at, door);
+                    waiting.Enqueue(other);
+                }
+            }
+        }
+
+        var points = new List<TilePoint>();
+        var here = from;
+        for (var region = start; region != end && via.TryGetValue(region, out var step); region = step.Next)
+        {
+            var d = step.Door;
+            TilePoint through;
+            if (d.Height >= d.Width)
+            {
+                // A gateway in a hedge that runs north to south: cross at the height the straight line would.
+                var x = d.X + (d.Width / 2);
+                var t = to.X == here.X ? 0.5 : Math.Clamp((x - here.X) / (double)(to.X - here.X), 0, 1);
+                through = new TilePoint(x, Math.Clamp((int)Math.Round(here.Y + (t * (to.Y - here.Y))), d.Y + 2, d.Bottom - 3));
+            }
+            else
+            {
+                var y = d.Y + (d.Height / 2);
+                var t = to.Y == here.Y ? 0.5 : Math.Clamp((y - here.Y) / (double)(to.Y - here.Y), 0, 1);
+                through = new TilePoint(Math.Clamp((int)Math.Round(here.X + (t * (to.X - here.X))), d.X + 2, d.Right - 3), y);
+            }
+
+            points.Add(through);
+            here = through;
+        }
+
+        return points;
+    }
+
+    /// <summary>True on any grass that has been rented, whatever it is for: where stalls can be built and staff can stand.</summary>
+    public bool Rented(TilePoint p) => FromPlan ? UseAt(p) is not null : Field.Contains(p);
+
+    /// <summary>The hedges as a few rectangles, for drawing.</summary>
+    public IReadOnlyList<TileRect> HedgeRuns()
+    {
+        var runs = new List<TileRect>();
+        var done = new bool[Width * Height];
+        for (var y = 0; y < Height; y++)
+        {
+            for (var x = 0; x < Width; x++)
+            {
+                if (done[(y * Width) + x] || _tiles[(y * Width) + x] != Ground.Hedge)
+                {
+                    continue;
+                }
+
+                var w = 0;
+                while (x + w < Width && !done[(y * Width) + x + w] && _tiles[(y * Width) + x + w] == Ground.Hedge)
+                {
+                    w++;
+                }
+
+                var h = 1;
+                while (y + h < Height && Enumerable.Range(x, w).All(c => !done[((y + h) * Width) + c] && _tiles[((y + h) * Width) + c] == Ground.Hedge)
+                    && (x == 0 || _tiles[((y + h) * Width) + x - 1] != Ground.Hedge || done[((y + h) * Width) + x - 1])
+                    && (x + w >= Width || _tiles[((y + h) * Width) + x + w] != Ground.Hedge))
+                {
+                    h++;
+                }
+
+                for (var yy = y; yy < y + h; yy++)
+                {
+                    for (var xx = x; xx < x + w; xx++)
+                    {
+                        done[(yy * Width) + xx] = true;
+                    }
+                }
+
+                runs.Add(new TileRect(x, y, w, h));
+            }
+        }
+
+        return runs;
+    }
+
     /// <summary>Where people come onto the map: the west end of the lane.</summary>
     public TilePoint LaneStart => new(0, Lane.Y + (Lane.Height / 2));
 
@@ -140,15 +326,31 @@ public sealed class FieldMap
     /// </summary>
     public IReadOnlyList<TilePoint> Pitches()
     {
-        var pitches = new List<TilePoint>();
-        if (!HasCamp)
+        if (FromPlan)
         {
-            return pitches;
+            var all = new List<TilePoint>();
+            foreach (var (camp, door, alongX) in _campDoors)
+            {
+                all.AddRange(PitchesIn(camp, door, alongX));
+            }
+
+            return all;
         }
 
-        var middle = CampGap.Y + (CampGap.Height / 2);
-        var random = Core.GameRandom.FromSeed((Camp.Width * 7919) + Camp.Height, 31);
-        var (left, top, right, bottom) = (Camp.X + 5, Camp.Y + 5, Camp.Right - 5, Camp.Bottom - 5);
+        return HasCamp ? PitchesIn(Camp, new TilePoint(Camp.X, CampGap.Y + (CampGap.Height / 2)), true) : new List<TilePoint>();
+    }
+
+    /// <summary>
+    /// The pitches in one camping field, nearest its gateway first. The way in from the gateway is
+    /// kept clear right across the field: along X for a gateway in an east or west hedge, along Y
+    /// for one in a north or south hedge.
+    /// </summary>
+    private static List<TilePoint> PitchesIn(TileRect camp, TilePoint door, bool alongX)
+    {
+        var pitches = new List<TilePoint>();
+        var middle = alongX ? door.Y : door.X;
+        var random = Core.GameRandom.FromSeed((camp.Width * 7919) + camp.Height, 31);
+        var (left, top, right, bottom) = (camp.X + 5, camp.Y + 5, camp.Right - 5, camp.Bottom - 5);
 
         // Tents are tried in random places over and over; one goes up wherever it is not too close
         // to another. A grid of buckets, each a little bigger than the spacing, keeps the looking quick.
@@ -163,7 +365,8 @@ public sealed class FieldMap
             var y = top + random.Next(bottom - top);
 
             // The way in from the gateway wanders a little across the field, with a ragged edge where the tents stop.
-            if (Math.Abs(y - middle - (3 * Math.Sin(x * 0.09))) < 9 + ((x * 7) % 4))
+            var (along, side) = alongX ? (x, y) : (y, x);
+            if (Math.Abs(side - middle - (3 * Math.Sin(along * 0.09))) < 9 + ((along * 7) % 4))
             {
                 continue;
             }
@@ -194,7 +397,7 @@ public sealed class FieldMap
             }
         }
 
-        return pitches.OrderBy(p => Math.Abs(p.X - Camp.X) + Math.Abs(p.Y - middle)).ThenBy(p => p.Y).ThenBy(p => p.X).ToList();
+        return pitches.OrderBy(p => Math.Abs(p.X - door.X) + Math.Abs(p.Y - door.Y)).ThenBy(p => p.Y).ThenBy(p => p.X).ToList();
     }
 
     /// <summary>
@@ -269,12 +472,181 @@ public sealed class FieldMap
         return map;
     }
 
+    /// <summary>
+    /// The site for a plan of rented fields: each field's grass with a hedge round it, a gateway
+    /// through every hedge two festival fields share, the lane, and a track from the lane to the
+    /// way in. Car parks have a hedge and a way out to the lane of their own. Fields not rented are
+    /// left as farmland. The map is cut to the rented fields and the lane beside them.
+    /// </summary>
+    public static FieldMap ForPlan(FieldPlan plan, int licence)
+    {
+        var rented = plan.Fields.ToList();
+        if (rented.Count == 0 || plan.WayIn is not { } wayIn)
+        {
+            throw new ArgumentException("A plan needs a festival field that touches the lane or the farm track.", nameof(plan));
+        }
+
+        const int margin = 24;      // 12 m of countryside round everything
+        const int hedge = Estate.HedgeMetres * 2;
+        const int laneY = 248;      // the lane is 5 m wide with a verge either side
+        const int laneDeep = 5;
+        const int stripX = 248;     // the farm track is 6 m wide
+        const int stripWide = 6;
+
+        var byTrack = !wayIn.OnLane;
+        var x0 = rented.Min(f => f.X);
+        var x1 = rented.Max(f => f.Right);
+        var y0 = Math.Min(rented.Min(f => f.Y), Estate.LaneTop);
+        var y1 = Math.Max(rented.Max(f => f.Bottom), Estate.LaneBottom);
+        if (byTrack)
+        {
+            x0 = Math.Min(x0, Estate.TrackLeft);
+            x1 = Math.Max(x1, Estate.TrackRight);
+        }
+
+        var ox = x0 - Estate.HedgeMetres - (margin / 2);
+        var oy = y0 - Estate.HedgeMetres - (margin / 2);
+        var width = ((x1 - x0) * 2) + (2 * (hedge + margin));
+        var height = ((y1 - y0) * 2) + (2 * (hedge + margin));
+        TileRect Tiles(int mx, int my, int mw, int mh) => new((mx - ox) * 2, (my - oy) * 2, mw * 2, mh * 2);
+        static TileRect Grow(TileRect r, int by) => new(r.X - by, r.Y - by, r.Width + (2 * by), r.Height + (2 * by));
+        static TileRect Around(IEnumerable<TileRect> rects)
+        {
+            var list = rects.ToList();
+            var (l, t) = (list.Min(r => r.X), list.Min(r => r.Y));
+            return new TileRect(l, t, list.Max(r => r.Right) - l, list.Max(r => r.Bottom) - t);
+        }
+
+        var fields = rented.Select(f => new MapField(f, plan.UseOf(f.Id)!.Value, Tiles(f.X, f.Y, f.MetresWide, f.MetresDeep))).ToList();
+        var grassOf = fields.ToDictionary(f => f.Info.Id, f => f.Grass);
+        var lane = new TileRect(0, (laneY - oy) * 2, width, laneDeep * 2);
+        var gateways = new List<TileRect>();
+        var tracks = new List<TileRect>();
+        var gapWide = Math.Clamp(licence <= 400 ? 6 : licence <= 1500 ? 12 : 24, 4, wayIn.MetresWide / 2) * 2;
+
+        // A gateway through every hedge two festival fields share, wider for a bigger crowd.
+        var festival = plan.Festival.ToList();
+        var campDoors = new List<(TileRect Camp, TilePoint Door, bool AlongX)>();
+        var doors = new List<(int A, int B, TileRect Door)>();
+        for (var i = 0; i < festival.Count; i++)
+        {
+            for (var j = i + 1; j < festival.Count; j++)
+            {
+                var (a, b) = (festival[i], festival[j]);
+                if (Estate.Gateway(a, b) is not { } g)
+                {
+                    continue;
+                }
+
+                var shared = g.NorthSouth ? Math.Min(a.Bottom, b.Bottom) - Math.Max(a.Y, b.Y) : Math.Min(a.Right, b.Right) - Math.Max(a.X, b.X);
+                var wide = Math.Clamp(licence / 200, 6, Math.Min(24, shared - 4)) * 2;
+                var cx = (int)Math.Round((g.X - ox) * 2);
+                var cy = (int)Math.Round((g.Y - oy) * 2);
+                var gate = g.NorthSouth ? new TileRect(cx - (hedge / 2), cy - (wide / 2), hedge, wide) : new TileRect(cx - (wide / 2), cy - (hedge / 2), wide, hedge);
+                gateways.Add(gate);
+                doors.Add((rented.IndexOf(a), rented.IndexOf(b), gate));
+                foreach (var camp in new[] { a, b }.Where(f => plan.UseOf(f.Id) == FieldUse.Camping && campDoors.All(d => d.Camp != grassOf[f.Id])))
+                {
+                    var grass = grassOf[camp.Id];
+                    var door = new TilePoint(Math.Clamp(cx, grass.X, grass.Right - 1), Math.Clamp(cy, grass.Y, grass.Bottom - 1));
+                    campDoors.Add((grass, door, g.NorthSouth));
+                }
+            }
+        }
+
+        // The way in: a gap in the hedge by the lane with a track to it, or a gap onto the farm track.
+        var inGrass = grassOf[wayIn.Id];
+        TileRect gap;
+        TileRect track;
+        if (!byTrack)
+        {
+            var north = wayIn.Bottom <= Estate.LaneTop;
+            var gx = inGrass.X + (inGrass.Width / 5);
+            gap = north ? new TileRect(gx, inGrass.Bottom, gapWide, hedge) : new TileRect(gx, inGrass.Y - hedge, gapWide, hedge);
+            track = north ? new TileRect(gx, gap.Bottom, gapWide, lane.Y - gap.Bottom) : new TileRect(gx, lane.Bottom, gapWide, gap.Y - lane.Bottom);
+            tracks.Add(track);
+        }
+        else
+        {
+            var west = wayIn.Right <= Estate.TrackLeft;
+            var tall = Math.Min(gapWide, inGrass.Height / 2);
+            var gy = inGrass.Bottom - (inGrass.Height / 5) - tall;
+            gap = west ? new TileRect(inGrass.Right, gy, hedge, tall) : new TileRect(inGrass.X - hedge, gy, hedge, tall);
+            var strip = Tiles(stripX, 0, stripWide, 1);
+            var farm = new TileRect(strip.X, gy, strip.Width, lane.Y - gy);
+            track = west ? new TileRect(gap.Right, gy, farm.X - gap.Right, tall) : new TileRect(farm.Right, gy, gap.X - farm.Right, tall);
+            tracks.Add(track);
+            tracks.Add(farm);
+        }
+
+        // Each car park has its own way out onto the lane.
+        foreach (var park in fields.Where(f => f.Use == FieldUse.CarPark && f.Info.OnLane))
+        {
+            var north = park.Info.Bottom <= Estate.LaneTop;
+            var px = park.Grass.X + (park.Grass.Width / 2) - 8;
+            var exit = north ? new TileRect(px, park.Grass.Bottom, 16, hedge) : new TileRect(px, park.Grass.Y - hedge, 16, hedge);
+            gateways.Add(exit);
+            doors.Add((fields.IndexOf(park), -1, exit));
+            tracks.Add(north ? new TileRect(px, park.Grass.Bottom + hedge, 16, lane.Y - park.Grass.Bottom - hedge) : new TileRect(px, lane.Bottom, 16, park.Grass.Y - hedge - lane.Bottom));
+        }
+
+        // A camping field with no festival neighbour is the way in itself.
+        foreach (var camp in fields.Where(f => f.Use == FieldUse.Camping && campDoors.All(d => d.Camp != f.Grass)))
+        {
+            campDoors.Add((camp.Grass, new TilePoint(Math.Clamp(gap.X + (gap.Width / 2), camp.Grass.X, camp.Grass.Right - 1), Math.Clamp(gap.Y, camp.Grass.Y, camp.Grass.Bottom - 1)), byTrack));
+        }
+
+        var festivalGrass = Around(fields.Where(f => f.Use != FieldUse.CarPark).Select(f => f.Grass));
+        var map = new FieldMap(width, height)
+        {
+            Field = festivalGrass,
+            HedgeLine = Grow(festivalGrass, hedge),
+            Gap = gap,
+            Lane = lane,
+            Track = track,
+            Fields = fields,
+            Gateways = gateways,
+            Tracks = tracks,
+        };
+        map._campDoors.AddRange(campDoors);
+        doors.Add((rented.IndexOf(wayIn), -1, gap));
+        map._doors.AddRange(doors);
+        foreach (var f in fields)
+        {
+            map.Fill(Grow(f.Grass, hedge), Ground.Hedge);
+        }
+
+        foreach (var f in fields)
+        {
+            map.Fill(f.Grass, Ground.Grass);
+        }
+
+        foreach (var g in gateways)
+        {
+            map.Fill(g, Ground.Grass);
+        }
+
+        map.Fill(gap, Ground.Grass);
+        map.Fill(lane, Ground.Lane);
+        foreach (var t in tracks)
+        {
+            map.Fill(t, Ground.Lane);
+        }
+
+        return map;
+    }
+
     private void Fill(TileRect area, Ground ground)
     {
         for (var y = area.Y; y < area.Bottom; y++)
         {
             for (var x = area.X; x < area.Right; x++)
             {
+                if (!InBounds(x, y))
+                {
+                    continue;
+                }
+
                 _tiles[(y * Width) + x] = ground;
             }
         }
