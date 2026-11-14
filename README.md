@@ -39,6 +39,7 @@ brands or sponsors.
 | 15. Balance: dear tickets sell far fewer and put people in a worse mood, the last tickets are the hardest to sell, better acts lift the mood more, the festival keeps a quarter of stall takings, and the council wants £5 a head in the bank before a bigger field | Done |
 | 16a. The estate map: nineteen named fields round the lane, rented each January for music, food, camping or parking, with a site laid out from whichever fields are chosen | Done |
 | 16b. Getting there: villagers walk, car park fields with bays and a parking charge, shuttle buses to the bus stop on the lane, and nobody buys a ticket without a way to get there | Done |
+| 17. Dancing to the beat: each song's beat is worked out once and saved beside it, and the crowd dances in time to it, with a move for each sort of music | Done |
 
 ## Controls
 
@@ -144,6 +145,22 @@ named with a number and the title: `01 Song Title.mp3`, `02 Another Song.mp3`. T
 playing order and the title is what the game shows. `.mp3`, `.ogg` and `.wav` all work. During an
 artist's set their songs play in order and round again; an artist with no songs plays in silence.
 The music has its own volume slider.
+
+### Dancing to the beat
+
+The crowd dances in time to the music. The first time the game runs with a new song, it listens to
+it quietly in the background (a few seconds a song, the act on stage first) and writes the beat
+into a small text file beside the song: `01 Song Title.mp3.beat`. That file holds the tempo, where
+the first beat falls and the time of every beat, so the crowd keeps time even if the players drift.
+Edit the numbers if the crowd is ever out of time, or delete the file to have it worked out again.
+`godot --path game -- --work-out-beats` does every song in one go and prints what it found.
+
+Each sort of music has its own move: pop bounces with hands up, rock head-bangs, metal head-bangs
+harder with horns, electronic jumps, country sways and claps, and hip hop nods with a hand pumping.
+About one in five does a gentler move that still suits the music, and one in ten just nods along.
+Everyone is a touch ahead of or behind the beat, and some dance harder than others. An act with no
+songs, or a song whose beat is not worked out yet, gets a steady beat that suits its music, and the
+crowd at the stage that is not being heard dances to that too.
 
 ## Checks
 
