@@ -153,7 +153,7 @@ public partial class LitterView : Node3D
             {
                 var wear = (float)_game.WearAt(column, row);
                 var mud = (float)_game.MudAt(column, row);
-                if ((wear < 0.25f && mud < 0.08f) || _game.GroundAt(column, row) is not null)
+                if ((wear < 0.25f && mud < 0.08f) || _game.GroundAt(column, row) is { } laid && laid != GroundKind.MownPath)
                 {
                     continue;
                 }

@@ -19,8 +19,20 @@ public sealed class PathFinder
     private const double Keen = 1.0005;
     private static readonly (int Dx, int Dy)[] Steps = { (1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (1, -1), (-1, 1), (-1, -1) };
 
+    /// <summary>How much further someone who keeps to paths will walk to stay on one: each step on the grass counts this much.</summary>
+    public const double OffPath = 1.8;
+
     private readonly FieldMap _map;
     private readonly float[] _crowding;
+    private readonly bool[] _onPath;
+    private readonly int[] _pathSum;
+    private bool _anyPaths;
+
+    /// <summary>How far, in tiles, someone will look to either side of the way they are going for a path to use.</summary>
+    private const int PathReach = 16;
+
+    /// <summary>A spread of path tiles, a metre or so apart, to choose where to join and leave the paths.</summary>
+    private readonly List<TilePoint> _pathPoints = new();
 
     // Kept between searches and marked with the search's number, so a route across a big field
     // does not have to wipe the whole map first.
@@ -36,7 +48,69 @@ public sealed class PathFinder
         _cost = new double[_crowding.Length];
         _cameFrom = new int[_crowding.Length];
         _searched = new int[_crowding.Length];
+        _onPath = new bool[_crowding.Length];
+        _pathSum = new int[(map.Width + 1) * (map.Height + 1)];
         Refresh();
+    }
+
+    /// <summary>True once any path has been laid.</summary>
+    public bool HasPaths => _anyPaths;
+
+    /// <summary>True if a tile is path (or the lane and track, which are a road anyway) for someone who keeps to paths.</summary>
+    public bool OnPath(TilePoint p) => _map.InBounds(p.X, p.Y) && _onPath[(p.Y * _map.Width) + p.X];
+
+    /// <summary>Says which tiles have a path on them. The lane and the track count as path too.</summary>
+    public void SetPaths(IEnumerable<TilePoint> tiles)
+    {
+        Array.Clear(_onPath);
+        _anyPaths = false;
+        _pathPoints.Clear();
+        foreach (var p in tiles)
+        {
+            if (_map.InBounds(p.X, p.Y))
+            {
+                _onPath[(p.Y * _map.Width) + p.X] = true;
+                _anyPaths = true;
+                if (p.X % 3 == 1 && p.Y % 3 == 1)
+                {
+                    _pathPoints.Add(p);
+                }
+            }
+        }
+
+        // A running count of laid path, so that how much path lies in any box can be found at once.
+        var stride = _map.Width + 1;
+        for (var y = 0; y < _map.Height; y++)
+        {
+            var row = 0;
+            for (var x = 0; x < _map.Width; x++)
+            {
+                row += _onPath[(y * _map.Width) + x] ? 1 : 0;
+                _pathSum[((y + 1) * stride) + x + 1] = _pathSum[(y * stride) + x + 1] + row;
+            }
+        }
+
+        for (var y = 0; y < _map.Height; y++)
+        {
+            for (var x = 0; x < _map.Width; x++)
+            {
+                if (_map[x, y] == Ground.Lane)
+                {
+                    _onPath[(y * _map.Width) + x] = true;
+                }
+            }
+        }
+    }
+
+    /// <summary>True if any laid path lies near the box between two tiles.</summary>
+    private bool PathNear(TilePoint a, TilePoint b)
+    {
+        var x0 = Math.Max(0, Math.Min(a.X, b.X) - PathReach);
+        var y0 = Math.Max(0, Math.Min(a.Y, b.Y) - PathReach);
+        var x1 = Math.Min(_map.Width, Math.Max(a.X, b.X) + PathReach + 1);
+        var y1 = Math.Min(_map.Height, Math.Max(a.Y, b.Y) + PathReach + 1);
+        var stride = _map.Width + 1;
+        return _pathSum[(y1 * stride) + x1] - _pathSum[(y0 * stride) + x1] - _pathSum[(y1 * stride) + x0] + _pathSum[(y0 * stride) + x0] > 0;
     }
 
     /// <summary>Works out again where the tight spots are. Call after anything is built or removed.</summary>
@@ -78,13 +152,20 @@ public sealed class PathFinder
 
     /// <summary>
     /// The route from one tile to another as a list of tiles to walk through in order, with the
-    /// straight stretches reduced to their ends. Null if there is no way through.
+    /// straight stretches reduced to their ends. Null if there is no way through. Someone who keeps
+    /// to paths will go out of their way to walk on one; everyone else cuts straight across.
     /// </summary>
-    public List<TilePoint>? FindPath(TilePoint from, TilePoint to)
+    public List<TilePoint>? FindPath(TilePoint from, TilePoint to, bool keepToPaths = false)
     {
         if (!_map.IsWalkable(from) || !_map.IsWalkable(to))
         {
             return null;
+        }
+
+        // With no path anywhere near the way, there is nothing to keep to.
+        if (keepToPaths && _anyPaths && PathNear(from, to) && ByPath(from, to) is { } byPath)
+        {
+            return byPath;
         }
 
         if (ClearLine(from, to))
@@ -93,6 +174,69 @@ public sealed class PathFinder
             return from == to ? new List<TilePoint> { from } : new List<TilePoint> { from, to };
         }
 
+        return Search(from, to, false);
+    }
+
+    /// <summary>
+    /// The way someone who keeps to paths goes: across the grass to the best place to join a path,
+    /// along the paths, and off again at the best place to leave. Null if no path is worth it, so
+    /// that they go straight across like anyone else.
+    /// </summary>
+    private List<TilePoint>? ByPath(TilePoint from, TilePoint to)
+    {
+        // Join where the walk to the path, and on from there, is shortest; leave the same way.
+        TilePoint? join = null, leave = null;
+        var best = double.MaxValue;
+        foreach (var p in _pathPoints)
+        {
+            var score = (OffPath * Estimate(from.X, from.Y, p)) + Estimate(p.X, p.Y, to);
+            if (score < best && _map.IsWalkable(p))
+            {
+                (best, join) = (score, p);
+            }
+        }
+
+        if (join is not { } j)
+        {
+            return null;
+        }
+
+        best = double.MaxValue;
+        foreach (var p in _pathPoints)
+        {
+            var score = Estimate(j.X, j.Y, p) + (OffPath * Estimate(p.X, p.Y, to));
+            if (score < best && _map.IsWalkable(p))
+            {
+                (best, leave) = (score, p);
+            }
+        }
+
+        // Worth it only if the paths (with the walk on and off them on the grass counting extra)
+        // beat walking straight across the grass.
+        var l = leave!.Value;
+        var onPath = (OffPath * Estimate(from.X, from.Y, j)) + Estimate(j.X, j.Y, l) + (OffPath * Estimate(l.X, l.Y, to));
+        if (onPath >= OffPath * Estimate(from.X, from.Y, to) || Estimate(j.X, j.Y, l) < 8)
+        {
+            return null;
+        }
+
+        var on = from == j ? new List<TilePoint> { j } : FindPath(from, j);
+        var along = Search(j, l, true);
+        var off = l == to ? new List<TilePoint> { l } : FindPath(l, to);
+        if (on is null || along is null || off is null)
+        {
+            return null;
+        }
+
+        var route = new List<TilePoint>(on);
+        route.AddRange(along.Skip(1));
+        route.AddRange(off.Skip(1));
+        return route;
+    }
+
+    /// <summary>A* across the tiles. Kept to paths, it only steps on path.</summary>
+    private List<TilePoint>? Search(TilePoint from, TilePoint to, bool pathOnly)
+    {
         var width = _map.Width;
         var cost = _cost;
         var cameFrom = _cameFrom;
@@ -150,7 +294,12 @@ public sealed class PathFinder
                 }
 
                 var next = (ny * width) + nx;
-                var stepCost = (dx != 0 && dy != 0 ? Diagonal : 1) * (1 + _crowding[next]);
+                if (pathOnly && !_onPath[next])
+                {
+                    continue;
+                }
+
+                var stepCost = (dx != 0 && dy != 0 ? Diagonal : 1) * (pathOnly ? 1 : 1 + _crowding[next]);
                 var total = cost[current] + stepCost;
                 if (searched[next] != search)
                 {

@@ -1,6 +1,7 @@
 using BlueprintFestival.Audio;
 using BlueprintFestival.Simulation.Sound;
 using System;
+using System.Linq;
 using BlueprintFestival.Simulation;
 using BlueprintFestival.Simulation.Site;
 using BlueprintFestival.Simulation.World;
@@ -108,6 +109,7 @@ public partial class BuildTool : Node3D
             BuildMode.Gate => "Click to put the gate up. R turns it. Close the fence either side so it is the only way in.",
             BuildMode.Stall => "Click on the grass to put it up. R turns it. People queue at the front.",
             BuildMode.Staff => Hire == StaffKind.TicketStaff ? "Click a gate to put them on it. One for each lane." : "Click on the grass to post them there.",
+            BuildMode.Ground when IsPathLine => "Hold the mouse button and drag to lay a path, 2 m wide. Some people keep to paths; others cut across.",
             BuildMode.Ground => "Click a patch of grass, or hold the mouse button and drag to cover a stretch.",
             BuildMode.Remove => "Click a stage, a stall, a gate or a stretch of fence to take it down. You get the money back. Click staff to send them home.",
             _ => "",
@@ -235,10 +237,25 @@ public partial class BuildTool : Node3D
         return (Math.Min(a.Column, b.Column), Math.Min(a.Row, b.Row), Math.Max(a.Column, b.Column), Math.Max(a.Row, b.Row));
     }
 
+    /// <summary>True when the ground picked is a path, laid in a line one patch wide rather than over a box.</summary>
+    private bool IsPathLine => Ground is GroundKind.MownPath or GroundKind.BarkChip or GroundKind.Gravel;
+
+    /// <summary>The patches a path dragged between two tiles would cover, as the box round them, clipped to the field.</summary>
+    private (int C0, int R0, int C1, int R1)? PathPatches(TilePoint from, TilePoint to)
+    {
+        if (Patches(from, from) is not var (a, b, _, _) || Patches(to, to) is not var (c, d, _, _))
+        {
+            return Patches(from, to);
+        }
+
+        var line = _game.PathLine((a, b), (c, d)).ToList();
+        return line.Count == 0 ? null : (line.Min(p => p.Column), line.Min(p => p.Row), line.Max(p => p.Column), line.Max(p => p.Row));
+    }
+
     /// <summary>What covering the box between two tiles would cost, leaving out patches already covered the same way.</summary>
     public BuildCheck CheckGround(TilePoint from, TilePoint to)
     {
-        if (Patches(from, to) is not var (c0, r0, c1, r1))
+        if ((IsPathLine ? PathPatches(from, to) : Patches(from, to)) is not var (c0, r0, c1, r1))
         {
             return BuildCheck.No("That is outside the field.");
         }
@@ -258,11 +275,11 @@ public partial class BuildTool : Node3D
             : new BuildCheck(true, cost, null);
     }
 
-    /// <summary>Lays straw or trackway over the box between two tiles.</summary>
+    /// <summary>Lays straw or trackway over the box between two tiles, or a path in a line between them.</summary>
     public BuildCheck DragGround(TilePoint from, TilePoint to)
     {
         var result = CheckGround(from, to);
-        if (result.Ok && Patches(from, to) is var (c0, r0, c1, r1))
+        if (result.Ok && (IsPathLine ? PathPatches(from, to) : Patches(from, to)) is var (c0, r0, c1, r1))
         {
             for (var r = r0; r <= r1; r++)
             {
@@ -431,7 +448,7 @@ public partial class BuildTool : Node3D
             {
                 var from = _dragFrom ?? at;
                 check = CheckGround(from, at);
-                pad = Patches(from, at) is var (c0, r0, c1, r1) ? PatchRect(c0, r0, c1, r1) : new TileRect(at.X, at.Y, 1, 1);
+                pad = (IsPathLine ? PathPatches(from, at) : Patches(from, at)) is var (c0, r0, c1, r1) ? PatchRect(c0, r0, c1, r1) : new TileRect(at.X, at.Y, 1, 1);
                 ClearGhostOnly();
                 break;
             }

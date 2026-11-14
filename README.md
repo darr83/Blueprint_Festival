@@ -35,6 +35,7 @@ brands or sponsors.
 | 11. Sound effects: the field, the weather, the crowd, stalls, building, the radio and buttons, with volume sliders | Done (files made with `tools/make_sounds.py`) |
 | 12. Artists and music: 25 made-up artists with a genre, a rating and a following, and a folder each for their songs | Done (songs are added to `game/Music`) |
 | 13. Selling tickets: book every set yourself in January, advertise and sell month by month, then build week with the last tickets sold day by day | Done |
+| 14. Paths and a scattered campsite: mown, bark chip and gravel paths that about half the crowd keeps to (most on a wet day), and tents dotted about a bigger camping field | Done |
 
 ## Controls
 
@@ -46,7 +47,7 @@ brands or sponsors.
 | Show the whole field | Home |
 | Pause / resume | Space |
 | Crowd view on / off | C, or the button bottom right |
-| Build | Pick from the build bar, click to place, drag for fence |
+| Build | Pick from the build bar, click to place, drag for fence, ground cover and paths |
 | Turn the piece being placed | R |
 | Stop building | Right-click or Esc |
 | Speed 1x / 2x / 4x / 8x | 1 / 2 / 3 / 4 |
@@ -132,6 +133,7 @@ The music has its own volume slider.
 - `godot --path game -- --shots=DIR` writes review screenshots to a folder.
 - `godot --path game -- --people-shots=DIR` writes line-up pictures of the people.
 - `godot --path game -- --sales-shots=DIR` writes pictures of the planning and ticket sales screens.
+- `godot --path game -- --path-shots=DIR` writes pictures of paths and the camping field.
 
 The tests and the launch test run on every pull request.
 

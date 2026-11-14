@@ -129,11 +129,17 @@ public sealed class FieldMap
     /// <summary>How many people the field's licence could allow at two square metres each.</summary>
     public int ComfortableCapacity => (int)(Field.Width * TileMetres * Field.Height * TileMetres / 2);
 
-    /// <summary>The pitches in the camping field, nearest the gateway first: one tent each, in rows with paths between.</summary>
+    /// <summary>The closest two tents are pitched, centre to centre, in tiles (3.4 m).</summary>
+    public const double PitchSpacing = 6.8;
+
+    /// <summary>
+    /// The pitches in the camping field, nearest the gateway first: one tent each, dotted about the
+    /// field wherever there is room, never closer than <see cref="PitchSpacing"/> to the next one.
+    /// The way in from the gateway is kept clear right across the field. The same field always
+    /// gets the same pitches.
+    /// </summary>
     public IReadOnlyList<TilePoint> Pitches()
     {
-        const int across = 6;   // a tent every 3 m along a row
-        const int down = 7;     // rows 3.5 m apart
         var pitches = new List<TilePoint>();
         if (!HasCamp)
         {
@@ -141,21 +147,54 @@ public sealed class FieldMap
         }
 
         var middle = CampGap.Y + (CampGap.Height / 2);
-        for (var y = Camp.Y + 6; y < Camp.Bottom - 6; y += down)
+        var random = Core.GameRandom.FromSeed((Camp.Width * 7919) + Camp.Height, 31);
+        var (left, top, right, bottom) = (Camp.X + 5, Camp.Y + 5, Camp.Right - 5, Camp.Bottom - 5);
+
+        // Tents are tried in random places over and over; one goes up wherever it is not too close
+        // to another. A grid of buckets, each a little bigger than the spacing, keeps the looking quick.
+        var bucket = (int)Math.Ceiling(PitchSpacing);
+        var across = ((right - left) / bucket) + 1;
+        var down = ((bottom - top) / bucket) + 1;
+        var buckets = new List<TilePoint>?[across * down];
+        var tries = (right - left) * (bottom - top) / 2;
+        for (var i = 0; i < tries; i++)
         {
-            if (Math.Abs(y - middle) < 8)
+            var x = left + random.Next(right - left);
+            var y = top + random.Next(bottom - top);
+
+            // The way in from the gateway wanders a little across the field, with a ragged edge where the tents stop.
+            if (Math.Abs(y - middle - (3 * Math.Sin(x * 0.09))) < 9 + ((x * 7) % 4))
             {
-                // The way in from the gateway is kept clear right across the field.
                 continue;
             }
 
-            for (var x = Camp.X + 8; x < Camp.Right - 4; x += across)
+            var bx = (x - left) / bucket;
+            var by = (y - top) / bucket;
+            var near = false;
+            for (var cy = Math.Max(0, by - 1); cy <= Math.Min(down - 1, by + 1) && !near; cy++)
             {
-                pitches.Add(new TilePoint(x, y));
+                for (var cx = Math.Max(0, bx - 1); cx <= Math.Min(across - 1, bx + 1) && !near; cx++)
+                {
+                    foreach (var p in buckets[(cy * across) + cx] ?? Enumerable.Empty<TilePoint>())
+                    {
+                        if (((p.X - x) * (p.X - x)) + ((p.Y - y) * (p.Y - y)) < PitchSpacing * PitchSpacing)
+                        {
+                            near = true;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (!near)
+            {
+                var pitch = new TilePoint(x, y);
+                (buckets[(by * across) + bx] ??= new List<TilePoint>()).Add(pitch);
+                pitches.Add(pitch);
             }
         }
 
-        return pitches.OrderBy(p => Math.Abs(p.X - Camp.X) + Math.Abs(p.Y - middle)).ToList();
+        return pitches.OrderBy(p => Math.Abs(p.X - Camp.X) + Math.Abs(p.Y - middle)).ThenBy(p => p.Y).ThenBy(p => p.X).ToList();
     }
 
     /// <summary>
@@ -169,7 +208,7 @@ public sealed class FieldMap
     {
         new FieldSize("the village field", 400, 60, 40, 6),
         new FieldSize("Home Farm meadow", 1500, 110, 70, 12),
-        new FieldSize("the showground", 5000, 180, 120, 24, 90),
+        new FieldSize("the showground", 5000, 180, 120, 24, 140),
     };
 
     /// <summary>The smallest field that a licence for so many people fits on.</summary>

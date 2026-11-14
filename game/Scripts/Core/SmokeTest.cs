@@ -145,13 +145,29 @@ public partial class SmokeTest : Node
 
                     // Ground cover: straw goes down by the patch, and is drawn.
                     opened.BuildBar.Toggle(BuildMode.Ground);
-                    Check(opened.BuildBar.ChoiceCount == 2 && opened.BuildBar.Choose("groundStraw") && opened.Build.Mode == BuildMode.Ground, "The build bar should offer straw and trackway.");
+                    Check(opened.BuildBar.ChoiceCount == 5 && opened.BuildBar.Choose("groundStraw") && opened.Build.Mode == BuildMode.Ground, "The build bar should offer straw, trackway and three paths.");
                     var patch = new TilePoint(grass.X + 41, grass.Y + 41);
                     Check(opened.Build.DragGround(patch, patch).Ok && opened.Game.GroundCovered == 1, "Straw should go down on a patch of grass.");
                     Check(!opened.Build.DragGround(patch, patch).Ok, "Straw should not be laid twice on the same patch.");
                     opened.Weather.Refresh();
                     Check(opened.Weather.CoverShown == 1, "The straw should be drawn.");
                     Check(opened.Game.Money == 1554 - 120 - 200 - 40 - 3, $"A patch of straw should cost £3, leaving £1,191, not £{opened.Game.Money}.");
+
+                    // A path goes down in a line, is drawn, and can be lifted again (once the gates are open there is no money back).
+                    Check(opened.BuildBar.Choose("groundGravel"), "The ground tab should offer a gravel path.");
+                    var pathFrom = new TilePoint(grass.X + 49, grass.Y + 61);
+                    Check(opened.Build.DragGround(pathFrom, new TilePoint(grass.X + 58, grass.Y + 63)).Ok && opened.Game.PathPatches == 3 && opened.Game.Crowd.HasPaths, $"A gravel path three patches long should go down, not {opened.Game.PathPatches}.");
+                    opened.Weather.Refresh();
+                    Check(opened.Weather.CoverShown == 4, "The path should be drawn.");
+                    if (opened.Game.PatchAt(pathFrom) is var (pc, pr))
+                    {
+                        for (var i = 0; i < 3; i++)
+                        {
+                            opened.Game.LiftGround(pc + i, pr);
+                        }
+                    }
+
+                    Check(opened.Game.PathPatches == 0 && !opened.Game.Crowd.HasPaths && opened.Game.Money == 1554 - 120 - 200 - 40 - 3 - (3 * 7), $"Lifting the path should leave no path and the £21 it cost spent: {opened.Game.PathPatches} left, £{opened.Game.Money}.");
                     Check(opened.Weather.StreaksShown == 0 && opened.Sky.Overcast < 0.01f, "A fine day should have no rain and no cloud.");
                     Check(opened.TopBar.WeatherText.StartsWith("Fine", StringComparison.Ordinal), $"The top bar should say the day is fine, not '{opened.TopBar.WeatherText}'.");
                     opened.BuildBar.Close();

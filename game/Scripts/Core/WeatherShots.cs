@@ -101,7 +101,7 @@ public partial class WeatherShots : Node
         GameManager.Instance.StartNewFestival(null);
     }
 
-    private static void RunTo(FestivalGame game, double hour)
+    internal static void RunTo(FestivalGame game, double hour)
     {
         var until = game.Day.AddHours(hour);
         while (game.Phase == Phase.Day && game.Now < until)

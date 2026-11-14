@@ -29,6 +29,15 @@ public enum GroundKind
 
     /// <summary>Metal trackway panels: dear, but the grass under them comes to no harm.</summary>
     Trackway,
+
+    /// <summary>A strip of grass mown short: next to free, and it shows people the way, but it is still grass.</summary>
+    MownPath,
+
+    /// <summary>A path of bark chippings: soft underfoot and soaks up most of the mud.</summary>
+    BarkChip,
+
+    /// <summary>A path of rolled gravel: hardly any mud and hardly any wear.</summary>
+    Gravel,
 }
 
 /// <summary>
@@ -175,9 +184,36 @@ public sealed partial class FestivalGame
     /// <summary>How many people a forecast like this puts off, as a share of the crowd that still comes.</summary>
     private double ForecastPull => 1 - (0.3 * Math.Max(0, RainChance - 20) / 100.0);
 
-    public static int CostOf(GroundKind kind) => kind == GroundKind.Trackway ? 10 : 3;
+    public static int CostOf(GroundKind kind) => kind switch
+    {
+        GroundKind.Trackway => 10,
+        GroundKind.MownPath => 1,
+        GroundKind.BarkChip => 4,
+        GroundKind.Gravel => 7,
+        _ => 3,
+    };
 
-    public static string NameOf(GroundKind kind) => kind == GroundKind.Trackway ? "Trackway" : "Straw";
+    public static string NameOf(GroundKind kind) => kind switch
+    {
+        GroundKind.Trackway => "Trackway",
+        GroundKind.MownPath => "Mown path",
+        GroundKind.BarkChip => "Bark chip path",
+        GroundKind.Gravel => "Gravel path",
+        _ => "Straw",
+    };
+
+    /// <summary>True for the kinds of ground people can follow as a path. Straw is scattered, not a path.</summary>
+    public static bool IsPath(GroundKind kind) => kind != GroundKind.Straw;
+
+    /// <summary>How much of the mud on bare ground still shows through what is laid.</summary>
+    private static double MudThrough(GroundKind? kind) => kind switch
+    {
+        GroundKind.Straw => 0.3,
+        GroundKind.Trackway => 0,
+        GroundKind.BarkChip => 0.2,
+        GroundKind.Gravel => 0.05,
+        _ => 1,
+    };
 
     private void StartWeather()
     {
@@ -189,6 +225,8 @@ public sealed partial class FestivalGame
         }
 
         Crowd.Mud = MudAtPlace;
+        Crowd.PathShare = People.Crowd.DryPathShare;
+        Crowd.SetPaths(Array.Empty<TilePoint>());
         Dress();
     }
 
@@ -243,18 +281,21 @@ public sealed partial class FestivalGame
     }
 
     /// <summary>What is laid on a patch of ground, if anything.</summary>
-    public GroundKind? GroundAt(int column, int row) => _ground[(row * WearColumns) + column] switch { 1 => GroundKind.Straw, 2 => GroundKind.Trackway, _ => null };
+    public GroundKind? GroundAt(int column, int row) => KindOf(_ground[(row * WearColumns) + column]);
 
-    /// <summary>How many patches have straw or trackway on them.</summary>
+    private static GroundKind? KindOf(byte laid) => laid == 0 || laid > 5 ? null : (GroundKind)(laid - 1);
+
+    /// <summary>How many patches have straw, trackway or a path on them.</summary>
     public int GroundCovered => _ground.Count(g => g != 0);
 
+    /// <summary>How many patches of path have been laid (trackway counts as path).</summary>
+    public int PathPatches => _ground.Count(g => KindOf(g) is { } kind && IsPath(kind));
+
+    /// <summary>True if a patch of ground has a path on it.</summary>
+    public bool PathAt(int column, int row) => GroundAt(column, row) is { } kind && IsPath(kind);
+
     /// <summary>How muddy one patch is, from 0 to 1. Mud is wet ground that has been walked on.</summary>
-    public double MudAt(int column, int row) => _ground[(row * WearColumns) + column] switch
-    {
-        2 => 0,
-        1 => 0.3 * BareMud(column, row),
-        _ => BareMud(column, row),
-    };
+    public double MudAt(int column, int row) => MudThrough(GroundAt(column, row)) * BareMud(column, row);
 
     /// <summary>Wet grass that nobody has walked on is only wet; it takes feet to make mud of it.</summary>
     private double BareMud(int column, int row) => Wetness * Math.Clamp((WearAt(column, row) - 0.15) / 0.5, 0, 1);
@@ -300,8 +341,13 @@ public sealed partial class FestivalGame
         var check = CheckGround(kind, column, row);
         if (check.Ok)
         {
-            Spend("Ground cover", check.Cost);
-            _ground[(row * WearColumns) + column] = (byte)(kind == GroundKind.Straw ? 1 : 2);
+            Spend(IsPath(kind) && kind != GroundKind.Trackway ? "Paths" : "Ground cover", check.Cost);
+            var was = GroundAt(column, row);
+            _ground[(row * WearColumns) + column] = (byte)((int)kind + 1);
+            if (IsPath(kind) || (was is { } old && IsPath(old)))
+            {
+                PathsChanged();
+            }
         }
 
         return check;
@@ -319,7 +365,12 @@ public sealed partial class FestivalGame
         var refund = Phase == Phase.Build ? CostOf(kind) : 0;
         if (refund > 0)
         {
-            Spend("Ground cover", -refund);
+            Spend(IsPath(kind) && kind != GroundKind.Trackway ? "Paths" : "Ground cover", -refund);
+        }
+
+        if (IsPath(kind))
+        {
+            PathsChanged();
         }
 
         return refund;
@@ -337,15 +388,93 @@ public sealed partial class FestivalGame
 
         // An hour of pouring rain leaves the ground most of the way to sodden; it takes a long dry spell to come back.
         Wetness = Math.Clamp(Wetness + (rain > 0.05 ? rain * 0.012 : Weather.Kind == WeatherKind.Hot ? -0.003 : -0.0012), 0, 1);
+
+        SharePaths();
     }
 
     /// <summary>How much harder feet are on a patch than on dry grass: wet ground cuts up fast, and cover protects it.</summary>
-    private double WearRate(int index) => _ground[index] switch
+    private double WearRate(int index) => KindOf(_ground[index]) switch
     {
-        2 => 0,
-        1 => 0.5,
+        GroundKind.Trackway => 0,
+        GroundKind.Straw => 0.5,
+        GroundKind.BarkChip => 0.3,
+        GroundKind.Gravel => 0.1,
         _ => 1 + (1.5 * Wetness),
     };
+
+    /// <summary>
+    /// The patches of a path dragged from one patch to another: one patch wide, straight along
+    /// whichever way is longer, clipped to the field.
+    /// </summary>
+    public IEnumerable<(int Column, int Row)> PathLine((int Column, int Row) from, (int Column, int Row) to)
+    {
+        var across = Math.Abs(to.Column - from.Column) >= Math.Abs(to.Row - from.Row);
+        var length = across ? Math.Abs(to.Column - from.Column) : Math.Abs(to.Row - from.Row);
+        var step = Math.Sign(across ? to.Column - from.Column : to.Row - from.Row);
+        for (var i = 0; i <= length; i++)
+        {
+            var (c, r) = across ? (from.Column + (i * step), from.Row) : (from.Column, from.Row + (i * step));
+            if (c >= 0 && r >= 0 && c < WearColumns && r < WearRows)
+            {
+                yield return (c, r);
+            }
+        }
+    }
+
+    /// <summary>What a path from one patch to another would cost: patches that already have this path cost nothing.</summary>
+    public BuildCheck CheckPath(GroundKind kind, (int Column, int Row) from, (int Column, int Row) to)
+    {
+        var cost = PathLine(from, to).Sum(p => GroundAt(p.Column, p.Row) == kind ? 0 : CostOf(kind));
+        return cost == 0 ? new BuildCheck(false, 0, $"There is {NameOf(kind).ToLowerInvariant()} here already.") : Afford(new BuildCheck(true, cost, null));
+    }
+
+    /// <summary>Lays a straight path from one patch to another, over whatever else was laid there.</summary>
+    public BuildCheck LayPath(GroundKind kind, (int Column, int Row) from, (int Column, int Row) to)
+    {
+        var check = CheckPath(kind, from, to);
+        if (check.Ok)
+        {
+            foreach (var (c, r) in PathLine(from, to).ToList())
+            {
+                if (GroundAt(c, r) != kind)
+                {
+                    LayGround(kind, c, r);
+                }
+            }
+        }
+
+        return check;
+    }
+
+    /// <summary>Wet grass sends more people looking for a path: on sodden ground nine in ten keep to one.</summary>
+    private void SharePaths() => Crowd.PathShare = People.Crowd.DryPathShare + ((1 - People.Crowd.DryPathShare) * 0.8 * Math.Min(1, Wetness / 0.6));
+
+    /// <summary>Tells the crowd where the paths are, so that those who keep to paths can find them.</summary>
+    private void PathsChanged()
+    {
+        var f = Field.Field;
+        var tiles = new List<TilePoint>();
+        for (var row = 0; row < WearRows; row++)
+        {
+            for (var column = 0; column < WearColumns; column++)
+            {
+                if (!PathAt(column, row))
+                {
+                    continue;
+                }
+
+                for (var dy = 0; dy < WearTiles; dy++)
+                {
+                    for (var dx = 0; dx < WearTiles; dx++)
+                    {
+                        tiles.Add(new TilePoint(f.X + (column * WearTiles) + dx, f.Y + (row * WearTiles) + dy));
+                    }
+                }
+            }
+        }
+
+        Crowd.SetPaths(tiles);
+    }
 
     private WeatherSave SaveWeather() => new(Weather, RainChance, Wetness, PonchosOrdered, _ground.Any(g => g != 0) ? _ground.ToArray() : null)
     {
@@ -362,10 +491,12 @@ public sealed partial class FestivalGame
 
         RainChance = Math.Clamp(save.RainChance, 0, 100);
         Wetness = Math.Clamp(save.Wetness, 0, 1);
+        SharePaths();
         PonchosOrdered = save.Ponchos;
         if (save.Ground is { } ground && ground.Length == _ground.Length)
         {
             _ground = ground.ToArray();
+            PathsChanged();
         }
 
         Dress();

@@ -58,6 +58,7 @@ public class CampingTests
         Assert.True(pitches.Count >= 700, $"Only {pitches.Count} pitches.");
         Assert.Equal(pitches.Count, pitches.Distinct().Count());
         Assert.All(pitches, p => Assert.True(map.Camp.Contains(p)));
+        Assert.Equal(pitches, map.Pitches());
         var from = new TilePoint(map.Field.X + 20, map.Field.Y + 20);
         Assert.NotNull(new PathFinder(map).FindPath(from, pitches[^1]));
     }
@@ -128,5 +129,43 @@ public class CampingTests
         Assert.Equal(game.Crowd.CampersIn, loaded.Crowd.CampersIn);
         Assert.Equal(game.Money, loaded.Money);
         Assert.Equal(game.Crowd.OnSite, loaded.Crowd.OnSite);
+    }
+
+    [Fact]
+    public void Tents_are_dotted_about_with_room_between_them_and_not_in_rows()
+    {
+        var map = FieldMap.ForLicence(5000);
+        var pitches = map.Pitches();
+
+        // Nobody is pitched closer than 3.4 m to the next tent.
+        for (var i = 0; i < pitches.Count; i++)
+        {
+            for (var j = i + 1; j < pitches.Count; j++)
+            {
+                var (dx, dy) = (pitches[i].X - pitches[j].X, pitches[i].Y - pitches[j].Y);
+                Assert.True((dx * dx) + (dy * dy) >= FieldMap.PitchSpacing * FieldMap.PitchSpacing, $"{pitches[i]} and {pitches[j]} are too close.");
+            }
+        }
+
+        // Rows would put forty or more tents on the same line; dotted about, only a few share one.
+        var busiestRow = pitches.GroupBy(p => p.Y).Max(g => g.Count());
+        var busiestColumn = pitches.GroupBy(p => p.X).Max(g => g.Count());
+        Assert.True(busiestRow < 15, $"{busiestRow} tents in one row.");
+        Assert.True(busiestColumn < 15, $"{busiestColumn} tents in one column.");
+
+        // The way in from the gateway stays clear.
+        var middle = map.CampGap.Y + (map.CampGap.Height / 2);
+        Assert.DoesNotContain(pitches, p => Math.Abs(p.Y - middle) < 6);
+    }
+
+    [Fact]
+    public void Every_party_that_wants_to_camp_gets_a_pitch()
+    {
+        var game = FestivalGame.StartYear("Larkmoor Festival", new YearSetup(6, 5000, 90000));
+        game.BookCamping(true);
+        Assert.True(game.ConfirmPlan());
+        var wanted = game.Crowd.Parties.Count(p => (uint)(p.Id * 2654435761u) % 100 < Crowd.CamperShare * 100);
+        Assert.Equal(wanted, game.Crowd.Parties.Count(p => p.Pitch is not null));
+        Assert.True(game.Field.Pitches().Count >= wanted);
     }
 }
