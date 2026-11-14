@@ -41,6 +41,12 @@ public partial class FestivalScene : Node3D
 
     public YearScreen Year { get; private set; } = null!;
 
+    public DensityView Density { get; private set; } = null!;
+
+    public CrowdPanel CrowdSafety { get; private set; } = null!;
+
+    private ViewButtons _viewButtons = null!;
+
     public override void _Ready()
     {
         // Run straight from the editor (F6) and there is no game yet: start a default one.
@@ -73,6 +79,10 @@ public partial class FestivalScene : Node3D
         AddChild(Staff);
         Staff.Initialise(Game);
 
+        Density = new DensityView { Name = "Density" };
+        AddChild(Density);
+        Density.Initialise(Game);
+
         Camera = new CameraRig { Name = "CameraRig" };
         AddChild(Camera);
         Camera.Initialise(Game.Field);
@@ -97,11 +107,20 @@ public partial class FestivalScene : Node3D
         _hud.AddChild(Year);
         Year.Initialise(Game, this);
         BuildBar.Visible = Game.CanBuild;
-        var view = new ViewButtons { Name = "ViewButtons" };
-        _hud.AddChild(view);
-        view.Initialise(Camera);
+        _viewButtons = new ViewButtons { Name = "ViewButtons" };
+        _hud.AddChild(_viewButtons);
+        _viewButtons.Initialise(Camera, SetCrowdView);
+        CrowdSafety = new CrowdPanel { Name = "CrowdPanel" };
+        _hud.AddChild(CrowdSafety);
+        CrowdSafety.Initialise(Game, Density);
+        CrowdSafety.ShowMe += (x, y) =>
+        {
+            SetCrowdView(true);
+            Camera.LookAt((float)x, (float)y, 18f);
+        };
+        Game.CrushWarning += OnCrushWarning;
 
-        var hint = UiStyle.Body("Q / E turn view    WASD move    Wheel zoom    Space pause    R turn a piece", muted: true, size: 13);
+        var hint = UiStyle.Body("Q / E turn view    WASD move    Wheel zoom    Space pause    C crowd view", muted: true, size: 13);
         hint.Theme = UiStyle.Theme;
         hint.AddThemeColorOverride("font_color", new Color(1, 1, 1, 0.85f));
         hint.AddThemeColorOverride("font_shadow_color", new Color(0, 0, 0, 0.5f));
@@ -116,6 +135,13 @@ public partial class FestivalScene : Node3D
     {
         Game.Advance(delta);
         Sky.Apply(Game, Camera.Yaw);
+        CrowdSafety.RightInset = Money.Visible ? Money.Size.X + 14 : 0;
+        if (Density.Showing && Game.Phase is not (Phase.Day or Phase.Build))
+        {
+            // There is no crowd to look at once the day is over.
+            SetCrowdView(false);
+        }
+
         if (BuildBar.Visible != Game.CanBuild)
         {
             // Nothing is built while planning, tidying or reading the results.
@@ -152,11 +178,35 @@ public partial class FestivalScene : Node3D
             case Key.Key4:
                 Game.Clock.SetSpeed(GameSpeed.Fastest);
                 break;
+            case Key.C:
+                SetCrowdView(!Density.Showing);
+                break;
             case Key.Escape:
                 OpenMenu();
                 break;
         }
     }
+
+    /// <summary>Switches the crowd view on or off, and keeps its button in step.</summary>
+    public void SetCrowdView(bool on)
+    {
+        Density.Showing = on;
+        _viewButtons.SetCrowdView(on);
+        CrowdSafety.Refresh();
+    }
+
+    /// <summary>Somewhere has become a crush risk: slow the clock to normal and show the player where.</summary>
+    private void OnCrushWarning(double x, double y)
+    {
+        if (Game.Clock.Speed > GameSpeed.Normal)
+        {
+            Game.Clock.SetSpeed(GameSpeed.Normal);
+        }
+
+        SetCrowdView(true);
+    }
+
+    public override void _ExitTree() => Game.CrushWarning -= OnCrushWarning;
 
     public void TogglePause()
     {

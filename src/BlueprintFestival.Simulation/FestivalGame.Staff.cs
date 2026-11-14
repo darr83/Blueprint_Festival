@@ -118,6 +118,9 @@ public sealed class Incident
     /// <summary>True while the person is resting in the first aid tent.</summary>
     public bool Resting { get; internal set; }
 
+    /// <summary>True for someone hurt in a crush. They always need more than a sit down.</summary>
+    public bool Crush { get; internal init; }
+
     /// <summary>True while it is waiting for someone to come.</summary>
     public bool Waiting => Staff < 0 && !Resting;
 }
@@ -367,8 +370,10 @@ public sealed partial class FestivalGame
         var people = about.Sum(p => p.Members.Count);
 
         // A handful of people are taken ill over a day; more if people are going thirsty in the sun, and after an evening at the bar.
+        // People packed in tight faint more, and lose their tempers more.
         var parched = about.Where(p => p.Thirst >= People.Crowd.Pressing).Sum(p => p.Members.Count);
-        var illChance = (people + (parched * 3)) * (evening ? 0.007 : 0.005) / 60;
+        var packed = about.Where(p => Crowd.Density.At(p.X, p.Y) >= DensityMap.Busy).Sum(p => p.Members.Count);
+        var illChance = (people + (parched * 3) + (packed * 2)) * (evening ? 0.007 : 0.005) / 60;
         if (illRoll < illChance)
         {
             var party = about[(int)(whoIll * about.Count)];
@@ -377,7 +382,7 @@ public sealed partial class FestivalGame
         }
 
         // Trouble is rare by day and less rare once the bar has been open a while.
-        var troubleChance = people / 180.0 * (evening ? 0.6 : 0.25) / 60;
+        var troubleChance = (people + (packed * 2)) / 180.0 * (evening ? 0.6 : 0.25) / 60;
         if (troubleRoll < troubleChance)
         {
             var party = about[(int)(whoTrouble * about.Count)];
@@ -545,7 +550,8 @@ public sealed partial class FestivalGame
         var patient = PartyOf(incident)!;
 
         // Most people are right as rain after some water and a sit down. The rest need a lie down.
-        if (_chance.NextDouble() < 0.65)
+        var roll = _chance.NextDouble();
+        if (!incident.Crush && roll < 0.65)
         {
             Crowd.Recover(patient);
             Treated++;
@@ -567,7 +573,7 @@ public sealed partial class FestivalGame
 
     private StaffSave SaveStaff() => new(
         _staff.Select(s => new StaffMemberSave(s.Id, s.Kind, s.Tile, s.PostX, s.PostY, s.PostHeading, s.X, s.Y, s.Heading, s.State, s.Incident)).ToList(),
-        _incidents.Select(i => new IncidentSave(i.Id, i.Kind, i.X, i.Y, i.Party, i.Started, i.Staff, i.Left, i.Resting)).ToList(),
+        _incidents.Select(i => new IncidentSave(i.Id, i.Kind, i.X, i.Y, i.Party, i.Started, i.Staff, i.Left, i.Resting, i.Crush)).ToList(),
         _chance.State, _nextStaff, _nextIncident, Treated, Untreated, TroubleSorted, TroubleIgnored);
 
     private void RestoreStaff(StaffSave save)
@@ -580,7 +586,7 @@ public sealed partial class FestivalGame
 
         foreach (var i in save.Incidents ?? new())
         {
-            _incidents.Add(new Incident(i.Id, i.Kind, i.X, i.Y, i.Party, i.Started) { Staff = i.Staff, Left = i.Left, Resting = i.Resting });
+            _incidents.Add(new Incident(i.Id, i.Kind, i.X, i.Y, i.Party, i.Started) { Staff = i.Staff, Left = i.Left, Resting = i.Resting, Crush = i.Crush });
         }
 
         // Anyone who was walking somewhere works out their way again.
@@ -613,7 +619,7 @@ public sealed partial class FestivalGame
 public sealed record StaffMemberSave(int Id, StaffKind Kind, TilePoint Tile, double PostX, double PostY, double PostHeading, double X, double Y, double Heading, StaffState State, int Incident);
 
 /// <summary>One incident as written to a save file.</summary>
-public sealed record IncidentSave(int Id, IncidentKind Kind, double X, double Y, int Party, DateTime Started, int Staff, int Left, bool Resting);
+public sealed record IncidentSave(int Id, IncidentKind Kind, double X, double Y, int Party, DateTime Started, int Staff, int Left, bool Resting, bool Crush = false);
 
 /// <summary>The staff and what they are dealing with, as written to a save file.</summary>
 public sealed record StaffSave(List<StaffMemberSave>? Staff, List<IncidentSave>? Incidents, ulong Chance, int NextStaff, int NextIncident, int Treated, int Untreated, int TroubleSorted, int TroubleIgnored);

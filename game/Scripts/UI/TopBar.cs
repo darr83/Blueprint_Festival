@@ -152,6 +152,8 @@ public partial class TopBar : PanelContainer
         _mood.Text = $"Happy {_game.Crowd.Happiness}%";
         var music = _game.Show;
         _show.Text = music.Stage is null ? "No stage, no music"
+            : music.CalledOff is not null ? "The music has been called off"
+            : _game.ActPaused && music.Playing(now) is { } stopped ? $"Stopped: {stopped.Act.Name}"
             : music.Playing(now) is { } on ? $"Now: {on.Act.Name} until {on.End.ToString("HH:mm", British)}"
             : music.Next(now) is { } next ? $"Next: {next.Act.Name} at {next.Start.ToString("HH:mm", British)}"
             : "The music has finished";

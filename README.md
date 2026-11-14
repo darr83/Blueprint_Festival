@@ -14,6 +14,8 @@ brands or sponsors.
 
 ![A first-aider looking after someone](docs/screenshots/step-07/6_first_aider_at_work.jpg)
 
+![A big name packs the front of the stage](docs/screenshots/step-08/2_a_big_name_packs_the_front.jpg)
+
 ## Where it is up to
 
 | Step | State |
@@ -25,8 +27,8 @@ brands or sponsors.
 | 5. Needs and money: five stalls, queues, tickets at the gate, a money panel and a happiness score | Done |
 | 6. The festival year: plan the ticket price and headliner, build, run the day, clear the litter, read the results, grow | Done |
 | 7. Staff and first aid: ticket staff on the gate, security, first-aiders and a first aid tent, with people taken ill and trouble to sort out | Done |
-| 8. Crowd density and crush | Next |
-| 9. Weather and mud | |
+| 8. Crowd density and crush: a crowd view in green, amber and red, big names that pack the front, a front barrier, pausing the act, and a day called off if people are hurt | Done |
+| 9. Weather and mud | Next |
 | 10. Growing up: more stages, medical tent, big crowds, camping from 5,000 | |
 | 11. Sound and music: each act's own songs, crowd noise, clicks and a menu tune | |
 
@@ -39,6 +41,7 @@ brands or sponsors.
 | Turn the view a quarter turn | Q / E, or the turn buttons bottom right |
 | Show the whole field | Home |
 | Pause / resume | Space |
+| Crowd view on / off | C, or the button bottom right |
 | Build | Pick from the build bar, click to place, drag for fence |
 | Turn the piece being placed | R |
 | Stop building | Right-click or Esc |

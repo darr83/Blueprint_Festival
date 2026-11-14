@@ -89,8 +89,9 @@ public partial class ShowView : Node3D
         var now = _game.Now;
         var show = _game.Show;
         var stage = show.Stage;
-        var slot = show.Playing(now);
-        var roles = show.OnStage(now);
+        // While an act is stopped to let the crowd ease, the stage is empty.
+        var slot = _game.ActPaused ? null : show.Playing(now);
+        var roles = _game.ActPaused ? System.Array.Empty<BandRole>() : show.OnStage(now);
         if (stage != _stage || (slot?.Index ?? -1) != _slot || roles.Count != _onStage)
         {
             var dj = slot?.Act.Kind == ActKind.Dj;

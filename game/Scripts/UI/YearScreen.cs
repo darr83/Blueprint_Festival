@@ -131,7 +131,7 @@ public partial class YearScreen : Control
         var r = game.Result!;
         return new ResultsView(r.Year, $"{game.Name}, {game.Day:dddd d MMMM yyyy}", r.Came, r.Expected, r.Happy, r.WentHome,
             Lines(game.Income), Lines(game.Spending), r.LitterCleared, r.GrassWorn, r.Verdict, r.LicenceNow, r.LicenceNext,
-            r.Treated, r.Untreated, r.TroubleSorted, r.TroubleIgnored);
+            r.Treated, r.Untreated, r.TroubleSorted, r.TroubleIgnored, r.CrushInjuries, r.PulledOut);
     }
 
     private static List<(string What, int Amount)> Lines(IEnumerable<LedgerLine> lines) => lines.Select(l => (l.What, l.Amount)).ToList();

@@ -143,6 +143,9 @@ public sealed class Party
     /// <summary>When they will drop the rubbish they are holding, if they are holding any.</summary>
     public DateTime LitterAt { get; internal set; }
 
+    /// <summary>True once the party has made up its mind whether to stay on for the headliner.</summary>
+    public bool StayDecided { get; internal set; }
+
     /// <summary>How fast their needs grow compared with most people.</summary>
     internal double Appetite { get; set; } = 1;
 
@@ -191,6 +194,9 @@ public sealed class Crowd
     public static readonly TimeSpan LastArrival = TimeSpan.FromHours(13);
     public static readonly TimeSpan EveryoneOut = TimeSpan.FromHours(23.5);
 
+    /// <summary>From this time of day, people who were about to go home may stay on for the headliner instead.</summary>
+    public static readonly TimeSpan StayOnFrom = TimeSpan.FromHours(17);
+
     /// <summary>How far apart parties stand in a queue, in metres, and how many places a queue has before it bunches up.</summary>
     private const double QueueSpacing = 1.1;
 
@@ -230,6 +236,28 @@ public sealed class Crowd
     /// </summary>
     public Func<int, int>? OpenLanes { get; set; }
 
+    /// <summary>How crowded every part of the map is, measured again each minute.</summary>
+    public DensityMap Density { get; }
+
+    /// <summary>
+    /// True for a place (in metres) where security are keeping the crowd in hand. People looking
+    /// for somewhere to watch are turned away from such a place once it is busy.
+    /// </summary>
+    public Func<double, double, bool>? Stewarded { get; set; }
+
+    /// <summary>How far in front of a stage its front barrier stands, in metres, or 0 if it has none.</summary>
+    public Func<PlacedStage, double>? BarrierDepth { get; set; }
+
+    /// <summary>People per square metre at which security stop letting more people into a place.</summary>
+    public const double StewardLimit = 3.0;
+
+    /// <summary>People per square metre at which nobody else can physically squeeze in.</summary>
+    public const double PackedLimit = 6.5;
+
+    private int[] _claims = Array.Empty<int>();
+    private int _claimSlot = -1;
+    private int _measuredMinute = -1;
+
     public Crowd(FieldMap map, int seed, DateTime festivalDay)
         : this(map, new SiteLayout(map), seed, festivalDay)
     {
@@ -240,6 +268,8 @@ public sealed class Crowd
         _map = map;
         _site = site;
         _paths = new PathFinder(map);
+        Density = new DensityMap(map);
+        _claims = new int[Density.Across * Density.Down];
         Seed = seed;
         _day = festivalDay.Date;
         Plan(_day, null);
@@ -738,12 +768,29 @@ public sealed class Crowd
     public void Tick(DateTime now)
     {
         _now = now;
+        if (now.Minute != _measuredMinute)
+        {
+            _measuredMinute = now.Minute;
+            Density.Measure(Loose());
+        }
+
         var closing = now.TimeOfDay >= EveryoneOut;
+        var headliner = Show?.Stage is null || Show.CalledOff is not null ? null : Show.Slots.FirstOrDefault(s => s.Headliner);
         foreach (var party in _parties)
         {
             if (party.State is PartyState.Standing or PartyState.Strolling or PartyState.Watching or PartyState.AtStall)
             {
                 Feel(party, now);
+            }
+
+            if (!party.StayDecided && now >= party.Leaves && party.IsOnSite && party.State != PartyState.Leaving)
+            {
+                // Time to go home, unless the headliner is worth staying on for.
+                party.StayDecided = true;
+                if (headliner is not null && now < headliner.End && now.TimeOfDay >= StayOnFrom && party.Mood >= 0.3 && party.Random.NextDouble() < headliner.Act.Draw)
+                {
+                    party.Leaves = headliner.End + TimeSpan.FromMinutes(party.Random.Between(1, 14));
+                }
             }
 
             if (party.LitterAt != default && now >= party.LitterAt && party.IsOnSite)
@@ -867,7 +914,7 @@ public sealed class Crowd
                 case PartyState.WalkingIn:
                 case PartyState.Strolling:
                 case PartyState.Leaving:
-                    if (Walk(party))
+                    if (Walk(party, Pace(party)))
                     {
                         if (party.State == PartyState.Leaving)
                         {
@@ -1127,7 +1174,14 @@ public sealed class Crowd
         }
 
         party.Decided = slot.Index;
-        if (party.Random.NextDouble() >= slot.Act.Draw || PlaceToWatch(stage, party.Random) is not { } spot)
+        if (slot.Index != _claimSlot)
+        {
+            // A new act: everyone who wants to watch finds a place afresh.
+            _claimSlot = slot.Index;
+            Array.Clear(_claims);
+        }
+
+        if (party.Random.NextDouble() >= slot.Act.Draw || PlaceToWatch(stage, party.Random, slot.Act.Draw, party.Members.Count) is not { } spot)
         {
             return false;
         }
@@ -1140,28 +1194,170 @@ public sealed class Crowd
             return false;
         }
 
+        Claim(spot, party.Members.Count);
+
         return true;
     }
 
-    /// <summary>A place in front of a stage: close in more often than far back, in a fan that widens with distance.</summary>
-    private TilePoint? PlaceToWatch(PlacedStage stage, GameRandom random)
+    /// <summary>
+    /// Where everyone stands who is free to push and be pushed. People in a queue at a gate or a
+    /// stall are in an orderly line and are left out, as is anyone lying ill.
+    /// </summary>
+    private IEnumerable<(double X, double Y)> Loose()
+    {
+        foreach (var party in _parties)
+        {
+            if (!party.IsOnSite || party.State is PartyState.Queuing or PartyState.AtStall or PartyState.Unwell)
+            {
+                continue;
+            }
+
+            foreach (var m in party.Members)
+            {
+                yield return (party.X + m.OffsetX, party.Y + m.OffsetY);
+            }
+        }
+    }
+
+    /// <summary>How fast a party gets through where it is: a busy place is slow going and a packed one slower still.</summary>
+    private double Pace(Party party) => Density.StatusAt(party.X, party.Y) switch
+    {
+        Crowding.CrushRisk => 0.45,
+        Crowding.Busy => 0.75,
+        _ => 1.0,
+    };
+
+    /// <summary>
+    /// How far back from a stage its audience spreads, in metres. The more people the act draws,
+    /// the more of them press towards the front instead of standing back.
+    /// </summary>
+    public double AudienceReach(double draw) => 1.3 * Math.Sqrt(Math.Max(30, OnSite)) * Math.Clamp(1.45 - (draw * 1.25), 0.2, 1.2);
+
+    /// <summary>
+    /// How tightly people will pack themselves in to see an act, in people per square metre. For
+    /// most acts they keep a comfortable distance; for a big name they squeeze in until it hurts.
+    /// </summary>
+    public static double Squeeze(double draw)
+    {
+        var keen = Math.Max(0, draw - 0.5) / 0.45;
+        return Math.Min(PackedLimit, 2.0 + (4.5 * keen * keen));
+    }
+
+    /// <summary>People per square metre who have picked a place to watch from in the square at a place in metres.</summary>
+    private double Claimed(double x, double y, int joining)
+    {
+        var (sx, sy) = Density.SquareOf(x, y);
+        return (_claims[(sy * Density.Across) + sx] + joining) / (DensityMap.SquareMetres * DensityMap.SquareMetres);
+    }
+
+    private void Claim(TilePoint tile, int people)
+    {
+        var (x, y) = FieldMap.CentreOf(tile);
+        var (sx, sy) = Density.SquareOf(x, y);
+        _claims[(sy * Density.Across) + sx] += people;
+    }
+
+    /// <summary>
+    /// A place in front of a stage: close in more often than far back, in a fan that widens with
+    /// distance. A big draw pulls the fan in tight. Nobody can squeeze into a square that is packed
+    /// solid, and security turn people away from one that is already busy.
+    /// </summary>
+    private TilePoint? PlaceToWatch(PlacedStage stage, GameRandom random, double draw, int people, bool standBack = false)
     {
         var (fx, fy, dx, dy) = RunningOrder.Front(stage);
         var rect = stage.Rect;
         var half = (dx == 0 ? rect.Width : rect.Height) * FieldMap.TileMetres / 2;
-        var reach = 5 + (Expected / 14.0);
-        for (var attempt = 0; attempt < 24; attempt++)
+        var reach = AudienceReach(draw);
+        var barrier = BarrierDepth?.Invoke(stage) ?? 0;
+        var nearest = barrier > 0 ? barrier + 0.6 : 1.2;
+        for (var attempt = 0; attempt < 44; attempt++)
         {
-            var deep = 1.2 + (Math.Pow(random.NextDouble(), 1.3) * reach);
+            // Turned away from the front, people try further and further back.
+            var back = standBack ? 0.8 + (attempt * 0.05) : attempt < 20 ? 0 : (attempt - 19) * 0.12;
+            var deep = nearest + ((back + Math.Pow(random.NextDouble(), 1.3)) * reach);
             var across = random.Between(-1, 1) * ((half * 0.6) + (deep * 0.55));
             var tile = FieldMap.TileAt(fx + (dx * deep) - (dy * across), fy + (dy * deep) + (dx * across));
-            if (_standableSet.Contains(tile))
+            if (!_standableSet.Contains(tile))
+            {
+                continue;
+            }
+
+            var (x, y) = FieldMap.CentreOf(tile);
+            var limit = standBack ? DensityMap.Busy : Math.Min(Squeeze(draw), Stewarded?.Invoke(x, y) == true ? StewardLimit : PackedLimit);
+            if (Claimed(x, y, people) <= limit)
             {
                 return tile;
             }
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Eases a packed crowd: everyone watching from a busy square moves further back. Returns how
+    /// many people moved.
+    /// </summary>
+    public int Ease()
+    {
+        if (Show?.Playing(_now) is not { } slot || Show.Stage is not { } stage)
+        {
+            return 0;
+        }
+
+        Array.Clear(_claims);
+        var moved = 0;
+        foreach (var party in _parties)
+        {
+            if (party.State != PartyState.Watching || Density.At(party.X, party.Y) < DensityMap.Busy)
+            {
+                continue;
+            }
+
+            if (PlaceToWatch(stage, party.Random, slot.Act.Draw, party.Members.Count, standBack: true) is { } spot)
+            {
+                var watching = party.Watch;
+                Send(party, spot, PartyState.Strolling);
+                party.Watch = party.State == PartyState.Strolling ? watching : -1;
+                Claim(spot, party.Members.Count);
+                moved += party.Members.Count;
+            }
+        }
+
+        return moved;
+    }
+
+    /// <summary>Moves one party out of the crush to somewhere further back, as security do when they lift someone over the barrier.</summary>
+    public void MoveBack(Party party)
+    {
+        if (Show?.Stage is not { } stage || PlaceToWatch(stage, party.Random, 0.3, party.Members.Count, standBack: true) is not { } spot)
+        {
+            return;
+        }
+
+        party.Watch = -1;
+        Send(party, spot, PartyState.Strolling);
+    }
+
+    /// <summary>
+    /// The day is called off: everyone still here heads for the gate over the next few minutes,
+    /// thinking less of the festival than they did.
+    /// </summary>
+    public void SendEveryoneHome(DateTime now, double moodLost)
+    {
+        foreach (var party in _parties)
+        {
+            if (party.State is PartyState.Gone or PartyState.Leaving)
+            {
+                continue;
+            }
+
+            party.Mood = Math.Max(0, party.Mood - moodLost);
+            var goes = now + TimeSpan.FromMinutes(2 + ((party.Id * 7) % 18));
+            if (party.Leaves > goes)
+            {
+                party.Leaves = goes;
+            }
+        }
     }
 
     /// <summary>Someone in the party is taken ill or hurt. They stop where they are until helped.</summary>
@@ -1250,7 +1446,7 @@ public sealed class Crowd
     }
 
     /// <summary>Takes one tick's walk along the route. True once the party has got there.</summary>
-    private static bool Walk(Party party)
+    private static bool Walk(Party party, double pace = 1)
     {
         var path = party.Path;
         if (path is null)
@@ -1258,7 +1454,7 @@ public sealed class Crowd
             return true;
         }
 
-        var left = party.Speed;
+        var left = party.Speed * pace;
         while (left > 0 && party.PathIndex < path.Count)
         {
             var (wx, wy) = FieldMap.CentreOf(path[party.PathIndex]);
@@ -1297,7 +1493,7 @@ public sealed class Crowd
             {
                 Hunger = p.Hunger, Thirst = p.Thirst, Toilet = p.Toilet, Mood = p.Mood, Stall = p.Stall, StallLane = p.StallLane,
                 StallPlace = p.Stall >= 0 && p.Stall < _stallQueues.Count ? _stallQueues[p.Stall][p.StallLane].IndexOf(p) : 0,
-                QueuedSince = p.QueuedSince, NeedRetryAt = p.NeedRetryAt, GaveUp = p.GaveUp, Spent = p.Spent, LeftUnhappy = p.LeftUnhappy, Leaves = p.Leaves, LitterAt = p.LitterAt,
+                QueuedSince = p.QueuedSince, NeedRetryAt = p.NeedRetryAt, GaveUp = p.GaveUp, Spent = p.Spent, LeftUnhappy = p.LeftUnhappy, Leaves = p.Leaves, LitterAt = p.LitterAt, StayDecided = p.StayDecided,
             })
         .ToList();
 
@@ -1339,6 +1535,7 @@ public sealed class Crowd
             party.Spent = s.Spent;
             party.LeftUnhappy = s.LeftUnhappy;
             party.LitterAt = s.LitterAt;
+            party.StayDecided = s.StayDecided;
             party.NeedRetryAt = s.NeedRetryAt;
             if (s.Mood is { } mood)
             {
@@ -1446,6 +1643,8 @@ public sealed record PartySave(int Id, PartyState State, double X, double Y, dou
     public bool LeftUnhappy { get; init; }
 
     public DateTime LitterAt { get; init; }
+
+    public bool StayDecided { get; init; }
 
     public DateTime? Leaves { get; init; }
 }

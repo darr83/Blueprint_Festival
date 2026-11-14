@@ -49,10 +49,16 @@ public sealed class RunningOrder
     public PlacedStage? Stage => _site.Stages.Count > 0 ? _site.Stages[0] : null;
 
     /// <summary>The set that is on right now, or null between sets or with no stage.</summary>
-    public Slot? Playing(DateTime now) => Stage is null ? null : _slots.FirstOrDefault(s => now >= s.Start && now < s.End);
+    public Slot? Playing(DateTime now) => Stage is null || now >= CalledOff ? null : _slots.FirstOrDefault(s => now >= s.Start && now < s.End);
+
+    /// <summary>When the rest of the day's music was called off, if it was.</summary>
+    public DateTime? CalledOff { get; private set; }
+
+    /// <summary>Calls off the rest of the day's music from a moment on.</summary>
+    public void CallOff(DateTime from) => CalledOff = from;
 
     /// <summary>The next set still to start, or null once the last has begun.</summary>
-    public Slot? Next(DateTime now) => _slots.FirstOrDefault(s => s.Start > now);
+    public Slot? Next(DateTime now) => CalledOff is not null ? null : _slots.FirstOrDefault(s => s.Start > now);
 
     /// <summary>Who is on stage right now: the act's members who fit on the stage.</summary>
     public IReadOnlyList<BandRole> OnStage(DateTime now) =>
