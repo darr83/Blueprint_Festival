@@ -20,6 +20,12 @@ public enum BuildMode
     Staff,
     Ground,
     Remove,
+
+    /// <summary>Dragging out a queue lane: its barriers go up by themselves.</summary>
+    Lane,
+
+    /// <summary>Marking ground the public must keep off.</summary>
+    KeepOut,
 }
 
 /// <summary>
@@ -41,6 +47,9 @@ public partial class BuildTool : Node3D
     private TilePoint _hover;
     private bool _hovering;
     private string _ghostKey = "";
+    private bool _held;
+    private MeshInstance3D? _keepOut;
+    private StandardMaterial3D _keepOutMaterial = null!;
 
     public BuildMode Mode { get; private set; }
 
@@ -78,7 +87,17 @@ public partial class BuildTool : Node3D
         };
         _pad = new MeshInstance3D { Name = "Pad", Mesh = new BoxMesh { Size = Vector3.One }, MaterialOverride = _padMaterial, Visible = false, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
         AddChild(_pad);
+        _keepOutMaterial = new StandardMaterial3D
+        {
+            ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+            Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+            AlbedoColor = new Color(0.92f, 0.12f, 0.1f, 0.62f),
+        };
+        game.Site.Changed += DrawKeepOut;
+        DrawKeepOut();
     }
+
+    public override void _ExitTree() => _game.Site.Changed -= DrawKeepOut;
 
     public void PickStage(StageKind kind) => Pick(BuildMode.Stage, () => Stage = kind);
 
@@ -94,6 +113,35 @@ public partial class BuildTool : Node3D
 
     public void PickRemove() => Pick(BuildMode.Remove, () => { });
 
+    public void PickLane() => Pick(BuildMode.Lane, () => { });
+
+    public void PickKeepOut() => Pick(BuildMode.KeepOut, () => { });
+
+    /// <summary>True while the ground marked "no customers" is being shown: only while it is being marked.</summary>
+    public bool KeepOutShown => _keepOut is { Visible: true };
+
+    /// <summary>How many stretches of marked ground are drawn.</summary>
+    public int KeepOutRuns { get; private set; }
+
+    private void DrawKeepOut()
+    {
+        _keepOut?.QueueFree();
+        var builder = new MeshBuilder();
+        var runs = SiteLayout.RunsOf(_game.Site.KeepOut);
+        foreach (var (x, y, length, vertical) in runs)
+        {
+            var rect = vertical ? new TileRect(x, y, 1, length) : new TileRect(x, y, length, 1);
+            builder.Box(SiteView.Middle(rect) + new Vector3(0, 0.035f, 0), new Vector3((rect.Width * T) - 0.08f, 0.02f, (rect.Height * T) - 0.08f), Colors.White);
+        }
+
+        KeepOutRuns = runs.Count;
+        _keepOut = builder.BuildNode("KeepOut");
+        _keepOut.MaterialOverride = _keepOutMaterial;
+        _keepOut.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
+        _keepOut.Visible = Mode == BuildMode.KeepOut;
+        AddChild(_keepOut);
+    }
+
     public void Stop() => Pick(BuildMode.None, () => { });
 
     private void Pick(BuildMode mode, Action set)
@@ -101,6 +149,7 @@ public partial class BuildTool : Node3D
         Mode = mode;
         set();
         _dragFrom = null;
+        _held = false;
         Refused = false;
         Status = mode switch
         {
@@ -111,10 +160,43 @@ public partial class BuildTool : Node3D
             BuildMode.Staff => Hire == StaffKind.TicketStaff ? "Click a gate to put them on it. One for each lane." : "Click on the grass to post them there.",
             BuildMode.Ground when IsPathLine => "Hold the mouse button and drag to lay a path, 2 m wide. Some people keep to paths; others cut across.",
             BuildMode.Ground => "Click a patch of grass, or hold the mouse button and drag to cover a stretch.",
+            BuildMode.Lane => "Hold the mouse button and drag out a queue from the front of a gate, stall or toilets. Drag again from its end to turn a corner.",
+            BuildMode.KeepOut => "Hold the mouse button and drag over ground customers must keep off. Start on marked ground to clear it.",
             BuildMode.Remove => "Click a stage, a stall, a gate or a stretch of fence to take it down. You get the money back. Click staff to send them home.",
             _ => "",
         };
         ClearGhost();
+        if (_keepOut is not null)
+        {
+            _keepOut.Visible = mode == BuildMode.KeepOut;
+        }
+    }
+
+    /// <summary>Shows a drag from one tile to another and holds it there whatever the mouse does, until another tool is picked. For pictures and the launch test.</summary>
+    public void HoldDrag(TilePoint from, TilePoint to)
+    {
+        _dragFrom = from;
+        _held = true;
+        ShowGhost(to);
+    }
+
+    /// <summary>Lays a queue lane between two tiles, or carries one on from its end.</summary>
+    public BuildCheck DragLane(TilePoint from, TilePoint to)
+    {
+        var result = _game.BuildLane(from, to);
+        Said(result, "Queue lane laid");
+        return result;
+    }
+
+    /// <summary>Marks the box between two tiles "no customers", or clears it if the drag started on marked ground.</summary>
+    public BuildCheck DragKeepOut(TilePoint from, TilePoint to)
+    {
+        var mark = !_game.Site.IsKeptClear(from);
+        var result = _game.KeepOut(from, to, mark);
+        Refused = !result.Ok;
+        SoundBoard.Cue(result.Ok ? Sounds.BuildGround : Sounds.Refuse);
+        Status = !result.Ok ? result.Problem ?? "That cannot be marked." : mark ? "Customers will keep off that ground." : "Customers can walk there again.";
+        return result;
     }
 
     /// <summary>Turns the thing being placed a quarter turn.</summary>
@@ -306,7 +388,7 @@ public partial class BuildTool : Node3D
         SoundBoard.Cue(!result.Ok ? Sounds.Refuse : Mode switch
         {
             BuildMode.Stage => Sounds.BuildStage,
-            BuildMode.Fence => Sounds.BuildFence,
+            BuildMode.Fence or BuildMode.Lane => Sounds.BuildFence,
             BuildMode.Gate => Sounds.BuildGate,
             BuildMode.Staff => Sounds.HireStaff,
             BuildMode.Ground => Sounds.BuildGround,
@@ -339,7 +421,7 @@ public partial class BuildTool : Node3D
 
     public override void _Process(double delta)
     {
-        if (Mode == BuildMode.None)
+        if (Mode == BuildMode.None || _held)
         {
             return;
         }
@@ -444,6 +526,41 @@ public partial class BuildTool : Node3D
                 break;
             }
 
+            case BuildMode.Lane:
+            {
+                var from = _dragFrom ?? at;
+                check = _game.CheckLane(from, at);
+                var last = SiteLayout.Line(from, at).Last();
+                pad = new TileRect(Math.Min(from.X, last.X), Math.Min(from.Y, last.Y), Math.Abs(last.X - from.X) + 1, Math.Abs(last.Y - from.Y) + 1);
+                var across = pad.Width >= pad.Height;
+                Ghost($"lane{pad}", () =>
+                {
+                    // The barrier that will go up either side.
+                    var builder = new MeshBuilder();
+                    foreach (var side in new[] { -1, 1 })
+                    {
+                        var run = across ? new FenceRun(FenceKind.CrowdBarrier, pad.X, pad.Y + side, pad.Width, false) : new FenceRun(FenceKind.CrowdBarrier, pad.X + side, pad.Y, pad.Height, true);
+                        SiteView.AddRun(builder, run);
+                    }
+
+                    return builder.BuildNode("Lane");
+                });
+                break;
+            }
+
+            case BuildMode.KeepOut:
+            {
+                var from = _dragFrom ?? at;
+                var mark = !_game.Site.IsKeptClear(from);
+                check = _game.CheckKeepOut(from, at, mark);
+                pad = new TileRect(Math.Min(from.X, at.X), Math.Min(from.Y, at.Y), Math.Abs(at.X - from.X) + 1, Math.Abs(at.Y - from.Y) + 1);
+                ClearGhostOnly();
+                ShowPad(pad, check.Ok);
+                Refused = !check.Ok;
+                Status = !check.Ok ? check.Problem ?? "" : mark ? "No customers here: free" : "Let customers back on this ground";
+                return;
+            }
+
             case BuildMode.Ground:
             {
                 var from = _dragFrom ?? at;
@@ -479,11 +596,7 @@ public partial class BuildTool : Node3D
             _ghost.Visible = true;
         }
 
-        // The ground under it: white where it can go, dark where it cannot.
-        _pad.Visible = true;
-        _pad.Position = SiteView.Middle(pad) + new Vector3(0, 0.03f, 0);
-        _pad.Scale = new Vector3(pad.Width * T, 0.02f, pad.Height * T);
-        _padMaterial.AlbedoColor = check.Ok ? new Color(1, 1, 1, 0.45f) : new Color(0.11f, 0.17f, 0.21f, 0.55f);
+        ShowPad(pad, check.Ok);
 
         if (Mode != BuildMode.Remove)
         {
@@ -497,8 +610,18 @@ public partial class BuildTool : Node3D
         }
     }
 
+    /// <summary>The ground under what is being placed: white where it can go, dark where it cannot.</summary>
+    private void ShowPad(TileRect pad, bool ok)
+    {
+        _pad.Visible = true;
+        _pad.Position = SiteView.Middle(pad) + new Vector3(0, 0.03f, 0);
+        _pad.Scale = new Vector3(pad.Width * T, 0.02f, pad.Height * T);
+        _padMaterial.AlbedoColor = ok ? new Color(1, 1, 1, 0.45f) : new Color(0.11f, 0.17f, 0.21f, 0.55f);
+    }
+
     private string Label() => Mode switch
     {
+        BuildMode.Lane => "Queue lane",
         BuildMode.Stage => Catalogue.Of(Stage).Name,
         BuildMode.Gate => Catalogue.Of(Gate).Name,
         BuildMode.Stall => Catalogue.Of(Stall).Name,
@@ -557,7 +680,7 @@ public partial class BuildTool : Node3D
                 break;
 
             case InputEventMouseButton { ButtonIndex: MouseButton.Left } click when _hovering:
-                if (Mode is BuildMode.Fence or BuildMode.Ground)
+                if (Mode is BuildMode.Fence or BuildMode.Ground or BuildMode.Lane or BuildMode.KeepOut)
                 {
                     if (click.Pressed)
                     {
@@ -569,6 +692,14 @@ public partial class BuildTool : Node3D
                         if (Mode == BuildMode.Fence)
                         {
                             DragFence(from, _hover);
+                        }
+                        else if (Mode == BuildMode.Lane)
+                        {
+                            DragLane(from, _hover);
+                        }
+                        else if (Mode == BuildMode.KeepOut)
+                        {
+                            DragKeepOut(from, _hover);
                         }
                         else
                         {

@@ -46,6 +46,7 @@ public sealed class FieldMap
 
     private readonly Ground[] _tiles;
     private readonly bool[] _blocked;
+    private readonly bool[] _staffOnly;
 
     private FieldMap(int width, int height)
     {
@@ -53,6 +54,7 @@ public sealed class FieldMap
         Height = height;
         _tiles = new Ground[width * height];
         _blocked = new bool[width * height];
+        _staffOnly = new bool[width * height];
     }
 
     /// <summary>Width of the whole map in tiles (west to east).</summary>
@@ -328,7 +330,25 @@ public sealed class FieldMap
     public bool InBounds(int x, int y) => x >= 0 && y >= 0 && x < Width && y < Height;
 
     /// <summary>True where people can walk: grass or lane with nothing built on it.</summary>
-    public bool IsWalkable(int x, int y) => this[x, y] is Ground.Grass or Ground.Lane && !_blocked[(y * Width) + x];
+    public bool IsWalkable(int x, int y) => this[x, y] is Ground.Grass or Ground.Lane && !_blocked[(y * Width) + x] && !_staffOnly[(y * Width) + x];
+
+    /// <summary>True where staff can walk: anywhere the public can, and the ground the public are kept off.</summary>
+    public bool IsWalkableForStaff(int x, int y) => this[x, y] is Ground.Grass or Ground.Lane && !_blocked[(y * Width) + x];
+
+    public bool IsWalkableForStaff(TilePoint p) => IsWalkableForStaff(p.X, p.Y);
+
+    /// <summary>Says which tiles the public are kept off.</summary>
+    public void SetStaffOnly(IEnumerable<TilePoint> tiles)
+    {
+        Array.Clear(_staffOnly);
+        foreach (var p in tiles)
+        {
+            if (InBounds(p.X, p.Y))
+            {
+                _staffOnly[(p.Y * Width) + p.X] = true;
+            }
+        }
+    }
 
     /// <summary>True where something built stands in the way.</summary>
     public bool IsBlocked(TilePoint p) => InBounds(p.X, p.Y) && _blocked[(p.Y * Width) + p.X];
