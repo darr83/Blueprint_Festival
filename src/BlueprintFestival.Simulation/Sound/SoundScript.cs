@@ -1,3 +1,4 @@
+using BlueprintFestival.Simulation.Show;
 using BlueprintFestival.Simulation.Site;
 
 namespace BlueprintFestival.Simulation.Sound;
@@ -49,6 +50,10 @@ public static class Sounds
     public const string AllClear = "all_clear";
     public const string PaStop = "pa_stop";
     public const string PaStart = "pa_start";
+    public const string StepBack1 = "pa_step_back_1";
+    public const string StepBack2 = "pa_step_back_2";
+    public const string StepBack3 = "pa_step_back_3";
+    public const string PaRestart = "pa_restart";
     public const string RainStart = "rain_start";
     public const string MudSquelch = "mud_squelch";
     public const string LitterPick = "litter_pick";
@@ -62,6 +67,9 @@ public static class Sounds
 
     /// <summary>One clap of the crowd clapping along, each a little different; one plays on each clap of the beat.</summary>
     public static readonly IReadOnlyList<string> Claps = [Clap1, Clap2, Clap3];
+
+    /// <summary>The PA announcements asking a packed crowd to step back, in a different voice each; they take turns.</summary>
+    public static readonly IReadOnlyList<string> StepBack = new[] { StepBack1, StepBack2, StepBack3 };
 
     /// <summary>The sounds that play round and round for as long as they are wanted.</summary>
     public static readonly IReadOnlyList<string> Loops =
@@ -97,6 +105,8 @@ public sealed class SoundScript : IDisposable
         game.Crowd.Served += OnServed;
         game.CrushWarning += OnCrushWarning;
         game.CrushInjury += OnCrushInjury;
+        game.Announced += OnAnnounced;
+        game.ActCancelled += OnActCancelled;
         Poll();
     }
 
@@ -112,6 +122,16 @@ public sealed class SoundScript : IDisposable
         _game.Crowd.Served -= OnServed;
         _game.CrushWarning -= OnCrushWarning;
         _game.CrushInjury -= OnCrushInjury;
+        _game.Announced -= OnAnnounced;
+        _game.ActCancelled -= OnActCancelled;
+    }
+
+    private void OnAnnounced(int which) => Cue?.Invoke(Sounds.StepBack[which % Sounds.StepBack.Count]);
+
+    private void OnActCancelled(Slot slot)
+    {
+        Cue?.Invoke(Sounds.PaStop);
+        Cue?.Invoke(Sounds.Groan);
     }
 
     /// <summary>Which crowd murmur fits this many people, each as a loudness from 0 to 1.</summary>
@@ -241,6 +261,11 @@ public sealed class SoundScript : IDisposable
             if (game.ActPaused)
             {
                 Cue?.Invoke(Sounds.Groan);
+            }
+            else if (game.MusicOn)
+            {
+                // The music comes back with a thank you over the PA.
+                Cue?.Invoke(Sounds.PaRestart);
             }
         }
 

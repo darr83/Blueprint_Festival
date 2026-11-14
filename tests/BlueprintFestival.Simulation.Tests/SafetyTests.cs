@@ -11,7 +11,7 @@ public class SafetyTests
     /// a first aid tent and two first-aiders. The headliner is the biggest name on offer, playing
     /// on the farm trailer that is all there is money left for, or the smallest, on a bandstand.
     /// </summary>
-    private static FestivalGame BuildDay(bool bigName, string name = "Larkmoor Festival")
+    internal static FestivalGame BuildDay(bool bigName, string name = "Larkmoor Festival")
     {
         var game = FestivalGame.NewFestival(name);
         var stars = bigName ? game.Headliners.Max(h => h.Stars) : game.Headliners.Min(h => h.Stars);

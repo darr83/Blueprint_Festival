@@ -22,6 +22,12 @@ public enum StaffState
 
     /// <summary>Walking back to their post.</summary>
     Returning,
+
+    /// <summary>Security sent by the player into a crush, on their way there.</summary>
+    Sent,
+
+    /// <summary>Security standing in a crush the player sent them to, keeping the crowd back.</summary>
+    Holding,
 }
 
 /// <summary>Something that needs a member of staff.</summary>
@@ -75,7 +81,15 @@ public sealed class StaffMember
     /// <summary>The number of the incident they are dealing with, or -1.</summary>
     public int Incident { get; internal set; } = -1;
 
-    public bool IsWalking => State is StaffState.Going or StaffState.Escorting or StaffState.Returning;
+    public bool IsWalking => State is StaffState.Going or StaffState.Escorting or StaffState.Returning or StaffState.Sent;
+
+    /// <summary>Where the player sent them into a crush, in metres.</summary>
+    public double HoldX { get; internal set; }
+
+    public double HoldY { get; internal set; }
+
+    /// <summary>Ticks still to stand in the crush once they are there.</summary>
+    public int HoldLeft { get; internal set; }
 
     public bool IsFree => State is StaffState.AtPost or StaffState.Returning;
 
@@ -141,6 +155,9 @@ public sealed partial class FestivalGame
 
     private const int TreatTicks = 240;
     private const int SortTicks = 180;
+
+    /// <summary>How long security sent into a crush stand there once they arrive: ten minutes.</summary>
+    public const int HoldTicks = 600;
     private const int RestTicks = 1200;
 
     private readonly List<StaffMember> _staff = new();
@@ -534,6 +551,23 @@ public sealed partial class FestivalGame
 
                 break;
 
+            case StaffState.Sent:
+                if (Step(member))
+                {
+                    member.State = StaffState.Holding;
+                    member.HoldLeft = HoldTicks;
+                }
+
+                break;
+
+            case StaffState.Holding:
+                if (--member.HoldLeft <= 0 || Phase != Phase.Day)
+                {
+                    Walk(member, member.PostX, member.PostY, StaffState.Returning);
+                }
+
+                break;
+
             case StaffState.Returning:
                 if (Step(member))
                 {
@@ -636,7 +670,7 @@ public sealed partial class FestivalGame
     }
 
     private StaffSave SaveStaff() => new(
-        _staff.Select(s => new StaffMemberSave(s.Id, s.Kind, s.Tile, s.PostX, s.PostY, s.PostHeading, s.X, s.Y, s.Heading, s.State, s.Incident) { Path = s.Path?.Skip(s.PathIndex).ToList() }).ToList(),
+        _staff.Select(s => new StaffMemberSave(s.Id, s.Kind, s.Tile, s.PostX, s.PostY, s.PostHeading, s.X, s.Y, s.Heading, s.State, s.Incident) { Path = s.Path?.Skip(s.PathIndex).ToList(), HoldX = s.HoldX, HoldY = s.HoldY, HoldLeft = s.HoldLeft }).ToList(),
         _incidents.Select(i => new IncidentSave(i.Id, i.Kind, i.X, i.Y, i.Party, i.Started, i.Staff, i.Left, i.Resting, i.Crush) { Tent = i.Tent, Bed = i.Bed }).ToList(),
         _chance.State, _nextStaff, _nextIncident, Treated, Untreated, TroubleSorted, TroubleIgnored);
 
@@ -644,7 +678,7 @@ public sealed partial class FestivalGame
     {
         foreach (var s in save.Staff ?? new())
         {
-            var member = new StaffMember(s.Id, s.Kind, s.Tile, s.PostX, s.PostY, s.PostHeading) { X = s.X, Y = s.Y, Heading = s.Heading, State = Enum.IsDefined(s.State) ? s.State : StaffState.AtPost, Incident = s.Incident };
+            var member = new StaffMember(s.Id, s.Kind, s.Tile, s.PostX, s.PostY, s.PostHeading) { X = s.X, Y = s.Y, Heading = s.Heading, State = Enum.IsDefined(s.State) ? s.State : StaffState.AtPost, Incident = s.Incident, HoldX = s.HoldX, HoldY = s.HoldY, HoldLeft = s.HoldLeft };
             _staff.Add(member);
         }
 
@@ -657,7 +691,7 @@ public sealed partial class FestivalGame
         var ways = (save.Staff ?? new()).Where(s => s.Path is { Count: > 0 }).ToDictionary(s => s.Id, s => s.Path!);
         foreach (var member in _staff)
         {
-            if (ways.TryGetValue(member.Id, out var way) && member.State is StaffState.Going or StaffState.Escorting or StaffState.Returning && way.All(Field.IsWalkable))
+            if (ways.TryGetValue(member.Id, out var way) && member.State is StaffState.Going or StaffState.Escorting or StaffState.Returning or StaffState.Sent && way.All(Field.IsWalkable))
             {
                 member.Path = way.ToList();
                 member.PathIndex = 0;
@@ -677,6 +711,9 @@ public sealed partial class FestivalGame
                 case StaffState.Returning:
                     Walk(member, member.PostX, member.PostY, StaffState.Returning);
                     break;
+                case StaffState.Sent:
+                    Walk(member, member.HoldX, member.HoldY, StaffState.Sent);
+                    break;
             }
         }
 
@@ -692,6 +729,13 @@ public sealed record StaffMemberSave(int Id, StaffKind Kind, TilePoint Tile, dou
 {
     /// <summary>The rest of the way they were walking, if they were walking.</summary>
     public List<TilePoint>? Path { get; init; }
+
+    /// <summary>Where security sent into a crush are standing, and for how many more ticks.</summary>
+    public double HoldX { get; init; }
+
+    public double HoldY { get; init; }
+
+    public int HoldLeft { get; init; }
 }
 
 /// <summary>One incident as written to a save file.</summary>

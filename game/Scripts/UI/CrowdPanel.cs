@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using BlueprintFestival.Simulation;
 using BlueprintFestival.Simulation.People;
 using BlueprintFestival.Simulation.Show;
@@ -11,7 +12,8 @@ namespace BlueprintFestival.UI;
 /// <summary>
 /// Crowd safety on screen: the key to the crowd view's three colours, top left while the view is
 /// on, and a warning card under the top bar whenever somewhere is a crush risk, an act has been
-/// stopped, or the day has been called off.
+/// stopped, or the day has been called off. While a crush builds the card offers four choices:
+/// stop the music for an announcement, send security in, cancel the act, or leave it.
 /// </summary>
 public partial class CrowdPanel : Control
 {
@@ -24,8 +26,18 @@ public partial class CrowdPanel : Control
     private ColorRect _stripe = null!;
     private Label _heading = null!;
     private Label _body = null!;
-    private Button _pause = null!;
+    private GridContainer _choices = null!;
+    private Button _announce = null!;
+    private Button _security = null!;
+    private Button _cancel = null!;
+    private Button _leave = null!;
+    private Label _announceNote = null!;
+    private Label _securityNote = null!;
+    private Label _cancelNote = null!;
+    private Label _leaveNote = null!;
+    private Button _again = null!;
     private Button _show = null!;
+    private bool _reopened;
     private double _sinceRefresh = 1;
 
     /// <summary>Raised when the player asks to be shown where the trouble is, with the place in metres.</summary>
@@ -37,8 +49,11 @@ public partial class CrowdPanel : Control
     /// <summary>Whether the key to the colours is on screen.</summary>
     public bool KeyShown => _key.Visible;
 
-    /// <summary>Whether the warning card is offering to pause the act.</summary>
-    public bool CanPause => _warning.Visible && _pause.Visible;
+    /// <summary>Whether the warning card is offering the four crush choices.</summary>
+    public bool ChoicesShown => _warning.Visible && _choices.Visible;
+
+    /// <summary>Whether the player could stop the music for an announcement from the card.</summary>
+    public bool CanPause => ChoicesShown && !_announce.Disabled;
 
     public void Initialise(FestivalGame game, DensityView view)
     {
@@ -88,12 +103,23 @@ public partial class CrowdPanel : Control
         column.AddChild(_heading);
         _body = UiStyle.Body("", muted: true, size: 15);
         column.AddChild(_body);
+        _choices = new GridContainer { Columns = 2 };
+        _choices.AddThemeConstantOverride("h_separation", 10);
+        _choices.AddThemeConstantOverride("v_separation", 8);
+        column.AddChild(_choices);
+        (_announce, _announceNote) = Choice(UiStyle.Button("Stop and announce", () => Choose(CrushChoice.Announce)),
+            "Stop the music for a few minutes while the PA asks everyone to take a step back. Fewer people listen each time.");
+        (_security, _securityNote) = Choice(UiStyle.SecondaryButton("Send security in", () => Choose(CrushChoice.SendSecurity)),
+            "The nearest security walk over, hold the spot for ten minutes and lift people out. Their own posts stand empty meanwhile.");
+        (_cancel, _cancelNote) = Choice(UiStyle.SecondaryButton("Cancel the act", () => Choose(CrushChoice.CancelAct)),
+            "The act walks off now and the crowd spreads out. Their fans are let down, some go home, and the fee is not given back.");
+        (_leave, _leaveNote) = Choice(UiStyle.SecondaryButton("Do nothing", () => Choose(CrushChoice.LeaveIt)),
+            "The music plays on and the crowd may sort itself out. If anyone is hurt, the council will hear about it.");
         var buttons = new HBoxContainer();
         buttons.AddThemeConstantOverride("separation", 8);
         column.AddChild(buttons);
-        _pause = UiStyle.Button("Pause the act", Pause);
-        _pause.TooltipText = "Stop the music for a few minutes so the crowd moves back. The audience will not thank you.";
-        buttons.AddChild(_pause);
+        _again = UiStyle.Button("Choose again", Reopen);
+        buttons.AddChild(_again);
         _show = UiStyle.SecondaryButton("Show me", Look);
         buttons.AddChild(_show);
         AddChild(_warning);
@@ -113,10 +139,37 @@ public partial class CrowdPanel : Control
         }
     }
 
-    /// <summary>Stops the act, as the button on the warning card does.</summary>
-    public void Pause()
+    /// <summary>One of the four choices: its button, and a line under it saying what it costs.</summary>
+    private (Button, Label) Choice(Button button, string tooltip)
     {
-        _game.PauseAct();
+        var cell = new VBoxContainer { CustomMinimumSize = new Vector2(230, 0) };
+        cell.AddThemeConstantOverride("separation", 2);
+        button.TooltipText = tooltip;
+        button.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+        cell.AddChild(button);
+        var note = UiStyle.Body("", muted: true, size: 13);
+        note.CustomMinimumSize = new Vector2(230, 0);
+        note.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        cell.AddChild(note);
+        _choices.AddChild(cell);
+        return (button, note);
+    }
+
+    /// <summary>Does what the player chose for the crush, as the buttons on the warning card do.</summary>
+    public void Choose(CrushChoice choice)
+    {
+        _game.Choose(choice);
+        _reopened = false;
+        Refresh();
+    }
+
+    /// <summary>Stops the act for an announcement, as the first button on the warning card does.</summary>
+    public void Pause() => Choose(CrushChoice.Announce);
+
+    /// <summary>Brings the four choices back after the player chose to leave a crush alone.</summary>
+    private void Reopen()
+    {
+        _reopened = true;
         Refresh();
     }
 
@@ -165,29 +218,66 @@ public partial class CrowdPanel : Control
         if (day && _game.SeriousIncident)
         {
             Warn(DensityView.CrushRed, "The day has been called off",
-                $"{hurt} people were hurt in a crush {Where(x, y)}.\nThe music has stopped and everyone is going home.", pause: false, show: false);
+                $"{hurt} people were hurt in a crush {Where(x, y)}.\nThe music has stopped and everyone is going home.", choices: false, again: false, show: false);
         }
         else if (day && _game.ActPaused)
         {
-            Warn(DensityView.BusyAmber, "The act has stopped",
-                $"The crowd is moving back from the front.{(hurtLine.Length > 0 ? " " + hurtLine : "")}\nThe music starts again in a few minutes.", pause: false, show: true);
+            Warn(DensityView.BusyAmber, "The music has stopped",
+                $"The PA is asking everyone to take a step back.{(hurtLine.Length > 0 ? " " + hurtLine : "")}\nThe music starts again in a few minutes.", choices: false, again: false, show: true);
+        }
+        else if (day && _game.CrushBuilding && (!_game.CrushLeftAlone || _reopened))
+        {
+            (x, y) = _game.CrushSpot;
+            Warn(DensityView.CrushRed, $"Crush risk {Where(x, y)}",
+                $"{_game.Density.Worst:0.0} people per square metre. {(hurtLine.Length > 0 ? hurtLine : "People will be hurt if it stays like this.")}\nWhat do you do?",
+                choices: true, again: false, show: true);
+            UpdateChoices();
         }
         else if (day && _game.CrushBuilding)
         {
-            Warn(DensityView.CrushRed, $"Crush risk {Where(x, y)}",
-                $"{_game.Density.Worst:0.0} people per square metre. {(hurtLine.Length > 0 ? hurtLine : "People will be hurt if it stays like this.")}\nSecurity posted there turn people away before it gets this bad.",
-                pause: _game.MusicOn, show: true);
+            (x, y) = _game.CrushSpot;
+            Warn(DensityView.CrushRed, $"Crush risk {Where(x, y)}, left alone",
+                $"{_game.Density.Worst:0.0} people per square metre. {(hurtLine.Length > 0 ? hurtLine : "Nobody has been hurt yet.")}", choices: false, again: true, show: true);
+        }
+        else if (day && _game.Staff.Any(s => s.State is StaffState.Sent or StaffState.Holding) && _game.Density.RedSquares > 0)
+        {
+            var there = _game.Staff.Count(s => s.State == StaffState.Holding);
+            Warn(DensityView.BusyAmber, "Security are going in",
+                there == 0 ? "They are on their way to the crush." : $"{there} are in the crowd, lifting people out to the back.", choices: false, again: false, show: true);
         }
         else
         {
             _warning.Visible = false;
+            _reopened = false;
         }
     }
 
     /// <summary>How much room to leave on the right for another panel that is open there, in pixels.</summary>
     public float RightInset { get; set; }
 
-    private void Warn(Color stripe, string heading, string body, bool pause, bool show)
+    /// <summary>Brings the four choices up to date: what each would cost now, and which can be done.</summary>
+    private void UpdateChoices()
+    {
+        var heard = _game.AnnouncementHeard;
+        _announce.Disabled = !_game.MusicOn;
+        _announceNote.Text = !_game.MusicOn ? "No music is on to stop." :
+            heard >= 1 ? "Free. The crowd gets a little bored." :
+            $"Free. Only about {heard * 100:0}% will listen this time.";
+
+        var free = _game.SecurityFree;
+        _security.Disabled = free == 0;
+        _securityNote.Text = free == 0 ? "No security are free." :
+            $"{free} go, £{free * FestivalGame.Overtime} overtime. The music plays on.";
+
+        var act = _game.ActAtCrush;
+        _cancel.Disabled = act is null;
+        _cancelNote.Text = act is null ? "No act is on." : $"{act.Act.Name} walk off. Fans upset, fee lost.";
+
+        _leave.Disabled = false;
+        _leaveNote.Text = "Free, but anyone hurt counts against the licence.";
+    }
+
+    private void Warn(Color stripe, string heading, string body, bool choices, bool again, bool show)
     {
         _warning.Visible = true;
         _warning.ResetSize();
@@ -195,7 +285,8 @@ public partial class CrowdPanel : Control
         _stripe.Color = stripe;
         _heading.Text = heading;
         _body.Text = body;
-        _pause.Visible = pause;
+        _choices.Visible = choices;
+        _again.Visible = again;
         _show.Visible = show;
     }
 }

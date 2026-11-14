@@ -46,6 +46,18 @@ public sealed record YearResult(int Year, int Came, int Expected, int Happy, int
     string Verdict, int LicenceNow, int LicenceNext, bool Loan, bool Closed, int Treated = 0, int Untreated = 0, int TroubleSorted = 0, int TroubleIgnored = 0,
     int CrushInjuries = 0, int PulledOut = 0, bool SeriousIncident = false, int FieldRepair = 0, string Weather = "")
 {
+    /// <summary>How many times the music was stopped for an announcement.</summary>
+    public int Announcements { get; init; }
+
+    /// <summary>How many times security were sent into a crush.</summary>
+    public int SecuritySent { get; init; }
+
+    /// <summary>How many acts were cancelled because of a crush.</summary>
+    public int ActsCancelled { get; init; }
+
+    /// <summary>People hurt in a crush that was left alone.</summary>
+    public int HurtLeftAlone { get; init; }
+
     public int Profit => In - Out;
 }
 
@@ -632,12 +644,13 @@ public sealed partial class FestivalGame
             var profit = TotalIncome - TotalSpending;
             var bigger = LicenceAfter(Licence);
             var moving = FieldMap.SizeFor(bigger) != FieldMap.SizeFor(Licence);
-            var good = Phase == Phase.Results && !_loanThisYear && happy >= HappyEnough && cleared >= TidyEnough && profit >= 0 && Untreated == 0 && !SeriousIncident;
+            var good = Phase == Phase.Results && !_loanThisYear && happy >= HappyEnough && cleared >= TidyEnough && profit >= 0 && Untreated == 0 && !SeriousIncident && HurtLeftAlone == 0;
             var next = good && (bigger == Licence || Money >= NeedsToGrowTo(bigger)) ? bigger : Licence;
             var verdict =
                 Phase == Phase.Closed ? "The money has run out a second time. The parish council will not lend again, and the festival is over." :
                 _loanThisYear ? $"The bank is empty. The parish council lends £{LoanAmount:N0} to try once more. They will not do it twice." :
                 SeriousIncident ? $"{CrushInjuries} people were hurt in a crush and the day had to be called off. The licence stays as it is until the crowd is kept safe." :
+                HurtLeftAlone > 0 ? $"{HurtLeftAlone} {(HurtLeftAlone == 1 ? "person was" : "people were")} hurt in a crush that was left to sort itself out. The council has heard about it, and the licence stays as it is." :
                 Untreated > 0 ? $"{Untreated} {(Untreated == 1 ? "person was" : "people were")} taken ill and nobody came to help. The licence stays as it is until there is proper first aid." :
                 happy < HappyEnough ? "People did not enjoy it enough. The licence stays as it is until they do." :
                 cleared < TidyEnough ? "The farmer is not happy with the state of the field. The licence stays as it is." :
@@ -648,8 +661,24 @@ public sealed partial class FestivalGame
                 "A good festival and a tidy field. This is as big as a licence gets.";
             return new YearResult(Year, Crowd.Arrived, Crowd.Expected, happy, Crowd.WentHomeUnhappy, TotalIncome, TotalSpending, cleared, GrassWorn,
                 verdict, Licence, next, _loanThisYear, Phase == Phase.Closed, Treated, Untreated, TroubleSorted, TroubleIgnored,
-                CrushInjuries, PulledOut, SeriousIncident, _fieldRepair, Weather.Summary);
+                CrushInjuries, PulledOut, SeriousIncident, _fieldRepair, Weather.Summary)
+            {
+                Announcements = ActsPaused,
+                SecuritySent = SecuritySent,
+                ActsCancelled = ActsCancelled,
+                HurtLeftAlone = HurtLeftAlone,
+            };
         }
+    }
+
+    /// <summary>
+    /// What people say about the year, which sells next year's tickets: how much they enjoyed it,
+    /// less for every act that was cancelled and for a crush left to hurt people.
+    /// </summary>
+    public static int WordOfMouth(YearResult result)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        return Math.Max(0, result.Happy - (5 * result.ActsCancelled) - (result.HurtLeftAlone > 0 ? 10 : 0));
     }
 
     /// <summary>Next year's festival: the bank and the licence carry over, the buildings do not.</summary>
@@ -657,7 +686,7 @@ public sealed partial class FestivalGame
     {
         Need(Phase.Results);
         var result = Result!;
-        return StartYear(Name, new YearSetup(Year + 1, result.LicenceNext, Money, BailedOut, result.Happy, Plan?.Save())).TravellingLike(this);
+        return StartYear(Name, new YearSetup(Year + 1, result.LicenceNext, Money, BailedOut, WordOfMouth(result), Plan?.Save())).TravellingLike(this);
     }
 
     private YearSave SaveYear() => new(Year, Licence, Phase, Day, TicketPrice, HeadlinerPicked, Crowd.Expected, BailedOut, _loanThisYear, LastHappiness,

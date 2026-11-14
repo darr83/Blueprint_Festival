@@ -5,7 +5,11 @@ using BlueprintFestival.Simulation.World;
 namespace BlueprintFestival.Simulation.Show;
 
 /// <summary>One set in the day: who plays, and from when to when.</summary>
-public sealed record Slot(int Index, Act Act, DateTime Start, DateTime End, bool Headliner);
+public sealed record Slot(int Index, Act Act, DateTime Start, DateTime End, bool Headliner)
+{
+    /// <summary>True for a set that was ended early, so the act walked off before the end.</summary>
+    public bool CutShort { get; init; }
+}
 
 /// <summary>
 /// The music on one stage. A stage has four sets, at two, four, six and eight o'clock, and any of
@@ -169,6 +173,19 @@ public sealed class RunningOrder
 
     /// <summary>Calls off the rest of the day's music from a moment on.</summary>
     public void CallOff(DateTime from) => CalledOff = from;
+
+    /// <summary>Ends a set early, from a moment on: the act walks off and the stage stands empty until the next set. False if the set is not on then.</summary>
+    public bool CutShort(int index, DateTime at)
+    {
+        var place = _slots.FindIndex(s => s.Index == index);
+        if (place < 0 || at < _slots[place].Start || at >= _slots[place].End)
+        {
+            return false;
+        }
+
+        _slots[place] = _slots[place] with { End = at, CutShort = true };
+        return true;
+    }
 
     /// <summary>The next set still to start, or null once the last has begun.</summary>
     public Slot? Next(DateTime now) => CalledOff is not null ? null : _slots.FirstOrDefault(s => s.Start > now);
