@@ -59,13 +59,13 @@ public class SecondStageTests
         game.Crowd.Parties.Where(p => p.State == PartyState.Watching && p.Watch >= 0 && p.Watch >= RunningOrder.SecondBase == second).Sum(p => p.Members.Count);
 
     [Fact]
-    public void A_second_line_up_is_six_smaller_acts_that_are_a_choice_at_planning()
+    public void A_second_line_up_is_four_smaller_acts_that_are_a_choice_at_planning()
     {
         var game = FestivalGame.StartYear("Larkmoor Festival", new YearSetup(4, 1500, 60000, false, 80));
         Assert.False(game.SecondStageBooked);
-        Assert.Equal(6, game.SecondShow.Slots.Count);
+        Assert.Equal(4, game.SecondShow.Slots.Count);
         Assert.All(game.SecondShow.Slots, s => Assert.True(s.Index >= RunningOrder.SecondBase && !s.Headliner && s.Act.Draw < 0.5));
-        var names = game.Show.Slots.Concat(game.SecondShow.Slots).Select(s => s.Act.Name).Concat(game.Headliners.Select(h => h.Act.Name)).ToList();
+        var names = game.Show.Slots.Take(3).Concat(game.SecondShow.Slots).Select(s => s.Act.Name).Concat(game.Headliners.Select(h => h.Act.Name)).ToList();
         Assert.Equal(names.Count, names.Distinct().Count());
 
         // Their sets overlap the main stage's, so there is a choice to make.
@@ -99,13 +99,13 @@ public class SecondStageTests
         var one = Built(book: true, secondStage: false);
         Assert.Equal(StageKind.MainStage, one.Show.Stage!.Kind);
         Assert.Null(one.SecondShow.Stage);
-        Assert.Null(one.SecondShow.Playing(one.Day.AddHours(13.2)));
+        Assert.Null(one.SecondShow.Playing(one.Day.AddHours(14.2)));
 
         // And a second stage with nobody booked for it stands empty.
         var unbooked = Built(book: false);
         Assert.Null(unbooked.SecondShow.Stage);
-        Assert.Null(unbooked.SecondShow.Playing(unbooked.Day.AddHours(13.2)));
-        Assert.NotNull(unbooked.Show.Playing(unbooked.Day.AddHours(13.5)));
+        Assert.Null(unbooked.SecondShow.Playing(unbooked.Day.AddHours(14.2)));
+        Assert.NotNull(unbooked.Show.Playing(unbooked.Day.AddHours(14.5)));
     }
 
     [Fact]
@@ -172,6 +172,7 @@ public class SecondStageTests
         Assert.True(loaded.SecondStageBooked);
         Assert.Equal(game.SecondShow.Playing(game.Now)!.Act.Name, loaded.SecondShow.Playing(loaded.Now)!.Act.Name);
         Assert.Equal(Watching(game, second: true), Watching(loaded, second: true));
+        Assert.Equal(game.LineUp.Select(s => (s.Index, s.Act.Name, s.Act.Draw, s.Headliner)), loaded.LineUp.Select(s => (s.Index, s.Act.Name, s.Act.Draw, s.Headliner)));
         for (var i = 0; i < 3600; i++)
         {
             game.Clock.Step();

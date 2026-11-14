@@ -183,11 +183,11 @@ public partial class SmokeTest : Node
                     Check(running.TopBar.MoneyText == $"£{running.Game.Money:N0}", "The top bar should show the money in the bank.");
                     Check(running.Site.StallCount == 3, "The three stalls should be drawn.");
                     Check(running.TopBar.TimeText != "08:00", "The clock in the top bar should have moved on.");
-                    Check(running.Acts.PerformerCount == 0, "Nobody should be on stage before midday.");
-                    Check(running.TopBar.ShowText.StartsWith("Next: ", StringComparison.Ordinal) && running.TopBar.ShowText.EndsWith("at 12:00", StringComparison.Ordinal), $"The top bar should say who is on at midday, not '{running.TopBar.ShowText}'.");
+                    Check(running.Acts.PerformerCount == 0, "Nobody should be on stage before two o'clock.");
+                    Check(running.TopBar.ShowText.StartsWith("Next: ", StringComparison.Ordinal) && running.TopBar.ShowText.EndsWith("at 14:00", StringComparison.Ordinal), $"The top bar should say who is on at two, not '{running.TopBar.ShowText}'.");
 
-                    // Skip on to a quarter past twelve, when the first act is well into its set.
-                    var quarterPast = running.Game.Now.Date.AddHours(12.25);
+                    // Skip on to a quarter past two, when the first act is well into its set.
+                    var quarterPast = running.Game.Now.Date.AddHours(14.25);
                     while (running.Game.Now < quarterPast)
                     {
                         running.Game.Clock.Step();
@@ -204,7 +204,7 @@ public partial class SmokeTest : Node
                 {
                     var music = show.Game.Show;
                     var onStage = music.OnStage(show.Game.Now);
-                    Check(music.Playing(show.Game.Now) is not null && onStage.Count > 0, "An act should be playing at a quarter past twelve.");
+                    Check(music.Playing(show.Game.Now) is not null && onStage.Count > 0, "An act should be playing at a quarter past two.");
                     Check(show.Acts.PerformerCount == onStage.Count, $"The act should be drawn on the stage: {show.Acts.PerformerCount} drawn, {onStage.Count} playing.");
                     Check(show.TopBar.ShowText.StartsWith($"Now: {music.Playing(show.Game.Now)!.Act.Name}", StringComparison.Ordinal), $"The top bar should say who is on, not '{show.TopBar.ShowText}'.");
                     Check(show.Game.Crowd.Watching > 0, "Some people should be watching the act.");
@@ -324,9 +324,50 @@ public partial class SmokeTest : Node
                     Check(game.SecondStageBooked && game.ActFees == before + game.SecondStageFee, "Clicking the second stage should book its acts.");
                     plan.Year.ToggleSecondStage();
                     Check(!game.SecondStageBooked && game.ActFees == before, "Clicking the second stage again should cancel them.");
-                    var fees = game.ActFees;
-                    plan.Year.StartBuilding();
-                    Check(game.Phase == Phase.Build && game.Money == 2000 - fees, $"Starting to build should pay the acts £{fees}, leaving £{2000 - fees}, not £{game.Money}.");
+                    // Booking the bill by hand: any artist in any set, a second stage, and sets left empty.
+                    plan.Year.PickSlot(0);
+                    plan.Year.PickArtist("Tobias Pell");
+                    Check(game.Show.At(0)?.Name == "Tobias Pell", "Clicking an artist should book them for the set picked.");
+                    plan.Year.PickSlot(1);
+                    plan.Year.PickArtist(null);
+                    Check(game.Show.At(1) is null && game.Show.Slots.Count == 3, "A set should be able to be left empty.");
+                    plan.Year.ToggleStage();
+                    Check(game.SecondStageBooked && game.SecondShow.Slots.Count == 0 && plan.Year.SlotPicked == RunningOrder.SecondBase, "Adding a second stage should give four empty sets.");
+                    plan.Year.PickArtist("DJ Haybale");
+                    Check(game.SecondShow.At(RunningOrder.SecondBase)?.Name == "DJ Haybale", "An artist should be bookable for the second stage.");
+                    plan.Year.ToggleStage();
+                    Check(!game.SecondStageBooked && game.LineUp.Count() == 3, "Taking the second stage away should take its acts off the bill.");
+                    var view = BlueprintFestival.UI.YearScreen.PlanOf(game, plan.Year.SlotPicked);
+                    Check(view.Main.Count == 4 && view.Second is null && view.Artists.Count == 25 && view.Acts == 3 && view.Fees == game.ActFees, "The planning screen should show four sets, 25 artists and the fees.");
+                    plan.Year.ChangePrice(-3);
+                    Check(game.TicketPrice == 5, "The price buttons should change the ticket price a pound at a time.");
+
+                    // January to June: tickets on sale a month at a time.
+                    var fees = game.PlanCost;
+                    plan.Year.BookEvent();
+                    Check(game.Phase == Phase.Sell && plan.Year.Showing == Phase.Sell && plan.Year.HasCentrePanel && game.Money == 2000 - fees, $"Booking the event should pay £{fees} and open the ticket sales screen.");
+                    foreach (var advert in new[] { "posters", "newsletter", "flyers", "banners", "email" })
+                    {
+                        plan.Year.ToggleAdvert(advert);
+                    }
+
+                    Check(game.AdvertReach == 1200 && game.AdvertCost == 39, "Switching adverts on should add up their reach and cost.");
+                    plan.Year.RunMonth();
+                    Check(plan.Year.Running && game.SalesTurn == 1 && game.TicketsSold > 0, "Running January should sell tickets and play the month out.");
+                    plan.Year.FinishRun();
+                    Check(!plan.Year.Running && BlueprintFestival.UI.YearScreen.SalesOf(game).SoldAfter.Count == 2, "The sales screen should show January sold.");
+                    for (var month = 1; month < 6; month++)
+                    {
+                        plan.Year.RunMonth();
+                        plan.Year.FinishRun();
+                    }
+
+                    Check(game.Phase == Phase.Build && plan.Year.Showing == Phase.Build && game.SalesLog.Count == 6, "After June it should be build week.");
+                    Check(game.Money == 2000 - fees + game.SalesLog.Sum(l => l.Taken - l.AdCost), "The bank should hold the ticket money less the adverts.");
+                    Check(game.Crowd.Expected == System.Math.Max(10, game.TicketsSold), "The crowd expected should be the tickets sold.");
+                    plan.Year.NextDay();
+                    Check(game.SalesTurn == 7 && game.NextSalesTurn == "Monday", "Ending Sunday should sell Sunday's tickets.");
+                    GD.Print($"[smoke] sold {game.TicketsSold} of {game.Licence} by Monday of build week, £{game.Money} in the bank");
                     Check(game.Show.Slots[^1].Act == game.Headliners[0].Act, "The headliner picked should close the show.");
                     Next(Stage.Building);
                 }

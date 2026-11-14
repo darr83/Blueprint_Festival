@@ -86,7 +86,9 @@ public class YearTests
         var small = game.ExpectedAt(8);
         game.ChooseHeadliner(2);
         Assert.True(game.ExpectedAt(8) > small);
-        Assert.Throws<ArgumentOutOfRangeException>(() => game.ExpectedAt(7));
+        Assert.InRange(game.ExpectedAt(7), game.ExpectedAt(8), game.ExpectedAt(5));
+        Assert.Throws<ArgumentOutOfRangeException>(() => game.ExpectedAt(0));
+        Assert.Throws<ArgumentOutOfRangeException>(() => game.ChooseTicket(7));
     }
 
     [Fact]
@@ -99,7 +101,7 @@ public class YearTests
         Assert.Equal(game.Headliners.OrderBy(h => h.Fee).ToList(), game.Headliners);
         Assert.Equal(3, game.Headliners.Select(h => h.Stars).Distinct().Count());
         Assert.All(game.Headliners, h => Assert.InRange(h.Stars, 2, 5));
-        var names = game.Headliners.Select(h => h.Act.Name).Concat(game.Show.Slots.Take(6).Select(s => s.Act.Name)).ToList();
+        var names = game.Headliners.Select(h => h.Act.Name).Concat(game.Show.Slots.Take(3).Select(s => s.Act.Name)).ToList();
         Assert.Equal(names.Count, names.Distinct().Count());
 
         var again = FestivalGame.NewFestival();
@@ -229,7 +231,12 @@ public class YearTests
 
         var second = game.NextYear();
         Assert.True(second.BailedOut);
-        second.ChooseHeadliner(2);
+        Assert.True(second.BookAct(3, "The Velvet Otters"));
+        for (var set = 0; set < 3 && second.PlanCost > second.Money; set++)
+        {
+            Assert.True(second.BookAct(set, null));
+        }
+
         Assert.True(second.ConfirmPlan());
         second.OpenGates();
         RunTheDay(second);

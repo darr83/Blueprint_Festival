@@ -73,10 +73,10 @@ public class RosterTests
             foreach (var name in new[] { "Larkmoor Festival", "Top Field Fair", "Midsummer on the Green" })
             {
                 var game = FestivalGame.StartYear(name, new YearSetup(year, FestivalGame.Licences[year - 1], 50000));
-                var acts = game.Show.Slots.Take(6).Concat(game.SecondShow.Slots).Select(s => s.Act).Concat(game.Headliners.Select(h => h.Act)).ToList();
+                var acts = game.Show.Slots.Take(3).Concat(game.SecondShow.Slots).Select(s => s.Act).Concat(game.Headliners.Select(h => h.Act)).ToList();
 
-                Assert.Equal(15, acts.Count);
-                Assert.Equal(15, acts.Select(a => a.Name).Distinct().Count());
+                Assert.Equal(10, acts.Count);
+                Assert.Equal(10, acts.Select(a => a.Name).Distinct().Count());
                 Assert.All(acts, act =>
                 {
                     var artist = Roster.Named(act.Name);
@@ -88,7 +88,7 @@ public class RosterTests
                     Assert.Equal(offer.Stars, offer.Act.Rating);
                     Assert.Contains(offer.Act.Kind, new[] { ActKind.Band, ActKind.Dj });
                 });
-                Assert.All(game.Show.Slots.Take(6), slot => Assert.InRange(slot.Act.Rating, 1, 3));
+                Assert.All(game.Show.Slots.Take(3), slot => Assert.InRange(slot.Act.Rating, 1, 3));
                 Assert.All(game.SecondShow.Slots, slot => Assert.InRange(slot.Act.Rating, 1, 3));
             }
         }

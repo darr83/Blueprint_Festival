@@ -31,21 +31,22 @@ public class ShowTests
     [InlineData(1)]
     [InlineData(21)]
     [InlineData(999)]
-    public void The_day_has_seven_sets_in_order_that_do_not_overlap_and_the_headliner_is_last(int seed)
+    public void The_day_has_four_two_hour_sets_in_order_that_do_not_overlap_and_the_headliner_is_last(int seed)
     {
         var show = new FestivalGame(seed: seed).Show;
-        Assert.Equal(7, show.Slots.Count);
-        Assert.Equal(Day.AddHours(12), show.Slots[0].Start);
+        Assert.Equal(4, show.Slots.Count);
+        Assert.Equal(Day.AddHours(14), show.Slots[0].Start);
+        Assert.All(show.Slots, s => Assert.Equal(TimeSpan.FromHours(2), s.End - s.Start));
         for (var i = 1; i < show.Slots.Count; i++)
         {
-            Assert.True(show.Slots[i].Start >= show.Slots[i - 1].End.AddMinutes(15), "There should be a changeover between sets.");
+            Assert.True(show.Slots[i].Start >= show.Slots[i - 1].End, "One set should end before the next starts.");
         }
 
-        Assert.All(show.Slots.Take(6), s => Assert.False(s.Headliner));
-        Assert.True(show.Slots[6].Headliner);
-        Assert.Equal(Day.AddHours(22), show.Slots[6].End);
-        Assert.True(show.Slots[6].Act.Draw > show.Slots.Take(6).Max(s => s.Act.Draw));
-        Assert.Contains(show.Slots[6].Act.Kind, new[] { ActKind.Band, ActKind.Dj });
+        Assert.All(show.Slots.Take(3), s => Assert.False(s.Headliner));
+        Assert.True(show.Slots[3].Headliner);
+        Assert.Equal(Day.AddHours(22), show.Slots[3].End);
+        Assert.True(show.Slots[3].Act.Draw > show.Slots.Take(3).Max(s => s.Act.Draw));
+        Assert.Contains(show.Slots[3].Act.Kind, new[] { ActKind.Band, ActKind.Dj });
     }
 
     [Fact]
@@ -59,7 +60,7 @@ public class ShowTests
         foreach (var seed in Enumerable.Range(1, 40))
         {
             var slots = new FestivalGame(seed: seed).Show.Slots;
-            Assert.Equal(7, slots.Select(s => s.Act.Name).Distinct().Count());
+            Assert.Equal(4, slots.Select(s => s.Act.Name).Distinct().Count());
             Assert.All(slots, s => Assert.InRange(s.Act.Draw, 0.3, 1.0));
             Assert.All(slots, s => Assert.InRange(s.Act.Members.Count, 1, 5));
             Assert.All(slots, s => Assert.False(string.IsNullOrWhiteSpace(s.Act.Name)));
@@ -79,15 +80,27 @@ public class ShowTests
     }
 
     [Fact]
-    public void A_set_is_on_between_its_start_and_end_and_not_in_the_changeover()
+    public void A_set_is_on_between_its_start_and_end_and_the_next_follows_straight_on()
     {
         var game = WithStage(StageKind.Bandstand);
-        Assert.Null(game.Show.Playing(Day.AddHours(11.9)));
-        Assert.Equal(0, game.Show.Playing(Day.AddHours(12))!.Index);
-        Assert.Equal(0, game.Show.Playing(Day.AddHours(12.7))!.Index);
-        Assert.Null(game.Show.Playing(Day.AddHours(12.8)));
-        Assert.Equal(1, game.Show.Next(Day.AddHours(12.8))!.Index);
+        Assert.Null(game.Show.Playing(Day.AddHours(13.9)));
+        Assert.Equal(0, game.Show.Playing(Day.AddHours(14))!.Index);
+        Assert.Equal(0, game.Show.Playing(Day.AddHours(15.9))!.Index);
+        Assert.Equal(1, game.Show.Playing(Day.AddHours(16))!.Index);
+        Assert.Equal(1, game.Show.Next(Day.AddHours(14.5))!.Index);
         Assert.Null(game.Show.Next(Day.AddHours(21)));
+        Assert.Null(game.Show.Playing(Day.AddHours(22)));
+
+        // A set left empty is a gap in the day.
+        game.Show.Book(1, null);
+        Assert.Equal(3, game.Show.Slots.Count);
+        Assert.Null(game.Show.Playing(Day.AddHours(16.5)));
+        Assert.Equal(2, game.Show.Next(Day.AddHours(14.5))!.Index);
+        Assert.True(game.Show.Slots[^1].Headliner);
+        game.Show.Book(3, null);
+        Assert.True(game.Show.Slots[^1].Headliner);
+        Assert.Equal(2, game.Show.Slots[^1].Index);
+        Assert.Throws<ArgumentOutOfRangeException>(() => game.Show.Book(4, null));
     }
 
     [Fact]
@@ -128,7 +141,7 @@ public class ShowTests
     public void When_an_act_is_on_people_gather_in_front_of_the_stage_facing_it(Facing facing)
     {
         var game = WithStage(StageKind.Bandstand, facing: facing);
-        RunUntil(game, 12.5);
+        RunUntil(game, 14.5);
         var slot = game.Show.Playing(game.Now)!;
         var watching = game.Crowd.Parties.Where(p => p.State == PartyState.Watching).ToList();
         Assert.True(game.Crowd.Watching >= 15, $"Only {game.Crowd.Watching} watching.");
@@ -154,11 +167,13 @@ public class ShowTests
     public void When_the_set_ends_the_crowd_drifts_away_and_comes_back_for_the_next()
     {
         var game = WithStage(StageKind.Bandstand);
-        RunUntil(game, 12.7);
+        game.Show.Book(1, null);
+        RunUntil(game, 15.9);
         Assert.True(game.Crowd.Watching > 10);
-        RunUntil(game, 12.78);
+        RunUntil(game, 16.1);
         Assert.Equal(0, game.Crowd.Watching);
-        RunUntil(game, 13.6);
+        game.Show.Book(1, game.Show.At(2));
+        RunUntil(game, 16.8);
         Assert.True(game.Crowd.Watching > 10);
         Assert.All(game.Crowd.Parties.Where(p => p.State == PartyState.Watching), p => Assert.Equal(1, p.Watch));
     }
@@ -181,7 +196,7 @@ public class ShowTests
     public void Taking_the_stage_down_mid_set_ends_the_show_and_everyone_still_gets_home()
     {
         var game = WithStage(StageKind.Bandstand);
-        RunUntil(game, 12.5);
+        RunUntil(game, 14.5);
         Assert.True(game.Crowd.Watching > 0);
         var stage = game.Site.Stages[0].Rect;
         game.Remove(new TilePoint(stage.X + 1, stage.Y + 1));
@@ -195,7 +210,7 @@ public class ShowTests
     public void A_save_in_the_middle_of_a_set_carries_on_just_the_same()
     {
         var game = WithStage(StageKind.Bandstand);
-        RunUntil(game, 13.5);
+        RunUntil(game, 14.5);
         var copy = FestivalGame.Load(SaveData.FromJson(game.Save().ToJson()));
         Assert.Equal(game.Crowd.Watching, copy.Crowd.Watching);
         Assert.Equal(game.Show.Slots.Select(s => s.Act), copy.Show.Slots.Select(s => s.Act), new ActComparer());

@@ -1432,10 +1432,21 @@ public sealed class Crowd
     }
 
     /// <summary>The places people have picked to watch from, as written to a save file.</summary>
-    public WatchingPlaces SavePlaces() => new(_claimSlot, Sparse(_claims), _claimSlotSecond, Sparse(_claimsSecond));
+    public WatchingPlaces SavePlaces() => new(_claimSlot, Sparse(_claims), _claimSlotSecond, Sparse(_claimsSecond))
+    {
+        Density = Density.Save(),
+        MeasuredMinute = _measuredMinute,
+    };
 
     public void RestorePlaces(WatchingPlaces? places)
     {
+        if (places?.Density is { } density)
+        {
+            // The crowd was last counted on the minute; counted again now it would walk a little differently.
+            Density.Restore(density);
+            _measuredMinute = places.MeasuredMinute;
+        }
+
         Array.Clear(_claims);
         Array.Clear(_claimsSecond);
         (_claimSlot, _claimSlotSecond) = (places?.Slot ?? -1, places?.SlotSecond ?? -1);
@@ -1893,4 +1904,11 @@ public sealed record PartySave(int Id, PartyState State, double X, double Y, dou
 /// How many people have picked each square of the crowd map to watch the act now on from, for
 /// the main stage and the second stage, and which sets those are.
 /// </summary>
-public sealed record WatchingPlaces(int Slot, Dictionary<int, int>? Claims, int SlotSecond, Dictionary<int, int>? ClaimsSecond);
+public sealed record WatchingPlaces(int Slot, Dictionary<int, int>? Claims, int SlotSecond, Dictionary<int, int>? ClaimsSecond)
+{
+    /// <summary>How many people were in each square when the crowd was last counted.</summary>
+    public Dictionary<int, int>? Density { get; init; }
+
+    /// <summary>The minute of the hour the crowd was last counted in.</summary>
+    public int MeasuredMinute { get; init; } = -1;
+}

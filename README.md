@@ -34,6 +34,7 @@ brands or sponsors.
 | 10c. Camping, as an option at 5,000: a camping field next door, tents, campers who stay the night | Done |
 | 11. Sound effects: the field, the weather, the crowd, stalls, building, the radio and buttons, with volume sliders | Done (files made with `tools/make_sounds.py`) |
 | 12. Artists and music: 25 made-up artists with a genre, a rating and a following, and a folder each for their songs | Done (songs are added to `game/Music`) |
+| 13. Selling tickets: book every set yourself in January, advertise and sell month by month, then build week with the last tickets sold day by day | Done |
 
 ## Controls
 
@@ -93,6 +94,24 @@ sounds again. The acts' music is not part of this and comes later.
 
 The volume sliders are in the pause menu (Esc) and on the main menu, and are remembered.
 
+## The festival year
+
+- **January.** You book the line-up. Each stage has four two-hour sets, at 14:00, 16:00, 18:00 and
+  20:00. Any of the 25 artists can play any set, an artist plays once, and a set can be left empty.
+  You can add a second stage for four more sets. You set the ticket price in whole pounds.
+- **January to June.** Tickets are on sale and each month is one turn. You switch adverts on and
+  off (15 of them, from posters in shop windows to national TV), change the price if you like, and
+  run the month. Adverts decide how many people hear about the festival. The line-up and the price
+  decide how many of them buy: more stars and more fans sell more, a price above what the line-up
+  is worth sells slowly, and a price below it sells fast. A festival people enjoyed last year sells
+  more by word of mouth. Sales speed up as July comes.
+- **July, build week.** You lay out the field. Ending each of the seven days sells that day's
+  tickets, and the price can still change.
+- **The day.** The crowd is the people who bought a ticket.
+
+The rules are in `src/BlueprintFestival.Simulation/FestivalGame.Sales.cs` and
+`Sales/Adverts.cs`.
+
 ## Artists and music
 
 There are 25 made-up artists (solo guitarists, duos, full bands and DJs), each with a genre, a
@@ -112,6 +131,7 @@ The music has its own volume slider.
   lets time pass until people arrive, pauses, turns the view, saves, loads and compares.
 - `godot --path game -- --shots=DIR` writes review screenshots to a folder.
 - `godot --path game -- --people-shots=DIR` writes line-up pictures of the people.
+- `godot --path game -- --sales-shots=DIR` writes pictures of the planning and ticket sales screens.
 
 The tests and the launch test run on every pull request.
 

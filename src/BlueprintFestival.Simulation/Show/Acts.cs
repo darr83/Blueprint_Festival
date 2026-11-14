@@ -231,6 +231,20 @@ public static class ActGenerator
             Stem = stem,
         };
 
+    /// <summary>How much of the field an artist draws to the stage: more stars, more of it, and most of all as the last act of the night.</summary>
+    public static double DrawOf(Artist artist, bool closing)
+    {
+        ArgumentNullException.ThrowIfNull(artist);
+        return closing ? 0.55 + (0.08 * artist.Rating) : 0.35 + (0.1 * artist.Rating);
+    }
+
+    /// <summary>An artist from the roster as an act ready to play.</summary>
+    public static Act Of(Artist artist, bool closing = false)
+    {
+        ArgumentNullException.ThrowIfNull(artist);
+        return From(artist, DrawOf(artist, closing), Hash(artist.Name) % 100000, artist.Name);
+    }
+
     /// <summary>Marks an act as booked, so nobody is booked twice in one festival.</summary>
     public static void Take(ISet<string> taken, Act act)
     {
