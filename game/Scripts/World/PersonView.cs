@@ -15,6 +15,12 @@ public enum Pose
 
     /// <summary>Holding a ticket out for the gate staff to see.</summary>
     ShowingTicket,
+
+    /// <summary>Clapping hard with hands in front, as at the end of a song.</summary>
+    Clapping,
+
+    /// <summary>Playing an instrument or singing: the arms reach where they are told (see <see cref="PersonView.Perform"/>).</summary>
+    Performing,
 }
 
 /// <summary>
@@ -46,7 +52,18 @@ public partial class PersonView : Node3D
     private float _through;
     private float _energy = 1;
     private float _show;
+    private float _clap;
+    private float _perform;
+    private Vector3 _performLeft;
+    private Vector3 _performRight;
+    private float _performLift;
+    private Vector3 _performLean;
+    private float _shoulderX;
+    private float _headY;
+    private float _headR;
+    private float _mouthY;
     private MeshInstance3D? _ticket;
+    private MeshInstance3D? _mouth;
 
     public PersonLook Look { get; private set; } = null!;
 
@@ -86,6 +103,10 @@ public partial class PersonView : Node3D
         var headY = HeadY + (headR - HeadR);
         var shoulder = 0.185f * (0.75f + (0.25f * build)) * (look.Female ? 0.95f : 1.03f);
         var depth = 0.25f * (0.85f + (0.15f * build));
+        _shoulderX = shoulder + 0.045f;
+        _headY = headY;
+        _headR = headR;
+        _mouthY = -headR * (look.Beard ? 0.3f : 0.36f);
 
         var body = new MeshBuilder();
 
@@ -357,7 +378,75 @@ public partial class PersonView : Node3D
         _cheer = Mathf.MoveToward(_cheer, Pose == Pose.Cheering ? 1f : 0f, step * 4f);
         _dance = Mathf.MoveToward(_dance, Pose == Pose.Dancing ? 1f : 0f, step * 3f);
         _show = Mathf.MoveToward(_show, Pose == Pose.ShowingTicket ? 1f : 0f, step * 5f);
+        _clap = Mathf.MoveToward(_clap, Pose == Pose.Clapping ? 1f : 0f, step * 5f);
+        _perform = Mathf.MoveToward(_perform, Pose == Pose.Performing ? 1f : 0f, step * 6f);
         ApplyPose();
+    }
+
+    /// <summary>
+    /// Sets where the hands go while the pose is <see cref="Pose.Performing"/>: a point for each
+    /// hand to reach towards, in metres in this person's own space (they face +Z, feet at 0), how
+    /// far the body is lifted, and how the upper body leans (degrees).
+    /// </summary>
+    public void Perform(Vector3 leftHand, Vector3 rightHand, float lift = 0, Vector3 lean = default)
+    {
+        _performLeft = Aim(-1, leftHand);
+        _performRight = Aim(1, rightHand);
+        _performLift = lift;
+        _performLean = lean;
+    }
+
+    /// <summary>Where a hand is now, in the world.</summary>
+    public Vector3 HandAt(bool right) => (right ? _armRight : _armLeft).GlobalTransform * new Vector3(0, -ArmLength, 0);
+
+    /// <summary>
+    /// Opens the mouth, from 0 (the usual smile) to 1 (wide open, singing a big note). Only made
+    /// the first time a mouth opens.
+    /// </summary>
+    public void Mouth(float open)
+    {
+        if (_mouth is null)
+        {
+            if (open < 0.08f)
+            {
+                return;
+            }
+
+            var y = _headY + _mouthY + (_headR * 0.04f);
+            var z = Mathf.Sqrt(Mathf.Max(0.0001f, (_headR * _headR) - (_mouthY * _mouthY))) + 0.004f;
+            _mouth = new MeshInstance3D
+            {
+                Name = "Mouth",
+                Mesh = new SphereMesh { Radius = 0.5f, Height = 1f, RadialSegments = 12, Rings = 6 },
+                MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color("#5A2330"), Roughness = 0.9f },
+                Position = new Vector3(0, y - HipY, z - 0.008f),
+                CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+            };
+            _upper.AddChild(_mouth);
+        }
+
+        _mouth.Visible = open >= 0.08f;
+        _mouth.Scale = new Vector3(_headR * (0.36f + (0.12f * open)), _headR * (0.1f + (0.42f * open)), 0.03f);
+    }
+
+    /// <summary>
+    /// The arm angles (degrees) that point an arm from its shoulder towards a point in this
+    /// person's space. An arm hangs straight down; X swings it forward (negative) and Z out to the side.
+    /// </summary>
+    private Vector3 Aim(int side, Vector3 target)
+    {
+        var scale = (float)Look.Height;
+        var shoulder = new Vector3(side * _shoulderX * scale, ShoulderY * scale, 0);
+        var d = target - shoulder;
+        if (d.LengthSquared() < 0.0001f)
+        {
+            return new Vector3(0, 0, side * 7f);
+        }
+
+        d = d.Normalized();
+        var z = Mathf.RadToDeg(Mathf.Asin(Mathf.Clamp(d.X, -1f, 1f)));
+        var x = Mathf.RadToDeg(Mathf.Atan2(-d.Z, -d.Y));
+        return new Vector3(x, 0, z);
     }
 
     /// <summary>
@@ -379,6 +468,8 @@ public partial class PersonView : Node3D
         _cheer = pose == Pose.Cheering ? 1 : 0;
         _dance = pose == Pose.Dancing ? 1 : 0;
         _show = pose == Pose.ShowingTicket ? 1 : 0;
+        _clap = pose == Pose.Clapping ? 1 : 0;
+        _perform = pose == Pose.Performing ? 1 : 0;
         ApplyPose();
     }
 
@@ -406,6 +497,24 @@ public partial class PersonView : Node3D
             lift = Mathf.Lerp(lift, danceLift, _dance);
             lean = danceLean * _dance;
             turn = danceTurn * _dance;
+        }
+
+        if (_clap > 0)
+        {
+            // Clapping fast, each person in their own time: hands apart, then together in front.
+            var apart = 0.5f + (0.5f * Mathf.Sin(((float)Time.GetTicksMsec() / 1000f * Mathf.Tau * 3.2f) + (Look.Seed * 1.3f)));
+            var open = 26f * apart;
+            left = left.Lerp(new Vector3(-82, 0, 16 - open), _clap);
+            right = right.Lerp(new Vector3(-82, 0, -16 + open), _clap);
+        }
+
+        if (_perform > 0)
+        {
+            left = left.Lerp(_performLeft, _perform);
+            right = right.Lerp(_performRight, _perform);
+            lift = Mathf.Lerp(lift, _performLift, _perform);
+            lean = lean.Lerp(_performLean, _perform);
+            turn *= 1 - _perform;
         }
 
         _armLeft.RotationDegrees = left;

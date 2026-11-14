@@ -76,6 +76,13 @@ public partial class CameraRig : Node3D
         _size = Mathf.Clamp(size, MinSize, MaxSize);
     }
 
+    /// <summary>Looks at a point closer than the player can zoom, for filming. Size is the height of the view in metres.</summary>
+    public void LookCloser(float xMetres, float zMetres, float size)
+    {
+        _target = new Vector3(xMetres, 0, zMetres);
+        _size = Mathf.Clamp(size, 2f, MaxSize);
+    }
+
     /// <summary>Jumps straight to where the view is heading, with no easing. Used for screenshots.</summary>
     public void Snap()
     {

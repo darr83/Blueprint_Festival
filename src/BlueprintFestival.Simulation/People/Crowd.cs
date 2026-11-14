@@ -419,6 +419,27 @@ public sealed class Crowd
     /// <summary>True while the set a party went to watch is still on.</summary>
     private bool StillOn(int set, DateTime now) => set >= 0 && ShowOf(set)?.Playing(now)?.Index == set;
 
+    /// <summary>How long a party stays clapping and cheering after a set they watched to the end.</summary>
+    private static TimeSpan ApplauseFor(Party party) => TimeSpan.FromMinutes(Performing.ApplauseMinutes(party.Id));
+
+    /// <summary>True while a set a party watched has just finished and they are still clapping the act off.</summary>
+    private bool Applauding(Party party, DateTime now) =>
+        party.Watch >= 0 && ShowOf(party.Watch) is { } show && show.Bowing(now) is { } bowing && bowing.Index == party.Watch
+        && now < bowing.End + ApplauseFor(party);
+
+    /// <summary>
+    /// True in the last part of a set, when those watching hold on for the end unless a need is
+    /// pressing, rather than go to a stall.
+    /// </summary>
+    private bool NearTheEnd(int set, DateTime now) =>
+        ShowOf(set)?.Playing(now) is { } slot && slot.Index == set && slot.End - now <= TimeSpan.FromMinutes(EndOfSetMinutes);
+
+    /// <summary>How bad a need has to be to make someone miss the end of a set they are watching.</summary>
+    public const double HoldOnFor = 0.95;
+
+    /// <summary>How near the end of a set, in game minutes, those watching wait for it to finish before going for a drink or the toilet.</summary>
+    public const int EndOfSetMinutes = 25;
+
     /// <summary>How many people are standing watching the act that is on.</summary>
     public int Watching => _parties.Where(p => p.State == PartyState.Watching).Sum(p => p.Members.Count);
 
@@ -1451,6 +1472,13 @@ public sealed class Crowd
                     // A big crowd takes longer to drift away at the end of the night.
                     party.Leaves = headliner.End + TimeSpan.FromMinutes(party.Random.Between(1, 14 + Math.Min(20, _parties.Count / 80.0)));
                 }
+
+                if (party.State == PartyState.Watching && ShowOf(party.Watch)?.Playing(now) is { } watched && watched.Index == party.Watch
+                    && party.Leaves < watched.End + ApplauseFor(party) && party.Mood >= 0.15 && Performing.StaysToTheEnd(party.Id))
+                {
+                    // Most of those watching see the set out and clap the act off before they go.
+                    party.Leaves = watched.End + ApplauseFor(party);
+                }
             }
 
             if (party.LitterAt != default && now >= party.LitterAt && party.IsOnSite)
@@ -1529,13 +1557,19 @@ public sealed class Crowd
                         party.Watch = -1;
                         Send(party, Home(party), PartyState.Leaving);
                     }
-                    else if (party.Wants is not null && SeekStall(party, now))
+                    else if (party.Wants is not null && SeekStall(party, now, NearTheEnd(party.Watch, now) || Applauding(party, now) ? HoldOnFor : Seeking))
                     {
                         // Something cannot wait for the end of the set.
                         party.Watch = -1;
                     }
                     else if (!StillOn(party.Watch, now))
                     {
+                        if (Applauding(party, now))
+                        {
+                            // The set is over, but the act is still taking its applause.
+                            break;
+                        }
+
                         // The set is over. With the stage empty this is the moment for a drink, some food
                         // or the toilet, even for those who could have waited; the rest hang about, then wander off.
                         party.Watch = -1;

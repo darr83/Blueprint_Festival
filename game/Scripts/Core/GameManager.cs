@@ -103,6 +103,10 @@ public partial class GameManager : Node
             {
                 AddChild(new DanceShots(arg["--dance-shots=".Length..]) { Name = "DanceShots" });
             }
+            else if (arg.StartsWith("--band-shots=", StringComparison.Ordinal))
+            {
+                AddChild(new BandShots(arg["--band-shots=".Length..]) { Name = "BandShots" });
+            }
             else if (arg == "--work-out-beats")
             {
                 AddChild(new BeatScan { Name = "BeatScan" });

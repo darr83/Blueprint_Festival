@@ -42,6 +42,7 @@ brands or sponsors.
 | 17. Dancing to the beat: each song's beat is worked out once and saved beside it, and the crowd dances in time to it, with a move for each sort of music | Done |
 | 18a. Proper queues: people stand one behind the next at gates and stalls, long queues bend and fold back instead of piling up, each person holds up a ticket at the gate, and a stall has one queue with each server taking the next party | Done |
 | 18b. Toilets: one queue for each set of cabins, each person walks to a free cubicle, the door swings open and shuts behind them, the sign turns red while they are inside and green when they come out, and they wait nearby for the rest of their party | Done |
+| 19. The band plays to the music: the drummer's sticks come down on each drum on the beat and the drums shake, guitars are strummed on the beat, the singer's mouth moves with the singing; a few seconds between songs while the crowd claps and cheers; the last song fades at the end of a set, the crowd cheers louder and most stay to clap the act off before they go | Done |
 
 ## Controls
 
@@ -180,6 +181,26 @@ Everyone is a touch ahead of or behind the beat, and some dance harder than othe
 songs, or a song whose beat is not worked out yet, gets a steady beat that suits its music, and the
 crowd at the stage that is not being heard dances to that too.
 
+### The band plays along
+
+The act plays to the same beat the crowd dances to. The drummer sits at a kit of bass drum, snare,
+two toms, a floor tom, hi-hat and crash: the right stick keeps time on the hi-hat (a crash at the
+start of every fourth bar), the left hits the snare on the second and fourth beats, and the end of
+every fourth bar is a fill round the toms. Each stick comes down on its drum exactly on its beat,
+and the drum swells or the cymbal rocks as it is hit. Guitars and bass are strummed down across
+the strings on each beat and up between, with the other hand changing chords on the neck. The
+singer sings into the mic, their mouth opening with the singing that is heard (the middle of the
+sound is listened to as it plays), and waves, points, holds the mic with both hands or claps over
+their head. The keyboard player plays, the DJ scratches and punches the air, rock and metal
+players jump at the end of every eighth bar.
+
+When a song ends the stage is quiet for a few seconds: the crowd stops dancing to clap and cheer
+(`song_end_` sounds and the `applause_loop`), and the singer thanks them. Near the end of a set
+no new song starts, and the last one fades away over its last seconds. The act then stays on for
+three minutes to wave and bow while the crowd cheers and claps, louder than between songs. Most of
+those watching hold on for the end of a set unless a need is desperate, and stay to clap for one
+to three minutes before they drift off to the stalls or home.
+
 ## Checks
 
 - `dotnet test tests/BlueprintFestival.Simulation.Tests` runs the unit tests.
@@ -187,6 +208,8 @@ crowd at the stage that is not being heard dances to that too.
   lets time pass until people arrive, pauses, turns the view, saves, loads and compares.
 - `godot --path game -- --shots=DIR` writes review screenshots to a folder.
 - `godot --path game -- --people-shots=DIR` writes line-up pictures of the people.
+- `godot --path game --write-movie FILE.avi --fixed-fps 30 -- --band-shots=DIR` films a band
+  playing (close-ups of the drummer, singer and guitarist), the end of a song and the end of a set.
 - `godot --path game -- --sales-shots=DIR` writes pictures of the planning and ticket sales screens.
 - `godot --path game -- --path-shots=DIR` writes pictures of paths and the camping field.
 - `godot --path game -- --queue-shots=DIR` writes pictures of the queues at gates and stalls.
