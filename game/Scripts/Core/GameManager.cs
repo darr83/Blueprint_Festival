@@ -83,6 +83,10 @@ public partial class GameManager : Node
             {
                 AddChild(new SoundShots(arg["--sound-shots=".Length..]) { Name = "SoundShots" });
             }
+            else if (arg.StartsWith("--cam-shots=", StringComparison.Ordinal))
+            {
+                AddChild(new CamShots(arg["--cam-shots=".Length..]) { Name = "CamShots" });
+            }
             else if (arg.StartsWith("--break-shots=", StringComparison.Ordinal))
             {
                 AddChild(new BreakShots(arg["--break-shots=".Length..]) { Name = "BreakShots" });
@@ -106,6 +110,10 @@ public partial class GameManager : Node
             else if (arg.StartsWith("--dance-shots=", StringComparison.Ordinal))
             {
                 AddChild(new DanceShots(arg["--dance-shots=".Length..]) { Name = "DanceShots" });
+            }
+            else if (arg.StartsWith("--band-shots=", StringComparison.Ordinal))
+            {
+                AddChild(new BandShots(arg["--band-shots=".Length..]) { Name = "BandShots" });
             }
             else if (arg == "--work-out-beats")
             {

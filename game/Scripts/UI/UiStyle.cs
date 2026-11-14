@@ -91,6 +91,8 @@ public static class UiStyle
         ["pause"] = "<path d='M9 5v14M15 5v14'/>",
         ["play"] = "<path d='M7 4l12 8-12 8z'/>",
         ["crowd"] = "<circle cx='8' cy='8' r='3'/><circle cx='16' cy='8' r='3'/><path d='M2 20a6 6 0 0 1 12 0M10 20a6 6 0 0 1 12 0'/>",
+        ["camband"] = "<path d='M2 10h10v8H2zM12 13l4-2.5v7L12 15'/><path d='M21 3v7'/><circle cx='19.3' cy='10.2' r='1.7'/><path d='M21 3l-3 1'/>",
+        ["camcrowd"] = "<path d='M2 3h10v7H2zM12 5.5l4-2.5v7l-4-2.5'/><circle cx='6' cy='16' r='2'/><circle cx='12' cy='16' r='2'/><circle cx='18' cy='16' r='2'/><path d='M3 22a3 3 0 0 1 6 0M9 22a3 3 0 0 1 6 0M15 22a3 3 0 0 1 6 0'/>",
         ["left"] = "<path d='M3 12a9 9 0 1 0 3-6.7L3 8'/><path d='M3 3v5h5'/>",
         ["right"] = "<path d='M21 12a9 9 0 1 1-3-6.7L21 8'/><path d='M21 3v5h-5'/>",
         ["plus"] = "<path d='M12 5v14M5 12h14'/>",
