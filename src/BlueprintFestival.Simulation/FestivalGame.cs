@@ -208,6 +208,36 @@ public sealed partial class FestivalGame
         return check;
     }
 
+    /// <summary>Whether a queue lane could be dragged out here, counting the money.</summary>
+    public BuildCheck CheckLane(TilePoint from, TilePoint to) => Afford(Site.CheckLane(from, to));
+
+    /// <summary>Lays a queue lane (or carries one on from its end) and pays for it. Its barriers go up by themselves.</summary>
+    public BuildCheck BuildLane(TilePoint from, TilePoint to)
+    {
+        var check = CheckLane(from, to);
+        if (check.Ok)
+        {
+            Spend("Fences and gates", check.Cost);
+            Site.AddLane(from, to);
+        }
+
+        return check;
+    }
+
+    /// <summary>Whether the box between two tiles can be marked "no customers", or cleared again.</summary>
+    public BuildCheck CheckKeepOut(TilePoint from, TilePoint to, bool keepOut)
+    {
+        var check = Site.CheckKeepOut(from, to, keepOut);
+        return check.Ok && !CanBuild ? BuildCheck.No("Nothing can be built just now.") : check;
+    }
+
+    /// <summary>Marks ground "no customers" (or clears it). It costs nothing; staff still go there.</summary>
+    public BuildCheck KeepOut(TilePoint from, TilePoint to, bool keepOut)
+    {
+        var check = CheckKeepOut(from, to, keepOut);
+        return check.Ok ? Site.SetKeepOut(from, to, keepOut) : check;
+    }
+
     public BuildCheck BuildGate(GateKind kind, int x, int y, bool vertical)
     {
         var check = CheckGate(kind, x, y, vertical);

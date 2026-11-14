@@ -981,9 +981,8 @@ public sealed class Crowd
             party.Lane = bestLane;
             party.QueuedSince = _now;
             var line = _queues[best][bestLane];
-            var (x, y, _) = line.At(Entry(line, line.People));
+            party.Target = Approach(line, Entry(line, line.People));
             line.Parties.Add(party);
-            party.Target = FieldMap.TileAt(x, y);
             party.Path = Route(party, FieldMap.TileAt(party.X, party.Y), party.Target);
             party.PathIndex = 0;
             party.Moving = party.Path is not null;
@@ -1011,6 +1010,7 @@ public sealed class Crowd
         _serving.Clear();
         _cubicles.Clear();
         _taken.Clear();
+        var fenced = MatchLanes();
         foreach (var stall in _site.Stalls)
         {
             var info = Catalogue.Of(stall.Kind);
@@ -1037,7 +1037,11 @@ public sealed class Crowd
             {
                 var (fx, fy) = _site.LaneMouth(g, lane, 0);
                 lanes[lane] = new QueueLine(fx, fy);
-                if (use.InUse)
+                if (use.InUse && fenced.TryGetValue((true, g, lane), out var built))
+                {
+                    AlongLane(lanes[lane], built.Lane, built.FromEnd, GatePlaces, p => _site.SideOf(p) == Side.Outside);
+                }
+                else if (use.InUse)
                 {
                     var (x, y) = _site.LaneMouth(g, lane, 0.9);
                     Grow(lanes[lane], x, y, use.OutX, use.OutY, GatePlaces, 0, p => _site.SideOf(p) == Side.Outside);
@@ -1060,8 +1064,140 @@ public sealed class Crowd
 
             var (fx, fy, dx, dy) = SiteLayout.Front(stall.Rect, stall.Facing);
             var line = new QueueLine(fx, fy);
-            Grow(line, fx + (dx * StallQueueStart), fy + (dy * StallQueueStart), dx, dy, StallPlaces, StallFold, _ => true);
+            if (fenced.TryGetValue((false, _stallQueues.Count, 0), out var built))
+            {
+                AlongLane(line, built.Lane, built.FromEnd, StallPlaces, _ => true);
+            }
+            else
+            {
+                Grow(line, fx + (dx * StallQueueStart), fy + (dy * StallQueueStart), dx, dy, StallPlaces, StallFold, _ => true);
+            }
+
             _stallQueues.Add(line);
+        }
+    }
+
+    /// <summary>How near the end of a queue lane must be to where a queue would start for the queue to use it, in metres.</summary>
+    public const double LaneReach = 3.0;
+
+    /// <summary>
+    /// Pairs the queue lanes the player has laid with the queues they serve. A lane belongs to the
+    /// gate or stall whose queue would start nearest one of its ends, if that is within a few
+    /// metres; that end is the front. Each queue has one lane and each lane one queue.
+    /// </summary>
+    private Dictionary<(bool Gate, int Index, int Lane), (int Lane, bool FromEnd)> MatchLanes()
+    {
+        var pairs = new Dictionary<(bool, int, int), (int, bool)>();
+        var lanes = _site.Lanes;
+        if (lanes.Count == 0)
+        {
+            return pairs;
+        }
+
+        var offers = new List<(double Away, (bool, int, int) Queue, int Lane, bool FromEnd)>();
+        void Offer((bool, int, int) queue, double x, double y)
+        {
+            for (var l = 0; l < lanes.Count; l++)
+            {
+                foreach (var fromEnd in new[] { false, true })
+                {
+                    var (ex, ey) = FieldMap.CentreOf(fromEnd ? lanes[l][^1] : lanes[l][0]);
+                    var away = Math.Sqrt(((ex - x) * (ex - x)) + ((ey - y) * (ey - y)));
+                    if (away <= LaneReach)
+                    {
+                        offers.Add((away, queue, l, fromEnd));
+                    }
+                }
+            }
+        }
+
+        for (var g = 0; g < _site.Gates.Count; g++)
+        {
+            for (var lane = 0; _site.GateUses[g].InUse && lane < Catalogue.Of(_site.Gates[g].Kind).Lanes; lane++)
+            {
+                var (x, y) = _site.LaneMouth(g, lane, 0.9);
+                Offer((true, g, lane), x, y);
+            }
+        }
+
+        for (var i = 0; i < _site.Stalls.Count; i++)
+        {
+            if (Catalogue.Of(_site.Stalls[i].Kind).Serves is not null)
+            {
+                var (fx, fy, dx, dy) = SiteLayout.Front(_site.Stalls[i].Rect, _site.Stalls[i].Facing);
+                Offer((false, i, 0), fx + (dx * LaneFront), fy + (dy * LaneFront));
+            }
+        }
+
+        var used = new HashSet<int>();
+        foreach (var (_, queue, lane, fromEnd) in offers.OrderBy(o => o.Away))
+        {
+            if (!pairs.ContainsKey(queue) && used.Add(lane))
+            {
+                pairs[queue] = (lane, fromEnd);
+            }
+        }
+
+        return pairs;
+    }
+
+    /// <summary>How far out from a stall's front a queue lane is best started, in metres.</summary>
+    private const double LaneFront = 2.0;
+
+    private bool FreeFor(double x, double y, Func<TilePoint, bool> allowed)
+    {
+        var tile = FieldMap.TileAt(x, y);
+        return _map.IsWalkable(tile) && allowed(tile) && !Taken(x, y);
+    }
+
+    /// <summary>
+    /// Sets a queue out along a lane the player has laid: a place every step down the middle of it
+    /// from the front, round its corners, and then on out of the open end as far as there is room.
+    /// </summary>
+    private void AlongLane(QueueLine line, int laneIndex, bool fromEnd, int most, Func<TilePoint, bool> allowed)
+    {
+        const double s = QueueLine.Spacing;
+        var tiles = fromEnd ? _site.Lanes[laneIndex].Reverse().ToList() : _site.Lanes[laneIndex].ToList();
+        var (x, y) = FieldMap.CentreOf(tiles[0]);
+        line.Add(x, y);
+        var owed = s;
+        var (dx, dy) = (0.0, 0.0);
+        for (var i = 1; i < tiles.Count; i++)
+        {
+            var (nx, ny) = FieldMap.CentreOf(tiles[i]);
+            (dx, dy) = ((nx - x) / FieldMap.TileMetres, (ny - y) / FieldMap.TileMetres);
+            var left = FieldMap.TileMetres;
+            while (left >= owed - 1e-9)
+            {
+                (x, y) = (x + (dx * owed), y + (dy * owed));
+                left -= owed;
+                owed = s;
+                line.Add(x, y);
+            }
+
+            owed -= left;
+            (x, y) = (nx, ny);
+        }
+
+        foreach (var (px, py) in line.Places)
+        {
+            Take((px, py));
+        }
+
+        line.Fenced = line.Places.Count;
+        line.Mouth = (x + (dx * FieldMap.TileMetres), y + (dy * FieldMap.TileMetres));
+
+        // Past the open end the queue carries on across the grass like any other.
+        var (lx, ly) = line.Places[^1];
+        var (tx, ty) = (lx + (dx * s), ly + (dy * s));
+        if (_site.IsLane(FieldMap.TileAt(tx, ty)))
+        {
+            (tx, ty) = (tx + (dx * FieldMap.TileMetres), ty + (dy * FieldMap.TileMetres));
+        }
+
+        if (line.Places.Count < most && FreeFor(tx, ty, allowed))
+        {
+            Grow(line, tx, ty, dx, dy, most, 0, allowed);
         }
     }
 
@@ -1116,11 +1252,7 @@ public sealed class Crowd
     private void Grow(QueueLine line, double x, double y, double dx, double dy, int most, int fold, Func<TilePoint, bool> allowed)
     {
         const double s = QueueLine.Spacing;
-        bool Free(double px, double py)
-        {
-            var tile = FieldMap.TileAt(px, py);
-            return _map.IsWalkable(tile) && allowed(tile) && !Taken(px, py);
-        }
+        bool Free(double px, double py) => FreeFor(px, py, allowed);
 
         var (sx, sy) = (-dy, dx);
         var depth = 0;
@@ -1188,7 +1320,7 @@ public sealed class Crowd
 
     /// <summary>The place a party makes for to join a queue with so many people already in it.</summary>
     private static int Entry(QueueLine line, int people) =>
-        Math.Clamp(Math.Max(people, line.Fenced - 1), 0, Math.Max(0, line.Places.Count - 1));
+        Math.Clamp(Math.Max(people, line.Fenced), 0, Math.Max(0, line.Places.Count - 1));
 
     /// <summary>
     /// A party that has walked up to a queue takes its place at the back. If the back has moved on
@@ -1200,10 +1332,17 @@ public sealed class Crowd
         var enter = Entry(line, back);
         var (x, y, heading) = line.At(enter);
         var away = Math.Sqrt(((x - party.X) * (x - party.X)) + ((y - party.Y) * (y - party.Y)));
-        if (away > 1.5 && party.Rejoins < 3 && Route(party, FieldMap.TileAt(party.X, party.Y), FieldMap.TileAt(x, y)) is { Count: > 0 } path)
+        var door = Approach(line, enter);
+        if (door != FieldMap.TileAt(x, y))
+        {
+            var (mx, my) = FieldMap.CentreOf(door);
+            away = Math.Sqrt(((mx - party.X) * (mx - party.X)) + ((my - party.Y) * (my - party.Y)));
+        }
+
+        if (away > 1.5 && party.Rejoins < 3 && Route(party, FieldMap.TileAt(party.X, party.Y), door) is { Count: > 0 } path)
         {
             party.Rejoins++;
-            party.Target = FieldMap.TileAt(x, y);
+            party.Target = door;
             party.Path = path;
             party.PathIndex = 0;
             party.Moving = true;
@@ -1333,9 +1472,32 @@ public sealed class Crowd
         party.Gate = -1;
         party.ServiceLeft = -1;
         party.Moving = false;
+        if (party.InLine)
+        {
+            StepOut(party);
+        }
+
         party.InLine = false;
         party.Checked = 0;
         party.Rejoins = 0;
+    }
+
+    /// <summary>Someone leaving a fenced queue lane part way along ducks out under the barrier.</summary>
+    private void StepOut(Party party)
+    {
+        var at = FieldMap.TileAt(party.X, party.Y);
+        if (_site.IsLane(at))
+        {
+            (party.X, party.Y) = FieldMap.CentreOf(NearestWalkable(at));
+        }
+    }
+
+    /// <summary>The tile to walk to for a place in a queue: the place itself, or the open end of the lane if the place is inside one.</summary>
+    private TilePoint Approach(QueueLine line, int place)
+    {
+        var (x, y, _) = line.At(place);
+        var tile = FieldMap.TileAt(x, y);
+        return _map.IsWalkable(tile) || line.Mouth is not { } mouth ? tile : FieldMap.TileAt(mouth.X, mouth.Y);
     }
 
     private void Queue(Party party)
@@ -1707,8 +1869,8 @@ public sealed class Crowd
         }
 
         var line = _stallQueues[best]!;
-        var place = line.At(Entry(line, line.People));
-        var path = Route(party, FieldMap.TileAt(party.X, party.Y), FieldMap.TileAt(place.X, place.Y));
+        var door = Approach(line, Entry(line, line.People));
+        var path = Route(party, FieldMap.TileAt(party.X, party.Y), door);
         if (path is null)
         {
             // Cannot get there (fenced off, perhaps): try again in a while.
@@ -1723,7 +1885,7 @@ public sealed class Crowd
         party.Rejoins = 0;
         party.ServiceLeft = -1;
         party.QueuedSince = now;
-        party.Target = FieldMap.TileAt(place.X, place.Y);
+        party.Target = door;
         party.Path = path;
         party.PathIndex = 0;
         party.Moving = true;
@@ -1733,6 +1895,11 @@ public sealed class Crowd
 
     private void LeaveStall(Party party)
     {
+        if (party.InLine && party.Server < 0)
+        {
+            StepOut(party);
+        }
+
         if (party.Stall >= 0 && party.Stall < _stallQueues.Count)
         {
             _stallQueues[party.Stall]?.Parties.Remove(party);
