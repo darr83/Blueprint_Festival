@@ -40,6 +40,33 @@ public class GameClockTests
         Assert.Equal(expectedTicks, clock.TickCount);
     }
 
+    [Theory]
+    [InlineData(GameSpeed.Testing16, 60)]
+    [InlineData(GameSpeed.Testing32, 120)]
+    public void Testing_speeds_run_sixteen_and_thirty_two_times_as_fast(GameSpeed speed, int expectedTicks)
+    {
+        var clock = new GameClock();
+        clock.SetSpeed(speed);
+        Assert.Equal(expectedTicks, clock.Advance(0.5));
+    }
+
+    [Fact]
+    public void At_thirty_two_times_a_slow_frame_still_keeps_up()
+    {
+        // A tenth of a second frame (10 frames a second) at 32x is 24 ticks: well under the cap,
+        // so nothing of the day is dropped.
+        var clock = new GameClock();
+        clock.SetSpeed(GameSpeed.Testing32);
+        var ticks = 0;
+        for (var i = 0; i < 10; i++)
+        {
+            ticks += clock.Advance(0.1);
+        }
+
+        Assert.InRange(ticks, 239, 240);
+        Assert.True(GameClock.MaxTicksPerAdvance > 24);
+    }
+
     [Fact]
     public void Nothing_moves_while_paused()
     {

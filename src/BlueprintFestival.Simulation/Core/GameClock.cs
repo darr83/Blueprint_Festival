@@ -8,6 +8,12 @@ public enum GameSpeed
     Fast = 2,
     VeryFast = 4,
     Fastest = 8,
+
+    /// <summary>For testing: a whole festival day in about four real minutes.</summary>
+    Testing16 = 16,
+
+    /// <summary>For testing: a whole festival day in about two real minutes.</summary>
+    Testing32 = 32,
 }
 
 /// <summary>

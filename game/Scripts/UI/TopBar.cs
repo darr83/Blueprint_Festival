@@ -21,6 +21,8 @@ public partial class TopBar : PanelContainer
         (GameSpeed.Fast, "2x", "Double speed (2)"),
         (GameSpeed.VeryFast, "4x", "Four times speed (3)"),
         (GameSpeed.Fastest, "8x", "Eight times speed (4)"),
+        (GameSpeed.Testing16, "16x", "Sixteen times speed, for testing (5)"),
+        (GameSpeed.Testing32, "32x", "Thirty-two times speed, for testing (6)"),
     };
 
     private readonly Dictionary<GameSpeed, Button> _speedButtons = new();
