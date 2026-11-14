@@ -28,7 +28,10 @@ public static partial class SiteProps
                 BarTent(b, node);
                 break;
             case StallKind.Toilets:
-                Toilets(b, node);
+                Toilets(b, node, 3);
+                break;
+            case StallKind.ToiletBlock:
+                Toilets(b, node, 9);
                 break;
             case StallKind.FirstAidTent:
                 return FirstAidTent();
@@ -258,18 +261,18 @@ public static partial class SiteProps
         b.Box(new Vector3(1.9f, 0.5f, -1.4f), new Vector3(1.2f, 1.0f, 0.7f), new Color("#F5F5F5"));
     }
 
-    private static void Toilets(MeshBuilder b, Node3D node)
+    private static void Toilets(MeshBuilder b, Node3D node, int cabins)
     {
-        // Three portable cabins in a row.
-        for (var i = 0; i < 3; i++)
+        // Portable cabins in a row: three for a village, nine in a block.
+        for (var i = 0; i < cabins; i++)
         {
-            var x = (i - 1) * 1.25f;
+            var x = (i - ((cabins - 1) / 2f)) * 1.25f;
             b.Box(new Vector3(x, 0.06f, 0), new Vector3(1.2f, 0.12f, 1.25f), Charcoal);
             b.Box(new Vector3(x, 1.2f, 0), new Vector3(1.14f, 2.16f, 1.18f), Teal);
             b.Box(new Vector3(x, 2.32f, 0), new Vector3(1.2f, 0.1f, 1.24f), Cream, new Vector3(4, 0, 0));
             b.Box(new Vector3(x, 1.12f, 0.6f), new Vector3(0.8f, 1.86f, 0.03f), Cream);
             b.Box(new Vector3(x + 0.3f, 1.1f, 0.63f), new Vector3(0.06f, 0.16f, 0.04f), Black);
-            b.Tube(new Vector3(x, 1.75f, 0.625f), new Vector3(0.16f, 0.02f, 0.16f), i == 1 ? new Color("#D9483B") : new Color("#1E9E52"), new Vector3(90, 0, 0));
+            b.Tube(new Vector3(x, 1.75f, 0.625f), new Vector3(0.16f, 0.02f, 0.16f), i % 3 == 1 ? new Color("#D9483B") : new Color("#1E9E52"), new Vector3(90, 0, 0));
             b.Tube(new Vector3(x - 0.42f, 2.5f, -0.45f), new Vector3(0.09f, 0.5f, 0.09f), Black);
         }
 

@@ -54,6 +54,10 @@ public partial class GameManager : Node
             {
                 AddChild(new WeatherShots(arg["--weather-shots=".Length..]) { Name = "WeatherShots" });
             }
+            else if (arg.StartsWith("--growth-shots=", StringComparison.Ordinal))
+            {
+                AddChild(new GrowthShots(arg["--growth-shots=".Length..]) { Name = "GrowthShots" });
+            }
             else if (arg.StartsWith("--crowd-shots=", StringComparison.Ordinal))
             {
                 AddChild(new CrowdShots(arg["--crowd-shots=".Length..]) { Name = "CrowdShots" });
@@ -80,6 +84,14 @@ public partial class GameManager : Node
     public void StartNewFestival(string? name)
     {
         Game = FestivalGame.NewFestival(name);
+        GetTree().Paused = false;
+        GetTree().ChangeSceneToFile(FestivalScene);
+    }
+
+    /// <summary>Opens a festival that has already been made, in whatever year it is in.</summary>
+    public void Open(FestivalGame game)
+    {
+        Game = game;
         GetTree().Paused = false;
         GetTree().ChangeSceneToFile(FestivalScene);
     }

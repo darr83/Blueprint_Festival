@@ -53,6 +53,7 @@ public partial class ShowView : Node3D
             StageKind.Bandstand => new[] { new Vector2(0, 1.2f), new Vector2(-1.9f, 0.8f), new Vector2(1.9f, 0.8f) },
             _ => new[] { new Vector2(0, 1.7f), new Vector2(-2.4f, 1.2f), new Vector2(2.4f, 1.2f) },
         };
+        var big = kind is StageKind.HiredStage or StageKind.MainStage;
         var spots = new List<Vector3>();
         var used = 0;
         foreach (var role in roles)
@@ -60,14 +61,14 @@ public partial class ShowView : Node3D
             Vector3 at;
             if (roles.Count == 1)
             {
-                at = new Vector3(0, deck, (kind == StageKind.HiredStage ? 0.6f : 0.3f) + shift);
+                at = new Vector3(0, deck, (big ? 0.6f : 0.3f) + shift);
             }
             else if (role == BandRole.Drummer && kind != StageKind.FarmTrailer)
             {
                 // The hired stage has a drum riser at the back.
-                at = kind == StageKind.HiredStage ? new Vector3(-0.2f, deck + 0.5f, -1.9f) : new Vector3(0, deck, -1.3f + shift);
+                at = big ? new Vector3(-0.2f, deck + 0.5f, -1.9f) : new Vector3(0, deck, -1.3f + shift);
             }
-            else if (role == BandRole.Keys && kind == StageKind.HiredStage)
+            else if (role == BandRole.Keys && big)
             {
                 at = new Vector3(3.0f, deck, -0.6f);
             }
@@ -78,7 +79,8 @@ public partial class ShowView : Node3D
                 at = new Vector3(spot.X, deck, spot.Y + shift);
             }
 
-            spots.Add(at);
+            // The main stage is the hired stage made bigger, so everyone stands further apart and higher up.
+            spots.Add(kind == StageKind.MainStage ? at * SiteProps.MainStageScale : at);
         }
 
         return spots;
@@ -190,7 +192,8 @@ public partial class ShowView : Node3D
 
         _rig.Position = SiteView.Middle(stage.Rect);
         _rig.RotationDegrees = new Vector3(0, SiteView.Turn(stage.Facing), 0);
-        if (stage.Kind != StageKind.HiredStage)
+        var k = stage.Kind == StageKind.MainStage ? SiteProps.MainStageScale : 1f;
+        if (stage.Kind is not (StageKind.HiredStage or StageKind.MainStage))
         {
             // Small stages get a string of warm bulbs' worth of light, no more.
             var high = stage.Kind == StageKind.Bandstand ? 3.2f : 3.6f;
@@ -204,11 +207,11 @@ public partial class ShowView : Node3D
             : new[] { new Color("#F6B93B"), new Color("#E94F7B"), new Color("#FFF1C9"), new Color("#E94F7B"), new Color("#F6B93B") };
         for (var i = 0; i < colours.Length; i++)
         {
-            var x = (i - 2) * 1.9f;
-            var from = new Vector3(x, 6.3f, 2.6f);
-            var spot = new SpotLight3D { LightColor = colours[i], SpotRange = 14f, SpotAngle = 32f, ShadowEnabled = false, Position = from };
-            Add(spot, 9f);
-            spot.LookAtFromPosition(from, new Vector3(x * 0.8f, 1.3f, 0.2f), Vector3.Up);
+            var x = (i - 2) * 1.9f * k;
+            var from = new Vector3(x, 6.3f * k, 2.6f * k);
+            var spot = new SpotLight3D { LightColor = colours[i], SpotRange = 14f * k, SpotAngle = 32f, ShadowEnabled = false, Position = from };
+            Add(spot, 9f * k);
+            spot.LookAtFromPosition(from, new Vector3(x * 0.8f, 1.3f * k, 0.2f), Vector3.Up);
 
             // A beam through the haze, pointing out over the crowd.
             var material = new StandardMaterial3D
@@ -222,17 +225,17 @@ public partial class ShowView : Node3D
             var tilt = new Vector3(52, (i - 2) * 16, 0);
             _rig.AddChild(new MeshInstance3D
             {
-                Mesh = new CylinderMesh { TopRadius = 0.08f, BottomRadius = 1.3f, Height = 11f, RadialSegments = 12, Rings = 1 },
+                Mesh = new CylinderMesh { TopRadius = 0.08f * k, BottomRadius = 1.3f * k, Height = 11f * k, RadialSegments = 12, Rings = 1 },
                 MaterialOverride = material,
                 CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
                 RotationDegrees = tilt,
-                Position = from + (Basis.FromEuler(tilt * (Mathf.Pi / 180f)) * new Vector3(0, -5.5f, 0)) + new Vector3(0, 0.2f, 0.5f),
+                Position = from + (Basis.FromEuler(tilt * (Mathf.Pi / 180f)) * new Vector3(0, -5.5f * k, 0)) + new Vector3(0, 0.2f, 0.5f),
             });
             _beams.Add((material, colours[i]));
         }
 
-        Add(new OmniLight3D { LightColor = dj ? new Color("#9C7BFF") : new Color("#FFD9A0"), OmniRange = 17f, Position = new Vector3(0, 5.5f, 8f) }, 5f);
-        Add(new OmniLight3D { LightColor = new Color("#FFE8C0"), OmniRange = 9f, Position = new Vector3(0, 4.5f, 1f) }, 3f);
+        Add(new OmniLight3D { LightColor = dj ? new Color("#9C7BFF") : new Color("#FFD9A0"), OmniRange = 17f * k, Position = new Vector3(0, 5.5f * k, 8f * k) }, 5f * k);
+        Add(new OmniLight3D { LightColor = new Color("#FFE8C0"), OmniRange = 9f * k, Position = new Vector3(0, 4.5f * k, 1f) }, 3f * k);
     }
 
     private void Add(Light3D light, float full)

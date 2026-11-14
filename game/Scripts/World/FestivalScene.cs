@@ -1,6 +1,7 @@
 using BlueprintFestival.Core;
 using BlueprintFestival.Simulation;
 using BlueprintFestival.Simulation.Core;
+using BlueprintFestival.Simulation.People;
 using BlueprintFestival.UI;
 using Godot;
 
@@ -131,12 +132,17 @@ public partial class FestivalScene : Node3D
         BuildBar.Visible = Game.CanBuild;
         _viewButtons = new ViewButtons { Name = "ViewButtons" };
         _hud.AddChild(_viewButtons);
-        _viewButtons.Initialise(Camera, SetCrowdView);
+        _viewButtons.Initialise(Camera, on =>
+        {
+            _viewFromWarning = false;
+            SetCrowdView(on);
+        });
         CrowdSafety = new CrowdPanel { Name = "CrowdPanel" };
         _hud.AddChild(CrowdSafety);
         CrowdSafety.Initialise(Game, Density);
         CrowdSafety.ShowMe += (x, y) =>
         {
+            _viewFromWarning = false;
             SetCrowdView(true);
             Camera.LookAt((float)x, (float)y, 18f);
         };
@@ -158,6 +164,13 @@ public partial class FestivalScene : Node3D
         Game.Advance(delta);
         Sky.Apply(Game, Camera.Yaw);
         CrowdSafety.RightInset = Money.Visible ? Money.Size.X + 14 : 0;
+        if (_viewFromWarning && Density.Showing && !Game.CrushBuilding && Game.CrowdStatus != Crowding.CrushRisk)
+        {
+            // The knot of people has cleared by itself: put the view back as the player had it.
+            _viewFromWarning = false;
+            SetCrowdView(false);
+        }
+
         if (Density.Showing && Game.Phase is not (Phase.Day or Phase.Build))
         {
             // There is no crowd to look at once the day is over.
@@ -203,6 +216,7 @@ public partial class FestivalScene : Node3D
                 Game.Clock.SetSpeed(GameSpeed.Fastest);
                 break;
             case Key.C:
+                _viewFromWarning = false;
                 SetCrowdView(!Density.Showing);
                 break;
             case Key.Escape:
@@ -220,6 +234,8 @@ public partial class FestivalScene : Node3D
     }
 
     /// <summary>Somewhere has become a crush risk: slow the clock to normal and show the player where.</summary>
+    private bool _viewFromWarning;
+
     private void OnCrushWarning(double x, double y)
     {
         if (Game.Clock.Speed > GameSpeed.Normal)
@@ -227,7 +243,11 @@ public partial class FestivalScene : Node3D
             Game.Clock.SetSpeed(GameSpeed.Normal);
         }
 
-        SetCrowdView(true);
+        if (!Density.Showing)
+        {
+            _viewFromWarning = true;
+            SetCrowdView(true);
+        }
     }
 
     public override void _ExitTree() => Game.CrushWarning -= OnCrushWarning;

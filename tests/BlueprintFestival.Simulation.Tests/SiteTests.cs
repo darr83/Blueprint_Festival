@@ -31,21 +31,22 @@ public class SiteTests
     [Fact]
     public void Everything_in_the_catalogue_has_a_name_a_size_and_a_price()
     {
-        Assert.Equal(3, Catalogue.Stages.Count);
+        Assert.Equal(4, Catalogue.Stages.Count);
         Assert.Equal(4, Catalogue.Fences.Count);
-        Assert.Equal(2, Catalogue.Gates.Count);
+        Assert.Equal(3, Catalogue.Gates.Count);
         Assert.All(Enum.GetValues<StageKind>(), k => Assert.Equal(k, Catalogue.Of(k).Kind));
         Assert.All(Enum.GetValues<FenceKind>(), k => Assert.Equal(k, Catalogue.Of(k).Kind));
         Assert.All(Enum.GetValues<GateKind>(), k => Assert.Equal(k, Catalogue.Of(k).Kind));
         Assert.All(Catalogue.Stages, s => Assert.True(s.Cost > 0 && s.Width > 0 && s.Depth > 0 && s.Name.Length > 0));
-        Assert.All(Catalogue.Gates, g => Assert.True(g.Cost > 0 && g.Lanes >= 1 && g.SecondsPerPerson > 0 && g.Width <= 12));
+        Assert.All(Catalogue.Gates, g => Assert.True(g.Cost > 0 && g.Lanes >= 1 && g.SecondsPerPerson > 0 && g.Width <= 24));
         Assert.True(Catalogue.Stages.Select(s => s.Cost).SequenceEqual(Catalogue.Stages.Select(s => s.Cost).OrderBy(c => c)));
     }
 
     [Fact]
     public void A_first_festival_can_afford_any_one_stage_a_gate_and_some_fence()
     {
-        foreach (var stage in Catalogue.Stages)
+        // The main stage is on offer from the start, but it is for a festival that has grown into it.
+        foreach (var stage in Catalogue.Stages.Where(s => s.Kind != StageKind.MainStage))
         {
             Assert.True(stage.Cost + Catalogue.Of(GateKind.VillageGate).Cost + SiteLayout.FenceCost(FenceKind.Rope, 100) <= FestivalGame.StartingMoney);
         }

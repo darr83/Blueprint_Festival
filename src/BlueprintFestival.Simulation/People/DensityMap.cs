@@ -27,7 +27,7 @@ public sealed class DensityMap
     /// <summary>People per square metre at which a place is busy.</summary>
     public const double Busy = 2.0;
 
-    /// <summary>People per square metre at which a place is a crush risk.</summary>
+    /// <summary>People per square metre above which a place is a crush risk.</summary>
     public const double Crush = 4.0;
 
     private const double SquareArea = SquareMetres * SquareMetres;
@@ -59,7 +59,7 @@ public sealed class DensityMap
     /// <summary>How many squares were busy, but not a crush risk, at the last measure.</summary>
     public int AmberSquares { get; private set; }
 
-    public static Crowding StatusOf(double perMetre) => perMetre >= Crush ? Crowding.CrushRisk : perMetre >= Busy ? Crowding.Busy : Crowding.Comfortable;
+    public static Crowding StatusOf(double perMetre) => perMetre > Crush ? Crowding.CrushRisk : perMetre >= Busy ? Crowding.Busy : Crowding.Comfortable;
 
     /// <summary>The square a place in metres falls in.</summary>
     public (int X, int Y) SquareOf(double x, double y) =>
@@ -98,7 +98,7 @@ public sealed class DensityMap
         for (var i = 0; i < _counts.Length; i++)
         {
             var perMetre = _counts[i] / SquareArea;
-            if (perMetre >= Crush)
+            if (perMetre > Crush)
             {
                 RedSquares++;
             }

@@ -8,15 +8,34 @@ namespace BlueprintFestival.Simulation.World;
 public sealed class PathFinder
 {
     private const double Diagonal = 1.41421356;
+
+    /// <summary>How many tiles from either end a straight line may pass close to something built.</summary>
+    private const int EndReach = 6;
+
+    /// <summary>
+    /// A hair's weight on the distance still to go, so that of two equally good routes the search
+    /// follows the one that is nearly there instead of trying every one of them.
+    /// </summary>
+    private const double Keen = 1.0005;
     private static readonly (int Dx, int Dy)[] Steps = { (1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (1, -1), (-1, 1), (-1, -1) };
 
     private readonly FieldMap _map;
     private readonly float[] _crowding;
 
+    // Kept between searches and marked with the search's number, so a route across a big field
+    // does not have to wipe the whole map first.
+    private readonly double[] _cost;
+    private readonly int[] _cameFrom;
+    private readonly int[] _searched;
+    private int _search;
+
     public PathFinder(FieldMap map)
     {
         _map = map;
         _crowding = new float[map.Width * map.Height];
+        _cost = new double[_crowding.Length];
+        _cameFrom = new int[_crowding.Length];
+        _searched = new int[_crowding.Length];
         Refresh();
     }
 
@@ -68,17 +87,38 @@ public sealed class PathFinder
             return null;
         }
 
+        if (ClearLine(from, to))
+        {
+            // Open ground all the way: walk straight there.
+            return from == to ? new List<TilePoint> { from } : new List<TilePoint> { from, to };
+        }
+
         var width = _map.Width;
-        var count = width * _map.Height;
-        var cost = new double[count];
-        var cameFrom = new int[count];
-        Array.Fill(cost, double.MaxValue);
-        Array.Fill(cameFrom, -1);
+        var cost = _cost;
+        var cameFrom = _cameFrom;
+        var searched = _searched;
+        if (++_search == int.MaxValue)
+        {
+            Array.Clear(searched);
+            _search = 1;
+        }
+
+        var search = _search;
 
         var start = (from.Y * width) + from.X;
         var goal = (to.Y * width) + to.X;
         var open = new PriorityQueue<int, double>();
         cost[start] = 0;
+        cameFrom[start] = -1;
+        searched[start] = search;
+        cost[goal] = double.MaxValue;
+        cameFrom[goal] = -1;
+        searched[goal] = search;
+        if (goal == start)
+        {
+            cost[start] = 0;
+        }
+
         open.Enqueue(start, 0);
 
         while (open.TryDequeue(out var current, out var priority))
@@ -90,7 +130,7 @@ public sealed class PathFinder
 
             var cx = current % width;
             var cy = current / width;
-            if (priority > cost[current] + Estimate(cx, cy, to) + 1e-9)
+            if (priority > cost[current] + (Keen * Estimate(cx, cy, to)) + 1e-9)
             {
                 continue; // an out-of-date entry
             }
@@ -112,11 +152,18 @@ public sealed class PathFinder
                 var next = (ny * width) + nx;
                 var stepCost = (dx != 0 && dy != 0 ? Diagonal : 1) * (1 + _crowding[next]);
                 var total = cost[current] + stepCost;
+                if (searched[next] != search)
+                {
+                    searched[next] = search;
+                    cost[next] = double.MaxValue;
+                    cameFrom[next] = -1;
+                }
+
                 if (total < cost[next])
                 {
                     cost[next] = total;
                     cameFrom[next] = current;
-                    open.Enqueue(next, total + Estimate(nx, ny, to));
+                    open.Enqueue(next, total + (Keen * Estimate(nx, ny, to)));
                 }
             }
         }
@@ -138,6 +185,55 @@ public sealed class PathFinder
 
         path.Reverse();
         return Straighten(path);
+    }
+
+    /// <summary>
+    /// True if the straight line between two tiles crosses nothing but open ground, well clear of
+    /// anything in the way. No route can be shorter than that, so there is no need to search.
+    /// </summary>
+    private bool ClearLine(TilePoint from, TilePoint to)
+    {
+        var width = _map.Width;
+        var (x, y) = (from.X, from.Y);
+        var dx = Math.Abs(to.X - x);
+        var dy = Math.Abs(to.Y - y);
+        var sx = x < to.X ? 1 : -1;
+        var sy = y < to.Y ? 1 : -1;
+        var error = dx - dy;
+        while (true)
+        {
+            // Close to either end the line may brush past something: that is where it is going.
+            var nearEnd = Math.Max(Math.Abs(x - from.X), Math.Abs(y - from.Y)) <= EndReach || Math.Max(Math.Abs(x - to.X), Math.Abs(y - to.Y)) <= EndReach;
+            if (!_map.IsWalkable(x, y) || (!nearEnd && _crowding[(y * width) + x] != 0))
+            {
+                return false;
+            }
+
+            if (x == to.X && y == to.Y)
+            {
+                return true;
+            }
+
+            var twice = 2 * error;
+            var stepX = twice > -dy;
+            var stepY = twice < dx;
+            if (stepX && stepY && (!_map.IsWalkable(x + sx, y) || !_map.IsWalkable(x, y + sy)))
+            {
+                return false; // no cutting corners
+            }
+
+            if (stepX)
+            {
+                error -= dy;
+                x += sx;
+            }
+
+            if (stepY)
+            {
+                error += dx;
+                y += sy;
+            }
+        }
     }
 
     private static double Estimate(int x, int y, TilePoint to)

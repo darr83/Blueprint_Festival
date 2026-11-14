@@ -12,7 +12,7 @@ public sealed record TicketChoice(int Price, int Expected);
 /// <summary>What the planning screen shows.</summary>
 public sealed record PlanView(int Year, string Festival, string Date, int Licence, int Bank, IReadOnlyList<TicketChoice> Tickets, int TicketPicked,
     IReadOnlyList<ActOffer> Headliners, int HeadlinerPicked, IReadOnlyList<string> Support, int SupportFee,
-    string Forecast = "", bool Ponchos = false, int PonchoCost = 0);
+    string Forecast = "", bool Ponchos = false, int PonchoCost = 0, string Field = "", int Rent = 0);
 
 /// <summary>What the results screen shows.</summary>
 public sealed record ResultsView(int Year, string Festival, int Came, int Expected, int Happy, int WentHome, IReadOnlyList<(string What, int Amount)> In,
@@ -85,7 +85,8 @@ public static class YearPanels
 
         // Kept tight, so the whole panel and its button fit on a 900 pixel high screen.
         box.AddChild(UiStyle.Heading($"Plan year {view.Year}", 28));
-        box.AddChild(UiStyle.Body($"{view.Festival}  ·  {view.Date}  ·  Licence for up to {view.Licence:N0} people  ·  £{view.Bank:N0} in the bank", muted: true, size: 15));
+        var where = view.Field.Length > 0 ? $" on {view.Field}" : "";
+        box.AddChild(UiStyle.Body($"{view.Festival}  ·  {view.Date}  ·  Licence for up to {view.Licence:N0} people{where}  ·  £{view.Bank:N0} in the bank", muted: true, size: 15));
 
         box.AddChild(Section("Ticket price"));
         var tickets = new HBoxContainer();
@@ -158,9 +159,14 @@ public static class YearPanels
 
         box.AddChild(Section("Money"));
         var ticket = view.Tickets[view.TicketPicked];
-        var fees = view.Headliners[view.HeadlinerPicked].Fee + (view.Support.Count * view.SupportFee) + ponchos;
+        var fees = view.Headliners[view.HeadlinerPicked].Fee + (view.Support.Count * view.SupportFee) + ponchos + view.Rent;
         box.AddChild(MoneyRow("In the bank now", $"£{view.Bank:N0}"));
-        box.AddChild(MoneyRow($"Act fees, paid today ({view.Support.Count + 1} acts)", $"-£{fees - ponchos:N0}"));
+        box.AddChild(MoneyRow($"Act fees, paid today ({view.Support.Count + 1} acts)", $"-£{fees - ponchos - view.Rent:N0}"));
+        if (view.Rent > 0)
+        {
+            box.AddChild(MoneyRow("Field rent and licence, £1 a head", $"-£{view.Rent:N0}"));
+        }
+
         if (ponchos > 0)
         {
             box.AddChild(MoneyRow("Rain ponchos", $"-£{ponchos:N0}"));

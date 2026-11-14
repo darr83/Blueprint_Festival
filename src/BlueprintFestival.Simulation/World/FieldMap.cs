@@ -1,5 +1,8 @@
 namespace BlueprintFestival.Simulation.World;
 
+/// <summary>One of the fields a festival can be held on: its name, the biggest licence it takes, its size and the width of the way in.</summary>
+public sealed record FieldSize(string Name, int Holds, int MetresWide, int MetresDeep, int GapMetres);
+
 /// <summary>A position on the tile grid.</summary>
 public readonly record struct TilePoint(int X, int Y);
 
@@ -121,7 +124,27 @@ public sealed class FieldMap
     /// </summary>
     public static FieldMap Village() => Create(fieldMetresWide: 60, fieldMetresDeep: 40);
 
-    public static FieldMap Create(int fieldMetresWide, int fieldMetresDeep)
+    /// <summary>The three fields a festival can be held on, smallest first.</summary>
+    public static readonly IReadOnlyList<FieldSize> Sizes = new[]
+    {
+        new FieldSize("the village field", 400, 60, 40, 6),
+        new FieldSize("Home Farm meadow", 1500, 110, 70, 12),
+        new FieldSize("the showground", 5000, 180, 120, 24),
+    };
+
+    /// <summary>The smallest field that a licence for so many people fits on.</summary>
+    public static FieldSize SizeFor(int licence) => Sizes.FirstOrDefault(s => licence <= s.Holds) ?? Sizes[^1];
+
+    /// <summary>The field for a licence: bigger crowds are given more grass and a wider way in.</summary>
+    public static FieldMap ForLicence(int licence)
+    {
+        var size = SizeFor(licence);
+        return Create(size.MetresWide, size.MetresDeep, size.GapMetres);
+    }
+
+    public static FieldMap Create(int fieldMetresWide, int fieldMetresDeep) => Create(fieldMetresWide, fieldMetresDeep, 6);
+
+    public static FieldMap Create(int fieldMetresWide, int fieldMetresDeep, int gapMetres)
     {
         if (fieldMetresWide < 20 || fieldMetresDeep < 20)
         {
@@ -131,7 +154,7 @@ public sealed class FieldMap
         const int margin = 24;      // 12 m of countryside round the hedge
         const int hedge = 3;        // a 1.5 m thick hedge
         const int laneWidth = 10;   // a 5 m lane
-        const int gapWidth = 12;    // a 6 m gap
+        var gapWidth = Math.Clamp(gapMetres, 4, fieldMetresWide / 2) * 2;
         const int laneGap = 16;     // 8 m of verge between hedge and lane
 
         var fieldW = fieldMetresWide * 2;

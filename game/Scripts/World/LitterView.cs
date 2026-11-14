@@ -17,7 +17,8 @@ public partial class LitterView : Node3D
     private static readonly Color Mud = new(0.2f, 0.14f, 0.08f);
 
     private FestivalGame _game = null!;
-    private MeshInstance3D? _litter;
+    private readonly MultiMeshInstance3D[] _pieces = new MultiMeshInstance3D[3];
+    private readonly float[][] _buffers = { Array.Empty<float>(), Array.Empty<float>(), Array.Empty<float>() };
     private MultiMeshInstance3D _worn = null!;
     private int _drawn = -1;
     private double _sinceLitter = 1;
@@ -53,6 +54,27 @@ public partial class LitterView : Node3D
             },
         };
         AddChild(_worn);
+
+        // Litter is cans, wrappers and crumpled cups: one shape of each, drawn as many times as there are pieces.
+        var shapes = new Mesh[]
+        {
+            new CylinderMesh { TopRadius = 0.5f, BottomRadius = 0.5f, Height = 1f, RadialSegments = 8, Rings = 1 },
+            new BoxMesh { Size = Vector3.One },
+            new SphereMesh { Radius = 0.5f, Height = 1f, RadialSegments = 8, Rings = 4 },
+        };
+        for (var kind = 0; kind < 3; kind++)
+        {
+            _pieces[kind] = new MultiMeshInstance3D
+            {
+                Name = $"Litter {kind}",
+                Visible = false,
+                CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+                Multimesh = new MultiMesh { TransformFormat = MultiMesh.TransformFormatEnum.Transform3D, UseColors = true, Mesh = shapes[kind] },
+                MaterialOverride = new StandardMaterial3D { VertexColorUseAsAlbedo = true, Roughness = 1f, MetallicSpecular = 0.05f },
+            };
+            AddChild(_pieces[kind]);
+        }
+
         Refresh();
     }
 
@@ -73,34 +95,51 @@ public partial class LitterView : Node3D
         {
             _sinceLitter = 0;
             _drawn = _game.Litter.Count;
-            _litter?.QueueFree();
-            _litter = null;
-            if (_drawn > 0)
+            var counts = new int[3];
+            var needed = Mathf.NearestPo2(Math.Max(64, _drawn)) * 16;
+            for (var kind = 0; kind < 3; kind++)
             {
-                var b = new MeshBuilder();
-                foreach (var piece in _game.Litter)
+                if (_buffers[kind].Length < needed)
                 {
-                    // The look of a piece comes from where it lies, so it does not change as others are picked up.
-                    var pick = (int)(Math.Abs((piece.X * 37.1) + (piece.Y * 91.7)) * 10);
-                    var colour = Colours[pick % Colours.Length];
-                    var at = new Vector3((float)piece.X, 0.05f, (float)piece.Y);
-                    var turn = pick * 47 % 180;
-                    switch (pick / 7 % 3)
-                    {
-                        case 0:
-                            b.Tube(at + new Vector3(0, 0.03f, 0), new Vector3(0.12f, 0.2f, 0.12f), colour, new Vector3(90, turn, 0));
-                            break;
-                        case 1:
-                            b.Box(at, new Vector3(0.3f, 0.04f, 0.22f), colour, new Vector3(0, turn, 0));
-                            break;
-                        default:
-                            b.Ball(at + new Vector3(0, 0.04f, 0), new Vector3(0.2f, 0.14f, 0.18f), colour, new Vector3(0, turn, 0));
-                            break;
-                    }
+                    _buffers[kind] = new float[needed];
                 }
+            }
 
-                _litter = b.BuildNode("Litter");
-                AddChild(_litter);
+            foreach (var piece in _game.Litter)
+            {
+                // The look of a piece comes from where it lies, so it does not change as others are picked up.
+                var pick = (int)(Math.Abs((piece.X * 37.1) + (piece.Y * 91.7)) * 10);
+                var colour = Colours[pick % Colours.Length].SrgbToLinear();
+                var kind = pick / 7 % 3;
+                var (lift, shape, lean) = kind switch
+                {
+                    0 => (0.08f, new Vector3(0.12f, 0.2f, 0.12f), 90f),
+                    1 => (0.05f, new Vector3(0.3f, 0.04f, 0.22f), 0f),
+                    _ => (0.09f, new Vector3(0.2f, 0.14f, 0.18f), 0f),
+                };
+                var basis = Basis.FromEuler(new Vector3(Mathf.DegToRad(lean), Mathf.DegToRad(pick * 47 % 180), 0)).Scaled(shape);
+                var o = counts[kind]++ * 16;
+                var buffer = _buffers[kind];
+                (buffer[o], buffer[o + 1], buffer[o + 2], buffer[o + 3]) = (basis.X.X, basis.Y.X, basis.Z.X, (float)piece.X);
+                (buffer[o + 4], buffer[o + 5], buffer[o + 6], buffer[o + 7]) = (basis.X.Y, basis.Y.Y, basis.Z.Y, lift);
+                (buffer[o + 8], buffer[o + 9], buffer[o + 10], buffer[o + 11]) = (basis.X.Z, basis.Y.Z, basis.Z.Z, (float)piece.Y);
+                (buffer[o + 12], buffer[o + 13], buffer[o + 14], buffer[o + 15]) = (colour.R, colour.G, colour.B, 1f);
+            }
+
+            for (var kind = 0; kind < 3; kind++)
+            {
+                var mesh = _pieces[kind].Multimesh;
+                _pieces[kind].Visible = counts[kind] > 0;
+                if (counts[kind] > 0)
+                {
+                    if (mesh.InstanceCount * 16 != _buffers[kind].Length)
+                    {
+                        mesh.InstanceCount = _buffers[kind].Length / 16;
+                    }
+
+                    mesh.Buffer = _buffers[kind];
+                    mesh.VisibleInstanceCount = counts[kind];
+                }
             }
         }
 

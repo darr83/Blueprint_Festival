@@ -35,9 +35,23 @@ public static partial class SiteProps
         new("#E94F7B"), new("#F6B93B"), new("#F6F0E2"), new("#4FA8D8"), new("#8FD3A8"),
     };
 
+    /// <summary>How much bigger the main stage is than the hired stage it is modelled on: 20 m wide against 12.</summary>
+    public const float MainStageScale = 20f / 12f;
+
     public static Node3D Stage(StageKind kind, string festivalName)
     {
         var node = new Node3D { Name = Catalogue.Of(kind).Name };
+        if (kind == StageKind.MainStage)
+        {
+            // The hired stage's big sister: the same shape, two thirds bigger every way.
+            var scaled = new Node3D { Name = "Scaled", Scale = Vector3.One * MainStageScale };
+            var shapes = new MeshBuilder();
+            HiredStage(shapes, scaled, festivalName);
+            scaled.AddChild(shapes.BuildNode("Shapes"));
+            node.AddChild(scaled);
+            return node;
+        }
+
         var b = new MeshBuilder();
         switch (kind)
         {
@@ -401,8 +415,10 @@ public static partial class SiteProps
         }
         else
         {
-            // A steel arch over two lanes, with a banner across.
-            const float half = 3.0f, high = 4.4f;
+            // A steel arch over its lanes, with a banner across.
+            var info = Catalogue.Of(kind);
+            var half = info.Width * 0.25f;
+            const float high = 4.4f;
             Truss(b, new Vector3(-half, 0, 0), new Vector3(-half, high, 0));
             Truss(b, new Vector3(half, 0, 0), new Vector3(half, high, 0));
             Truss(b, new Vector3(-half, high, 0), new Vector3(half, high, 0));
@@ -413,7 +429,7 @@ public static partial class SiteProps
 
             b.Box(new Vector3(0, high - 0.85f, 0.2f), new Vector3((half * 2) - 0.5f, 1.1f, 0.06f), Pink);
             b.Box(new Vector3(0, high - 1.36f, 0.21f), new Vector3((half * 2) - 0.5f, 0.1f, 0.07f), Sunflower);
-            Painted(node, festivalName, new Vector3(0, high - 0.8f, 0.25f), 5.2f, 0.62f, Colors.White);
+            Painted(node, festivalName, new Vector3(0, high - 0.8f, 0.25f), Math.Min(8f, (half * 2) - 0.8f), 0.62f, Colors.White);
             foreach (var x in new[] { -half, half })
             {
                 // A flag on each tower.
@@ -421,8 +437,13 @@ public static partial class SiteProps
                 b.Box(new Vector3(x + 0.45f, high + 1.4f, 0), new Vector3(0.85f, 0.5f, 0.03f), Sunflower);
             }
 
-            // Barriers that split the way in into two lanes and funnel the queue.
-            AddFence(b, FenceKind.CrowdBarrier, new Vector3(0, 0, 0.3f), new Vector3(0, 0, 5.7f));
+            // Barriers that split the way in into its lanes and funnel the queue.
+            for (var lane = 1; lane < info.Lanes; lane++)
+            {
+                var x = -half + (lane * half * 2 / info.Lanes);
+                AddFence(b, FenceKind.CrowdBarrier, new Vector3(x, 0, 0.3f), new Vector3(x, 0, 5.7f));
+            }
+
             AddFence(b, FenceKind.CrowdBarrier, new Vector3(-half + 0.1f, 0, 0.4f), new Vector3(-half + 0.1f, 0, 5f));
             AddFence(b, FenceKind.CrowdBarrier, new Vector3(half - 0.1f, 0, 0.4f), new Vector3(half - 0.1f, 0, 5f));
 

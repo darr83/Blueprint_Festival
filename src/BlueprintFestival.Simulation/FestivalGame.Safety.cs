@@ -25,7 +25,7 @@ public sealed partial class FestivalGame
     /// <summary>How far from where they stand a member of security keeps the crowd in hand, in metres.</summary>
     public const double GuardReach = 3.5;
 
-    /// <summary>How far back from a front barrier security standing behind it keep the crowd in hand, in metres.</summary>
+    /// <summary>How far back from a front barrier each member of security standing behind it keeps the crowd in hand, in metres.</summary>
     public const double PitReach = 8;
 
     private readonly Dictionary<int, int> _redMinutes = new();
@@ -39,6 +39,16 @@ public sealed partial class FestivalGame
 
     /// <summary>The worst the crowd is anywhere right now.</summary>
     public Crowding CrowdStatus => DensityMap.StatusOf(Density.Worst);
+
+    /// <summary>True while some square that security do not have in hand has been a crush risk for two minutes or more: no passing knot of people, but a crowd that is stuck.</summary>
+    public bool CrushBuilding => _redMinutes.Any(square => square.Value >= 2 && !InHand(square.Key));
+
+    /// <summary>True if security have the crowd in hand in a square of the crowd map, by the square's number.</summary>
+    private bool InHand(int square)
+    {
+        var (x, y) = DensityMap.CentreOf(square % Density.Across, square / Density.Across);
+        return Stewarded(x, y);
+    }
 
     /// <summary>People hurt in a crush today.</summary>
     public int CrushInjuries { get; private set; }
@@ -123,25 +133,56 @@ public sealed partial class FestivalGame
     }
 
     /// <summary>True if a member of security is at their post in the clear strip between a stage and its front barrier.</summary>
-    public bool HasPitCrew(PlacedStage stage)
+    public bool HasPitCrew(PlacedStage stage) => PitCrew(stage) > 0;
+
+    /// <summary>How many security are at their posts in the clear strip between a stage and its front barrier.</summary>
+    public int PitCrew(PlacedStage stage)
     {
+        ArgumentNullException.ThrowIfNull(stage);
         var barrier = BarrierDepth(stage);
         if (barrier <= 0)
+        {
+            return 0;
+        }
+
+        var half = HalfWidth(stage) + 1.5;
+        var crew = 0;
+        foreach (var s in _staff)
+        {
+            if (s.Kind != StaffKind.Security || s.State != StaffState.AtPost)
+            {
+                continue;
+            }
+
+            var (deep, across) = InFrontOf(stage, s.X, s.Y);
+            if (deep >= 0 && deep <= barrier && Math.Abs(across) <= half)
+            {
+                crew++;
+            }
+        }
+
+        return crew;
+    }
+
+    /// <summary>True for security whose post is in the clear strip between a stage and its front barrier.</summary>
+    private bool InPit(StaffMember member)
+    {
+        if (member.Kind != StaffKind.Security)
         {
             return false;
         }
 
-        var half = HalfWidth(stage) + 1.5;
-        return _staff.Any(s =>
+        foreach (var stage in Site.Stages)
         {
-            if (s.Kind != StaffKind.Security || s.State != StaffState.AtPost)
+            var barrier = BarrierDepth(stage);
+            var (deep, across) = InFrontOf(stage, member.PostX, member.PostY);
+            if (barrier > 0 && deep >= 0 && deep <= barrier && Math.Abs(across) <= HalfWidth(stage) + 1.5)
             {
-                return false;
+                return true;
             }
+        }
 
-            var (deep, across) = InFrontOf(stage, s.X, s.Y);
-            return deep >= 0 && deep <= barrier && Math.Abs(across) <= half;
-        });
+        return false;
     }
 
     /// <summary>
@@ -160,13 +201,15 @@ public sealed partial class FestivalGame
 
         foreach (var stage in Site.Stages)
         {
-            if (!HasPitCrew(stage))
+            var crew = PitCrew(stage);
+            if (crew == 0)
             {
                 continue;
             }
 
+            // Each of the pit crew looks after another stretch of the crowd, further back and wider.
             var (deep, across) = InFrontOf(stage, x, y);
-            if (deep >= 0 && deep <= BarrierDepth(stage) + PitReach && Math.Abs(across) <= HalfWidth(stage) + 4)
+            if (deep >= 0 && deep <= BarrierDepth(stage) + (PitReach * crew) + 1 && Math.Abs(across) <= HalfWidth(stage) + 2 + (5 * crew))
             {
                 return true;
             }
@@ -217,7 +260,7 @@ public sealed partial class FestivalGame
             {
                 var key = (sy * density.Across) + sx;
                 var perMetre = density.In(sx, sy);
-                if (perMetre < DensityMap.Crush)
+                if (perMetre <= DensityMap.Crush)
                 {
                     _redMinutes.Remove(key);
                     continue;
@@ -225,9 +268,10 @@ public sealed partial class FestivalGame
 
                 var minutes = _redMinutes.GetValueOrDefault(key) + 1;
                 _redMinutes[key] = minutes;
-                if (minutes == 2 && !_wasRed)
+                if (minutes >= 2 && !_wasRed && !InHand(key))
                 {
-                    // Red for a second minute running is no passing knot of people: warn the player.
+                    // Red for a second minute running is no passing knot of people: warn the player,
+                    // unless security are right there and already lifting people out.
                     _wasRed = true;
                     var (wx, wy) = DensityMap.CentreOf(sx, sy);
                     CrushWarning?.Invoke(wx, wy);

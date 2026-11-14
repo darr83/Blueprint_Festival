@@ -11,7 +11,8 @@ namespace BlueprintFestival.World;
 /// </summary>
 public partial class WeatherView : Node3D
 {
-    private const int Streaks = 2600;
+    private int _streaks = 2600;
+    private float[] _rainBuffer = Array.Empty<float>();
     private const float Top = 16f;
 
     private static readonly Color Straw = new("#E0C46C");
@@ -54,7 +55,7 @@ public partial class WeatherView : Node3D
             {
                 TransformFormat = MultiMesh.TransformFormatEnum.Transform3D,
                 Mesh = new BoxMesh { Size = new Vector3(0.035f, 0.75f, 0.035f) },
-                InstanceCount = Streaks,
+                InstanceCount = 0,
                 VisibleInstanceCount = 0,
             },
         };
@@ -63,10 +64,15 @@ public partial class WeatherView : Node3D
         // Every streak has its own place and speed, made up once from its number, so the rain looks the same on every computer.
         var width = game.Field.Width * (float)FieldMap.TileMetres;
         var depth = game.Field.Height * (float)FieldMap.TileMetres;
-        _starts = new Vector3[Streaks];
-        _speeds = new float[Streaks];
+
+        // A bigger field needs more rain to look as wet.
+        _streaks = Math.Clamp((int)(2600 * width * depth / 6000f), 2600, 12000);
+        _rain.Multimesh.InstanceCount = _streaks;
+        _rainBuffer = new float[_streaks * 12];
+        _starts = new Vector3[_streaks];
+        _speeds = new float[_streaks];
         var random = new Random(77);
-        for (var i = 0; i < Streaks; i++)
+        for (var i = 0; i < _streaks; i++)
         {
             _starts[i] = new Vector3((float)random.NextDouble() * width, (float)random.NextDouble() * Top, (float)random.NextDouble() * depth);
             _speeds[i] = 13f + ((float)random.NextDouble() * 5f);
@@ -94,9 +100,13 @@ public partial class WeatherView : Node3D
 
     private void DrawRain()
     {
-        var shown = Falling < 0.03f ? 0 : (int)(Streaks * Mathf.Clamp(0.25f + (Falling * 0.75f), 0, 1));
+        var shown = Falling < 0.03f ? 0 : (int)(_streaks * Mathf.Clamp(0.25f + (Falling * 0.75f), 0, 1));
         var mesh = _rain.Multimesh;
         mesh.VisibleInstanceCount = shown;
+        if (shown == 0)
+        {
+            return;
+        }
 
         // The rain comes down on a slant, as if on a breeze.
         var slant = new Basis(new Vector3(0, 0, 1), Mathf.DegToRad(9));
@@ -104,8 +114,13 @@ public partial class WeatherView : Node3D
         {
             var start = _starts[i];
             var y = Mathf.PosMod(start.Y - ((float)_time * _speeds[i]), Top);
-            mesh.SetInstanceTransform(i, new Transform3D(slant, new Vector3(start.X + (y * 0.16f), y, start.Z)));
+            var o = i * 12;
+            (_rainBuffer[o], _rainBuffer[o + 1], _rainBuffer[o + 2], _rainBuffer[o + 3]) = (slant.X.X, slant.Y.X, slant.Z.X, start.X + (y * 0.16f));
+            (_rainBuffer[o + 4], _rainBuffer[o + 5], _rainBuffer[o + 6], _rainBuffer[o + 7]) = (slant.X.Y, slant.Y.Y, slant.Z.Y, y);
+            (_rainBuffer[o + 8], _rainBuffer[o + 9], _rainBuffer[o + 10], _rainBuffer[o + 11]) = (slant.X.Z, slant.Y.Z, slant.Z.Z, start.Z);
         }
+
+        mesh.Buffer = _rainBuffer;
     }
 
     /// <summary>Draws the straw and trackway again if any has been laid or lifted.</summary>
