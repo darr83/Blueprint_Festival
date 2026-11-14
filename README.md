@@ -37,6 +37,7 @@ brands or sponsors.
 | 13. Selling tickets: book every set yourself in January, advertise and sell month by month, then build week with the last tickets sold day by day | Done |
 | 14. Paths and a scattered campsite: mown, bark chip and gravel paths that about half the crowd keeps to (most on a wet day), and tents dotted about a bigger camping field | Done |
 | 15. Balance: dear tickets sell far fewer and put people in a worse mood, the last tickets are the hardest to sell, better acts lift the mood more, the festival keeps a quarter of stall takings, and the council wants £5 a head in the bank before a bigger field | Done |
+| 16a. The estate map: nineteen named fields round the lane, rented each January for music, food, camping or parking, with a site laid out from whichever fields are chosen | Done (cars and buses come in 16b) |
 
 ## Controls
 
@@ -98,6 +99,13 @@ The volume sliders are in the pause menu (Esc) and on the main menu, and are rem
 
 ## The festival year
 
+- **January, the fields.** The year opens on a map of the Larkmoor estate. You click a field and
+  say what it is for: music, food and stalls, camping or a car park. Each field has its own size,
+  rent and room. Festival fields must share a hedge so a gateway can join them, and one of them
+  must touch the lane or the farm track. Tickets on sale are the room in the music fields or the
+  licence, whichever is smaller. Stages go only in music fields and tents only in camping fields;
+  stalls can go on any rented grass. In the first year the parish lends the village green and
+  that is the only field.
 - **January.** You book the line-up. Each stage has four two-hour sets, at 14:00, 16:00, 18:00 and
   20:00. Any of the 25 artists can play any set, an artist plays once, and a set can be left empty.
   You can add a second stage for four more sets. You set the ticket price in whole pounds.

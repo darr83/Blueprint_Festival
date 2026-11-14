@@ -312,6 +312,16 @@ public partial class SmokeTest : Node
                 {
                     var game = plan.Game;
                     Check(game.Phase == Phase.Plan && plan.Year.Showing == Phase.Plan && plan.Year.HasCentrePanel, "A new festival should open on the planning screen.");
+                    // January starts on the estate map, with the village green and nothing else in the first year.
+                    Check(plan.Year.ChoosingFields && game.Plan is not null && game.FieldRent == 0, "A new festival should open on the estate map with the village green lent free.");
+                    Check(plan.FindChild("Estate", true, false) is BlueprintFestival.UI.EstateMap, "The estate map should be on the screen.");
+                    plan.Year.SelectField("church");
+                    plan.Year.UseField(BlueprintFestival.Simulation.World.FieldUse.Food);
+                    plan.Year.ConfirmFields();
+                    Check(plan.Year.ChoosingFields, "A second field should be refused in the first year.");
+                    plan.Year.UseField(null);
+                    plan.Year.ConfirmFields();
+                    Check(!plan.Year.ChoosingFields && plan.Year.HasCentrePanel, "Keeping the village green should move on to booking the acts.");
                     Check(!plan.BuildBar.Visible, "Nothing should be built while planning.");
                     Check(game.Headliners.Count == 3, "Three headliners should be on offer.");
                     Check(plan.TopBar.TimeText == "08:00", "The clock should be stopped while planning.");

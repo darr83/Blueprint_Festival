@@ -47,7 +47,7 @@ public sealed partial class FestivalGame
     /// <summary>What the next turn is called, or null when selling is over.</summary>
     public string? NextSalesTurn => SalesTurn < SalesMonths.Count ? SalesMonths[SalesTurn] : SalesTurn < SalesTurns ? BuildDays[SalesTurn - SalesMonths.Count] : null;
 
-    public bool SoldOut => TicketsSold >= Licence;
+    public bool SoldOut => TicketsSold >= OnSale;
 
     public bool AdvertOn(string id) => _adverts.Contains(id);
 
@@ -115,7 +115,7 @@ public sealed partial class FestivalGame
     /// How keen the people still without a ticket are, from 1 in January down to <see cref="LastToBuy"/>
     /// for the very last ticket: the keenest buy first, so the last few hundred take the most selling.
     /// </summary>
-    public double Keenness => 1 - ((1 - LastToBuy) * Math.Min(1.0, (double)TicketsSold / Licence));
+    public double Keenness => 1 - ((1 - LastToBuy) * Math.Min(1.0, (double)TicketsSold / OnSale));
 
     /// <summary>How keen the last buyer is, next to the first.</summary>
     public const double LastToBuy = 0.45;
@@ -157,13 +157,13 @@ public sealed partial class FestivalGame
     }
 
     /// <summary>About how many tickets the next turn would sell as things stand, before luck.</summary>
-    public int SalesForecast => NextSalesTurn is null ? 0 : Math.Min(Licence - TicketsSold, (int)Math.Round(Demand(SalesTurn)));
+    public int SalesForecast => NextSalesTurn is null ? 0 : Math.Min(OnSale - TicketsSold, (int)Math.Round(Demand(SalesTurn)));
 
     private double Demand(int turn)
     {
         var week = turn >= SalesMonths.Count;
         var word = LastHappiness is { } h ? 0.6 + (0.5 * h / 100.0) : 1.0;
-        var heard = (Licence * 0.035 * word) + (Math.Pow(AdvertReach, 0.85) * 0.12);
+        var heard = (OnSale * 0.035 * word) + (Math.Pow(AdvertReach, 0.85) * 0.12);
         return heard * LineUpPull * PricePull * Keenness * (week ? DayUrgency * ForecastPull : Urgency[turn]);
     }
 
@@ -206,7 +206,7 @@ public sealed partial class FestivalGame
         }
 
         var luck = GameRandom.FromSeed(Seed, 40 + SalesTurn).Between(0.93, 1.07);
-        var tickets = Math.Clamp((int)Math.Round(Demand(SalesTurn) * luck), 0, Licence - TicketsSold);
+        var tickets = Math.Clamp((int)Math.Round(Demand(SalesTurn) * luck), 0, OnSale - TicketsSold);
         if (cost > 0)
         {
             Spend("Advertising", cost);
@@ -250,7 +250,7 @@ public sealed partial class FestivalGame
 
         SoldAhead = true;
         SalesTurn = Math.Clamp(sales.Turn, 0, SalesTurns);
-        TicketsSold = Math.Clamp(sales.Sold, 0, Licence);
+        TicketsSold = Math.Clamp(sales.Sold, 0, OnSale);
         _adverts.Clear();
         _adverts.UnionWith((sales.Adverts ?? new()).Where(a => Adverts.Find(a) is not null));
         _salesLog.Clear();

@@ -18,7 +18,7 @@ public sealed record PlanView(int Year, string Festival, string Date, int Licenc
 
 /// <summary>What the planning screen can do.</summary>
 public sealed record PlanActions(System.Action? Book = null, System.Action<int>? PickSlot = null, System.Action<string?>? PickArtist = null,
-    System.Action? ToggleSecond = null, System.Action<int>? Price = null, System.Action? Ponchos = null, System.Action? Camping = null);
+    System.Action? ToggleSecond = null, System.Action<int>? Price = null, System.Action? Ponchos = null, System.Action? Camping = null, System.Action? Fields = null);
 
 /// <summary>One way of advertising, and whether it is switched on.</summary>
 public sealed record AdvertView(string Id, string Name, int Cost, int Reach, string Reaches, bool On);
@@ -159,6 +159,15 @@ public static partial class YearPanels
         box.AddChild(UiStyle.Heading($"January: plan year {view.Year}", 26));
         var where = view.Field.Length > 0 ? $" on {view.Field}" : "";
         box.AddChild(UiStyle.Body($"{view.Festival}  ·  {view.Date}  ·  Licence for up to {view.Licence:N0} people{where}  ·  £{view.Bank:N0} in the bank", muted: true, size: 15));
+
+        if (does.Fields is not null)
+        {
+            var fields = UiStyle.SecondaryButton("Change fields", does.Fields);
+            fields.Name = "Change fields";
+            fields.SizeFlagsHorizontal = Control.SizeFlags.ShrinkBegin;
+            fields.AddThemeFontSizeOverride("font_size", 13);
+            box.AddChild(fields);
+        }
 
         var columns = new HBoxContainer();
         columns.AddThemeConstantOverride("separation", 18);

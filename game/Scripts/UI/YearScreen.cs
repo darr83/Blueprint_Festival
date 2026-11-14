@@ -6,6 +6,7 @@ using BlueprintFestival.Core;
 using BlueprintFestival.Simulation;
 using BlueprintFestival.Simulation.Sales;
 using BlueprintFestival.Simulation.Show;
+using BlueprintFestival.Simulation.World;
 using BlueprintFestival.World;
 using Godot;
 
@@ -30,6 +31,14 @@ public partial class YearScreen : Control
     private float _run = -1;
     private int _turnShown = -1;
     private int _priceShown = -1;
+    private FieldPlan? _draft;
+    private string _fieldPicked = Estate.VillageGreen;
+
+    /// <summary>True while the January screen is the estate map, before the acts are booked.</summary>
+    public bool ChoosingFields => _game.Phase == Phase.Plan && _game.Plan is not null && !GameManager.Instance.FieldsChosen;
+
+    /// <summary>The fields as picked so far on the estate map.</summary>
+    public FieldPlan Draft => _draft ??= _game.Plan?.Copy() ?? new FieldPlan();
 
     /// <summary>How long a month takes to run on the sales screen, in seconds.</summary>
     public const float MonthSeconds = 2.4f;
@@ -115,7 +124,14 @@ public partial class YearScreen : Control
         switch (_shown)
         {
             case Phase.Plan:
-                Centre(YearPanels.Plan(PlanOf(_game, _slot), new PlanActions(BookEvent, PickSlot, PickArtist, ToggleStage, ChangePrice, TogglePonchos, ToggleCamping), scroll));
+                if (ChoosingFields)
+                {
+                    Centre(YearPanels.Fields(FieldsOf(_game, Draft, _fieldPicked), new FieldsActions(SelectField, UseField, ConfirmFields)));
+                    break;
+                }
+
+                Centre(YearPanels.Plan(PlanOf(_game, _slot), new PlanActions(BookEvent, PickSlot, PickArtist, ToggleStage, ChangePrice, TogglePonchos, ToggleCamping,
+                    _game.Plan is null ? null : ChangeFields), scroll));
                 break;
             case Phase.Sell:
                 Centre(YearPanels.Sales(SalesOf(_game, Running), RunMonth, ToggleAdvert, ChangePrice, Running));
@@ -195,7 +211,8 @@ public partial class YearScreen : Control
                 at is { } set && set != picked ? $"on the {StageName(set)} at {TimeOf(game, set)}, click to swap" : "", at == picked);
         }).ToList(),
         game.TicketPrice, (int)System.Math.Round(game.FairPrice), (int)System.Math.Round(game.LineUpPull * 100), game.ActFees, game.LineUp.Count(), game.PlanCost,
-        game.EarlyForecast, game.PonchosOrdered, game.PonchoCost, game.Ground.Name, game.FieldRent,
+        game.EarlyForecast, game.PonchosOrdered, game.PonchoCost,
+        game.Plan is { } fields ? string.Join(" and ", fields.Festival.Select(f => f.Name)) : game.Ground.Name, game.FieldRent,
         game.CampingBooked, game.CampingOffered ? FestivalGame.CampingCost : 0, game.CampersExpected, FestivalGame.CampingFee);
 
     /// <summary>What the ticket sales screen shows.</summary>
@@ -209,7 +226,7 @@ public partial class YearScreen : Control
             after.Add(after[^1] + line.Tickets);
         }
 
-        return new SalesView(game.Name, game.Licence, game.Money, turn, turn < FestivalGame.SalesMonths.Count ? FestivalGame.SalesMonths[turn] : null, game.TicketsSold,
+        return new SalesView(game.Name, game.OnSale, game.Money, turn, turn < FestivalGame.SalesMonths.Count ? FestivalGame.SalesMonths[turn] : null, game.TicketsSold,
             game.SalesLog.Sum(l => l.Taken), game.SalesLog.Sum(l => l.AdCost), game.AdvertReach, game.AdvertCost, game.SalesForecast,
             game.TicketPrice, (int)System.Math.Round(game.FairPrice), (int)System.Math.Round(game.LineUpPull * 100),
             Adverts.All.Select(a => new AdvertView(a.Id, a.Name, a.Cost, a.Reach, a.Reaches, game.AdvertOn(a.Id))).ToList(),
@@ -218,7 +235,7 @@ public partial class YearScreen : Control
 
     /// <summary>What the build panel shows in build week, or null in a year whose tickets are paid for at the gate.</summary>
     public static BuildWeekView? WeekOf(FestivalGame game) => !game.SoldAhead ? null
-        : new BuildWeekView(game.NextSalesTurn, game.TicketsSold, game.Licence, game.SalesForecast, game.AdvertCost, game.TicketPrice, (int)System.Math.Round(game.FairPrice));
+        : new BuildWeekView(game.NextSalesTurn, game.TicketsSold, game.OnSale, game.SalesForecast, game.AdvertCost, game.TicketPrice, (int)System.Math.Round(game.FairPrice));
 
     public static ResultsView ResultsOf(FestivalGame game)
     {
@@ -336,6 +353,56 @@ public partial class YearScreen : Control
     public void ToggleSecondStage()
     {
         _game.BookSecondStage(!_game.SecondStageBooked);
+        SoundBoard.Cue(Sounds.Click);
+        Rebuild();
+    }
+
+    /// <summary>What the field choosing screen shows for a plan being drawn up.</summary>
+    public static FieldsView FieldsOf(FestivalGame game, FieldPlan draft, string picked) => new(
+        game.Year, game.Name, game.Licence, game.Money, draft, picked, draft.Problems(game.Licence, game.Year),
+        game.Plan is null || !draft.Save().SequenceEqual(game.Plan.Save()));
+
+    public void SelectField(string id)
+    {
+        _fieldPicked = id;
+        SoundBoard.Cue(Sounds.Click);
+        Rebuild();
+    }
+
+    /// <summary>Rents the picked field for a use, or gives it up with null.</summary>
+    public void UseField(FieldUse? use)
+    {
+        Draft.Set(_fieldPicked, use);
+        SoundBoard.Cue(Sounds.Click);
+        Rebuild();
+    }
+
+    /// <summary>Takes the fields as drawn up and moves on to the acts. A changed site is laid out again.</summary>
+    public void ConfirmFields()
+    {
+        if (!ChoosingFields || Draft.Problems(_game.Licence, _game.Year).Count > 0)
+        {
+            SoundBoard.Cue(Sounds.Refuse);
+            return;
+        }
+
+        SoundBoard.Cue(Sounds.Click);
+        if (_game.Plan is not null && Draft.Save().SequenceEqual(_game.Plan.Save()))
+        {
+            GameManager.Instance.FieldsChosen = true;
+            Rebuild();
+        }
+        else if (_game.WithFields(Draft) is { } moved)
+        {
+            GameManager.Instance.ChangeFields(moved);
+        }
+    }
+
+    /// <summary>Back from the acts to the estate map.</summary>
+    public void ChangeFields()
+    {
+        GameManager.Instance.FieldsChosen = false;
+        _draft = null;
         SoundBoard.Cue(Sounds.Click);
         Rebuild();
     }

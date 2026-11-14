@@ -150,7 +150,7 @@ public sealed class SiteLayout
         var stall = new PlacedStall(kind, x, y, facing);
         foreach (var p in TilesOf(stall.Rect))
         {
-            if (!_map.Field.Contains(p) || !IsBuildable(p))
+            if (!_map.Rented(p) || !IsBuildable(p))
             {
                 return BuildCheck.No("A stall must stand on the grass inside the hedge.");
             }
@@ -215,6 +215,11 @@ public sealed class SiteLayout
         var stage = new PlacedStage(kind, x, y, facing);
         foreach (var p in TilesOf(stage.Rect))
         {
+            if (_map.FromPlan && _map.UseAt(p) is { } use && use != FieldUse.Music)
+            {
+                return BuildCheck.No("A stage can only go in a music field.");
+            }
+
             if (!_map.Field.Contains(p) || !IsBuildable(p))
             {
                 return BuildCheck.No("A stage must stand on the grass inside the hedge.");

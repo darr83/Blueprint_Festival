@@ -174,6 +174,30 @@ public sealed class PathFinder
             return from == to ? new List<TilePoint> { from } : new List<TilePoint> { from, to };
         }
 
+        // Between two rented fields the way is through the gateways, one field at a time.
+        if (_map.Waypoints(from, to) is { Count: > 0 } gateways)
+        {
+            var route = new List<TilePoint> { from };
+            var here = from;
+            foreach (var next in gateways.Append(to))
+            {
+                var leg = here == next ? null : ClearLine(here, next) ? new List<TilePoint> { here, next } : Search(here, next, false);
+                if (here != next && leg is null)
+                {
+                    route = null;
+                    break;
+                }
+
+                route.AddRange(leg?.Skip(1) ?? Enumerable.Empty<TilePoint>());
+                here = next;
+            }
+
+            if (route is not null)
+            {
+                return route;
+            }
+        }
+
         return Search(from, to, false);
     }
 
