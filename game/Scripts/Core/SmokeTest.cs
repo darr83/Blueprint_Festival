@@ -139,6 +139,19 @@ public partial class SmokeTest : Node
                     opened.BuildBar.Close();
                     Check(opened.Build.Mode == BuildMode.None, "Closing the bar should put the tool down.");
                     Check(opened.Game.Money == 1554 - 120 - 200 - 40, $"The money should add up after the stalls, not be £{opened.Game.Money}.");
+
+                    // Ground cover: straw goes down by the patch, and is drawn.
+                    opened.BuildBar.Toggle(BuildMode.Ground);
+                    Check(opened.BuildBar.ChoiceCount == 2 && opened.BuildBar.Choose("groundStraw") && opened.Build.Mode == BuildMode.Ground, "The build bar should offer straw and trackway.");
+                    var patch = new TilePoint(grass.X + 41, grass.Y + 41);
+                    Check(opened.Build.DragGround(patch, patch).Ok && opened.Game.GroundCovered == 1, "Straw should go down on a patch of grass.");
+                    Check(!opened.Build.DragGround(patch, patch).Ok, "Straw should not be laid twice on the same patch.");
+                    opened.Weather.Refresh();
+                    Check(opened.Weather.CoverShown == 1, "The straw should be drawn.");
+                    Check(opened.Game.Money == 1554 - 120 - 200 - 40 - 3, $"A patch of straw should cost £3, leaving £1,191, not £{opened.Game.Money}.");
+                    Check(opened.Weather.StreaksShown == 0 && opened.Sky.Overcast < 0.01f, "A fine day should have no rain and no cloud.");
+                    Check(opened.TopBar.WeatherText.StartsWith("Fine", StringComparison.Ordinal), $"The top bar should say the day is fine, not '{opened.TopBar.WeatherText}'.");
+                    opened.BuildBar.Close();
                     _savedMoney = opened.Game.Money;
                     opened.Game.Clock.SetSpeed(GameSpeed.Fastest);
                     _mark = opened.Game.Now;
@@ -284,6 +297,11 @@ public partial class SmokeTest : Node
                     plan.Year.PickTicket(2);
                     plan.Year.PickHeadliner(0);
                     Check(game.TicketPrice == 8 && game.HeadlinerPicked == 0, "Clicking a ticket price and a headliner should choose them.");
+                    Check(BlueprintFestival.UI.YearScreen.PlanOf(game).Forecast.Contains("chance of rain", StringComparison.Ordinal), "The planning screen should carry the long-range forecast.");
+                    plan.Year.TogglePonchos();
+                    Check(game.PonchosOrdered && game.PonchoCost == game.Crowd.Expected, "Clicking the ponchos should order one for everyone expected.");
+                    plan.Year.TogglePonchos();
+                    Check(!game.PonchosOrdered, "Clicking the ponchos again should cancel them.");
                     var fees = game.ActFees;
                     plan.Year.StartBuilding();
                     Check(game.Phase == Phase.Build && game.Money == 2000 - fees, $"Starting to build should pay the acts £{fees}, leaving £{2000 - fees}, not £{game.Money}.");

@@ -15,6 +15,7 @@ public enum BuildMode
     Gate,
     Stall,
     Staff,
+    Ground,
     Remove,
 }
 
@@ -50,6 +51,8 @@ public partial class BuildTool : Node3D
 
     public StaffKind Hire { get; private set; }
 
+    public GroundKind Ground { get; private set; }
+
     public Facing Facing { get; private set; } = Facing.South;
 
     public bool Vertical { get; private set; }
@@ -84,6 +87,8 @@ public partial class BuildTool : Node3D
 
     public void PickStaff(StaffKind kind) => Pick(BuildMode.Staff, () => Hire = kind);
 
+    public void PickGround(GroundKind kind) => Pick(BuildMode.Ground, () => Ground = kind);
+
     public void PickRemove() => Pick(BuildMode.Remove, () => { });
 
     public void Stop() => Pick(BuildMode.None, () => { });
@@ -101,6 +106,7 @@ public partial class BuildTool : Node3D
             BuildMode.Gate => "Click to put the gate up. R turns it. Close the fence either side so it is the only way in.",
             BuildMode.Stall => "Click on the grass to put it up. R turns it. People queue at the front.",
             BuildMode.Staff => Hire == StaffKind.TicketStaff ? "Click a gate to put them on it. One for each lane." : "Click on the grass to post them there.",
+            BuildMode.Ground => "Click a patch of grass, or hold the mouse button and drag to cover a stretch.",
             BuildMode.Remove => "Click a stage, a stall, a gate or a stretch of fence to take it down. You get the money back. Click staff to send them home.",
             _ => "",
         };
@@ -182,10 +188,14 @@ public partial class BuildTool : Node3D
                 return new BuildCheck(true, -back, null);
             }
 
+            case BuildMode.Ground:
+                return DragGround(at, at);
+
             case BuildMode.Remove:
             {
+                var covered = _game.Site.IsEmpty(at) && _game.PatchAt(at) is var (c, r) && _game.GroundAt(c, r) is not null;
                 var refund = _game.Remove(at);
-                result = refund > 0 || !_game.Site.IsEmpty(at) ? new BuildCheck(true, -refund, null) : BuildCheck.No("There is nothing there to take down.");
+                result = refund > 0 || covered || !_game.Site.IsEmpty(at) ? new BuildCheck(true, -refund, null) : BuildCheck.No("There is nothing there to take down.");
                 Refused = !result.Ok;
                 Status = result.Ok ? $"Taken down. £{refund:N0} back." : result.Problem!;
                 return result;
@@ -205,6 +215,68 @@ public partial class BuildTool : Node3D
         var result = _game.BuildFence(Fence, from, to);
         Said(result, "Fence up");
         return result;
+    }
+
+    /// <summary>The patches of ground in the box between two tiles, clipped to the field.</summary>
+    private (int C0, int R0, int C1, int R1)? Patches(TilePoint from, TilePoint to)
+    {
+        var f = _game.Field.Field;
+        TilePoint Clip(TilePoint p) => new(Math.Clamp(p.X, f.X, f.Right - 1), Math.Clamp(p.Y, f.Y, f.Bottom - 1));
+        if (!f.Contains(from) && !f.Contains(to))
+        {
+            return null;
+        }
+
+        var (a, b) = (_game.PatchAt(Clip(from))!.Value, _game.PatchAt(Clip(to))!.Value);
+        return (Math.Min(a.Column, b.Column), Math.Min(a.Row, b.Row), Math.Max(a.Column, b.Column), Math.Max(a.Row, b.Row));
+    }
+
+    /// <summary>What covering the box between two tiles would cost, leaving out patches already covered the same way.</summary>
+    public BuildCheck CheckGround(TilePoint from, TilePoint to)
+    {
+        if (Patches(from, to) is not var (c0, r0, c1, r1))
+        {
+            return BuildCheck.No("That is outside the field.");
+        }
+
+        var cost = 0;
+        for (var r = r0; r <= r1; r++)
+        {
+            for (var c = c0; c <= c1; c++)
+            {
+                cost += _game.GroundAt(c, r) == Ground ? 0 : FestivalGame.CostOf(Ground);
+            }
+        }
+
+        return cost == 0 ? new BuildCheck(false, 0, $"There is {FestivalGame.NameOf(Ground).ToLowerInvariant()} here already.")
+            : !_game.CanBuild ? new BuildCheck(false, cost, "Nothing can be built just now.")
+            : cost > _game.Money ? new BuildCheck(false, cost, $"That costs £{cost:N0} and there is £{_game.Money:N0} in the bank.")
+            : new BuildCheck(true, cost, null);
+    }
+
+    /// <summary>Lays straw or trackway over the box between two tiles.</summary>
+    public BuildCheck DragGround(TilePoint from, TilePoint to)
+    {
+        var result = CheckGround(from, to);
+        if (result.Ok && Patches(from, to) is var (c0, r0, c1, r1))
+        {
+            for (var r = r0; r <= r1; r++)
+            {
+                for (var c = c0; c <= c1; c++)
+                {
+                    _game.LayGround(Ground, c, r);
+                }
+            }
+        }
+
+        Said(result, $"{FestivalGame.NameOf(Ground)} laid");
+        return result;
+    }
+
+    private TileRect PatchRect(int c0, int r0, int c1, int r1)
+    {
+        var f = _game.Field.Field;
+        return new TileRect(f.X + (c0 * FestivalGame.WearTiles), f.Y + (r0 * FestivalGame.WearTiles), (c1 - c0 + 1) * FestivalGame.WearTiles, (r1 - r0 + 1) * FestivalGame.WearTiles);
     }
 
     private void Said(BuildCheck result, string done)
@@ -342,11 +414,30 @@ public partial class BuildTool : Node3D
                 break;
             }
 
+            case BuildMode.Ground:
+            {
+                var from = _dragFrom ?? at;
+                check = CheckGround(from, at);
+                pad = Patches(from, at) is var (c0, r0, c1, r1) ? PatchRect(c0, r0, c1, r1) : new TileRect(at.X, at.Y, 1, 1);
+                ClearGhostOnly();
+                break;
+            }
+
             default:
             {
                 var site = _game.Site;
                 pad = site.StageAt(at)?.Rect ?? site.StallAt(at)?.Rect ?? site.GateAt(at)?.Rect ?? new TileRect(at.X, at.Y, 1, 1);
                 var refund = site.RefundAt(at);
+                if (refund == 0 && site.IsEmpty(at) && _game.StaffAt(at) is null && _game.PatchAt(at) is var (c, r) && _game.GroundAt(c, r) is { } laid)
+                {
+                    // Straw or trackway with nothing standing on it.
+                    pad = PatchRect(c, r, c, r);
+                    refund = _game.Phase == Phase.Build ? FestivalGame.CostOf(laid) : 0;
+                    check = new BuildCheck(true, -refund, null);
+                    ClearGhostOnly();
+                    break;
+                }
+
                 check = refund > 0 || _game.StaffAt(at) is not null ? new BuildCheck(true, -refund, null) : BuildCheck.No("");
                 ClearGhostOnly();
                 break;
@@ -382,6 +473,7 @@ public partial class BuildTool : Node3D
         BuildMode.Gate => Catalogue.Of(Gate).Name,
         BuildMode.Stall => Catalogue.Of(Stall).Name,
         BuildMode.Staff => Catalogue.Of(Hire).Name,
+        BuildMode.Ground => FestivalGame.NameOf(Ground),
         _ => Catalogue.Of(Fence).Name,
     };
 
@@ -435,7 +527,7 @@ public partial class BuildTool : Node3D
                 break;
 
             case InputEventMouseButton { ButtonIndex: MouseButton.Left } click when _hovering:
-                if (Mode == BuildMode.Fence)
+                if (Mode is BuildMode.Fence or BuildMode.Ground)
                 {
                     if (click.Pressed)
                     {
@@ -444,7 +536,15 @@ public partial class BuildTool : Node3D
                     else if (_dragFrom is { } from)
                     {
                         _dragFrom = null;
-                        DragFence(from, _hover);
+                        if (Mode == BuildMode.Fence)
+                        {
+                            DragFence(from, _hover);
+                        }
+                        else
+                        {
+                            DragGround(from, _hover);
+                        }
+
                         ClearGhostOnly();
                     }
                 }

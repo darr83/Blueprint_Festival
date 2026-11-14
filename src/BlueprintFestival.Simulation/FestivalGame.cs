@@ -56,6 +56,7 @@ public sealed partial class FestivalGame
         _wear = new int[WearColumns * WearRows];
         StartStaff();
         StartSafety();
+        StartWeather();
         if (Planned)
         {
             MakeOffers();
@@ -213,6 +214,11 @@ public sealed partial class FestivalGame
         {
             Spend(line, -refund);
         }
+        else if (PatchAt(tile) is var (column, row) && GroundAt(column, row) is not null)
+        {
+            // Nothing stands here, so it is the straw or trackway that comes up.
+            return LiftGround(column, row);
+        }
 
         return refund;
     }
@@ -261,6 +267,7 @@ public sealed partial class FestivalGame
         Year = Planned ? SaveYear() : null,
         Staff = _staff.Count > 0 || _incidents.Count > 0 || Planned ? SaveStaff() : null,
         Safety = Planned ? SaveSafety() : null,
+        Weather = SaveWeather(),
     };
 
     public static FestivalGame Load(SaveData data)
@@ -275,12 +282,22 @@ public sealed partial class FestivalGame
         var game = data.Year is { } year
             ? new FestivalGame(data.Name, year.Day.Date + GameClock.DefaultStart.TimeOfDay, data.Seed, new YearSetup(year.Number, year.Licence, 0, year.BailedOut, year.LastHappiness))
             : new FestivalGame(data.Name, data.Clock.Now.Date + GameClock.DefaultStart.TimeOfDay, data.Seed);
+        // The clock comes back first so the rain is right, and the weather before the crowd is planned again.
+        game.Clock.RestoreState(data.Clock);
+        if (data.Weather is not null)
+        {
+            game.RestoreWeather(data.Weather);
+        }
+
         if (data.Year is not null)
         {
             game.RestoreYear(data.Year);
         }
+        else if (data.Weather is not null)
+        {
+            game.Crowd.Replan(game.Crowd.Expected);
+        }
 
-        game.Clock.RestoreState(data.Clock);
         if (data.Site is not null)
         {
             game.Site.Restore(data.Site);
@@ -315,8 +332,8 @@ public sealed record LedgerLine(string What, int Amount);
 public sealed record SaveData(int Version, string Name, ClockState Clock, int? Seed = null, List<PartySave>? Parties = null, SiteSave? Site = null, int? Money = null,
     List<LedgerLine>? Income = null, List<LedgerLine>? Spending = null)
 {
-    /// <summary>Version 1 had the name and clock. Version 2 added the seed and the people. Version 3 added what is built, and money. Version 4 added stalls, needs and the day's takings. Version 5 added the festival year. Version 6 added staff and first aid. Version 7 added crowd safety.</summary>
-    public const int CurrentVersion = 7;
+    /// <summary>Version 1 had the name and clock. Version 2 added the seed and the people. Version 3 added what is built, and money. Version 4 added stalls, needs and the day's takings. Version 5 added the festival year. Version 6 added staff and first aid. Version 7 added crowd safety. Version 8 added weather, mud and ground cover.</summary>
+    public const int CurrentVersion = 8;
 
     /// <summary>Where the festival is in its year. Missing from a festival with nothing to plan.</summary>
     public YearSave? Year { get; init; }
@@ -326,6 +343,9 @@ public sealed record SaveData(int Version, string Name, ClockState Clock, int? S
 
     /// <summary>Crush injuries and anything else about crowd safety on the day.</summary>
     public SafetySave? Safety { get; init; }
+
+    /// <summary>The day's weather, how wet the ground is and what is laid on it.</summary>
+    public WeatherSave? Weather { get; init; }
 
     private static readonly JsonSerializerOptions Options = new()
     {

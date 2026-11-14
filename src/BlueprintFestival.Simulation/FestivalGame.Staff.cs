@@ -373,7 +373,9 @@ public sealed partial class FestivalGame
         // People packed in tight faint more, and lose their tempers more.
         var parched = about.Where(p => p.Thirst >= People.Crowd.Pressing).Sum(p => p.Members.Count);
         var packed = about.Where(p => Crowd.Density.At(p.X, p.Y) >= DensityMap.Busy).Sum(p => p.Members.Count);
-        var illChance = (people + (parched * 3) + (packed * 2)) * (evening ? 0.007 : 0.005) / 60;
+        // Mud turns ankles.
+        var slipping = Wetness <= 0 ? 0 : about.Where(p => MudAtPlace(p.X, p.Y) >= Slippery).Sum(p => p.Members.Count);
+        var illChance = (people + (parched * 3) + (packed * 2) + (slipping * 3)) * (evening ? 0.007 : 0.005) / 60;
         if (illRoll < illChance)
         {
             var party = about[(int)(whoIll * about.Count)];

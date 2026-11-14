@@ -13,6 +13,9 @@ public partial class LitterView : Node3D
         new("#F5F5F5"), new("#D9483B"), new("#4FA8D8"), new("#F6D84A"), new("#C9C2B0"), new("#7A4A2A"),
     };
 
+    private static readonly Color DryEarth = new(0.48f, 0.4f, 0.27f);
+    private static readonly Color Mud = new(0.2f, 0.14f, 0.08f);
+
     private FestivalGame _game = null!;
     private MeshInstance3D? _litter;
     private MultiMeshInstance3D _worn = null!;
@@ -110,7 +113,8 @@ public partial class LitterView : Node3D
             for (var column = 0; column < _game.WearColumns; column++)
             {
                 var wear = (float)_game.WearAt(column, row);
-                if (wear < 0.25f)
+                var mud = (float)_game.MudAt(column, row);
+                if ((wear < 0.25f && mud < 0.08f) || _game.GroundAt(column, row) is not null)
                 {
                     continue;
                 }
@@ -118,7 +122,10 @@ public partial class LitterView : Node3D
                 var x = (f.X * (float)FieldMap.TileMetres) + ((column + 0.5f) * size);
                 var z = (f.Y * (float)FieldMap.TileMetres) + ((row + 0.5f) * size);
                 _worn.Multimesh.SetInstanceTransform(shown, new Transform3D(Basis.Identity, new Vector3(x, 0.02f, z)));
-                _worn.Multimesh.SetInstanceColor(shown, new Color(0.48f, 0.4f, 0.27f, (wear - 0.2f) * 0.75f));
+                // Dry, worn grass goes pale brown; wet, it turns to dark mud.
+                var colour = DryEarth.Lerp(Mud, Mathf.Clamp(mud * 1.4f, 0, 1));
+                colour.A = Mathf.Clamp(Mathf.Max((wear - 0.2f) * 0.75f, mud * 1.5f), 0, 0.92f);
+                _worn.Multimesh.SetInstanceColor(shown, colour);
                 shown++;
             }
         }

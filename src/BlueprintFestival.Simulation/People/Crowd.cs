@@ -254,6 +254,29 @@ public sealed class Crowd
     /// <summary>People per square metre at which nobody else can physically squeeze in.</summary>
     public const double PackedLimit = 6.5;
 
+    /// <summary>How hard it is raining, from 0 (dry) to 1 (pouring).</summary>
+    public double Rain { get; set; }
+
+    /// <summary>How much faster than usual people get thirsty: 1 on an ordinary day, more in the heat.</summary>
+    public double Heat { get; set; } = 1;
+
+    /// <summary>How muddy the ground is at a place in metres, from 0 to 1. Left unset, the ground is firm.</summary>
+    public Func<double, double, double>? Mud { get; set; }
+
+    /// <summary>Whether people have dressed for a wet day: wellies, and a rain poncho for about half of them.</summary>
+    public bool DressedForRain { get; set; }
+
+    /// <summary>Whether the festival hands everyone a rain poncho at the gate on a wet day.</summary>
+    public bool FreePonchos { get; set; }
+
+    /// <summary>Mood lost in an hour of pouring rain by someone with no poncho, and by someone with one.</summary>
+    public const double SoakedPerHour = 0.07;
+
+    public const double PonchoPerHour = 0.015;
+
+    /// <summary>Mood lost in an hour of standing in deep mud.</summary>
+    public const double MudPerHour = 0.06;
+
     private int[] _claims = Array.Empty<int>();
     private int _claimSlot = -1;
     private int _measuredMinute = -1;
@@ -420,12 +443,17 @@ public sealed class Crowd
             for (var i = 0; i < size; i++)
             {
                 var lookSeed = unchecked((Seed * 31) + personId);
-                var look = LookGenerator.FestivalGoer(lookSeed);
+                var look = LookGenerator.FestivalGoer(lookSeed, DressedForRain);
 
                 // A child never comes alone: the first of any party is at least a teenager.
                 if (i == 0 && look.Age == AgeGroup.Child)
                 {
-                    look = LookGenerator.FestivalGoer(lookSeed, AgeGroup.Adult);
+                    look = LookGenerator.FestivalGoer(lookSeed, AgeGroup.Adult, DressedForRain);
+                }
+
+                if (DressedForRain && FreePonchos && look.Poncho is null)
+                {
+                    look = look with { Poncho = LookGenerator.PonchoColours[personId % LookGenerator.PonchoColours.Length] };
                 }
 
                 // Members stand in a small ring round the party's middle.
@@ -950,7 +978,7 @@ public sealed class Crowd
     {
         const double perHour = 1.0 / 3600;
         party.Hunger = Math.Min(1.2, party.Hunger + (party.Appetite * perHour / HoursToHungry));
-        party.Thirst = Math.Min(1.2, party.Thirst + (party.Appetite * perHour / HoursToThirsty));
+        party.Thirst = Math.Min(1.2, party.Thirst + (party.Appetite * Heat * perHour / HoursToThirsty));
         party.Toilet = Math.Min(1.2, party.Toilet + (party.Appetite * perHour / HoursToToilet));
 
         var change = party.State == PartyState.Watching ? 0.05 * perHour : 0;
@@ -960,6 +988,18 @@ public sealed class Crowd
             {
                 change -= (need >= 1 ? 0.06 : 0.03) * perHour;
             }
+        }
+
+        if (Rain > 0.05)
+        {
+            // Rain is miserable without a poncho and only a nuisance with one.
+            var covered = (double)party.Members.Count(m => m.Look.Poncho is not null) / party.Members.Count;
+            change -= Rain * ((covered * PonchoPerHour) + ((1 - covered) * SoakedPerHour)) * perHour;
+        }
+
+        if (Mud is not null && party.State is not (PartyState.Queuing or PartyState.AtStall))
+        {
+            change -= Mud(party.X, party.Y) * MudPerHour * perHour;
         }
 
         party.Mood = Math.Clamp(party.Mood + change, 0, 1);
@@ -1220,12 +1260,12 @@ public sealed class Crowd
     }
 
     /// <summary>How fast a party gets through where it is: a busy place is slow going and a packed one slower still.</summary>
-    private double Pace(Party party) => Density.StatusAt(party.X, party.Y) switch
+    private double Pace(Party party) => (1 - (0.5 * (Mud?.Invoke(party.X, party.Y) ?? 0))) * (Density.StatusAt(party.X, party.Y) switch
     {
         Crowding.CrushRisk => 0.45,
         Crowding.Busy => 0.75,
         _ => 1.0,
-    };
+    });
 
     /// <summary>
     /// How far back from a stage its audience spreads, in metres. The more people the act draws,

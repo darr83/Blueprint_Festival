@@ -39,7 +39,7 @@ public readonly record struct LitterPiece(double X, double Y);
 /// <summary>How the year went.</summary>
 public sealed record YearResult(int Year, int Came, int Expected, int Happy, int WentHome, int In, int Out, int LitterCleared, int GrassWorn,
     string Verdict, int LicenceNow, int LicenceNext, bool Loan, bool Closed, int Treated = 0, int Untreated = 0, int TroubleSorted = 0, int TroubleIgnored = 0,
-    int CrushInjuries = 0, int PulledOut = 0, bool SeriousIncident = false)
+    int CrushInjuries = 0, int PulledOut = 0, bool SeriousIncident = false, int FieldRepair = 0, string Weather = "")
 {
     public int Profit => In - Out;
 }
@@ -76,6 +76,7 @@ public sealed partial class FestivalGame
     private readonly List<LitterPiece> _litter = new();
     private int[] _wear = Array.Empty<int>();
     private bool _loanThisYear;
+    private int _fieldRepair;
 
     /// <summary>True for a festival that runs through a whole year: plan, build, day, tidy, results.</summary>
     public bool Planned { get; }
@@ -181,7 +182,7 @@ public sealed partial class FestivalGame
 
         var word = LastHappiness is { } h ? 0.6 + (0.5 * h / 100.0) : 1.0;
         var pull = _offers.Count > 0 ? 0.85 + (0.05 * _offers[HeadlinerPicked].Stars) : 1.0;
-        return Math.Clamp((int)Math.Round(Licence * TurnoutAtPrice[i] * word * pull), 10, Licence);
+        return Math.Clamp((int)Math.Round(Licence * TurnoutAtPrice[i] * word * pull * ForecastPull), 10, Licence);
     }
 
     public void ChooseTicket(int price)
@@ -208,12 +209,18 @@ public sealed partial class FestivalGame
     public bool ConfirmPlan()
     {
         Need(Phase.Plan);
-        if (ActFees > Money)
+        var ponchos = PonchosOrdered ? PonchoCost : 0;
+        if (ActFees + ponchos > Money)
         {
             return false;
         }
 
         Spend("Act fees", ActFees);
+        if (ponchos > 0)
+        {
+            Spend("Rain ponchos", ponchos);
+        }
+
         ApplyPlan(Turnout());
         Phase = Phase.Build;
         return true;
@@ -248,6 +255,7 @@ public sealed partial class FestivalGame
         Crowd.Tick(clock.Now);
         TickStaff(clock.Now);
         TickSafety(clock.Now);
+        TickWeather(clock.Now);
         if (clock.TickCount % 10 == 0)
         {
             Wear();
@@ -275,7 +283,8 @@ public sealed partial class FestivalGame
             {
                 var column = Math.Min(WearColumns - 1, (tile.X - f.X) / WearTiles);
                 var row = Math.Min(WearRows - 1, (tile.Y - f.Y) / WearTiles);
-                _wear[(row * WearColumns) + column] += party.Members.Count * 10;
+                var index = (row * WearColumns) + column;
+                _wear[index] += (int)Math.Round(party.Members.Count * 10 * WearRate(index));
             }
         }
     }
@@ -320,6 +329,12 @@ public sealed partial class FestivalGame
     {
         Need(Phase.Tidy);
         Phase = Phase.Results;
+        _fieldRepair = FieldRepair;
+        if (_fieldRepair > 0)
+        {
+            Spend("Field repairs", _fieldRepair);
+        }
+
         if (Money < NeedsFor(Licence))
         {
             if (BailedOut)
@@ -369,7 +384,7 @@ public sealed partial class FestivalGame
                 "A good festival and a tidy field. The village field can take no more people than this.";
             return new YearResult(Year, Crowd.Arrived, Crowd.Expected, happy, Crowd.WentHomeUnhappy, TotalIncome, TotalSpending, cleared, GrassWorn,
                 verdict, Licence, next, _loanThisYear, Phase == Phase.Closed, Treated, Untreated, TroubleSorted, TroubleIgnored,
-                CrushInjuries, PulledOut, SeriousIncident);
+                CrushInjuries, PulledOut, SeriousIncident, _fieldRepair, Weather.Summary);
         }
     }
 
@@ -382,7 +397,10 @@ public sealed partial class FestivalGame
     }
 
     private YearSave SaveYear() => new(Year, Licence, Phase, Day, TicketPrice, HeadlinerPicked, Crowd.Expected, BailedOut, _loanThisYear, LastHappiness,
-        LitterAtStart, _litter.ToList(), _wear.ToArray());
+        LitterAtStart, _litter.ToList(), _wear.ToArray())
+    {
+        FieldRepair = _fieldRepair,
+    };
 
     private void RestoreYear(YearSave year)
     {
@@ -400,6 +418,7 @@ public sealed partial class FestivalGame
 
         BailedOut = year.BailedOut;
         _loanThisYear = year.Loan;
+        _fieldRepair = Math.Max(0, year.FieldRepair);
         LitterAtStart = Math.Max(0, year.LitterAtStart);
         _litter.AddRange(year.Litter ?? new());
         if (year.Wear is { } wear && wear.Length == _wear.Length)
@@ -411,4 +430,8 @@ public sealed partial class FestivalGame
 
 /// <summary>The festival year as written to a save file.</summary>
 public sealed record YearSave(int Number, int Licence, Phase Phase, DateTime Day, int TicketPrice, int Headliner, int Turnout, bool BailedOut, bool Loan,
-    int? LastHappiness, int LitterAtStart, List<LitterPiece>? Litter, int[]? Wear);
+    int? LastHappiness, int LitterAtStart, List<LitterPiece>? Litter, int[]? Wear)
+{
+    /// <summary>What the farmer charged for worn-out grass, once the field is handed back.</summary>
+    public int FieldRepair { get; init; }
+}

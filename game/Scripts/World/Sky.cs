@@ -22,6 +22,25 @@ public partial class Sky : Node3D
     private DirectionalLight3D _fill = null!;
     private WorldEnvironment _environment = null!;
 
+    private static readonly Color CloudLight = new("#C9D1DA");
+    private static readonly Color HotSun = new("#FFEFC4");
+    private float _cloud = -1;
+
+    /// <summary>How overcast the sky is drawn: 0 clear, 1 under heavy rain cloud. It eases from one to the other.</summary>
+    public float Overcast => Mathf.Max(0, _cloud);
+
+    /// <summary>How overcast the sky ought to be for the weather right now.</summary>
+    public static float CloudFor(FestivalGame game)
+    {
+        var rain = (float)game.RainNow;
+        return game.Weather.Kind switch
+        {
+            WeatherKind.Rain => rain > 0.05f ? 0.75f + (0.25f * rain) : 0.55f,
+            WeatherKind.Showers => rain > 0.05f ? 0.6f + (0.3f * rain) : 0.2f,
+            _ => 0,
+        };
+    }
+
     /// <summary>How far into the night it is: 0 by day, 1 at night.</summary>
     public float Night { get; private set; }
 
@@ -66,8 +85,13 @@ public partial class Sky : Node3D
     }
 
     /// <summary>Sets the light for the time on the clock, with the sun over the viewer's left shoulder.</summary>
-    public void Apply(FestivalGame game, float viewYawDegrees)
+    public void Apply(FestivalGame game, float viewYawDegrees, bool settle = false)
     {
+        if (settle)
+        {
+            _cloud = -1;
+        }
+
         var time = game.Now.TimeOfDay;
         var day = (float)Daylight.At(time);
         var golden = (float)Daylight.GoldenHour(time);
@@ -86,5 +110,22 @@ public partial class Sky : Node3D
         env.AmbientLightColor = NightAmbient.Lerp(DayAmbient, day);
         env.AmbientLightEnergy = Mathf.Lerp(0.3f, 0.55f, day);
         env.BackgroundColor = NightBackdrop.Lerp(DayBackdrop, day);
+
+        // Cloud takes the strength out of the sun and the colour out of everything; a hot day is a touch brighter and yellower.
+        var target = CloudFor(game);
+        _cloud = _cloud < 0 ? target : Mathf.MoveToward(_cloud, target, (float)GetProcessDeltaTime() * 0.25f);
+        var cloud = _cloud * day;
+        _sun.LightColor = _sun.LightColor.Lerp(CloudLight, cloud * 0.8f);
+        _sun.LightEnergy *= 1 - (0.6f * cloud);
+        _sun.ShadowOpacity = 1 - (0.65f * cloud);
+        env.AmbientLightColor = env.AmbientLightColor.Lerp(CloudLight, cloud * 0.6f);
+        env.AmbientLightEnergy += 0.16f * cloud;
+        env.AdjustmentSaturation = 1.1f - (0.3f * cloud);
+        env.BackgroundColor = env.BackgroundColor.Lerp(new Color("#5E7D63"), cloud * 0.7f);
+        if (game.Weather.Kind == WeatherKind.Hot)
+        {
+            _sun.LightColor = _sun.LightColor.Lerp(HotSun, day * 0.6f);
+            _sun.LightEnergy *= 1 + (0.1f * day);
+        }
     }
 }

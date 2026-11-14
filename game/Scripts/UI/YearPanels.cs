@@ -11,12 +11,13 @@ public sealed record TicketChoice(int Price, int Expected);
 
 /// <summary>What the planning screen shows.</summary>
 public sealed record PlanView(int Year, string Festival, string Date, int Licence, int Bank, IReadOnlyList<TicketChoice> Tickets, int TicketPicked,
-    IReadOnlyList<ActOffer> Headliners, int HeadlinerPicked, IReadOnlyList<string> Support, int SupportFee);
+    IReadOnlyList<ActOffer> Headliners, int HeadlinerPicked, IReadOnlyList<string> Support, int SupportFee,
+    string Forecast = "", bool Ponchos = false, int PonchoCost = 0);
 
 /// <summary>What the results screen shows.</summary>
 public sealed record ResultsView(int Year, string Festival, int Came, int Expected, int Happy, int WentHome, IReadOnlyList<(string What, int Amount)> In,
     IReadOnlyList<(string What, int Amount)> Out, int LitterCleared, int GrassWorn, string Verdict, int LicenceNow, int LicenceNext,
-    int Treated = 0, int Untreated = 0, int TroubleSorted = 0, int TroubleIgnored = 0, int CrushInjuries = 0, int PulledOut = 0);
+    int Treated = 0, int Untreated = 0, int TroubleSorted = 0, int TroubleIgnored = 0, int CrushInjuries = 0, int PulledOut = 0, int FieldRepair = 0, string Weather = "");
 
 /// <summary>
 /// The screens of the festival year that sit over the field: planning before, results after.
@@ -74,16 +75,17 @@ public static class YearPanels
     }
 
     /// <summary>The planning screen: ticket price, headline act, and what is left to build with.</summary>
-    public static Control Plan(PlanView view, System.Action? start = null, System.Action<int>? pickTicket = null, System.Action<int>? pickHeadliner = null)
+    public static Control Plan(PlanView view, System.Action? start = null, System.Action<int>? pickTicket = null, System.Action<int>? pickHeadliner = null,
+        System.Action? togglePonchos = null)
     {
         var panel = Card(820);
         var box = new VBoxContainer();
-        box.AddThemeConstantOverride("separation", 10);
+        box.AddThemeConstantOverride("separation", 8);
         panel.AddChild(box);
 
-        box.AddChild(UiStyle.Heading($"Plan year {view.Year}", 32));
+        // Kept tight, so the whole panel and its button fit on a 900 pixel high screen.
+        box.AddChild(UiStyle.Heading($"Plan year {view.Year}", 28));
         box.AddChild(UiStyle.Body($"{view.Festival}  ·  {view.Date}  ·  Licence for up to {view.Licence:N0} people  ·  £{view.Bank:N0} in the bank", muted: true, size: 15));
-        box.AddChild(new Control { CustomMinimumSize = new Vector2(0, 6) });
 
         box.AddChild(Section("Ticket price"));
         var tickets = new HBoxContainer();
@@ -100,7 +102,6 @@ public static class YearPanels
         }
 
         box.AddChild(tickets);
-        box.AddChild(new Control { CustomMinimumSize = new Vector2(0, 6) });
 
         box.AddChild(Section("Headline act"));
         var acts = new HBoxContainer();
@@ -133,24 +134,48 @@ public static class YearPanels
         var support = UiStyle.Body($"Also playing: {string.Join(", ", view.Support)}. Local acts, £{view.SupportFee} each.", muted: true, size: 14);
         support.AutowrapMode = TextServer.AutowrapMode.WordSmart;
         box.AddChild(support);
-        box.AddChild(new Control { CustomMinimumSize = new Vector2(0, 6) });
+
+        var ponchos = view.Ponchos ? view.PonchoCost : 0;
+        if (view.Forecast.Length > 0)
+        {
+            box.AddChild(Section("Weather"));
+            var weather = new HBoxContainer();
+            weather.AddThemeConstantOverride("separation", 10);
+            var outlook = Tile(false, 380);
+            var said = new VBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
+            said.AddChild(UiStyle.Heading(view.Forecast, 18));
+            said.AddChild(UiStyle.Body("The long-range forecast. It is only a guess this far ahead.", muted: true, size: 14));
+            outlook.AddChild(said);
+            weather.AddChild(outlook);
+            var order = Tile(view.Ponchos, 380, togglePonchos);
+            var offer = new VBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
+            offer.AddChild(UiStyle.Heading(view.Ponchos ? $"Rain ponchos ordered: £{view.PonchoCost:N0}" : $"Order rain ponchos: £{view.PonchoCost:N0}", 18));
+            offer.AddChild(UiStyle.Body("One for everyone at the gate if it is wet. Wasted if it stays dry.", muted: true, size: 14));
+            order.AddChild(offer);
+            weather.AddChild(order);
+            box.AddChild(weather);
+            }
 
         box.AddChild(Section("Money"));
         var ticket = view.Tickets[view.TicketPicked];
-        var fees = view.Headliners[view.HeadlinerPicked].Fee + (view.Support.Count * view.SupportFee);
+        var fees = view.Headliners[view.HeadlinerPicked].Fee + (view.Support.Count * view.SupportFee) + ponchos;
         box.AddChild(MoneyRow("In the bank now", $"£{view.Bank:N0}"));
-        box.AddChild(MoneyRow($"Act fees, paid today ({view.Support.Count + 1} acts)", $"-£{fees:N0}"));
+        box.AddChild(MoneyRow($"Act fees, paid today ({view.Support.Count + 1} acts)", $"-£{fees - ponchos:N0}"));
+        if (ponchos > 0)
+        {
+            box.AddChild(MoneyRow("Rain ponchos", $"-£{ponchos:N0}"));
+        }
+
         box.AddChild(new HSeparator());
         box.AddChild(MoneyRow("Left to build with", $"£{view.Bank - fees:N0}", strong: true));
         box.AddChild(MoneyRow($"Tickets on the day, if about {ticket.Expected} come", $"about £{ticket.Price * ticket.Expected:N0}", muted: true));
-        box.AddChild(new Control { CustomMinimumSize = new Vector2(0, 8) });
 
         var buttons = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.End };
         var go = UiStyle.Button("Start building", start ?? (() => { }));
         if (fees > view.Bank)
         {
             go.Disabled = true;
-            buttons.AddChild(UiStyle.Body("There is not the money for these acts.  ", muted: true, size: 14));
+            buttons.AddChild(UiStyle.Body("There is not the money for all this.  ", muted: true, size: 14));
         }
 
         buttons.AddChild(go);
@@ -168,7 +193,7 @@ public static class YearPanels
 
         // Kept tight, so the whole panel and its button fit on a 900 pixel high screen.
         box.AddChild(UiStyle.Heading($"Year {view.Year} results", 28));
-        box.AddChild(UiStyle.Body(view.Festival, muted: true, size: 15));
+        box.AddChild(UiStyle.Body(view.Weather.Length > 0 ? $"{view.Festival}  ·  {view.Weather}" : view.Festival, muted: true, size: 15));
 
         var takings = 0;
         foreach (var (_, amount) in view.In)
@@ -225,7 +250,7 @@ public static class YearPanels
 
         box.AddChild(Section("The field afterwards"));
         box.AddChild(MoneyRow("Litter cleared", $"{view.LitterCleared}%"));
-        box.AddChild(MoneyRow("Grass worn to mud", $"{view.GrassWorn}%"));
+        box.AddChild(MoneyRow("Grass worn out", view.FieldRepair > 0 ? $"{view.GrassWorn}%. The farmer charged £{view.FieldRepair:N0} to put it right" : $"{view.GrassWorn}%"));
         box.AddChild(Section("People looked after"));
         var crush = (view.CrushInjuries > 0 ? $", {view.CrushInjuries} hurt in a crush" : "") + (view.PulledOut > 0 ? $", {view.PulledOut} lifted out of a crush in time" : "");
         box.AddChild(MoneyRow("Taken ill or hurt", (view.Untreated > 0 ? $"{view.Treated} treated, {view.Untreated} left with no help" : $"{view.Treated} treated") + crush));
@@ -250,7 +275,7 @@ public static class YearPanels
     }
 
     /// <summary>The small panel shown on the build day, before the gates open.</summary>
-    public static Control BuildDay(int expected, int bank, System.Action? open = null)
+    public static Control BuildDay(int expected, int bank, System.Action? open = null, string forecast = "")
     {
         var panel = Card(360);
         var box = new VBoxContainer();
@@ -261,6 +286,20 @@ public static class YearPanels
         words.AutowrapMode = TextServer.AutowrapMode.WordSmart;
         words.CustomMinimumSize = new Vector2(300, 0);
         box.AddChild(words);
+        if (forecast.Length > 0)
+        {
+            var weather = new PanelContainer();
+            weather.AddThemeStyleboxOverride("panel", UiStyle.Box(UiStyle.Ground, 10, UiStyle.Border, 12));
+            var lines = new VBoxContainer();
+            lines.AddChild(Section("Tomorrow's weather"));
+            var said = UiStyle.Body(forecast, size: 15);
+            said.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+            said.CustomMinimumSize = new Vector2(270, 0);
+            lines.AddChild(said);
+            weather.AddChild(lines);
+            box.AddChild(weather);
+        }
+
         box.AddChild(MoneyRow("Expected tomorrow", $"about {expected}"));
         box.AddChild(MoneyRow("Left to build with", $"£{bank:N0}"));
         box.AddChild(new Control { CustomMinimumSize = new Vector2(0, 4) });
