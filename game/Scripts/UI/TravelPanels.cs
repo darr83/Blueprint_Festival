@@ -15,11 +15,8 @@ public static partial class YearPanels
     {
         var row = new HBoxContainer { Name = name };
         row.AddThemeConstantOverride("separation", 6);
-        var down = UiStyle.SecondaryButton("-", () => change?.Invoke(-1));
-        var up = UiStyle.SecondaryButton("+", () => change?.Invoke(1));
-        down.Name = "Less";
-        up.Name = "More";
-        down.CustomMinimumSize = up.CustomMinimumSize = new Vector2(34, 0);
+        var down = StepButton(false, change is null ? null : () => change(-1));
+        var up = StepButton(true, change is null ? null : () => change(1));
         var label = UiStyle.Heading(value, 19);
         label.CustomMinimumSize = new Vector2(40, 0);
         label.HorizontalAlignment = HorizontalAlignment.Center;
@@ -35,7 +32,7 @@ public static partial class YearPanels
         cell.AddThemeConstantOverride("separation", 2);
         var top = new HBoxContainer { CustomMinimumSize = new Vector2(0, 34) };
         top.AddThemeConstantOverride("separation", 8);
-        var name = UiStyle.Body(title, size: 15);
+        var name = UiStyle.Body(title, size: 15, bold: true);
         name.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
         top.AddChild(name);
         if (stepper is not null)

@@ -20,32 +20,32 @@ public partial class ViewButtons : PanelContainer
     public void Initialise(CameraRig camera, System.Action<bool>? crowdView = null)
     {
         Theme = UiStyle.Theme;
-        AddThemeStyleboxOverride("panel", UiStyle.Card(margin: 8, radius: 14));
+        AddThemeStyleboxOverride("panel", UiStyle.Card(margin: 7, radius: 999));
         var row = new HBoxContainer();
-        row.AddThemeConstantOverride("separation", 6);
+        row.AddThemeConstantOverride("separation", 2);
         AddChild(row);
         if (crowdView is not null)
         {
-            _crowd = UiStyle.SecondaryButton("Crowd view", () => { });
+            _crowd = UiStyle.RoundButton("crowd", () => { }, 44);
             _crowd.ToggleMode = true;
-            _crowd.TooltipText = "Tint the field by how tightly people are packed (C)";
+            _crowd.TooltipText = "Crowd view: tint the field by how tightly people are packed (C)";
             _crowd.Toggled += on => crowdView(on);
             row.AddChild(_crowd);
         }
 
-        Add(row, "Turn left", "Turn the view a quarter turn (Q)", () => camera.Turn(-1));
-        Add(row, "Turn right", "Turn the view a quarter turn (E)", () => camera.Turn(1));
-        Add(row, "+", "Zoom in (mouse wheel)", () => camera.ZoomBy(0.8f));
-        Add(row, "-", "Zoom out (mouse wheel)", () => camera.ZoomBy(1.25f));
-        Add(row, "Whole field", "Show the whole field (Home)", camera.ShowWholeField);
-        SetAnchorsAndOffsetsPreset(LayoutPreset.BottomRight, LayoutPresetMode.Minsize, 16);
+        Add(row, "left", "Turn the view a quarter turn left (Q)", () => camera.Turn(-1));
+        Add(row, "right", "Turn the view a quarter turn right (E)", () => camera.Turn(1));
+        Add(row, "plus", "Zoom in (mouse wheel)", () => camera.ZoomBy(0.8f));
+        Add(row, "minus", "Zoom out (mouse wheel)", () => camera.ZoomBy(1.25f));
+        Add(row, "whole", "Show the whole field (Home)", camera.ShowWholeField);
+        SetAnchorsAndOffsetsPreset(LayoutPreset.BottomRight, LayoutPresetMode.Minsize, 22);
         GrowHorizontal = GrowDirection.Begin;
         GrowVertical = GrowDirection.Begin;
     }
 
-    private static void Add(Container row, string text, string tip, System.Action pressed)
+    private static void Add(Container row, string icon, string tip, System.Action pressed)
     {
-        var button = UiStyle.SecondaryButton(text, pressed);
+        var button = UiStyle.RoundButton(icon, pressed, 44);
         button.TooltipText = tip;
         row.AddChild(button);
     }

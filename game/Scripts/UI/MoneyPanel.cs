@@ -23,14 +23,14 @@ public partial class MoneyPanel : PanelContainer
         _game = game;
         Theme = UiStyle.Theme;
         CustomMinimumSize = new Vector2(330, 0);
-        AddThemeStyleboxOverride("panel", UiStyle.Card(margin: 18));
+        AddThemeStyleboxOverride("panel", UiStyle.Card(margin: 20, radius: 12));
         _box = new VBoxContainer();
         _box.AddThemeConstantOverride("separation", 6);
         AddChild(_box);
         Visible = false;
-        SetAnchorsAndOffsetsPreset(LayoutPreset.TopRight, LayoutPresetMode.Minsize, 18);
+        SetAnchorsAndOffsetsPreset(LayoutPreset.TopRight, LayoutPresetMode.Minsize, 22);
         GrowHorizontal = GrowDirection.Begin;
-        Position = new Vector2(Position.X, 62);
+        Position = new Vector2(Position.X, UiStyle.TopClear);
         Refresh();
     }
 
@@ -61,8 +61,9 @@ public partial class MoneyPanel : PanelContainer
         }
 
         LineCount = 0;
-        _box.AddChild(UiStyle.Heading("Today's money", 20));
-        Row("In", "", muted: true);
+        _box.AddChild(UiStyle.Caps("The takings", pink: true));
+        _box.AddChild(UiStyle.Heading("Today's money", 26));
+        _box.AddChild(UiStyle.Caps("In"));
         foreach (var line in _game.Income)
         {
             var what = line.What != "Tickets" ? line.What : _game.SoldAhead ? $"Tickets  {_game.TicketsSold} sold" : $"Tickets  {crowd.ThroughGates} at £{_game.TicketPrice}";
@@ -76,7 +77,7 @@ public partial class MoneyPanel : PanelContainer
         }
 
         _box.AddChild(new HSeparator());
-        Row("Out", "", muted: true);
+        _box.AddChild(UiStyle.Caps("Out"));
         foreach (var line in _game.Spending)
         {
             Row(line.What, $"£{line.Amount:N0}");
@@ -94,7 +95,7 @@ public partial class MoneyPanel : PanelContainer
         Row("In the bank", $"£{_game.Money:N0}");
 
         _box.AddChild(new Control { CustomMinimumSize = new Vector2(0, 6) });
-        _box.AddChild(UiStyle.Heading("How people feel", 17));
+        _box.AddChild(UiStyle.Caps("How people feel"));
         Bar("Happy", crowd.Happiness);
         Bar("Fed", crowd.Content(Need.Food));
         Bar("Watered", crowd.Content(Need.Drink));
@@ -127,7 +128,7 @@ public partial class MoneyPanel : PanelContainer
         var label = UiStyle.Body(what, size: 15);
         label.CustomMinimumSize = new Vector2(80, 0);
         row.AddChild(label);
-        var colour = percent >= 70 ? new Color("#1E9E52") : percent >= 40 ? new Color("#E8A317") : new Color("#D9483B");
+        var colour = percent >= 70 ? UiStyle.FirstAidGreen : percent >= 40 ? new Color("#E8A317") : new Color("#D9483B");
         var bar = new ProgressBar { Value = percent, ShowPercentage = false, CustomMinimumSize = new Vector2(0, 14), SizeFlagsHorizontal = SizeFlags.ExpandFill, SizeFlagsVertical = SizeFlags.ShrinkCenter };
         bar.AddThemeStyleboxOverride("fill", UiStyle.Box(colour, 7));
         bar.AddThemeStyleboxOverride("background", UiStyle.Box(UiStyle.Border, 7));

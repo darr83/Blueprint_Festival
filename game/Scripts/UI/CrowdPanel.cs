@@ -53,7 +53,7 @@ public partial class CrowdPanel : Control
         var rows = new VBoxContainer();
         rows.AddThemeConstantOverride("separation", 6);
         _key.AddChild(rows);
-        rows.AddChild(UiStyle.Heading("Crowd view", 18));
+        rows.AddChild(UiStyle.Heading("Crowd view", 20));
         foreach (var (status, text) in new[]
         {
             (Crowding.Comfortable, "Comfortable: under 2 people per m²"),
@@ -70,8 +70,9 @@ public partial class CrowdPanel : Control
 
         AddChild(_key);
         _key.SetAnchorsAndOffsetsPreset(LayoutPreset.TopLeft, LayoutPresetMode.Minsize, 16);
-        _key.OffsetTop = 66;
-        _key.OffsetBottom = 66;
+        _key.OffsetTop = UiStyle.TopClear;
+        _key.OffsetBottom = UiStyle.TopClear;
+        _key.OffsetLeft = _key.OffsetRight = 22;
 
         _warning = new PanelContainer();
         _warning.AddThemeStyleboxOverride("panel", UiStyle.Card(margin: 14, radius: 14));
@@ -83,7 +84,7 @@ public partial class CrowdPanel : Control
         var column = new VBoxContainer();
         column.AddThemeConstantOverride("separation", 6);
         line.AddChild(column);
-        _heading = UiStyle.Heading("", 20);
+        _heading = UiStyle.Heading("", 22);
         column.AddChild(_heading);
         _body = UiStyle.Body("", muted: true, size: 15);
         column.AddChild(_body);
@@ -98,8 +99,8 @@ public partial class CrowdPanel : Control
         AddChild(_warning);
         _warning.SetAnchorsAndOffsetsPreset(LayoutPreset.TopRight, LayoutPresetMode.Minsize, 16);
         _warning.GrowHorizontal = GrowDirection.Begin;
-        _warning.OffsetTop = 66;
-        _warning.OffsetBottom = 66;
+        _warning.OffsetTop = UiStyle.TopClear;
+        _warning.OffsetBottom = UiStyle.TopClear;
         Refresh();
     }
 
@@ -190,7 +191,7 @@ public partial class CrowdPanel : Control
     {
         _warning.Visible = true;
         _warning.ResetSize();
-        _warning.Position = new Vector2(GetViewportRect().Size.X - 16 - RightInset - _warning.Size.X, 66);
+        _warning.Position = new Vector2(GetViewportRect().Size.X - 22 - RightInset - _warning.Size.X, UiStyle.TopClear);
         _stripe.Color = stripe;
         _heading.Text = heading;
         _body.Text = body;

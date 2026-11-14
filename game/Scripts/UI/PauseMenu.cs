@@ -18,13 +18,15 @@ public partial class PauseMenu : Control
         AddChild(new ColorRect { Color = new Color(UiStyle.NightInk, 0.45f), AnchorRight = 1, AnchorBottom = 1 });
         var centre = new CenterContainer { AnchorRight = 1, AnchorBottom = 1 };
         AddChild(centre);
-        var panel = new PanelContainer { CustomMinimumSize = new Vector2(340, 0) };
+        var panel = new Paper(26, small: true) { CustomMinimumSize = new Vector2(380, 0) };
         centre.AddChild(panel);
         var column = new VBoxContainer();
         column.AddThemeConstantOverride("separation", 12);
         panel.AddChild(column);
 
-        column.AddChild(UiStyle.Heading("Paused"));
+        column.AddChild(UiStyle.Caps("Interval", pink: true));
+        column.AddChild(UiStyle.Heading("Paused", 36));
+        column.AddChild(UiStyle.Rule());
         column.AddChild(UiStyle.Button("Carry on", Close));
         column.AddChild(UiStyle.SecondaryButton("Save", () => Save()));
         column.AddChild(UiStyle.SecondaryButton("Save and go to main menu", () =>
