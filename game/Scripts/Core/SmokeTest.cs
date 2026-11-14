@@ -153,7 +153,7 @@ public partial class SmokeTest : Node
                     Check(opened.Weather.CoverShown == 1, "The straw should be drawn.");
                     Check(opened.Game.Money == 1554 - 120 - 200 - 40 - 3, $"A patch of straw should cost £3, leaving £1,191, not £{opened.Game.Money}.");
 
-                    // A path goes down in a line, is drawn, and comes up again for the money back on the build day.
+                    // A path goes down in a line, is drawn, and can be lifted again (once the gates are open there is no money back).
                     Check(opened.BuildBar.Choose("groundGravel"), "The ground tab should offer a gravel path.");
                     var pathFrom = new TilePoint(grass.X + 49, grass.Y + 61);
                     Check(opened.Build.DragGround(pathFrom, new TilePoint(grass.X + 58, grass.Y + 63)).Ok && opened.Game.PathPatches == 3 && opened.Game.Crowd.HasPaths, $"A gravel path three patches long should go down, not {opened.Game.PathPatches}.");
@@ -167,7 +167,7 @@ public partial class SmokeTest : Node
                         }
                     }
 
-                    Check(opened.Game.PathPatches == 0 && !opened.Game.Crowd.HasPaths && opened.Game.Money == 1554 - 120 - 200 - 40 - 3, "Lifting the path on the build day should give the money back.");
+                    Check(opened.Game.PathPatches == 0 && !opened.Game.Crowd.HasPaths && opened.Game.Money == 1554 - 120 - 200 - 40 - 3 - (3 * 7), $"Lifting the path should leave no path and the £21 it cost spent: {opened.Game.PathPatches} left, £{opened.Game.Money}.");
                     Check(opened.Weather.StreaksShown == 0 && opened.Sky.Overcast < 0.01f, "A fine day should have no rain and no cloud.");
                     Check(opened.TopBar.WeatherText.StartsWith("Fine", StringComparison.Ordinal), $"The top bar should say the day is fine, not '{opened.TopBar.WeatherText}'.");
                     opened.BuildBar.Close();
