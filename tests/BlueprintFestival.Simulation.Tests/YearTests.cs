@@ -35,6 +35,9 @@ public class YearTests
     private static FestivalGame AfterTheDay(string name = "Larkmoor Festival")
     {
         var game = FestivalGame.NewFestival(name);
+
+        // The local act: a bigger name on a farm trailer needs a front barrier, which is another test's business.
+        game.ChooseHeadliner(0);
         Assert.True(game.ConfirmPlan());
         BuildSite(game);
         game.OpenGates();

@@ -121,7 +121,9 @@ public sealed class FieldMap
     /// </summary>
     public static FieldMap Village() => Create(fieldMetresWide: 60, fieldMetresDeep: 40);
 
-    public static FieldMap Create(int fieldMetresWide, int fieldMetresDeep)
+    public static FieldMap Create(int fieldMetresWide, int fieldMetresDeep) => Create(fieldMetresWide, fieldMetresDeep, 6);
+
+    public static FieldMap Create(int fieldMetresWide, int fieldMetresDeep, int gapMetres)
     {
         if (fieldMetresWide < 20 || fieldMetresDeep < 20)
         {
@@ -131,7 +133,7 @@ public sealed class FieldMap
         const int margin = 24;      // 12 m of countryside round the hedge
         const int hedge = 3;        // a 1.5 m thick hedge
         const int laneWidth = 10;   // a 5 m lane
-        const int gapWidth = 12;    // a 6 m gap
+        var gapWidth = Math.Clamp(gapMetres, 4, fieldMetresWide / 2) * 2;
         const int laneGap = 16;     // 8 m of verge between hedge and lane
 
         var fieldW = fieldMetresWide * 2;
