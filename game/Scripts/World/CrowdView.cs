@@ -52,6 +52,7 @@ public partial class CrowdView : Node3D
     private readonly StageBeat _secondBeat = new();
     private readonly CrowdClap _clap = new();
     private int _clappers;
+    private int _applauding;
 
     /// <summary>The music being played, which the crowd dances in time to. Null dances to a steady beat.</summary>
     public MusicPlayer? Music { get; set; }
@@ -73,6 +74,12 @@ public partial class CrowdView : Node3D
 
     /// <summary>How many claps have been played on the beat so far.</summary>
     public int ClapsPlayed => _clap.Played;
+
+    /// <summary>How many people are clapping or cheering between songs or at the end of a set.</summary>
+    public int Applauding { get; private set; }
+
+    /// <summary>How loud the clapping under the cheers is, from 0 to 1.</summary>
+    public float ApplauseLevel { get; private set; }
 
     /// <summary>How many people are drawn as simple figures, because the crowd is big or the view is far out.</summary>
     public int Simple { get; private set; }
@@ -180,6 +187,19 @@ public partial class CrowdView : Node3D
         return main.DistanceSquared(person.X, person.Y) <= second.DistanceSquared(person.X, person.Y) ? main : second;
     }
 
+    /// <summary>
+    /// The stage someone watching is clapping and cheering at, between songs or at the end of a
+    /// set: the nearer stage with an act on. Null while a song is playing there.
+    /// </summary>
+    private StageBeat? ApplauseFor(Simulation.People.PersonOnSite person)
+    {
+        var main = _mainBeat.Slot is not null ? _mainBeat : null;
+        var second = _secondBeat.Slot is not null ? _secondBeat : null;
+        var stage = main is null || second is null ? main ?? second
+            : main.DistanceSquared(person.X, person.Y) <= second.DistanceSquared(person.X, person.Y) ? main : second;
+        return stage?.Moment is StageMoment.BetweenSongs or StageMoment.Applause ? stage : null;
+    }
+
     /// <summary>The stage whose music is being heard, while an act is on there.</summary>
     private StageBeat? HeardStage()
     {
@@ -191,6 +211,16 @@ public partial class CrowdView : Node3D
     private bool ClapsAlong(Simulation.People.PersonOnSite person, StageBeat? heard) =>
         heard is not null && person.Watching && !person.Walking && StageFor(person) == heard
         && Dancing.MoveFor(heard.Genre, person.Id) == DanceMove.Sway;
+
+    /// <summary>
+    /// What someone does when a song ends or the act takes its applause: most clap, some throw their
+    /// arms up and cheer, each changing now and then; at the end of a set more of them cheer.
+    /// </summary>
+    private Pose Applause(int person, StageBeat stage)
+    {
+        var cheerOutOfTen = stage.Moment == StageMoment.Applause ? 5 : 3;
+        return ((person * 7) + (int)((_time + (person % 5)) / 1.6)) % 10 < cheerOutOfTen ? Pose.Cheering : Pose.Clapping;
+    }
 
     /// <summary>How far a simple figure, far from the camera, bobs or jumps off the ground in time.</summary>
     private static float SimpleLift((Genre Genre, double Beat) dance, int person)
@@ -272,6 +302,7 @@ public partial class CrowdView : Node3D
         var dancers = 0;
         var heard = HeardStage();
         _clappers = 0;
+        _applauding = 0;
         foreach (var person in _people)
         {
             // Someone unwell lies on the ground, or on a bed if they have been taken to the first aid tent.
@@ -303,14 +334,17 @@ public partial class CrowdView : Node3D
                 // more of them, more often, for the headline act.
                 var cheering = person.Watching && ((person.Id * 7) + (int)(_time / 2.5)) % 10 < _cheerOutOfTen;
                 var dance = person.Watching && !person.Walking ? BeatFor(person) : null;
+                var applause = person.Watching && !person.Walking ? ApplauseFor(person) : null;
                 _clappers += ClapsAlong(person, heard) ? 1 : 0;
+                _applauding += applause is not null ? 1 : 0;
                 if (dance is { } d)
                 {
                     var move = Dancing.MoveFor(d.Genre, person.Id);
                     view.Dance(move, (float)Dancing.Through(d.Beat, move, person.Id), (float)Dancing.Energy(person.Id));
                 }
 
-                view.Pose = person.Ticket ? Pose.ShowingTicket : person.Walking && speed > 0 ? Pose.Walking : dance is not null ? Pose.Dancing : cheering ? Pose.Cheering : Pose.Standing;
+                view.Pose = person.Ticket ? Pose.ShowingTicket : person.Walking && speed > 0 ? Pose.Walking : dance is not null ? Pose.Dancing
+                    : applause is not null ? Applause(person.Id, applause) : cheering ? Pose.Cheering : Pose.Standing;
                 dancers += view.Pose == Pose.Dancing ? 1 : 0;
                 Bubble(person.Id, view, person.Wants, cameraYaw);
                 if (snap)
@@ -340,6 +374,7 @@ public partial class CrowdView : Node3D
             var tall = _heights[person.Id];
             var basis = person.Unwell ? new Basis(Vector3.Right, tilt).Scaled(Vector3.One * tall) : Basis.FromScale(Vector3.One * tall);
             _clappers += ClapsAlong(person, heard) ? 1 : 0;
+            _applauding += person.Watching && !person.Walking && ApplauseFor(person) is not null ? 1 : 0;
             if (person.Watching && !person.Walking && BeatFor(person) is { } beat)
             {
                 at += new Vector3(0, SimpleLift(beat, person.Id), 0);
@@ -355,6 +390,12 @@ public partial class CrowdView : Node3D
         Dancers = dancers;
         Clappers = _clappers;
         _clap.Update(heard, _clappers, held, delta);
+        Applauding = _applauding;
+        // The clapping under the cheers: louder at the end of a set than between songs, and louder the more people clap.
+        var loudest = _mainBeat.Moment == StageMoment.Applause || _secondBeat.Moment == StageMoment.Applause ? 1f : 0.6f;
+        var want = held || _applauding == 0 ? 0f : Mathf.Clamp(Mathf.Sqrt(_applauding / 250f), 0.25f, 1f) * loudest;
+        ApplauseLevel = want;
+        SoundBoard.Instance?.SetLoop(Sounds.ApplauseLoop, want);
         foreach (var (node, buffer) in new[] { (_bodies, _bodyBuffer), (_heads, _headBuffer), (_hair, _hairBuffer) })
         {
             node.Visible = simple > 0;
@@ -391,58 +432,6 @@ public partial class CrowdView : Node3D
             _bubbles.Remove(id);
         }
     }
-}
-
-/// <summary>
-/// The beat at one stage, worked out once a frame: the song's own beat when its music is the music
-/// being heard, otherwise a steady beat suited to the act, counted from when it came on.
-/// </summary>
-internal sealed class StageBeat
-{
-    private int _slot = -1;
-    private double _clock;
-    private double _frontX;
-    private double _frontY;
-
-    /// <summary>True while an act is on at this stage and playing.</summary>
-    public bool On { get; private set; }
-
-    public Genre Genre { get; private set; }
-
-    /// <summary>How many beats into the song (or set) it is.</summary>
-    public double Beat { get; private set; }
-
-    public void Update(FestivalGame game, RunningOrder show, MusicPlayer? music, bool held, double delta)
-    {
-        var playing = game.Phase == Phase.Day ? show.Playing(game.Now) : null;
-        if (playing is null || show.Stage is not { } stage)
-        {
-            On = false;
-            _slot = -1;
-            return;
-        }
-
-        if (playing.Index != _slot)
-        {
-            _slot = playing.Index;
-            _clock = 0;
-        }
-
-        (_frontX, _frontY, _, _) = RunningOrder.Front(stage);
-        // Everyone stops when the act is stopped for the crowd's safety.
-        On = !game.ActPaused;
-        Genre = playing.Act.Genre;
-        if (!held)
-        {
-            _clock += delta;
-        }
-
-        Beat = music is not null && music.Heard == show && music.SongPlaying
-            ? Dancing.BeatNow(music.Beat, music.SongSeconds, Genre, music.SongSeconds)
-            : Dancing.BeatNow(null, 0, Genre, _clock);
-    }
-
-    public double DistanceSquared(double x, double y) => ((x - _frontX) * (x - _frontX)) + ((y - _frontY) * (y - _frontY));
 }
 
 /// <summary>

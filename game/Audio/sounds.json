@@ -489,6 +489,42 @@
       "gap": 0.0,
       "keep": 0.4,
       "prompt": "One single big clap from a festival crowd clapping in time, a thousand hands together at the same instant, a full warm hit, then silence. No music, no voices, no cheering."
+    },
+    {
+      "id": "song_end_small",
+      "bus": "Crowd",
+      "seconds": 3.5,
+      "loop": false,
+      "volume": 0.9,
+      "gap": 2,
+      "prompt": "A small outdoor crowd of about a hundred people clapping and cheering warmly the moment a song finishes, a few whoops. No music."
+    },
+    {
+      "id": "song_end_big",
+      "bus": "Crowd",
+      "seconds": 4,
+      "loop": false,
+      "volume": 1.0,
+      "gap": 2,
+      "prompt": "A big festival crowd of thousands cheering, whistling and clapping loudly the moment a song finishes. No music."
+    },
+    {
+      "id": "set_end_ovation",
+      "bus": "Crowd",
+      "seconds": 9,
+      "loop": false,
+      "volume": 1.0,
+      "gap": 20,
+      "prompt": "An enormous outdoor festival crowd roaring, screaming, whistling and applauding wildly at the end of a band's final song, a huge ovation that keeps going. No music."
+    },
+    {
+      "id": "applause_loop",
+      "bus": "Crowd",
+      "seconds": 10,
+      "loop": true,
+      "volume": 0.9,
+      "gap": 0,
+      "prompt": "Steady continuous applause from an outdoor festival crowd, lots of hands clapping with the odd cheer and whistle, even and unbroken. No music."
     }
   ]
 }

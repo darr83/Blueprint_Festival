@@ -49,7 +49,11 @@ public static class Performers
         };
         var person = PersonView.Build(look);
         person.Name = "Person";
-        person.SetPose(role == BandRole.Singer ? Pose.Cheering : Pose.Standing);
+        person.SetPose(Pose.Performing);
+        if (role == BandRole.Drummer)
+        {
+            person.Position = new Vector3(0, -DrummerSits, -0.05f);
+        }
         node.AddChild(person);
 
         var b = new MeshBuilder();
@@ -57,7 +61,7 @@ public static class Performers
         switch (role)
         {
             case BandRole.Singer:
-                Stand(b, new Vector3(0.05f, 0, 0.42f), 1.42f * h);
+                Stand(b, new Vector3(-0.04f, 0, 0.42f), 1.24f * h);
                 break;
 
             case BandRole.Guitarist:
@@ -77,25 +81,13 @@ public static class Performers
             }
 
             case BandRole.Fiddler:
+                // The fiddle under the chin; the bow is held in the right hand (see Bow).
                 b.Ball(new Vector3(-0.2f, 1.3f * h, 0.16f), new Vector3(0.16f, 0.07f, 0.28f), Wood, new Vector3(0, 25, 0));
                 b.Box(new Vector3(-0.3f, 1.3f * h, 0.38f), new Vector3(0.03f, 0.03f, 0.24f), WoodDark, new Vector3(0, 25, 0));
-                b.Box(new Vector3(-0.08f, 1.34f * h, 0.32f), new Vector3(0.5f, 0.015f, 0.015f), Cream, new Vector3(0, 20, 20));
                 break;
 
             case BandRole.Drummer:
-                // A stool to sit on is hidden by the kit: bass drum, snare, two toms, hi-hat and cymbals.
-                b.Tube(new Vector3(0, 0.36f, 0.75f), new Vector3(0.66f, 0.42f, 0.66f), new Color("#E94F7B"), new Vector3(90, 0, 0));
-                b.Tube(new Vector3(0, 0.36f, 0.97f), new Vector3(0.6f, 0.02f, 0.6f), Cream, new Vector3(90, 0, 0));
-                b.Tube(new Vector3(-0.42f, 0.62f, 0.5f), new Vector3(0.36f, 0.16f, 0.36f), Cream);
-                b.Tube(new Vector3(-0.2f, 0.86f, 0.78f), new Vector3(0.3f, 0.2f, 0.3f), new Color("#E94F7B"), new Vector3(-20, 0, 0));
-                b.Tube(new Vector3(0.2f, 0.86f, 0.78f), new Vector3(0.32f, 0.22f, 0.32f), new Color("#E94F7B"), new Vector3(-20, 0, 0));
-                b.Tube(new Vector3(0.52f, 0.5f, 0.45f), new Vector3(0.42f, 0.36f, 0.42f), new Color("#E94F7B"));
-                foreach (var (x, z, y, size) in new[] { (-0.72f, 0.55f, 0.95f, 0.36f), (-0.5f, 0.95f, 1.25f, 0.46f), (0.6f, 0.9f, 1.2f, 0.5f) })
-                {
-                    b.Tube(new Vector3(x, y / 2, z), new Vector3(0.03f, y, 0.03f), Steel);
-                    b.Tube(new Vector3(x, y, z), new Vector3(size, 0.02f, size), new Color("#F6B93B"), new Vector3(8, 0, 6));
-                }
-
+                BuildKit(node);
                 break;
 
             case BandRole.Keys:
@@ -124,6 +116,103 @@ public static class Performers
         }
 
         return node;
+    }
+
+    /// <summary>How far below standing the drummer sits on the stool, in metres.</summary>
+    public const float DrummerSits = 0.15f;
+
+    /// <summary>The middle of the top of each drum and cymbal, where a stick strikes it, the drummer facing south (+Z).</summary>
+    public static Vector3 DrumTop(Drum drum) => drum switch
+    {
+        Drum.Snare => new Vector3(-0.24f, 0.70f, 0.45f),
+        Drum.HighTom => new Vector3(-0.17f, 0.91f, 0.64f),
+        Drum.LowTom => new Vector3(0.17f, 0.91f, 0.64f),
+        Drum.FloorTom => new Vector3(0.42f, 0.66f, 0.6f),
+        Drum.HiHat => new Vector3(0.47f, 0.88f, 0.32f),
+        _ => new Vector3(0.5f, 1.18f, 0.62f),
+    };
+
+    /// <summary>A drum stick, lying along +Z from the hand, one metre long before it is stretched to fit.</summary>
+    public static Node3D Stick()
+    {
+        var b = new MeshBuilder();
+        b.Tube(new Vector3(0, 0, 0.5f), new Vector3(0.04f, 1f, 0.04f), Cream, new Vector3(90, 0, 0));
+        return b.BuildNode("Stick");
+    }
+
+    /// <summary>A fiddle bow, lying along +Z from the hand, one metre long before it is stretched to fit.</summary>
+    public static Node3D Bow()
+    {
+        var b = new MeshBuilder();
+        b.Tube(new Vector3(0, 0, 0.5f), new Vector3(0.016f, 1f, 0.016f), WoodDark, new Vector3(90, 0, 0));
+        b.Box(new Vector3(0, -0.02f, 0.5f), new Vector3(0.008f, 0.02f, 0.95f), Cream);
+        return b.BuildNode("Bow");
+    }
+
+    /// <summary>
+    /// The drum kit, each drum and cymbal a node of its own (named after it) so it can shake when it
+    /// is hit: bass drum, snare, two toms, a floor tom, hi-hat, crash and ride, and a stool.
+    /// </summary>
+    private static void BuildKit(Node3D node)
+    {
+        var pink = new Color("#E94F7B");
+        var brass = new Color("#F6B93B");
+        var kit = new Node3D { Name = "Kit" };
+        node.AddChild(kit);
+
+        void Piece(string name, Vector3 at, System.Action<MeshBuilder> build)
+        {
+            var b = new MeshBuilder();
+            build(b);
+            kit.AddChild(b.BuildNode(name, at));
+        }
+
+        // The stool, half hidden behind the kit.
+        Piece("Stool", new Vector3(0, 0, -0.05f), b =>
+        {
+            b.Tube(new Vector3(0, 0.44f, 0), new Vector3(0.34f, 0.07f, 0.34f), Black);
+            b.Tube(new Vector3(0, 0.22f, 0), new Vector3(0.04f, 0.44f, 0.04f), Steel);
+        });
+        Piece("Kick", new Vector3(0, 0.33f, 0.8f), b =>
+        {
+            b.Tube(Vector3.Zero, new Vector3(0.62f, 0.4f, 0.62f), pink, new Vector3(90, 0, 0));
+            b.Tube(new Vector3(0, 0, 0.21f), new Vector3(0.56f, 0.02f, 0.56f), Cream, new Vector3(90, 0, 0));
+        });
+        Piece(nameof(Drum.Snare), DrumTop(Drum.Snare) - new Vector3(0, 0.07f, 0), b =>
+        {
+            b.Tube(Vector3.Zero, new Vector3(0.34f, 0.13f, 0.34f), Cream);
+            b.Tube(new Vector3(0, -0.36f, 0), new Vector3(0.03f, 0.6f, 0.03f), Steel);
+        });
+        foreach (var (drum, size) in new[] { (Drum.HighTom, 0.28f), (Drum.LowTom, 0.31f) })
+        {
+            Piece(drum.ToString(), DrumTop(drum) - new Vector3(0, 0.1f, -0.03f), b => b.Tube(Vector3.Zero, new Vector3(size, 0.2f, size), pink, new Vector3(-18, 0, 0)));
+        }
+
+        Piece(nameof(Drum.FloorTom), DrumTop(Drum.FloorTom) - new Vector3(0, 0.17f, 0), b =>
+        {
+            b.Tube(Vector3.Zero, new Vector3(0.4f, 0.34f, 0.4f), pink);
+            b.Tube(new Vector3(0, 0.17f, 0), new Vector3(0.37f, 0.02f, 0.37f), Cream);
+        });
+        foreach (var (drum, size, tilt) in new[] { (Drum.HiHat, 0.36f, 0f), (Drum.Crash, 0.48f, 10f) })
+        {
+            var top = DrumTop(drum);
+            Piece(drum.ToString() + " stand", new Vector3(top.X, top.Y / 2, top.Z + 0.04f), b => b.Tube(Vector3.Zero, new Vector3(0.03f, top.Y, 0.03f), Steel));
+            Piece(drum.ToString(), top - new Vector3(0, 0.02f, 0), b =>
+            {
+                b.Tube(Vector3.Zero, new Vector3(size, 0.02f, size), brass, new Vector3(tilt, 0, -tilt / 2));
+                if (drum == Drum.HiHat)
+                {
+                    b.Tube(new Vector3(0, -0.04f, 0), new Vector3(size, 0.02f, size), brass);
+                }
+            });
+        }
+
+        // The ride cymbal, on the far side.
+        Piece("Ride", new Vector3(-0.6f, 1.08f, 0.62f), b =>
+        {
+            b.Tube(Vector3.Zero, new Vector3(0.5f, 0.02f, 0.5f), brass, new Vector3(8, 0, 6));
+            b.Tube(new Vector3(0, -0.54f, 0), new Vector3(0.03f, 1.08f, 0.03f), Steel);
+        });
     }
 
     private static void Stand(MeshBuilder b, Vector3 foot, float height)

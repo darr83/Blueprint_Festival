@@ -59,13 +59,27 @@ public static class Sounds
     public const string Clap1 = "clap_1";
     public const string Clap2 = "clap_2";
     public const string Clap3 = "clap_3";
+    public const string SongEndSmall = "song_end_small";
+    public const string SongEndBig = "song_end_big";
+    public const string SetEndOvation = "set_end_ovation";
+    public const string ApplauseLoop = "applause_loop";
 
     /// <summary>One clap of the crowd clapping along, each a little different; one plays on each clap of the beat.</summary>
     public static readonly IReadOnlyList<string> Claps = [Clap1, Clap2, Clap3];
 
     /// <summary>The sounds that play round and round for as long as they are wanted.</summary>
     public static readonly IReadOnlyList<string> Loops =
-        [Day, Night, RainLight, RainHeavy, CrowdSmall, CrowdMedium, CrowdLarge, CrowdQueue];
+        [Day, Night, RainLight, RainHeavy, CrowdSmall, CrowdMedium, CrowdLarge, CrowdQueue, ApplauseLoop];
+
+    /// <summary>
+    /// The clapping that goes on under the cheers between songs and at the end of a set. The game
+    /// sets how loud it is from how many people are clapping, so it is not one of the levels the
+    /// sound script works out.
+    /// </summary>
+    public static bool SetByTheGame(string loop) => loop == ApplauseLoop;
+
+    /// <summary>The cheer when a song ends, for this many people watching.</summary>
+    public static string SongEndFor(int watching) => watching < 400 ? SongEndSmall : SongEndBig;
 }
 
 /// <summary>
@@ -77,7 +91,7 @@ public static class Sounds
 public sealed class SoundScript : IDisposable
 {
     private readonly FestivalGame _game;
-    private readonly Dictionary<string, double> _levels = Sounds.Loops.ToDictionary(id => id, _ => 0.0);
+    private readonly Dictionary<string, double> _levels = Sounds.Loops.Where(id => !Sounds.SetByTheGame(id)).ToDictionary(id => id, _ => 0.0);
     private Phase _phase;
     private int _playing = -1;
     private int _playingSecond = -1;
@@ -260,13 +274,12 @@ public sealed class SoundScript : IDisposable
 
         if (before >= 0)
         {
-            // The act that was on has finished: a hand for them as they go.
+            // The act that was on has finished: the loudest cheer of their set, clapping and
+            // cheering together, as the crowd clap them off.
             var headliner = show.Slots.Any(s => s.Index == before && s.Headliner);
-            Cue?.Invoke(headliner || watching >= 500 ? Sounds.ApplauseBig : Sounds.ApplauseSmall);
-            if (headliner)
-            {
-                Cue?.Invoke(CheerFor(watching));
-            }
+            var big = headliner || watching >= 500;
+            Cue?.Invoke(big ? Sounds.ApplauseBig : Sounds.ApplauseSmall);
+            Cue?.Invoke(big ? Sounds.SetEndOvation : CheerFor(watching));
         }
 
         if (now is not null)
