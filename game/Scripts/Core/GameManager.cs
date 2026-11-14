@@ -87,6 +87,10 @@ public partial class GameManager : Node
             {
                 AddChild(new CampShots(arg["--camp-shots=".Length..]) { Name = "CampShots" });
             }
+            else if (arg.StartsWith("--queue-shots=", StringComparison.Ordinal))
+            {
+                AddChild(new QueueShots(arg["--queue-shots=".Length..]) { Name = "QueueShots" });
+            }
             else if (arg.StartsWith("--field-shots=", StringComparison.Ordinal))
             {
                 AddChild(new FieldShots(arg["--field-shots=".Length..]) { Name = "FieldShots" });

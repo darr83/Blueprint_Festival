@@ -283,7 +283,7 @@ public partial class CrowdView : Node3D
                     view.Dance(move, (float)Dancing.Through(d.Beat, move, person.Id), (float)Dancing.Energy(person.Id));
                 }
 
-                view.Pose = person.Walking && speed > 0 ? Pose.Walking : dance is not null ? Pose.Dancing : cheering ? Pose.Cheering : Pose.Standing;
+                view.Pose = person.Ticket ? Pose.ShowingTicket : person.Walking && speed > 0 ? Pose.Walking : dance is not null ? Pose.Dancing : cheering ? Pose.Cheering : Pose.Standing;
                 dancers += view.Pose == Pose.Dancing ? 1 : 0;
                 Bubble(person.Id, view, person.Wants, cameraYaw);
                 if (snap)

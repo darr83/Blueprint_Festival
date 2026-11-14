@@ -154,7 +154,7 @@ public class NeedsTests
         while (game.Now < Day.AddHours(18))
         {
             game.Clock.Step();
-            longest = Math.Max(longest, game.Crowd.StallQueueLength(0, 0));
+            longest = Math.Max(longest, game.Crowd.StallQueueLength(0));
             if (game.Crowd.GaveUpQueuing > 0 && gaveUpAt == DateTime.MaxValue)
             {
                 gaveUpAt = game.Now;

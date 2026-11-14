@@ -154,7 +154,23 @@ public sealed class Party
     /// <summary>Which stall they are queuing at, or -1.</summary>
     public int Stall { get; internal set; } = -1;
 
-    public int StallLane { get; internal set; }
+    /// <summary>Which server of that stall is serving them, or -1 while they are still in the queue.</summary>
+    public int Server { get; internal set; } = -1;
+
+    /// <summary>True once they have reached the queue and are standing in it, one behind the next.</summary>
+    public bool InLine { get; internal set; }
+
+    /// <summary>How many places from the front of the queue the first of them stands. Part places are in between two.</summary>
+    public double LinePos { get; internal set; }
+
+    /// <summary>The place in the queue they are shuffling up to.</summary>
+    internal int LineTarget { get; set; }
+
+    /// <summary>How many of them have had their tickets checked and stepped through the gate.</summary>
+    public int Checked { get; internal set; }
+
+    /// <summary>How many times they have had to walk on because the back of the queue had moved.</summary>
+    internal int Rejoins { get; set; }
 
     /// <summary>When they joined the stall queue.</summary>
     public DateTime QueuedSince { get; internal set; }
@@ -206,7 +222,11 @@ public sealed class Party
 }
 
 /// <summary>One person as the game draws them: who they are, where they are, which way they face.</summary>
-public readonly record struct PersonOnSite(int Id, PersonLook Look, double X, double Y, double Heading, bool Walking, bool Watching = false, Need? Wants = null, bool Unwell = false);
+public readonly record struct PersonOnSite(int Id, PersonLook Look, double X, double Y, double Heading, bool Walking, bool Watching = false, Need? Wants = null, bool Unwell = false)
+{
+    /// <summary>True while this person is holding up their ticket for the gate staff.</summary>
+    public bool Ticket { get; init; }
+}
 
 /// <summary>
 /// Everyone who comes to the festival. The whole day's comings and goings are worked out from the
@@ -227,9 +247,6 @@ public sealed class Crowd
 
     /// <summary>From this time of day, people who were about to go home may stay on for the headliner instead.</summary>
     public static readonly TimeSpan StayOnFrom = TimeSpan.FromHours(17);
-
-    /// <summary>How far apart parties stand in a queue, in metres, and how many places a queue has before it bunches up.</summary>
-    private const double QueueSpacing = 1.1;
 
     /// <summary>How people feel when they walk in.</summary>
     public const double StartingMood = 0.65;
@@ -260,14 +277,22 @@ public sealed class Crowd
 
     /// <summary>How long people wait at a gate with nobody checking tickets before they go home.</summary>
     public const double GatePatienceMinutes = 30;
-    private const int QueuePlaces = 16;
+
+    /// <summary>How far out from a stall's front the queue starts, leaving room for the people being served.</summary>
+    public const double StallQueueStart = 2.8;
+
+    /// <summary>How many places a stall's queue runs out before it folds back on itself, and the most places it has.</summary>
+    private const int StallFold = 16;
+    private const int StallPlaces = 90;
+    private const int GatePlaces = 240;
 
     private readonly FieldMap _map;
     private readonly SiteLayout _site;
     private readonly PathFinder _paths;
     private readonly List<Party> _parties = new();
-    private readonly List<List<Party>[]> _queues = new();
-    private readonly List<List<Party>[]> _stallQueues = new();
+    private readonly List<QueueLine[]> _queues = new();
+    private readonly List<QueueLine?> _stallQueues = new();
+    private readonly List<Party?[]> _serving = new();
     private readonly List<TilePoint> _standable = new();
     private readonly HashSet<TilePoint> _standableSet = new();
     private readonly DateTime _day;
@@ -408,8 +433,17 @@ public sealed class Crowd
     /// <summary>How many people are queuing at stalls.</summary>
     public int AtStalls => _parties.Where(p => p.State == PartyState.AtStall).Sum(p => p.Members.Count);
 
-    /// <summary>How many parties are in one line of a stall's queue.</summary>
-    public int StallQueueLength(int stall, int lane) => stall < _stallQueues.Count && lane < _stallQueues[stall].Length ? _stallQueues[stall][lane].Count : 0;
+    /// <summary>How many people are in a stall's queue or walking to it, not counting anyone being served.</summary>
+    public int StallQueueLength(int stall) => stall < _stallQueues.Count ? _stallQueues[stall]?.People ?? 0 : 0;
+
+    /// <summary>How many of a stall's servers are busy with someone.</summary>
+    public int BeingServed(int stall) => stall < _serving.Count ? _serving[stall].Count(p => p is not null) : 0;
+
+    /// <summary>The queue at a stall, or null if it is not the kind of stall people queue at.</summary>
+    public QueueLine? StallLine(int stall) => stall >= 0 && stall < _stallQueues.Count ? _stallQueues[stall] : null;
+
+    /// <summary>The queue at one lane of a gate.</summary>
+    public QueueLine? GateLine(int gate, int lane) => gate >= 0 && gate < _queues.Count && lane >= 0 && lane < _queues[gate].Length ? _queues[gate][lane] : null;
 
     /// <summary>How many people have gone home early because their day was miserable.</summary>
     public int WentHomeUnhappy => _parties.Where(p => p.LeftUnhappy).Sum(p => p.Members.Count);
@@ -454,8 +488,8 @@ public sealed class Crowd
         return people == 0 ? 100 : (int)Math.Round(100.0 * fine / people);
     }
 
-    /// <summary>How many parties are in the queue for one lane of a gate.</summary>
-    public int QueueLength(int gate, int lane) => gate < _queues.Count && lane < _queues[gate].Length ? _queues[gate][lane].Count : 0;
+    /// <summary>How many people are in the queue for one lane of a gate, or walking to it.</summary>
+    public int QueueLength(int gate, int lane) => GateLine(gate, lane)?.People ?? 0;
 
     public int Seed { get; }
 
@@ -485,11 +519,16 @@ public sealed class Crowd
                     continue;
                 }
 
-                foreach (var m in party.Members)
+                for (var i = 0; i < party.Members.Count; i++)
                 {
-                    yield return new PersonOnSite(m.Id, m.Look, party.X + m.OffsetX, party.Y + m.OffsetY, party.Heading, party.IsWalking, party.State == PartyState.Watching,
-                        ReferenceEquals(m, party.Members[0]) && party.State != PartyState.Unwell ? party.Wants : null,
-                        party.State == PartyState.Unwell && ReferenceEquals(m, party.Members[0]));
+                    var m = party.Members[i];
+                    var (x, y, heading) = Place(party, i);
+                    yield return new PersonOnSite(m.Id, m.Look, x, y, heading, party.IsWalking, party.State == PartyState.Watching,
+                        i == 0 && party.State != PartyState.Unwell ? party.Wants : null,
+                        party.State == PartyState.Unwell && i == 0)
+                    {
+                        Ticket = party.State == PartyState.Queuing && party.InLine && party.ServiceLeft >= 0 && i == party.Checked,
+                    };
                 }
             }
         }
@@ -755,29 +794,7 @@ public sealed class Crowd
         _standableSet.Clear();
         _standableSet.UnionWith(_standable);
 
-        _queues.Clear();
-        foreach (var gate in _site.Gates)
-        {
-            var lanes = new List<Party>[Catalogue.Of(gate.Kind).Lanes];
-            for (var i = 0; i < lanes.Length; i++)
-            {
-                lanes[i] = new List<Party>();
-            }
-
-            _queues.Add(lanes);
-        }
-
-        _stallQueues.Clear();
-        foreach (var stall in _site.Stalls)
-        {
-            var lines = new List<Party>[Catalogue.Of(stall.Kind).Servers];
-            for (var i = 0; i < lines.Length; i++)
-            {
-                lines[i] = new List<Party>();
-            }
-
-            _stallQueues.Add(lines);
-        }
+        LayOutQueues();
 
         foreach (var party in _parties)
         {
@@ -794,6 +811,9 @@ public sealed class Crowd
             }
 
             var outside = _site.SideOf(at) == Side.Outside && !_site.OpenWayIn;
+            party.InLine = false;
+            party.Checked = 0;
+            party.Server = -1;
             switch (party.State)
             {
                 case PartyState.Queuing:
@@ -904,9 +924,10 @@ public sealed class Crowd
             // People join a lane with someone checking tickets; if nobody is, they wait at the first.
             for (var lane = 0; lane < Math.Max(1, Math.Min(_queues[g].Length, OpenLanes?.Invoke(g) ?? int.MaxValue)); lane++)
             {
-                if (_queues[g][lane].Count < bestLength)
+                var length = _queues[g][lane].People;
+                if (length < bestLength)
                 {
-                    (best, bestLane, bestLength) = (g, lane, _queues[g][lane].Count);
+                    (best, bestLane, bestLength) = (g, lane, length);
                 }
             }
         }
@@ -917,8 +938,9 @@ public sealed class Crowd
             party.Gate = best;
             party.Lane = bestLane;
             party.QueuedSince = _now;
-            _queues[best][bestLane].Add(party);
-            var (x, y) = QueuePlace(best, bestLane, bestLength);
+            var line = _queues[best][bestLane];
+            var (x, y, _) = line.At(Entry(line, line.People));
+            line.Parties.Add(party);
             party.Target = FieldMap.TileAt(x, y);
             party.Path = Route(party, FieldMap.TileAt(party.X, party.Y), party.Target);
             party.PathIndex = 0;
@@ -935,20 +957,324 @@ public sealed class Crowd
         party.Moving = party.Path is not null;
     }
 
-    /// <summary>Where the party in a given place of a queue stands, in metres. Long queues bunch up at the back.</summary>
-    private (double X, double Y) QueuePlace(int gate, int lane, int place) =>
-        _site.LaneMouth(gate, lane, 0.9 + (Math.Min(place, QueuePlaces - 1) * QueueSpacing));
+    /// <summary>
+    /// Sets out every queue afresh: one for each lane of a gate, running out from the gate on the
+    /// outside, and one for each stall, running out from its front and folding back on itself.
+    /// No queue runs through another, or through where people stand to be served.
+    /// </summary>
+    private void LayOutQueues()
+    {
+        _queues.Clear();
+        _stallQueues.Clear();
+        _serving.Clear();
+        _taken.Clear();
+        foreach (var stall in _site.Stalls)
+        {
+            var info = Catalogue.Of(stall.Kind);
+            for (var k = 0; info.Serves is not null && k < info.Servers; k++)
+            {
+                Take(SiteLayout.ServingPlace(stall, k, CounterMetres));
+                Take(SiteLayout.ServingPlace(stall, k, CounterMetres + 0.8));
+            }
+        }
+
+        for (var g = 0; g < _site.Gates.Count; g++)
+        {
+            var use = _site.GateUses[g];
+            var lanes = new QueueLine[Catalogue.Of(_site.Gates[g].Kind).Lanes];
+            for (var lane = 0; lane < lanes.Length; lane++)
+            {
+                var (fx, fy) = _site.LaneMouth(g, lane, 0);
+                lanes[lane] = new QueueLine(fx, fy);
+                if (use.InUse)
+                {
+                    var (x, y) = _site.LaneMouth(g, lane, 0.9);
+                    Grow(lanes[lane], x, y, use.OutX, use.OutY, GatePlaces, 0, p => _site.SideOf(p) == Side.Outside);
+                }
+            }
+
+            _queues.Add(lanes);
+        }
+
+        foreach (var stall in _site.Stalls)
+        {
+            var info = Catalogue.Of(stall.Kind);
+            _serving.Add(new Party?[info.Servers]);
+            if (info.Serves is null)
+            {
+                _stallQueues.Add(null);
+                continue;
+            }
+
+            var (fx, fy, dx, dy) = SiteLayout.Front(stall.Rect, stall.Facing);
+            var line = new QueueLine(fx, fy);
+            Grow(line, fx + (dx * StallQueueStart), fy + (dy * StallQueueStart), dx, dy, StallPlaces, StallFold, _ => true);
+            _stallQueues.Add(line);
+        }
+    }
+
+    /// <summary>How far out from a stall's front the people being served stand, in metres.</summary>
+    private const double CounterMetres = 0.7;
+
+    private readonly Dictionary<(int, int), List<(double X, double Y)>> _taken = new();
+
+    private void Take((double X, double Y) at)
+    {
+        var key = ((int)Math.Floor(at.X), (int)Math.Floor(at.Y));
+        if (!_taken.TryGetValue(key, out var list))
+        {
+            _taken[key] = list = new List<(double, double)>();
+        }
+
+        list.Add(at);
+    }
+
+    /// <summary>True if a place in some queue, or at a counter, is already within an arm's length of here.</summary>
+    private bool Taken(double x, double y)
+    {
+        const double near = 0.72;
+        var (cx, cy) = ((int)Math.Floor(x), (int)Math.Floor(y));
+        for (var gy = cy - 1; gy <= cy + 1; gy++)
+        {
+            for (var gx = cx - 1; gx <= cx + 1; gx++)
+            {
+                if (!_taken.TryGetValue((gx, gy), out var list))
+                {
+                    continue;
+                }
+
+                foreach (var (tx, ty) in list)
+                {
+                    if (((tx - x) * (tx - x)) + ((ty - y) * (ty - y)) < near * near)
+                    {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Adds places to a queue, one behind the next. A gate's queue (no fold) runs straight out and
+    /// turns a corner when something is in the way. A stall's queue runs out a set number of
+    /// places, steps to one side and comes back, like the rope lanes at a ticket office.
+    /// </summary>
+    private void Grow(QueueLine line, double x, double y, double dx, double dy, int most, int fold, Func<TilePoint, bool> allowed)
+    {
+        const double s = QueueLine.Spacing;
+        bool Free(double px, double py)
+        {
+            var tile = FieldMap.TileAt(px, py);
+            return _map.IsWalkable(tile) && allowed(tile) && !Taken(px, py);
+        }
+
+        var (sx, sy) = (-dy, dx);
+        var depth = 0;
+        var going = 1;
+        var rows = 0;
+        var across = 0;
+        line.Add(x, y);
+        Take((x, y));
+        while (line.Places.Count < most)
+        {
+            var (nx, ny) = (x + (dx * going * s), y + (dy * going * s));
+            var room = fold == 0 || (going > 0 ? depth < fold - 1 : depth > 0);
+            if (across == 0 && room && Free(nx, ny))
+            {
+                depth += going;
+            }
+            else if (fold > 0)
+            {
+                // Step two places to one side and come back the other way, leaving a clear gap between the rows.
+                (nx, ny) = (x + (sx * s), y + (sy * s));
+                if (!Free(nx, ny) && rows == 0 && across == 0)
+                {
+                    (sx, sy) = (-sx, -sy);
+                    (nx, ny) = (x + (sx * s), y + (sy * s));
+                }
+
+                if (!Free(nx, ny))
+                {
+                    break;
+                }
+
+                if (++across == RowsApart)
+                {
+                    across = 0;
+                    going = -going;
+                    rows++;
+                }
+            }
+            else if (Free(x + (sx * s), y + (sy * s)))
+            {
+                // Turn the corner and carry on along whatever is in the way.
+                (dx, dy) = (sx, sy);
+                (sx, sy) = (-dy, dx);
+                (nx, ny) = (x + (dx * s), y + (dy * s));
+            }
+            else if (Free(x - (sx * s), y - (sy * s)))
+            {
+                (dx, dy) = (-sx, -sy);
+                (sx, sy) = (-dy, dx);
+                (nx, ny) = (x + (dx * s), y + (dy * s));
+            }
+            else
+            {
+                break;
+            }
+
+            (x, y) = (nx, ny);
+            line.Add(x, y);
+            Take((x, y));
+        }
+    }
+
+    /// <summary>How many places apart the rows of a folded queue are.</summary>
+    private const int RowsApart = 3;
+
+    /// <summary>The place a party makes for to join a queue with so many people already in it.</summary>
+    private static int Entry(QueueLine line, int people) =>
+        Math.Clamp(Math.Max(people, line.Fenced - 1), 0, Math.Max(0, line.Places.Count - 1));
+
+    /// <summary>
+    /// A party that has walked up to a queue takes its place at the back. If the back has moved on
+    /// since they set off they walk on to it. True once they are standing in the line.
+    /// </summary>
+    private bool Join(Party party, QueueLine line)
+    {
+        var back = Math.Min(line.Standing, Math.Max(0, line.Places.Count - 1));
+        var enter = Entry(line, back);
+        var (x, y, heading) = line.At(enter);
+        var away = Math.Sqrt(((x - party.X) * (x - party.X)) + ((y - party.Y) * (y - party.Y)));
+        if (away > 1.5 && party.Rejoins < 3 && Route(party, FieldMap.TileAt(party.X, party.Y), FieldMap.TileAt(x, y)) is { Count: > 0 } path)
+        {
+            party.Rejoins++;
+            party.Target = FieldMap.TileAt(x, y);
+            party.Path = path;
+            party.PathIndex = 0;
+            party.Moving = true;
+            return false;
+        }
+
+        // The queue forms in the order people get there, so nobody waits behind someone who is
+        // still on their way across the field.
+        line.Parties.Remove(party);
+        var behind = line.Parties.FindIndex(p => !p.InLine);
+        line.Parties.Insert(behind < 0 ? line.Parties.Count : behind, party);
+        party.InLine = true;
+        party.LinePos = enter;
+        party.LineTarget = back;
+        (party.X, party.Y, party.Heading) = (x, y, heading);
+        return true;
+    }
+
+    /// <summary>Shuffles a party up the queue towards its place. True once it is standing there.</summary>
+    private static bool Shuffle(Party party, QueueLine line)
+    {
+        var gap = party.LinePos - party.LineTarget;
+        var moving = Math.Abs(gap) > 0.02;
+        if (moving)
+        {
+            party.LinePos -= Math.Sign(gap) * Math.Min(Math.Abs(gap), party.Speed / QueueLine.Spacing);
+        }
+        else
+        {
+            party.LinePos = party.LineTarget;
+        }
+
+        (party.X, party.Y, party.Heading) = line.At(party.LinePos);
+        party.Moving = moving;
+        return !moving;
+    }
+
+    /// <summary>Works out the place every party standing in a queue should be in: behind everyone ahead of them.</summary>
+    private void OrderQueues()
+    {
+        foreach (var lanes in _queues)
+        {
+            foreach (var line in lanes)
+            {
+                Order(line);
+            }
+        }
+
+        foreach (var line in _stallQueues)
+        {
+            if (line is not null)
+            {
+                Order(line);
+            }
+        }
+    }
+
+    private static void Order(QueueLine line)
+    {
+        var ahead = 0;
+        foreach (var party in line.Parties)
+        {
+            if (party.InLine)
+            {
+                party.LineTarget = ahead;
+                ahead += party.Members.Count - party.Checked;
+            }
+        }
+    }
+
+    /// <summary>Where one member of a party stands, and the way they face.</summary>
+    private (double X, double Y, double Heading) Place(Party party, int i)
+    {
+        if (party.State == PartyState.Queuing && party.InLine && GateLine(party.Gate, party.Lane) is { } gateLine)
+        {
+            if (i >= party.Checked)
+            {
+                return gateLine.At(party.LinePos + i - party.Checked);
+            }
+
+            // Those already checked wait just inside for the rest of their party.
+            var use = _site.GateUses[party.Gate];
+            var (ix, iy) = _site.LaneMouth(party.Gate, party.Lane, -(1.3 + (QueueLine.Spacing * (party.Checked - 1 - i))));
+            return (ix, iy, Math.Atan2(-use.OutX, -use.OutY));
+        }
+
+        if (party.State == PartyState.AtStall && party.Stall >= 0 && party.Stall < _site.Stalls.Count)
+        {
+            if (party.InLine && _stallQueues[party.Stall] is { } line)
+            {
+                return line.At(party.LinePos + i);
+            }
+
+            if (party.Server >= 0)
+            {
+                // At the counter people stand close together, two abreast, facing whoever is serving.
+                var stall = _site.Stalls[party.Stall];
+                var info = Catalogue.Of(stall.Kind);
+                var (_, _, fx, fy) = SiteLayout.Front(stall.Rect, stall.Facing);
+                var narrow = party.Members.Count == 1 || info.Width * FieldMap.TileMetres * 0.75 / info.Servers < 1.0;
+                var across = narrow ? 0 : ((i % 2) - 0.5) * 0.5;
+                var back = (narrow ? i : i / 2) * 0.55;
+                return (party.X - (fy * across) + (fx * back), party.Y + (fx * across) + (fy * back), Math.Atan2(-fx, -fy));
+            }
+        }
+
+        var m = party.Members[i];
+        return (party.X + m.OffsetX, party.Y + m.OffsetY, party.Heading);
+    }
 
     private void LeaveQueue(Party party)
     {
-        if (party.Gate >= 0 && party.Gate < _queues.Count)
+        if (party.Gate >= 0 && party.Gate < _queues.Count && party.Lane < _queues[party.Gate].Length)
         {
-            _queues[party.Gate][party.Lane].Remove(party);
+            _queues[party.Gate][party.Lane].Parties.Remove(party);
         }
 
         party.Gate = -1;
         party.ServiceLeft = -1;
         party.Moving = false;
+        party.InLine = false;
+        party.Checked = 0;
+        party.Rejoins = 0;
     }
 
     private void Queue(Party party)
@@ -974,27 +1300,13 @@ public sealed class Crowd
             return;
         }
 
-        var queue = _queues[party.Gate][party.Lane];
-        var place = queue.IndexOf(party);
-        var (x, y) = QueuePlace(party.Gate, party.Lane, place);
-        var dx = x - party.X;
-        var dy = y - party.Y;
-        var distance = Math.Sqrt((dx * dx) + (dy * dy));
-        var use = _site.GateUses[party.Gate];
-        if (distance > 0.05)
+        var line = _queues[party.Gate][party.Lane];
+        if (!party.InLine && !Join(party, line))
         {
-            // Shuffle up.
-            var step = Math.Min(distance, party.Speed);
-            party.X += dx / distance * step;
-            party.Y += dy / distance * step;
-            party.Heading = Math.Atan2(dx, dy);
-            party.Moving = true;
             return;
         }
 
-        party.Moving = false;
-        party.Heading = Math.Atan2(-use.OutX, -use.OutY);
-        if (place != 0)
+        if (!Shuffle(party, line) || party.LineTarget != 0)
         {
             return;
         }
@@ -1011,20 +1323,35 @@ public sealed class Crowd
             return;
         }
 
-        // At the front: tickets are checked, one person at a time.
+        // At the front: each person in turn holds up their ticket and steps through.
+        var seconds = Catalogue.Of(_site.Gates[party.Gate].Kind).SecondsPerPerson;
         if (party.ServiceLeft < 0)
         {
-            party.ServiceLeft = Catalogue.Of(_site.Gates[party.Gate].Kind).SecondsPerPerson * party.Members.Count;
+            party.ServiceLeft = seconds;
         }
         else if (--party.ServiceLeft <= 0)
         {
+            party.Checked++;
+            if (party.Checked < party.Members.Count)
+            {
+                party.ServiceLeft = seconds;
+                return;
+            }
+
+            var (gx, gy) = _site.LaneMouth(party.Gate, party.Lane, 0);
             LeaveQueue(party);
+            if (_map.IsWalkable(FieldMap.TileAt(gx, gy)))
+            {
+                (party.X, party.Y) = (gx, gy);
+            }
+
             party.Ticketed = true;
             TicketsSold?.Invoke(party.Members.Count);
             if (party.Camper)
             {
                 CamperArrived?.Invoke(party.Members.Count);
             }
+
             Send(party, SomewhereInField(party.Random), PartyState.WalkingIn);
         }
     }
@@ -1033,6 +1360,7 @@ public sealed class Crowd
     public void Tick(DateTime now)
     {
         _now = now;
+        OrderQueues();
         if (now.Minute != _measuredMinute)
         {
             _measuredMinute = now.Minute;
@@ -1287,25 +1615,23 @@ public sealed class Crowd
         }
 
         var best = -1;
-        var bestLane = 0;
         var bestScore = double.MaxValue;
         for (var i = 0; i < _site.Stalls.Count; i++)
         {
             var stall = _site.Stalls[i];
             var info = Catalogue.Of(stall.Kind);
-            if (info.Serves != need)
+            if (info.Serves != need || _stallQueues[i] is not { } queue)
             {
                 continue;
             }
 
-            for (var lane = 0; lane < info.Servers; lane++)
             {
-                var (x, y) = SiteLayout.ServingPlace(stall, lane, 0.9);
+                var (x, y, _) = queue.At(Entry(queue, queue.People));
                 var walk = Math.Abs(x - party.X) + Math.Abs(y - party.Y);
-                var score = (_stallQueues[i][lane].Count * info.SecondsPerPerson * 2.2) + (walk / party.Speed);
+                var score = ((queue.People + (_serving[i].Count(p => p is not null) * 2.2)) * info.SecondsPerPerson / info.Servers) + (walk / party.Speed);
                 if (score < bestScore)
                 {
-                    (best, bestLane, bestScore) = (i, lane, score);
+                    (best, bestScore) = (i, score);
                 }
             }
         }
@@ -1315,7 +1641,8 @@ public sealed class Crowd
             return false;
         }
 
-        var place = StallPlace(best, bestLane, _stallQueues[best][bestLane].Count);
+        var line = _stallQueues[best]!;
+        var place = line.At(Entry(line, line.People));
         var path = Route(party, FieldMap.TileAt(party.X, party.Y), FieldMap.TileAt(place.X, place.Y));
         if (path is null)
         {
@@ -1324,9 +1651,11 @@ public sealed class Crowd
             return false;
         }
 
-        _stallQueues[best][bestLane].Add(party);
+        line.Parties.Add(party);
         party.Stall = best;
-        party.StallLane = bestLane;
+        party.Server = -1;
+        party.InLine = false;
+        party.Rejoins = 0;
         party.ServiceLeft = -1;
         party.QueuedSince = now;
         party.Target = FieldMap.TileAt(place.X, place.Y);
@@ -1337,18 +1666,25 @@ public sealed class Crowd
         return true;
     }
 
-    /// <summary>Where the party in a given place of a stall's queue stands, in metres.</summary>
-    private (double X, double Y) StallPlace(int stall, int lane, int place) =>
-        SiteLayout.ServingPlace(_site.Stalls[stall], lane, 0.9 + (Math.Min(place, QueuePlaces - 1) * QueueSpacing));
-
     private void LeaveStall(Party party)
     {
         if (party.Stall >= 0 && party.Stall < _stallQueues.Count)
         {
-            _stallQueues[party.Stall][party.StallLane].Remove(party);
+            _stallQueues[party.Stall]?.Parties.Remove(party);
+            var serving = _serving[party.Stall];
+            for (var k = 0; k < serving.Length; k++)
+            {
+                if (ReferenceEquals(serving[k], party))
+                {
+                    serving[k] = null;
+                }
+            }
         }
 
         party.Stall = -1;
+        party.Server = -1;
+        party.InLine = false;
+        party.Rejoins = 0;
         party.ServiceLeft = -1;
         party.Moving = false;
         party.Path = null;
@@ -1356,7 +1692,7 @@ public sealed class Crowd
 
     private void QueueAtStall(Party party, DateTime now)
     {
-        if (party.Stall < 0 || party.Stall >= _stallQueues.Count)
+        if (party.Stall < 0 || party.Stall >= _stallQueues.Count || _stallQueues[party.Stall] is not { } line)
         {
             LeaveStall(party);
             party.State = PartyState.Standing;
@@ -1365,66 +1701,71 @@ public sealed class Crowd
 
         var stall = _site.Stalls[party.Stall];
         var info = Catalogue.Of(stall.Kind);
-        var queue = _stallQueues[party.Stall][party.StallLane];
-        var place = queue.IndexOf(party);
-
-        // People only wait so long once they have joined the queue, unless they are already being served.
-        if (party.Path is null && party.ServiceLeft < 0 && now - party.QueuedSince > TimeSpan.FromMinutes(PatienceMinutes))
+        if (party.Server < 0)
         {
-            LeaveStall(party);
-            party.GaveUp++;
-            party.Mood = Math.Max(0, party.Mood - 0.08);
-            party.NeedRetryAt = now + TimeSpan.FromMinutes(15);
-            party.State = PartyState.Standing;
-            party.WaitUntil = now;
-            return;
-        }
+            // People only wait so long once they have joined the queue.
+            if (party.InLine && now - party.QueuedSince > TimeSpan.FromMinutes(PatienceMinutes))
+            {
+                LeaveStall(party);
+                party.GaveUp++;
+                party.Mood = Math.Max(0, party.Mood - 0.08);
+                party.NeedRetryAt = now + TimeSpan.FromMinutes(15);
+                party.State = PartyState.Standing;
+                party.WaitUntil = now;
+                return;
+            }
 
-        if (party.Path is not null)
-        {
-            // Still walking to the back of the queue.
-            party.Moving = true;
-            if (!Walk(party))
+            if (party.Path is not null)
+            {
+                // Still walking to the back of the queue.
+                party.Moving = true;
+                if (!Walk(party))
+                {
+                    return;
+                }
+            }
+
+            if (!party.InLine)
+            {
+                if (!Join(party, line))
+                {
+                    return;
+                }
+
+                party.QueuedSince = now;
+            }
+
+            // First in the queue: as soon as whoever is serving is free, step up to them, without
+            // first walking to the very front.
+            var free = party.LineTarget == 0 ? Array.IndexOf(_serving[party.Stall], null) : -1;
+            Shuffle(party, line);
+            if (free < 0)
             {
                 return;
             }
 
-            // The queue forms in the order people get there, so nobody waits behind someone who
-            // is still on their way across the field.
-            queue.Remove(party);
-            var behind = queue.FindIndex(p => p.Path is not null);
-            queue.Insert(behind < 0 ? queue.Count : behind, party);
-            place = queue.IndexOf(party);
-            party.QueuedSince = now;
+            line.Parties.Remove(party);
+            _serving[party.Stall][free] = party;
+            party.InLine = false;
+            party.Server = free;
+            party.ServiceLeft = info.SecondsPerPerson * party.Members.Count;
         }
 
-        var (x, y) = StallPlace(party.Stall, party.StallLane, place);
-        var dx = x - party.X;
-        var dy = y - party.Y;
+        // Walk up to the counter. The serving starts as they set off, so nobody is kept waiting by the walk.
+        var (cx, cy) = SiteLayout.ServingPlace(stall, party.Server, CounterMetres);
+        var dx = cx - party.X;
+        var dy = cy - party.Y;
         var distance = Math.Sqrt((dx * dx) + (dy * dy));
-        if (distance > 0.05)
+        party.Moving = distance > 0.05;
+        if (party.Moving)
         {
             var step = Math.Min(distance, party.Speed);
             party.X += dx / distance * step;
             party.Y += dy / distance * step;
             party.Heading = Math.Atan2(dx, dy);
-            party.Moving = true;
-            return;
         }
 
-        party.Moving = false;
-        var (_, _, fx, fy) = SiteLayout.Front(stall.Rect, stall.Facing);
-        party.Heading = Math.Atan2(-fx, -fy);
-        if (place != 0)
-        {
-            return;
-        }
-
-        if (party.ServiceLeft < 0)
-        {
-            party.ServiceLeft = info.SecondsPerPerson * party.Members.Count;
-        }
-        else if (--party.ServiceLeft <= 0)
+        if (--party.ServiceLeft <= 0 && !party.Moving)
         {
             LeaveStall(party);
             switch (info.Serves)
@@ -1735,6 +2076,8 @@ public sealed class Crowd
     /// <summary>Someone in the party is taken ill or hurt. They stop where they are until helped.</summary>
     public void TakeIll(Party party)
     {
+        LeaveQueue(party);
+        LeaveStall(party);
         party.State = PartyState.Unwell;
         party.Watch = -1;
         party.Path = null;
@@ -1782,6 +2125,8 @@ public sealed class Crowd
 
         party.Leaves = _now;
         party.Watch = -1;
+        LeaveQueue(party);
+        LeaveStall(party);
         if (!_map.IsWalkable(FieldMap.TileAt(party.X, party.Y)))
         {
             (party.X, party.Y) = FieldMap.CentreOf(NearestWalkable(FieldMap.TileAt(party.X, party.Y)));
@@ -1872,10 +2217,11 @@ public sealed class Crowd
     public List<PartySave> Save() => _parties
         .Where(p => p.State != PartyState.Expected)
         .Select(p => new PartySave(p.Id, p.State, p.X, p.Y, p.Heading, p.Target.X, p.Target.Y, p.WaitUntil, p.Random.State, p.Path?.Skip(p.PathIndex).ToList(),
-            p.Gate, p.Lane, p.Gate >= 0 && p.Gate < _queues.Count ? _queues[p.Gate][p.Lane].IndexOf(p) : 0, p.ServiceLeft, p.Ticketed, p.Watch, p.Decided)
+            p.Gate, p.Lane, p.Gate >= 0 && p.Gate < _queues.Count ? _queues[p.Gate][p.Lane].Parties.IndexOf(p) : 0, p.ServiceLeft, p.Ticketed, p.Watch, p.Decided)
             {
-                Hunger = p.Hunger, Thirst = p.Thirst, Toilet = p.Toilet, Mood = p.Mood, Stall = p.Stall, StallLane = p.StallLane,
-                StallPlace = p.Stall >= 0 && p.Stall < _stallQueues.Count ? _stallQueues[p.Stall][p.StallLane].IndexOf(p) : 0,
+                Hunger = p.Hunger, Thirst = p.Thirst, Toilet = p.Toilet, Mood = p.Mood, Stall = p.Stall,
+                StallPlace = p.Stall >= 0 && p.Stall < _stallQueues.Count ? _stallQueues[p.Stall]?.Parties.IndexOf(p) ?? 0 : 0,
+                Server = p.Server, InLine = p.InLine, LinePos = p.LinePos, Checked = p.Checked,
                 QueuedSince = p.QueuedSince, NeedRetryAt = p.NeedRetryAt, GaveUp = p.GaveUp, Spent = p.Spent, LeftUnhappy = p.LeftUnhappy, Leaves = p.Leaves, LitterAt = p.LitterAt, DecidedSecond = p.DecidedSecond, StayDecided = p.StayDecided,
             })
         .ToList();
@@ -1885,12 +2231,17 @@ public sealed class Crowd
     {
         foreach (var queue in _queues.SelectMany(q => q))
         {
-            queue.Clear();
+            queue.Parties.Clear();
         }
 
-        foreach (var queue in _stallQueues.SelectMany(q => q))
+        foreach (var queue in _stallQueues)
         {
-            queue.Clear();
+            queue?.Parties.Clear();
+        }
+
+        foreach (var serving in _serving)
+        {
+            Array.Clear(serving);
         }
 
         foreach (var s in saved.OrderBy(s => s.QueuePlace).ThenBy(s => s.StallPlace).ThenBy(s => s.Id))
@@ -1915,6 +2266,10 @@ public sealed class Crowd
             party.Gate = -1;
             party.ServiceLeft = s.ServiceLeft;
             party.Stall = -1;
+            party.Server = -1;
+            party.InLine = false;
+            party.Checked = 0;
+            party.Rejoins = 0;
             party.GaveUp = s.GaveUp;
             party.Spent = s.Spent;
             party.LeftUnhappy = s.LeftUnhappy;
@@ -1937,12 +2292,23 @@ public sealed class Crowd
 
             if (s.State == PartyState.AtStall)
             {
-                if (s.Stall >= 0 && s.Stall < _stallQueues.Count && s.StallLane >= 0 && s.StallLane < _stallQueues[s.Stall].Length)
+                if (s.Stall >= 0 && s.Stall < _stallQueues.Count && _stallQueues[s.Stall] is { } line)
                 {
                     party.Stall = s.Stall;
-                    party.StallLane = s.StallLane;
                     party.QueuedSince = s.QueuedSince;
-                    _stallQueues[s.Stall][s.StallLane].Add(party);
+                    if (s.Server >= 0 && s.Server < _serving[s.Stall].Length && _serving[s.Stall][s.Server] is null)
+                    {
+                        party.Server = s.Server;
+                        _serving[s.Stall][s.Server] = party;
+                    }
+                    else
+                    {
+                        line.Parties.Add(party);
+                        party.InLine = s.InLine;
+                        party.LinePos = s.LinePos;
+                        party.ServiceLeft = -1;
+                    }
+
                     party.Path = s.Path is { Count: > 0 } && s.Path.All(_map.IsWalkable) ? s.Path.ToList() : null;
                     party.PathIndex = 0;
                 }
@@ -1961,7 +2327,10 @@ public sealed class Crowd
                 {
                     party.Gate = s.Gate;
                     party.Lane = s.Lane;
-                    _queues[s.Gate][s.Lane].Add(party);
+                    party.InLine = s.InLine;
+                    party.LinePos = s.LinePos;
+                    party.Checked = Math.Clamp(s.Checked, 0, party.Members.Count - 1);
+                    _queues[s.Gate][s.Lane].Parties.Add(party);
                 }
                 else if (s.Gate >= 0)
                 {
@@ -2012,7 +2381,19 @@ public sealed record PartySave(int Id, PartyState State, double X, double Y, dou
 
     public int Stall { get; init; } = -1;
 
+    /// <summary>Only in saves from before queues were single file.</summary>
     public int StallLane { get; init; }
+
+    /// <summary>Which server is serving them, or -1.</summary>
+    public int Server { get; init; } = -1;
+
+    /// <summary>True if they are standing in the queue, and how many places from the front.</summary>
+    public bool InLine { get; init; }
+
+    public double LinePos { get; init; }
+
+    /// <summary>How many of the party have had their tickets checked.</summary>
+    public int Checked { get; init; }
 
     public int StallPlace { get; init; }
 
