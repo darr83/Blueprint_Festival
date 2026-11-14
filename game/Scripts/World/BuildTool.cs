@@ -1,3 +1,5 @@
+using BlueprintFestival.Audio;
+using BlueprintFestival.Simulation.Sound;
 using System;
 using BlueprintFestival.Simulation;
 using BlueprintFestival.Simulation.Site;
@@ -184,6 +186,7 @@ public partial class BuildTool : Node3D
             {
                 var back = _game.DismissStaff(member);
                 Refused = false;
+                SoundBoard.Cue(Sounds.TakeDown);
                 Status = back > 0 ? $"Sent home. £{back:N0} back." : "Sent home. They are still paid for today.";
                 return new BuildCheck(true, -back, null);
             }
@@ -197,6 +200,7 @@ public partial class BuildTool : Node3D
                 var refund = _game.Remove(at);
                 result = refund > 0 || covered || !_game.Site.IsEmpty(at) ? new BuildCheck(true, -refund, null) : BuildCheck.No("There is nothing there to take down.");
                 Refused = !result.Ok;
+                SoundBoard.Cue(result.Ok ? Sounds.TakeDown : Sounds.Refuse);
                 Status = result.Ok ? $"Taken down. £{refund:N0} back." : result.Problem!;
                 return result;
             }
@@ -282,6 +286,15 @@ public partial class BuildTool : Node3D
     private void Said(BuildCheck result, string done)
     {
         Refused = !result.Ok;
+        SoundBoard.Cue(!result.Ok ? Sounds.Refuse : Mode switch
+        {
+            BuildMode.Stage => Sounds.BuildStage,
+            BuildMode.Fence => Sounds.BuildFence,
+            BuildMode.Gate => Sounds.BuildGate,
+            BuildMode.Staff => Sounds.HireStaff,
+            BuildMode.Ground => Sounds.BuildGround,
+            _ => Sounds.BuildStall,
+        });
         Status = result.Ok ? $"{done} for £{result.Cost:N0}." : result.Problem ?? "That cannot go there.";
     }
 

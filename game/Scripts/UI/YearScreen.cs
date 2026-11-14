@@ -1,3 +1,5 @@
+using BlueprintFestival.Audio;
+using BlueprintFestival.Simulation.Sound;
 using System.Collections.Generic;
 using System.Linq;
 using BlueprintFestival.Core;
@@ -140,24 +142,28 @@ public partial class YearScreen : Control
     public void PickTicket(int index)
     {
         _game.ChooseTicket(FestivalGame.TicketPrices[index]);
+        SoundBoard.Cue(Sounds.Click);
         Rebuild();
     }
 
     public void ToggleSecondStage()
     {
         _game.BookSecondStage(!_game.SecondStageBooked);
+        SoundBoard.Cue(Sounds.Click);
         Rebuild();
     }
 
     public void TogglePonchos()
     {
         _game.OrderPonchos(!_game.PonchosOrdered);
+        SoundBoard.Cue(_game.PonchosOrdered ? Sounds.Ponchos : Sounds.Click);
         Rebuild();
     }
 
     public void PickHeadliner(int index)
     {
         _game.ChooseHeadliner(index);
+        SoundBoard.Cue(Sounds.Click);
         Rebuild();
     }
 
@@ -166,6 +172,10 @@ public partial class YearScreen : Control
         if (_game.ConfirmPlan())
         {
             Rebuild();
+        }
+        else
+        {
+            SoundBoard.Cue(Sounds.Refuse);
         }
     }
 
@@ -178,6 +188,7 @@ public partial class YearScreen : Control
     public bool PayScouts()
     {
         var paid = _game.PayScouts();
+        SoundBoard.Cue(paid ? Sounds.Coins : Sounds.Refuse);
         Rebuild();
         return paid;
     }

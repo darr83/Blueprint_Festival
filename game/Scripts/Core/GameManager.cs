@@ -70,6 +70,10 @@ public partial class GameManager : Node
             {
                 AddChild(new StaffShots(arg["--staff-shots=".Length..]) { Name = "StaffShots" });
             }
+            else if (arg.StartsWith("--sound-shots=", StringComparison.Ordinal))
+            {
+                AddChild(new SoundShots(arg["--sound-shots=".Length..]) { Name = "SoundShots" });
+            }
             else if (arg.StartsWith("--shots=", StringComparison.Ordinal))
             {
                 AddChild(new Shots(arg["--shots=".Length..]) { Name = "Shots" });

@@ -1,3 +1,5 @@
+using BlueprintFestival.Audio;
+using BlueprintFestival.Simulation.Sound;
 using System;
 using System.Linq;
 using BlueprintFestival.Simulation;
@@ -302,6 +304,16 @@ public partial class SmokeTest : Node
                     Check(game.PonchosOrdered && game.PonchoCost == game.Crowd.Expected, "Clicking the ponchos should order one for everyone expected.");
                     plan.Year.TogglePonchos();
                     Check(!game.PonchosOrdered, "Clicking the ponchos again should cancel them.");
+                    var board = SoundBoard.Instance;
+                    Check(board is { Listed: 51 }, "The sound board should be loaded with all 51 sounds on its list.");
+                    Check(Sounds.Loops.All(board!.Knows) && board.Knows(Sounds.Till), "The sound board should know the background sounds and the till.");
+                    Check(board.Asked(Sounds.Notebook) == 1, "The planning notebook should be heard opening.");
+                    Check(board.Asked(Sounds.Ponchos) == 1, "Ordering ponchos should be heard.");
+                    board.SetVolume("Crowd", 0.5f, save: false);
+                    Check(Mathf.Abs(SoundBoard.Volume("Crowd") - 0.5f) < 0.01f, "The crowd volume slider should turn the crowd down.");
+                    board.SetVolume("Crowd", 0, save: false);
+                    Check(SoundBoard.Volume("Crowd") == 0, "A slider all the way down should be silent.");
+                    board.SetVolume("Crowd", 1, save: false);
                     var before = game.ActFees;
                     plan.Year.ToggleSecondStage();
                     Check(game.SecondStageBooked && game.ActFees == before + game.SecondStageFee, "Clicking the second stage should book its acts.");
@@ -343,10 +355,16 @@ public partial class SmokeTest : Node
                     Check(build.BuildBar.Choose("staffSecurity") && build.Build.ClickAt(new TilePoint(grass.X + 70, grass.Y + 28)).Ok, "Security should be posted on the grass.");
                     Check(build.BuildBar.Choose("stallFirstAidTent") && build.Build.ClickAt(new TilePoint(grass.X + 56, grass.Y + 8)).Ok, "The first aid tent should go up.");
                     Check(build.BuildBar.Choose("stallMedicalTent"), "The medical tent should be on the staff tab.");
+                    var sound = SoundBoard.Instance!;
+                    Check(sound.Asked(Sounds.RubberStamp) == 1, "The plan being stamped should be heard.");
+                    Check(sound.Asked(Sounds.HireStaff) == 3 && sound.Asked(Sounds.Refuse) >= 1, "Hiring staff should be heard, and so should being told no.");
+                    Check(sound.Asked(Sounds.BuildStall) >= 1, "A tent going up should be heard.");
+                    Check(sound.Wanted(Sounds.Day) > 0.9f && sound.Wanted(Sounds.CrowdSmall) == 0, "An empty field in the morning should be birdsong and no crowd.");
                     build.BuildBar.Close();
                     Check(game.Staff.Count == 3 && game.Spending.Any(l => l.What == "Staff wages" && l.Amount == 150), "Three staff should be hired for £150.");
                     build.Year.OpenGates();
                     Check(game.Phase == Phase.Day, "Opening the gates should start the day.");
+                    build.Sounds.Look();
 
                     // Run to the middle of the afternoon and look at the crowd view.
                     var guard = 0;
@@ -356,6 +374,8 @@ public partial class SmokeTest : Node
                     }
 
                     Check(!build.Density.Showing && !build.CrowdSafety.KeyShown, "The crowd view should start switched off.");
+                    build.Sounds.Look();
+                    Check(SoundBoard.Instance!.Wanted(Sounds.CrowdSmall) > 0.5f, "A village crowd in the afternoon should be heard.");
                     build.SetCrowdView(true);
                     Check(build.Density.Showing && build.CrowdSafety.KeyShown, "The crowd view button should switch the view and its key on.");
                     Check(game.Density.Worst > 0 && game.Density.Worst < 6.6, $"The crowd should be measured: worst {game.Density.Worst}.");
@@ -424,7 +444,13 @@ public partial class SmokeTest : Node
                     Check(next.Game.Money == _savedMoney, "The bank should carry over to next year.");
                     Check(next.Game.Site.Stages.Count == 0 && next.Site.StageCount == 0 && next.Site.StallCount == 0, "Next year should start on an empty field.");
                     Check(next.TopBar.MoneyText == $"£{_savedMoney:N0}", "The top bar should show the bank carried over.");
+                    var heard = SoundBoard.Instance!;
+                    Check(heard.Asked(Sounds.GatesOpen) == 1 && heard.Asked(Sounds.DayEnd) == 1, $"The gates opening and the end of the day should each be heard once, not {heard.Asked(Sounds.GatesOpen)} and {heard.Asked(Sounds.DayEnd)}.");
+                    Check(heard.Asked(Sounds.GateTicket) > 0, "Tickets being sold at the gate should be heard.");
+                    Check(heard.Asked(Sounds.ResultsGood) + heard.Asked(Sounds.ResultsBad) == 1, "The results should be heard once.");
+                    Check(heard.Asked(Sounds.Notebook) == 2, "Next year's notebook should be heard opening.");
                     Next(Stage.Done);
+                    GD.Print($"[smoke] Sound files found: {heard.WithFiles} of {heard.Listed}.");
                     GD.Print("[smoke] PASSED.");
                     GetTree().Quit(0);
                 }

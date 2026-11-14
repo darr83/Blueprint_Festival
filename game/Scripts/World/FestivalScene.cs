@@ -1,3 +1,4 @@
+using BlueprintFestival.Audio;
 using BlueprintFestival.Core;
 using BlueprintFestival.Simulation;
 using BlueprintFestival.Simulation.Core;
@@ -50,6 +51,8 @@ public partial class FestivalScene : Node3D
     public WeatherView Weather { get; private set; } = null!;
 
     public CrowdPanel CrowdSafety { get; private set; } = null!;
+
+    public FestivalSounds Sounds { get; private set; } = null!;
 
     private ViewButtons _viewButtons = null!;
     private Label _hint = null!;
@@ -111,6 +114,10 @@ public partial class FestivalScene : Node3D
         Density = new DensityView { Name = "Density" };
         AddChild(Density);
         Density.Initialise(Game);
+
+        Sounds = new FestivalSounds { Name = "Sounds" };
+        AddChild(Sounds);
+        Sounds.Initialise(Game);
 
         Camera = new CameraRig { Name = "CameraRig" };
         AddChild(Camera);
