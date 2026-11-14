@@ -13,6 +13,9 @@ public partial class SiteView : Node3D
 
     /// <summary>How far a cubicle door swings open, in degrees.</summary>
     private const float DoorOpenDegrees = -105f;
+    private const float DoorHoldSeconds = 0.7f;
+    private const float DoorSwingSpeed = 420f;
+    private readonly System.Collections.Generic.Dictionary<Node3D, float> _doorHeld = new();
 
     private readonly System.Collections.Generic.List<(int Stall, Node3D[] Doors)> _toilets = new();
     private readonly System.Collections.Generic.List<(PlacedStall Bin, Node3D Rubbish)> _bins = new();
@@ -88,18 +91,29 @@ public partial class SiteView : Node3D
             rubbish.Visible = _game.BinFill(bin) >= FestivalGame.BinWantsEmptying;
         }
 
-        var faster = Mathf.Max(1, (int)_game.Clock.Speed);
         foreach (var (stall, doors) in _toilets)
         {
             for (var i = 0; i < doors.Length; i++)
             {
                 var look = _game.Crowd.Cubicle(stall, doors.Length - 1 - i);
                 var door = doors[i];
-                var wanted = look == Simulation.People.CubicleLook.DoorOpen ? DoorOpenDegrees : 0f;
+
+                // At 4x and 8x a door is only open for a blink, so keep it open long enough to see.
+                _doorHeld.TryGetValue(door, out var held);
+                held = look == Simulation.People.CubicleLook.DoorOpen ? DoorHoldSeconds : Mathf.Max(0f, held - delta);
+                _doorHeld[door] = held;
+
+                var wanted = held > 0f ? DoorOpenDegrees : 0f;
                 var now = door.RotationDegrees.Y;
-                door.RotationDegrees = new Vector3(0, snap ? wanted : Mathf.MoveToward(now, wanted, delta * 260f * faster), 0);
-                door.GetNode<Node3D>("Engaged").Visible = look == Simulation.People.CubicleLook.Engaged;
-                door.GetNode<Node3D>("Vacant").Visible = look != Simulation.People.CubicleLook.Engaged;
+                door.RotationDegrees = new Vector3(0, snap ? wanted : Mathf.MoveToward(now, wanted, delta * DoorSwingSpeed), 0);
+
+                var engaged = look == Simulation.People.CubicleLook.Engaged;
+                door.GetNode<Node3D>("Engaged").Visible = engaged;
+                door.GetNode<Node3D>("Vacant").Visible = !engaged;
+                var cabin = door.GetParent();
+                var number = door.Name.ToString().Substring("Door".Length);
+                cabin.GetNode<Node3D>($"Lamp{number}Engaged").Visible = engaged;
+                cabin.GetNode<Node3D>($"Lamp{number}Vacant").Visible = !engaged;
             }
         }
     }
@@ -158,6 +172,7 @@ public partial class SiteView : Node3D
         _toilets.Clear();
         _bins.Clear();
         _shutBars.Clear();
+        _doorHeld.Clear();
         var site = _game.Site;
         foreach (var stage in site.Stages)
         {
