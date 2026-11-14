@@ -146,13 +146,22 @@ public partial class StaffShots : Node
             case "1_the_three_uniforms":
             {
                 var at = new Vector3((f.X + 60) * t, 0, (f.Y + 46) * t);
-                var kinds = new[] { StaffKind.TicketStaff, StaffKind.Security, StaffKind.FirstAider };
+                var kinds = new[] { StaffKind.TicketStaff, StaffKind.Security, StaffKind.FirstAider, StaffKind.Cleaner };
                 for (var i = 0; i < kinds.Length; i++)
                 {
                     var figure = SiteProps.Staff(kinds[i], i + 1);
                     festival.AddChild(figure);
-                    figure.Position = at + new Vector3((i - 1) * 1.1f, 0, (1 - i) * 1.1f);
+                    figure.Position = at + new Vector3((i - 1.5f) * 1.1f, 0, (1.5f - i) * 1.1f);
                     figure.RotationDegrees = new Vector3(0, 45, 0);
+                }
+
+                // An empty litter bin and one that wants emptying, beside the cleaner.
+                for (var i = 0; i < 2; i++)
+                {
+                    var bin = SiteProps.Stall(StallKind.Bin);
+                    festival.AddChild(bin);
+                    bin.Position = at + new Vector3(2.9f + (i * 1.2f), 0, -2.1f - (i * 1.2f));
+                    bin.GetNode<Node3D>("Rubbish").Visible = i == 1;
                 }
 
                 festival.Camera.LookAt(at.X, at.Z, 8f);
