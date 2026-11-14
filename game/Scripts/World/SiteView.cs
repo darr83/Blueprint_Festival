@@ -90,15 +90,10 @@ public partial class SiteView : Node3D
     public static Vector3 Middle(TileRect r) => new((r.X + (r.Width / 2f)) * T, 0, (r.Y + (r.Height / 2f)) * T);
 
     /// <summary>The turn for a gate: its front faces the side people queue on.</summary>
-    public static float Turn(PlacedGate gate, GateUse use)
-    {
-        if (use.InUse)
-        {
-            return use.OutX > 0 ? 90f : use.OutX < 0 ? -90f : use.OutY < 0 ? 180f : 0f;
-        }
+    public static float Turn(SiteLayout site, PlacedGate gate) => Turn(site.FrontOf(gate));
 
-        return gate.Vertical ? 90f : 0f;
-    }
+    /// <summary>The turn that points a model built facing south along a step (x, y) on the map.</summary>
+    public static float Turn((int X, int Y) front) => front.X > 0 ? 90f : front.X < 0 ? -90f : front.Y < 0 ? 180f : 0f;
 
     /// <summary>Adds a run of fence to a mesh: from the outer edge of its first tile to that of its last.</summary>
     public static void AddRun(MeshBuilder builder, FenceRun run)
@@ -186,7 +181,7 @@ public partial class SiteView : Node3D
         {
             var node = SiteProps.Gate(site.Gates[i].Kind, _game.Name);
             node.Position = Middle(site.Gates[i].Rect);
-            node.RotationDegrees = new Vector3(0, Turn(site.Gates[i], site.GateUses[i]), 0);
+            node.RotationDegrees = new Vector3(0, Turn(site, site.Gates[i]), 0);
             AddChild(node);
         }
 

@@ -250,6 +250,12 @@ public partial class BuildTool : Node3D
 
     private (int X, int Y) GateCorner(TilePoint at)
     {
+        // Over a gap in a hedge the gate goes across the gap, whichever way it was turned.
+        if (_game.Field.GapRunsNorthSouth(at) is { } upAndDown)
+        {
+            Vertical = upAndDown;
+        }
+
         var width = Catalogue.Of(Gate).Width;
         return Vertical ? (at.X, at.Y - (width / 2)) : (at.X - (width / 2), at.Y);
     }
@@ -501,7 +507,7 @@ public partial class BuildTool : Node3D
                 pad = gate.Rect;
                 Ghost($"gate{Gate}", () => SiteProps.Gate(Gate, _game.Name));
                 _ghost!.Position = SiteView.Middle(pad);
-                _ghost.RotationDegrees = new Vector3(0, Vertical ? 90 : 0, 0);
+                _ghost.RotationDegrees = new Vector3(0, SiteView.Turn(_game.Site, gate), 0);
                 break;
             }
 

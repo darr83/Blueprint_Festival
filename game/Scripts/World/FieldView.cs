@@ -349,9 +349,14 @@ public partial class FieldView : Node3D
             Box("Gatepost east", new Vector3(gx + gw + 0.45f, 1.05f, frontZ), new Vector3(0.34f, 2.1f, 0.34f), Wood);
         }
 
-        var signX = byTrack ? (_map.Tracks[^1].Right * T) + 3.2f : gx + gw + 3.2f;
+        // Off the farm track the sign stands by the lane next to the farm track (the stretch after
+        // the way in; car park tracks come later in the list).
+        var farm = _map.Tracks.ToList().IndexOf(_map.Track) + 1;
+        var signX = byTrack && farm > 0 && farm < _map.Tracks.Count ? (_map.Tracks[farm].Right * T) + 3.2f : gx + gw + 3.2f;
         var signZ = southOfLane ? (_map.Lane.Bottom * T) + 1.6f : (_map.Lane.Y * T) - 1.6f;
-        var sign = new Node3D { Name = "Sign", Position = new Vector3(signX, 0, signZ), RotationDegrees = new Vector3(0, 28f, 0) };
+
+        // The painted face looks out over the lane, turned a little along it.
+        var sign = new Node3D { Name = "Sign", Position = new Vector3(signX, 0, signZ), RotationDegrees = new Vector3(0, southOfLane ? 152f : 28f, 0) };
         AddChild(sign);
         var post = new BoxMesh { Size = new Vector3(0.16f, 2.3f, 0.16f) };
         sign.AddChild(new MeshInstance3D { Mesh = post, MaterialOverride = Material(Wood), Position = new Vector3(-1.5f, 1.15f, 0) });
