@@ -115,6 +115,58 @@ public sealed class SiteLayout
 
     public Side SideOf(TilePoint p) => _map.InBounds(p.X, p.Y) ? _sides[(p.Y * _map.Width) + p.X] : Side.Nowhere;
 
+    /// <summary>
+    /// The way a gate faces: a step (OutX, OutY) from the gate towards the side people queue on.
+    /// A working gate faces the outside it lets people in from. Otherwise (while it is being
+    /// placed, say) it faces whichever side is off the festival grass, such as the track or the
+    /// lane, and failing that the side nearer the way in off the lane.
+    /// </summary>
+    public (int OutX, int OutY) FrontOf(PlacedGate gate)
+    {
+        var index = _gates.IndexOf(gate);
+        if (index >= 0 && index < _gateUses.Count && _gateUses[index].InUse)
+        {
+            return (_gateUses[index].OutX, _gateUses[index].OutY);
+        }
+
+        var rect = gate.Rect;
+        var (nx, ny) = gate.Vertical ? (1, 0) : (0, 1);
+        var tiles = TilesOf(rect).ToList();
+        // Hedges are a few tiles thick, so look a little way out on each side, not just one step.
+        const int lookOut = 8;
+        var offBefore = 0;
+        var offAfter = 0;
+        for (var d = 1; d <= lookOut; d++)
+        {
+            offBefore += tiles.Count(p => OffTheGrass(new TilePoint(p.X - (nx * d), p.Y - (ny * d))));
+            offAfter += tiles.Count(p => OffTheGrass(new TilePoint(p.X + (nx * d), p.Y + (ny * d))));
+        }
+
+        if (offBefore != offAfter)
+        {
+            return offBefore > offAfter ? (-nx, -ny) : (nx, ny);
+        }
+
+        // Both sides alike: face the way in, where people come from.
+        var gap = _map.Gap;
+        var toward = gate.Vertical
+            ? (gap.X + (gap.Width / 2.0)) - (rect.X + 0.5)
+            : (gap.Y + (gap.Height / 2.0)) - (rect.Y + 0.5);
+        return toward < 0 ? (-nx, -ny) : (nx, ny);
+    }
+
+    /// <summary>True for ground that is not festival grass: the hedge, the track, the lane or farmland.</summary>
+    private bool OffTheGrass(TilePoint p)
+    {
+        if (!_map.InBounds(p.X, p.Y))
+        {
+            return true;
+        }
+
+        var ground = _map[p];
+        return ground == Ground.Lane || ground == Ground.Hedge || ground == Ground.Countryside || _map.UseAt(p) is null;
+    }
+
     public FenceKind? FenceAt(TilePoint p) => _fence.TryGetValue(p, out var kind) ? kind : null;
 
     public PlacedStage? StageAt(TilePoint p) => _stages.FirstOrDefault(s => s.Rect.Contains(p));
