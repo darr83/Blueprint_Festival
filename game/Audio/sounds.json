@@ -459,6 +459,36 @@
       "volume": 0.9,
       "gap": 0.0,
       "prompt": "A heavy wooden farm gate creaking shut, a chain pulled through it and a padlock clicking."
+    },
+    {
+      "id": "clap_1",
+      "bus": "Crowd",
+      "seconds": 1,
+      "loop": false,
+      "volume": 0.8,
+      "gap": 0.0,
+      "keep": 0.4,
+      "prompt": "One single loud clap from a big outdoor festival crowd clapping together in unison, hundreds of hands hitting at the same instant, then silence. No music, no voices, no cheering."
+    },
+    {
+      "id": "clap_2",
+      "bus": "Crowd",
+      "seconds": 1,
+      "loop": false,
+      "volume": 0.8,
+      "gap": 0.0,
+      "keep": 0.4,
+      "prompt": "A single unison handclap from a large crowd in an open field, one sharp hit of many hands at once, then nothing. No music, no voices."
+    },
+    {
+      "id": "clap_3",
+      "bus": "Crowd",
+      "seconds": 1,
+      "loop": false,
+      "volume": 0.8,
+      "gap": 0.0,
+      "keep": 0.4,
+      "prompt": "One single big clap from a festival crowd clapping in time, a thousand hands together at the same instant, a full warm hit, then silence. No music, no voices, no cheering."
     }
   ]
 }

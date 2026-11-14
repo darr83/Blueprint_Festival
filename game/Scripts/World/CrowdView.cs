@@ -4,6 +4,7 @@ using BlueprintFestival.Simulation;
 using BlueprintFestival.Simulation.Core;
 using BlueprintFestival.Simulation.Show;
 using BlueprintFestival.Simulation.Site;
+using BlueprintFestival.Simulation.Sound;
 using Godot;
 
 namespace BlueprintFestival.World;
@@ -49,6 +50,8 @@ public partial class CrowdView : Node3D
     private int _cheerOutOfTen = 3;
     private readonly StageBeat _mainBeat = new();
     private readonly StageBeat _secondBeat = new();
+    private readonly CrowdClap _clap = new();
+    private int _clappers;
 
     /// <summary>The music being played, which the crowd dances in time to. Null dances to a steady beat.</summary>
     public MusicPlayer? Music { get; set; }
@@ -64,6 +67,12 @@ public partial class CrowdView : Node3D
 
     /// <summary>How many of the people drawn in full are dancing.</summary>
     public int Dancers { get; private set; }
+
+    /// <summary>How many people are clapping along to the music being heard.</summary>
+    public int Clappers { get; private set; }
+
+    /// <summary>How many claps have been played on the beat so far.</summary>
+    public int ClapsPlayed => _clap.Played;
 
     /// <summary>How many people are drawn as simple figures, because the crowd is big or the view is far out.</summary>
     public int Simple { get; private set; }
@@ -155,18 +164,33 @@ public partial class CrowdView : Node3D
     /// The music someone watching is dancing to: the act on the stage nearer to them, if one is
     /// playing. Null when no act is on (or it has been stopped).
     /// </summary>
-    private (Genre Genre, double Beat)? BeatFor(Simulation.People.PersonOnSite person)
+    private (Genre Genre, double Beat)? BeatFor(Simulation.People.PersonOnSite person) =>
+        StageFor(person) is { } stage ? (stage.Genre, stage.Beat) : null;
+
+    /// <summary>The stage someone watching dances to: the one nearer to them that has an act on.</summary>
+    private StageBeat? StageFor(Simulation.People.PersonOnSite person)
     {
         var main = _mainBeat.On ? _mainBeat : null;
         var second = _secondBeat.On ? _secondBeat : null;
         if (main is null || second is null)
         {
-            return (main ?? second) is { } only ? (only.Genre, only.Beat) : null;
+            return main ?? second;
         }
 
-        var nearer = main.DistanceSquared(person.X, person.Y) <= second.DistanceSquared(person.X, person.Y) ? main : second;
-        return (nearer.Genre, nearer.Beat);
+        return main.DistanceSquared(person.X, person.Y) <= second.DistanceSquared(person.X, person.Y) ? main : second;
     }
+
+    /// <summary>The stage whose music is being heard, while an act is on there.</summary>
+    private StageBeat? HeardStage()
+    {
+        var heard = Music?.Heard is { } show ? (show == _game.SecondShow ? _secondBeat : _mainBeat) : _mainBeat.On ? _mainBeat : _secondBeat;
+        return heard.On ? heard : null;
+    }
+
+    /// <summary>Whether someone is clapping along to the music being heard (the sway claps on every beat).</summary>
+    private bool ClapsAlong(Simulation.People.PersonOnSite person, StageBeat? heard) =>
+        heard is not null && person.Watching && !person.Walking && StageFor(person) == heard
+        && Dancing.MoveFor(heard.Genre, person.Id) == DanceMove.Sway;
 
     /// <summary>How far a simple figure, far from the camera, bobs or jumps off the ground in time.</summary>
     private static float SimpleLift((Genre Genre, double Beat) dance, int person)
@@ -246,6 +270,8 @@ public partial class CrowdView : Node3D
 
         _seen.Clear();
         var dancers = 0;
+        var heard = HeardStage();
+        _clappers = 0;
         foreach (var person in _people)
         {
             // Someone unwell lies on the ground, or on a bed if they have been taken to the first aid tent.
@@ -277,6 +303,7 @@ public partial class CrowdView : Node3D
                 // more of them, more often, for the headline act.
                 var cheering = person.Watching && ((person.Id * 7) + (int)(_time / 2.5)) % 10 < _cheerOutOfTen;
                 var dance = person.Watching && !person.Walking ? BeatFor(person) : null;
+                _clappers += ClapsAlong(person, heard) ? 1 : 0;
                 if (dance is { } d)
                 {
                     var move = Dancing.MoveFor(d.Genre, person.Id);
@@ -312,6 +339,7 @@ public partial class CrowdView : Node3D
             _shownStamp[person.Id] = _stamp;
             var tall = _heights[person.Id];
             var basis = person.Unwell ? new Basis(Vector3.Right, tilt).Scaled(Vector3.One * tall) : Basis.FromScale(Vector3.One * tall);
+            _clappers += ClapsAlong(person, heard) ? 1 : 0;
             if (person.Watching && !person.Walking && BeatFor(person) is { } beat)
             {
                 at += new Vector3(0, SimpleLift(beat, person.Id), 0);
@@ -325,6 +353,8 @@ public partial class CrowdView : Node3D
 
         Simple = simple;
         Dancers = dancers;
+        Clappers = _clappers;
+        _clap.Update(heard, _clappers, held, delta);
         foreach (var (node, buffer) in new[] { (_bodies, _bodyBuffer), (_heads, _headBuffer), (_hair, _hairBuffer) })
         {
             node.Visible = simple > 0;
@@ -413,4 +443,56 @@ internal sealed class StageBeat
     }
 
     public double DistanceSquared(double x, double y) => ((x - _frontX) * (x - _frontX)) + ((y - _frontY) * (y - _frontY));
+}
+
+/// <summary>
+/// The sound of the crowd clapping along: one clap on each beat of the music being heard, louder
+/// the more people are clapping. The clap is sent a moment early so it is heard on the beat.
+/// </summary>
+internal sealed class CrowdClap
+{
+    private readonly System.Random _random = new();
+    private double _last = double.NaN;
+    private double _rate;
+    private int _clap;
+
+    /// <summary>How many claps have been played.</summary>
+    public int Played { get; private set; }
+
+    /// <summary>How loud the claps are for this many people clapping, from 0 to 1.</summary>
+    public static float Level(int clappers) => clappers <= 0 ? 0 : Mathf.Clamp(Mathf.Sqrt(clappers / 300f), 0.15f, 1f);
+
+    public void Update(StageBeat? heard, int clappers, bool held, double delta)
+    {
+        if (heard is null || clappers <= 0 || held || delta <= 0)
+        {
+            _last = double.NaN;
+            return;
+        }
+
+        // How many beats a second, worked out from how far the beat moved this frame.
+        var now = heard.Beat;
+        if (!double.IsNaN(_last))
+        {
+            var step = (now - _last) / delta;
+            _rate = step is > 0 and < 6 ? (_rate <= 0 ? step : Mathf.Lerp((float)_rate, (float)step, 0.1f)) : _rate;
+        }
+
+        var ahead = now + (_rate * AudioServer.GetOutputLatency());
+        var before = double.IsNaN(_last) ? ahead : _last + (_rate * AudioServer.GetOutputLatency());
+        _last = now;
+        // A new song, or a jump in the music, starts counting again rather than clapping a burst.
+        if (ahead < before || ahead - before > 1.5)
+        {
+            return;
+        }
+
+        if (System.Math.Floor(ahead / Dancing.BeatsAClap) > System.Math.Floor(before / Dancing.BeatsAClap))
+        {
+            // Never the same clap twice running, so the beat does not sound like a drum machine.
+            _clap = (_clap + 1 + _random.Next(Sounds.Claps.Count - 1)) % Sounds.Claps.Count;
+            SoundBoard.Instance?.Play(Sounds.Claps[_clap], Level(clappers));
+            Played++;
+        }
+    }
 }

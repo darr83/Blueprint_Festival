@@ -73,6 +73,12 @@ public static class Dancing
     }
 
     /// <summary>
+    /// How many beats apart someone clapping along claps (only the sway claps): once a hit, like
+    /// the moves. The crowd's clap sound follows this too, so it matches the hands.
+    /// </summary>
+    public const int BeatsAClap = BeatsAHit;
+
+    /// <summary>
     /// How many hits one go of a move takes (a hit is every other beat, see <see cref="BeatsAHit"/>):
     /// a sway goes one way and back over two, a jump punches with one fist and then the other, and
     /// a hip hop nod leans one way and then the other.
