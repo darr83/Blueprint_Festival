@@ -22,6 +22,8 @@ public partial class QueueShots : Node
         ("1_queuing_at_the_gate", 200), ("2_showing_a_ticket", 200), ("3_the_queue_at_the_bar", 200), ("4_the_queue_at_the_food_van", 200),
         ("5_a_long_queue_folds_back", 200), ("6_two_lanes_at_the_arch_gate", 1500),
         ("7_queuing_for_the_toilets", 200), ("8_a_door_opens_and_the_sign_turns_red", 200),
+        ("9_dragging_out_a_queue_lane", 200), ("10_the_queue_in_its_lane", 200), ("11_a_lane_down_the_track_to_the_gate", 200),
+        ("12_marking_ground_no_customers", 200), ("13_the_marks_do_not_show_on_the_day", 200),
     };
 
     private readonly string _directory;
@@ -160,6 +162,13 @@ public partial class QueueShots : Node
         game.BuildFence(FenceKind.Paling, new TilePoint(gap.X, gap.Y + 1), new TilePoint(gap.Right - 1, gap.Y + 1));
         game.BuildGate(GateKind.VillageGate, gap.X + 2, gap.Y + 1, false);
         game.HireStaff(StaffKind.TicketStaff, new TilePoint(gap.X + 4, gap.Y + 1));
+        if (name[0] == '9' || name[1] != '_')
+        {
+            Lanes(festival, name);
+            Report(game, name);
+            return;
+        }
+
         game.BuildStall(StallKind.Toilets, f.X + 30, f.Y + 5, Facing.South);
         if (name[0] < '7')
         {
@@ -246,6 +255,85 @@ public partial class QueueShots : Node
         }
 
         Report(game, name);
+    }
+
+    /// <summary>The pictures of queue lanes and of ground marked "no customers".</summary>
+    private static void Lanes(FestivalScene festival, string name)
+    {
+        var game = festival.Game;
+        var f = game.Field.Field;
+        var gap = game.Field.Gap;
+        const float t = 0.5f;
+        game.BuildStall(StallKind.Toilets, f.X + 30, f.Y + 5, Facing.South);
+        game.BuildStall(StallKind.TeaAndCake, f.X + 50, f.Y + 30, Facing.South);
+        game.BuildStall(StallKind.Bar, f.X + 7, f.Y + 30, Facing.East);
+        if (name[1] != '0')
+        {
+            // (In the picture of the lane in use the tea table is the only food, so its queue is a long one.)
+            game.BuildStall(StallKind.FoodVan, f.X + 7, f.Y + 50, Facing.East);
+        }
+
+        var table = game.Site.Stalls[1].Rect;
+        var x = table.X + 3;
+        var y = table.Bottom + 2;
+        switch (name)
+        {
+            case "9_dragging_out_a_queue_lane":
+                // The first stretch is down; the second is being dragged round the corner.
+                game.BuildLane(new TilePoint(x, y), new TilePoint(x, y + 13));
+                game.BuildLane(new TilePoint(x, y + 13), new TilePoint(x + 2, y + 13));
+                festival.BuildBar.Toggle(BuildMode.Fence);
+                festival.BuildBar.Choose(UI.BuildBar.LaneKey);
+                festival.Build.HoldDrag(new TilePoint(x + 2, y + 13), new TilePoint(x + 2, y + 4));
+                festival.Camera.LookAt((x + 2) * t, (y + 7) * t, 13f);
+                break;
+
+            case "10_the_queue_in_its_lane":
+                game.BuildLane(new TilePoint(x, y), new TilePoint(x, y + 13));
+                game.BuildLane(new TilePoint(x, y + 13), new TilePoint(x + 2, y + 13));
+                game.BuildLane(new TilePoint(x + 2, y + 13), new TilePoint(x + 2, y + 2));
+                game.BuildLane(new TilePoint(x + 2, y + 2), new TilePoint(x + 4, y + 2));
+                game.BuildLane(new TilePoint(x + 4, y + 2), new TilePoint(x + 4, y + 11));
+                game.OpenGates();
+                RunUntil(game, () => game.Now.Hour >= 11 && game.Crowd.StallLine(1)!.Standing >= 16, 20);
+                festival.Camera.LookAt((x + 2) * t, (y + 7) * t, 13f);
+                break;
+
+            case "11_a_lane_down_the_track_to_the_gate":
+            {
+                // Out from the gate and down the track, whichever side of the field the lane is.
+                var outY = game.Site.GateUses[0].OutY;
+                game.BuildLane(new TilePoint(gap.X + 6, gap.Y + 1 + (outY * 2)), new TilePoint(gap.X + 6, gap.Y + 1 + (outY * 15)));
+                game.OpenGates();
+                RunUntil(game, () => game.Crowd.GateLine(0, 0)!.Standing >= 9, 11);
+                festival.Camera.Turn(2);
+                var (mx, my) = game.Site.LaneMouth(0, 0, 4.5);
+                festival.Camera.LookAt((float)mx, (float)my, 13f);
+                break;
+            }
+
+            default:
+            {
+                // Behind the bar and the food van, and the grass beside the bandstand.
+                game.KeepOut(new TilePoint(f.X, f.Y + 26), new TilePoint(f.X + 6, f.Y + 66), true);
+                game.KeepOut(new TilePoint(f.X + 7, f.Y + 42), new TilePoint(f.X + 11, f.Y + 49), true);
+                if (name == "12_marking_ground_no_customers")
+                {
+                    festival.BuildBar.Toggle(BuildMode.Fence);
+                    festival.BuildBar.Choose(UI.BuildBar.KeepOutKey);
+                    festival.Build.HoldDrag(new TilePoint(f.X + 7, f.Y + 62), new TilePoint(f.X + 11, f.Y + 66));
+                }
+                else
+                {
+                    game.KeepOut(new TilePoint(f.X + 7, f.Y + 62), new TilePoint(f.X + 11, f.Y + 66), true);
+                    game.OpenGates();
+                    RunUntil(game, () => game.Now.Hour >= 13 && game.Crowd.StallLine(2)!.Standing >= 3, 20);
+                }
+
+                festival.Camera.LookAt((f.X + 22) * t, (f.Y + 46) * t, 17f);
+                break;
+            }
+        }
     }
 
     private static void Report(FestivalGame game, string name)

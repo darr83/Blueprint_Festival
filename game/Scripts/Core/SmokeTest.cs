@@ -142,7 +142,7 @@ public partial class SmokeTest : Node
                     Check(opened.Build.Facing == Simulation.Site.Facing.West, "R should turn the piece a quarter turn.");
 
                     opened.BuildBar.Toggle(BuildMode.Fence);
-                    Check(opened.BuildBar.ChoiceCount == 4 && opened.BuildBar.Choose("fencePaling"), "The build bar should offer four fences.");
+                    Check(opened.BuildBar.ChoiceCount == 6 && opened.BuildBar.Choose("fencePaling"), "The build bar should offer four fences, the queue lane and the no-customers mark.");
                     Check(opened.Build.DragFence(new TilePoint(gap.X, gap.Y + 1), new TilePoint(gap.Right - 1, gap.Y + 1)).Ok, "A fence should close the gap.");
                     Check(!site.OpenWayIn, "With the gap fenced there should be no way in.");
 
@@ -164,6 +164,27 @@ public partial class SmokeTest : Node
                     Check(!opened.Build.ClickAt(new TilePoint(grass.X + 22, grass.Y + 18)).Ok, "One stall should not go on top of another.");
                     Check(opened.BuildBar.Choose("stallBar") && opened.Build.ClickAt(new TilePoint(grass.X + 20, grass.Y + 36)).Ok, "A bar should go on the grass.");
                     Check(opened.BuildBar.Choose("stallToilets") && opened.Build.ClickAt(new TilePoint(grass.X + 20, grass.Y + 52)).Ok, "Toilets should go on the grass.");
+
+                    // A queue lane is dragged out and its barriers go up by themselves; taking it down gives the money back.
+                    opened.BuildBar.Toggle(BuildMode.Fence);
+                    Check(opened.BuildBar.Choose(UI.BuildBar.LaneKey) && opened.Build.Mode == BuildMode.Lane, "The queue lane should be on the build bar.");
+                    opened.Build.HoldDrag(new TilePoint(grass.X + 50, grass.Y + 50), new TilePoint(grass.X + 50, grass.Y + 61));
+                    Check(opened.Build.Status.Contains("£36"), $"The bar should show what the lane costs, not '{opened.Build.Status}'.");
+                    Check(opened.Build.DragLane(new TilePoint(grass.X + 50, grass.Y + 50), new TilePoint(grass.X + 50, grass.Y + 61)).Ok, "A queue lane should go on the grass.");
+                    Check(opened.Build.DragLane(new TilePoint(grass.X + 50, grass.Y + 61), new TilePoint(grass.X + 52, grass.Y + 61)).Ok, "A queue lane should carry on round a corner from its end.");
+                    opened.Site.Rebuild();
+                    Check(opened.Site.LaneCount == 1 && site.LaneBarriers.Count > 24 && opened.Site.GetNodeOrNull("QueueBarriers") is not null, "The lane's barriers should be drawn.");
+                    Check(!opened.Game.Field.IsWalkable(new TilePoint(grass.X + 49, grass.Y + 55)), "Nobody should walk through a lane's barrier.");
+
+                    // Ground marked "no customers" shows only while it is being marked.
+                    Check(opened.BuildBar.Choose(UI.BuildBar.KeepOutKey) && opened.Build.Mode == BuildMode.KeepOut, "The no-customers mark should be on the build bar.");
+                    Check(opened.Build.DragKeepOut(new TilePoint(grass.X + 60, grass.Y + 50), new TilePoint(grass.X + 65, grass.Y + 55)).Ok, "Clear grass should take the mark.");
+                    Check(site.KeepOut.Count == 36 && opened.Build.KeepOutShown && opened.Build.KeepOutRuns == 6, "The marked ground should show while marking.");
+                    Check(!opened.Game.Field.IsWalkable(new TilePoint(grass.X + 62, grass.Y + 52)) && opened.Game.Field.IsWalkableForStaff(new TilePoint(grass.X + 62, grass.Y + 52)), "Marked ground is for staff only.");
+                    Check(opened.BuildBar.Choose("fenceRope") && !opened.Build.KeepOutShown, "The marks should not show with another tool in hand.");
+                    Check(opened.BuildBar.Choose(UI.BuildBar.KeepOutKey) && opened.Build.DragKeepOut(new TilePoint(grass.X + 60, grass.Y + 50), new TilePoint(grass.X + 65, grass.Y + 55)).Ok && site.KeepOut.Count == 0, "A drag that starts on marked ground should clear it.");
+                    opened.BuildBar.Toggle(BuildMode.Remove);
+                    Check(opened.Build.ClickAt(new TilePoint(grass.X + 49, grass.Y + 55)).Ok && site.Lanes.Count == 0 && site.LaneBarriers.Count == 0, "Taking down a barrier should take the whole lane.");
                     opened.BuildBar.Close();
                     Check(opened.Build.Mode == BuildMode.None, "Closing the bar should put the tool down.");
                     Check(opened.Game.Money == 1554 - 120 - 200 - 40, $"The money should add up after the stalls, not be £{opened.Game.Money}.");
@@ -214,7 +235,8 @@ public partial class SmokeTest : Node
                     {
                         if (party.IsOnSite)
                         {
-                            Check(running.Game.Field.IsWalkable(Simulation.World.FieldMap.TileAt(party.X, party.Y)), $"Party {party.Id} should be on ground people can walk on.");
+                            var at = Simulation.World.FieldMap.TileAt(party.X, party.Y);
+                            Check(running.Game.Field.IsWalkable(at) || running.Game.Site.IsLane(at), $"Party {party.Id} should be on ground people can walk on.");
                         }
                     }
 

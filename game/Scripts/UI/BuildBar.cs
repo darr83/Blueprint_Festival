@@ -24,6 +24,12 @@ public partial class BuildBar : VBoxContainer
     private Label _status = null!;
     private BuildMode _open = BuildMode.None;
 
+    /// <summary>The key of the queue lane choice, under Fences.</summary>
+    public const string LaneKey = "fenceQueueLane";
+
+    /// <summary>The key of the "no customers" choice, under Fences.</summary>
+    public const string KeepOutKey = "fenceNoCustomers";
+
     /// <summary>Which group's choices are showing.</summary>
     public BuildMode Open => _open;
 
@@ -123,6 +129,11 @@ public partial class BuildBar : VBoxContainer
                 {
                     AddChoice($"fence{f.Kind}", f.Name, $"£{f.CostPerMetre:N0} a metre", f.About, () => _tool.PickFence(f.Kind));
                 }
+
+                AddChoice(LaneKey, "Queue lane", $"£{SiteLayout.LaneCostPerMetre:N0} a metre",
+                    "Drag along the ground where people should queue for a gate, a stall or the toilets. The barriers go up either side by themselves.\nStart within 3 m of the front. Drag again from its end to turn a corner.", () => _tool.PickLane());
+                AddChoice(KeepOutKey, "No customers", "Free",
+                    "Mark ground customers must keep off, such as behind the stalls. Staff still go there.\nDrag to mark it; start on marked ground to clear it. It only shows while you are marking.", () => _tool.PickKeepOut());
 
                 break;
             case BuildMode.Gate:
@@ -263,6 +274,8 @@ public partial class BuildBar : VBoxContainer
         {
             BuildMode.Stage => $"stage{_tool.Stage}",
             BuildMode.Fence => $"fence{_tool.Fence}",
+            BuildMode.Lane => LaneKey,
+            BuildMode.KeepOut => KeepOutKey,
             BuildMode.Gate => $"gate{_tool.Gate}",
             BuildMode.Stall => $"stall{_tool.Stall}",
             BuildMode.Ground => $"ground{_tool.Ground}",

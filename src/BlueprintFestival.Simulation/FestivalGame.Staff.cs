@@ -176,7 +176,7 @@ public sealed partial class FestivalGame
 
     private void StartStaff()
     {
-        _staffPaths = new PathFinder(Field);
+        _staffPaths = new PathFinder(Field, staff: true);
         _chance = GameRandom.FromSeed(Seed, 31);
         Site.Changed += () => _staffPaths.Refresh();
         if (NeedsStaff)
@@ -219,7 +219,7 @@ public sealed partial class FestivalGame
                 return new BuildCheck(false, wage, "Every lane of this gate has someone on it.");
             }
         }
-        else if (!Field.IsWalkable(tile) || !Field.Rented(tile))
+        else if (!Field.IsWalkableForStaff(tile) || !Field.Rented(tile))
         {
             return new BuildCheck(false, wage, "They need a clear bit of the field to stand on.");
         }

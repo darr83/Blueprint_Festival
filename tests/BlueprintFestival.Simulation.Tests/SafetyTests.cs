@@ -114,7 +114,9 @@ public class SafetyTests
 
         Assert.True(redAtTheHeadliner);
         Assert.True(warnings >= 1);
-        Assert.Equal(FestivalGame.SeriousAt, game.CrushInjuries);
+        // The day is called off when the fifth person is hurt. Someone in another packed square can
+        // go down in that same minute, before the crowd has begun to move, so it can end one or two over.
+        Assert.InRange(game.CrushInjuries, FestivalGame.SeriousAt, FestivalGame.SeriousAt + 2);
         Assert.Equal(game.CrushInjuries, hurtAt.Count);
         Assert.True(game.SeriousIncident);
         Assert.NotNull(game.Show.CalledOff);
@@ -123,7 +125,7 @@ public class SafetyTests
         game.PayScouts();
         var result = game.HandBack();
         Assert.True(result.SeriousIncident);
-        Assert.Equal(FestivalGame.SeriousAt, result.CrushInjuries);
+        Assert.Equal(game.CrushInjuries, result.CrushInjuries);
         Assert.Equal(result.LicenceNow, result.LicenceNext);
         Assert.Contains("crush", result.Verdict, StringComparison.OrdinalIgnoreCase);
     }
