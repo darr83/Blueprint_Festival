@@ -126,10 +126,10 @@ public sealed record BeatInfo(double Bpm, double FirstBeat, double Strength = 1)
                 continue;
             }
 
-            var equals = line.IndexOfAny(['=', ':']);
+            var equals = line.IndexOfAny(new[] { '=', ':' });
             if (equals > 0 && line[..equals].Trim().Equals("beats", StringComparison.OrdinalIgnoreCase))
             {
-                foreach (var word in line[(equals + 1)..].Split([' ', ',', '\t'], StringSplitOptions.RemoveEmptyEntries))
+                foreach (var word in line[(equals + 1)..].Split(new[] { ' ', ',', '\t' }, StringSplitOptions.RemoveEmptyEntries))
                 {
                     if (double.TryParse(word, NumberStyles.Float, CultureInfo.InvariantCulture, out var at) && double.IsFinite(at)
                         && (beats.Count == 0 || at > beats[^1]))
