@@ -381,6 +381,15 @@ public sealed class Crowd
     /// <summary>Mood lost in an hour of standing in deep mud.</summary>
     public const double MudPerHour = 0.06;
 
+    /// <summary>How dark a place is right now, from 0 to 1, if the game knows: night with no light near is 1.</summary>
+    public Func<double, double, double>? Darkness { get; set; }
+
+    /// <summary>Mood lost in an hour of being somewhere pitch dark. Nobody minds the dark while watching an act.</summary>
+    public const double DarkPerHour = 0.05;
+
+    /// <summary>True if a party is somewhere the dark would bother them: about on the site, in a queue or at a stall.</summary>
+    public static bool MindsTheDark(Party party) => party.State is PartyState.Standing or PartyState.Strolling or PartyState.Queuing or PartyState.AtStall;
+
     private int[] _claims = Array.Empty<int>();
     private int _claimSlot = -1;
     private int[] _claimsSecond = Array.Empty<int>();
@@ -1837,6 +1846,12 @@ public sealed class Crowd
         if (Mud is not null && party.State is not (PartyState.Queuing or PartyState.AtStall))
         {
             change -= Mud(party.X, party.Y) * MudPerHour * perHour;
+        }
+
+        if (Darkness is not null && MindsTheDark(party))
+        {
+            // Stumbling about an unlit field at night is no fun, and does not feel safe.
+            change -= Darkness(party.X, party.Y) * DarkPerHour * perHour;
         }
 
         party.Mood = Math.Clamp(party.Mood + change, 0, 1);

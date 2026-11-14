@@ -185,6 +185,24 @@ public partial class SmokeTest : Node
                     Check(opened.BuildBar.Choose(UI.BuildBar.KeepOutKey) && opened.Build.DragKeepOut(new TilePoint(grass.X + 60, grass.Y + 50), new TilePoint(grass.X + 65, grass.Y + 55)).Ok && site.KeepOut.Count == 0, "A drag that starts on marked ground should clear it.");
                     opened.BuildBar.Toggle(BuildMode.Remove);
                     Check(opened.Build.ClickAt(new TilePoint(grass.X + 49, grass.Y + 55)).Ok && site.Lanes.Count == 0 && site.LaneBarriers.Count == 0, "Taking down a barrier should take the whole lane.");
+
+                    // Lights: a floodlight is clicked down, fairy lights are dragged out and their poles go in by themselves.
+                    opened.BuildBar.Toggle(BuildMode.Light);
+                    Check(opened.BuildBar.ChoiceCount == 3 && opened.BuildBar.Choose(UI.BuildBar.LightKey(LightKind.Floodlight)) && opened.Build.Mode == BuildMode.Light, "The build bar should offer three kinds of light.");
+                    var tower = new TilePoint(grass.X + 70, grass.Y + 50);
+                    opened.Build.ShowGhost(tower);
+                    Check(opened.Build.Status.Contains("£90"), $"The bar should show what a floodlight costs, not '{opened.Build.Status}'.");
+                    Check(opened.Build.ClickAt(tower).Ok && !opened.Build.ClickAt(tower).Ok, "A floodlight should go on the grass, once.");
+                    Check(opened.BuildBar.Choose(UI.BuildBar.LightKey(LightKind.FairyLights)) && opened.Build.Mode == BuildMode.Fairy, "Fairy lights should be dragged, not clicked.");
+                    var (strungFrom, strungTo) = (new TilePoint(grass.X + 70, grass.Y + 60), new TilePoint(grass.X + 90, grass.Y + 60));
+                    opened.Build.HoldDrag(strungFrom, strungTo);
+                    Check(opened.Build.Status.Contains("£30"), $"The bar should show what 10 m of fairy lights costs, not '{opened.Build.Status}'.");
+                    Check(opened.Build.DragFairyLights(strungFrom, strungTo).Ok, "Fairy lights should go up between two places on the grass.");
+                    opened.Lights.Rebuild();
+                    Check(opened.Lights.LightCount == 1 && opened.Lights.StringCount == 1 && opened.Lights.PoleCount == 3 && opened.Lights.LampCount == 3, "The floodlight and the fairy lights with their three poles should be drawn.");
+                    Check(opened.Lights.Strength == 0 && site.LitAt(new TilePoint(grass.X + 80, grass.Y + 62)) == 1, "The lights should be off by day, and light the ground round them.");
+                    opened.BuildBar.Toggle(BuildMode.Remove);
+                    Check(opened.Build.ClickAt(tower).Ok && opened.Build.ClickAt(strungTo).Ok && site.Lights.Count == 0 && site.FairyLights.Count == 0, "Taking down a light or a pole should give the money back.");
                     opened.BuildBar.Close();
                     Check(opened.Build.Mode == BuildMode.None, "Closing the bar should put the tool down.");
                     Check(opened.Game.Money == 1554 - 120 - 200 - 40, $"The money should add up after the stalls, not be £{opened.Game.Money}.");

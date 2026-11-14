@@ -30,6 +30,9 @@ public partial class BuildBar : VBoxContainer
     /// <summary>The key of the "no customers" choice, under Fences.</summary>
     public const string KeepOutKey = "fenceNoCustomers";
 
+    /// <summary>The key of a kind of light, under Lights.</summary>
+    public static string LightKey(LightKind kind) => $"light{kind}";
+
     /// <summary>Which group's choices are showing.</summary>
     public BuildMode Open => _open;
 
@@ -67,6 +70,7 @@ public partial class BuildBar : VBoxContainer
         AddTab(row, BuildMode.Stall, "stall", "Stalls", "Food, drink, toilets and water");
         AddTab(row, BuildMode.Staff, "staff", "Staff", "Ticket staff, security and first aid");
         AddTab(row, BuildMode.Ground, "ground", "Ground", "Straw, trackway and paths, to keep feet out of the mud");
+        AddTab(row, BuildMode.Light, "light", "Lights", "Path lights, floodlights and fairy lights for after dark");
         AddTab(row, BuildMode.Remove, "remove", "Take down", "Remove something and get the money back");
 
         SetAnchorsAndOffsetsPreset(LayoutPreset.BottomWide, LayoutPresetMode.Minsize, 14);
@@ -178,6 +182,16 @@ public partial class BuildBar : VBoxContainer
                 AddChoice($"ground{GroundKind.Gravel}", "Gravel path", $"£{FestivalGame.CostOf(GroundKind.Gravel)} per 2 m",
                     "Rolled gravel. Hardly any mud and hardly any wear.\nDrag to lay it, 2 m wide.", () => _tool.PickGround(GroundKind.Gravel));
                 break;
+            case BuildMode.Light:
+                foreach (var l in Lighting.All)
+                {
+                    var fairy = l.Kind == LightKind.FairyLights;
+                    AddChoice(LightKey(l.Kind), l.Name, fairy ? $"£{l.Cost:N0} a metre" : $"£{l.Cost:N0}",
+                        $"{l.About}\n{(fairy ? "Drag from one place to another; the poles go in by themselves. Start on a pole to carry on from it." : "Click on the grass to put it up.")}\nAfter dark, people are unhappy anywhere that is not lit.",
+                        () => _tool.PickLight(l.Kind));
+                }
+
+                break;
             case BuildMode.Remove:
                 _tool.PickRemove();
                 break;
@@ -225,6 +239,7 @@ public partial class BuildBar : VBoxContainer
             : k.StartsWith("fence") ? ("fence", UiStyle.StagePink)
             : k.StartsWith("gate") ? ("gate", UiStyle.StagePink)
             : k.StartsWith("staff") ? ("staff", UiStyle.StagePink)
+            : k.StartsWith("light") ? ("light", UiStyle.StagePink)
             : k.StartsWith("ground") ? ("ground", UiStyle.StagePink)
             : ("stall", UiStyle.StagePink);
     }
@@ -279,6 +294,7 @@ public partial class BuildBar : VBoxContainer
             BuildMode.Gate => $"gate{_tool.Gate}",
             BuildMode.Stall => $"stall{_tool.Stall}",
             BuildMode.Ground => $"ground{_tool.Ground}",
+            BuildMode.Light or BuildMode.Fairy => LightKey(_tool.Light),
             _ => "",
         };
         foreach (var (key, button) in _choices)

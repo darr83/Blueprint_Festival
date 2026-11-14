@@ -31,6 +31,9 @@ public partial class FestivalScene : Node3D
 
     public BuildTool Build { get; private set; } = null!;
 
+    /// <summary>The path lights, floodlights and fairy lights.</summary>
+    public LightsView Lights { get; private set; } = null!;
+
     public ShowView Acts { get; private set; } = null!;
 
     /// <summary>The acts on the second stage.</summary>
@@ -94,6 +97,10 @@ public partial class FestivalScene : Node3D
         Site = new SiteView { Name = "Site" };
         AddChild(Site);
         Site.Initialise(Game);
+
+        Lights = new LightsView { Name = "Lights" };
+        AddChild(Lights);
+        Lights.Initialise(Game);
 
         Acts = new ShowView { Name = "Show" };
         AddChild(Acts);

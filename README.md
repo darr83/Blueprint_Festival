@@ -44,6 +44,7 @@ brands or sponsors.
 | 18b. Toilets: one queue for each set of cabins, each person walks to a free cubicle, the door swings open and shuts behind them, the sign turns red while they are inside and green when they come out, and they wait nearby for the rest of their party | Done |
 | 18c. Queue lanes and staff-only ground: drag a queue along the ground for a gate, a stall or the toilets and the barriers go up either side by themselves, round corners too; and mark ground "no customers", which the public walk round, staff do not, and which only shows while you are marking it | Done |
 | 19. The band plays to the music: the drummer's sticks come down on each drum on the beat and the drums shake, guitars are strummed on the beat, the singer's mouth moves with the singing; a few seconds between songs while the crowd claps and cheers; the last song fades at the end of a set, the crowd cheers louder and most stay to clap the act off before they go | Done |
+| 19. Lights: path lights and floodlights are clicked down, fairy lights are dragged from one place to another and their poles go in by themselves (start on a pole to carry on from it, at any angle). They come on as it gets dark and light the ground round them; after dark people about on unlit ground slowly lose heart | Done |
 
 ## Controls
 
@@ -214,6 +215,7 @@ to three minutes before they drift off to the stalls or home.
 - `godot --path game -- --sales-shots=DIR` writes pictures of the planning and ticket sales screens.
 - `godot --path game -- --path-shots=DIR` writes pictures of paths and the camping field.
 - `godot --path game -- --queue-shots=DIR` writes pictures of the queues at gates, stalls and toilets, of queue lanes, and of ground marked "no customers".
+- `godot --path game -- --light-shots=DIR` writes pictures of the lights by day, at dusk and at night.
 
 The tests and the launch test run on every pull request.
 

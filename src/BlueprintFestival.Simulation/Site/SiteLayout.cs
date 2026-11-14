@@ -71,7 +71,7 @@ public readonly record struct GateUse(bool InUse, int OutX, int OutY);
 /// Everything the player has built on the field: stages, fences and gates. It keeps the map's
 /// blocked tiles up to date and works out which ground is inside the gates and which outside.
 /// </summary>
-public sealed class SiteLayout
+public sealed partial class SiteLayout
 {
     private readonly FieldMap _map;
     private readonly List<PlacedStage> _stages = new();
@@ -123,7 +123,7 @@ public sealed class SiteLayout
 
     public PlacedStall? StallAt(TilePoint p) => _stalls.FirstOrDefault(s => s.Rect.Contains(p));
 
-    public bool IsEmpty(TilePoint p) => !_fence.ContainsKey(p) && StageAt(p) is null && GateAt(p) is null && StallAt(p) is null && !_laneOf.ContainsKey(p) && !_barriers.Contains(p);
+    public bool IsEmpty(TilePoint p) => !_fence.ContainsKey(p) && StageAt(p) is null && GateAt(p) is null && StallAt(p) is null && !_laneOf.ContainsKey(p) && !_barriers.Contains(p) && !HasLight(p);
 
     /// <summary>The queue lanes the player has laid: each is the tiles people stand along, in order from one end to the other.</summary>
     public IReadOnlyList<IReadOnlyList<TilePoint>> Lanes => _lanes;
@@ -508,7 +508,7 @@ public sealed class SiteLayout
                 return BuildCheck.No("Fence can only go on the grass.");
             }
 
-            if (StageAt(p) is not null || GateAt(p) is not null || StallAt(p) is not null || _laneOf.ContainsKey(p) || _barriers.Contains(p))
+            if (StageAt(p) is not null || GateAt(p) is not null || StallAt(p) is not null || _laneOf.ContainsKey(p) || _barriers.Contains(p) || HasLight(p))
             {
                 return BuildCheck.No("Something is already built there.");
             }
@@ -537,7 +537,7 @@ public sealed class SiteLayout
                 return BuildCheck.No("A gate can only go on the grass.");
             }
 
-            if (StageAt(p) is not null || GateAt(p) is not null || StallAt(p) is not null || _laneOf.ContainsKey(p) || _barriers.Contains(p))
+            if (StageAt(p) is not null || GateAt(p) is not null || StallAt(p) is not null || _laneOf.ContainsKey(p) || _barriers.Contains(p) || HasLight(p))
             {
                 return BuildCheck.No("Something is already built there.");
             }
@@ -596,6 +596,11 @@ public sealed class SiteLayout
     /// <summary>What taking down whatever stands on a tile would give back, or 0 if nothing is there.</summary>
     public int RefundAt(TilePoint p)
     {
+        if (LightRefundAt(p) is > 0 and var lights)
+        {
+            return lights;
+        }
+
         if (StageAt(p) is { } stage)
         {
             return Catalogue.Of(stage.Kind).Cost;
@@ -644,7 +649,11 @@ public sealed class SiteLayout
     public int RemoveAt(TilePoint p)
     {
         var refund = RefundAt(p);
-        if (StageAt(p) is { } stage)
+        if (RemoveLightsAt(p))
+        {
+            // A light, or the fairy lights on a pole.
+        }
+        else if (StageAt(p) is { } stage)
         {
             _stages.Remove(stage);
         }
@@ -731,7 +740,8 @@ public sealed class SiteLayout
 
     public SiteSave Save() => new(_stages.ToList(), _gates.ToList(), FenceRuns(), _stalls.ToList(),
         _lanes.Count == 0 ? null : _lanes.Select(l => l.ToList()).ToList(),
-        _keepOut.Count == 0 ? null : RunsOf(_keepOut).Select(r => r.Vertical ? new TileRect(r.X, r.Y, 1, r.Length) : new TileRect(r.X, r.Y, r.Length, 1)).ToList());
+        _keepOut.Count == 0 ? null : RunsOf(_keepOut).Select(r => r.Vertical ? new TileRect(r.X, r.Y, 1, r.Length) : new TileRect(r.X, r.Y, r.Length, 1)).ToList(),
+        _lights.Count == 0 ? null : _lights.ToList(), _fairy.Count == 0 ? null : _fairy.ToList());
 
     /// <summary>Puts back a saved layout, skipping anything that no longer fits.</summary>
     public void Restore(SiteSave save)
@@ -744,6 +754,8 @@ public sealed class SiteLayout
         _laneOf.Clear();
         _barriers.Clear();
         _keepOut.Clear();
+        _lights.Clear();
+        _fairy.Clear();
         foreach (var s in save.Stages ?? new())
         {
             if (CheckStage(s.Kind, s.X, s.Y, s.Facing).Ok)
@@ -808,6 +820,7 @@ public sealed class SiteLayout
             }
         }
 
+        RestoreLights(save);
         Refresh();
     }
 
@@ -815,8 +828,10 @@ public sealed class SiteLayout
     private void Refresh()
     {
         LayBarriers();
+        _litStale = true;
+        _poles.Clear();
         _keepOut.RemoveWhere(p => _fence.ContainsKey(p) || StageAt(p) is not null || StallAt(p) is not null || GateAt(p) is not null || _laneOf.ContainsKey(p) || _barriers.Contains(p));
-        _map.SetBlocked(_stages.SelectMany(s => TilesOf(s.Rect)).Concat(_stalls.SelectMany(s => TilesOf(s.Rect))).Concat(_fence.Keys).Concat(_laneOf.Keys).Concat(_barriers));
+        _map.SetBlocked(_stages.SelectMany(s => TilesOf(s.Rect)).Concat(_stalls.SelectMany(s => TilesOf(s.Rect))).Concat(_fence.Keys).Concat(_laneOf.Keys).Concat(_barriers).Concat(LightsInTheWay));
         _map.SetStaffOnly(_keepOut);
 
         var width = _map.Width;
@@ -931,4 +946,5 @@ public sealed class SiteLayout
 
 /// <summary>The layout as written to a save file.</summary>
 public sealed record SiteSave(List<PlacedStage>? Stages, List<PlacedGate>? Gates, List<FenceRun>? Fences, List<PlacedStall>? Stalls = null,
-    List<List<TilePoint>>? Lanes = null, List<TileRect>? KeepOut = null);
+    List<List<TilePoint>>? Lanes = null, List<TileRect>? KeepOut = null,
+    List<PlacedLight>? Lights = null, List<FairyString>? FairyLights = null);

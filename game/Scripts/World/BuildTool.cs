@@ -26,6 +26,12 @@ public enum BuildMode
 
     /// <summary>Marking ground the public must keep off.</summary>
     KeepOut,
+
+    /// <summary>Putting up a path light or a floodlight. Also the Lights group on the build bar.</summary>
+    Light,
+
+    /// <summary>Dragging out a string of fairy lights: the poles go in by themselves.</summary>
+    Fairy,
 }
 
 /// <summary>
@@ -64,6 +70,8 @@ public partial class BuildTool : Node3D
     public StaffKind Hire { get; private set; }
 
     public GroundKind Ground { get; private set; }
+
+    public LightKind Light { get; private set; }
 
     public Facing Facing { get; private set; } = Facing.South;
 
@@ -111,6 +119,8 @@ public partial class BuildTool : Node3D
 
     public void PickGround(GroundKind kind) => Pick(BuildMode.Ground, () => Ground = kind);
 
+    public void PickLight(LightKind kind) => Pick(kind == LightKind.FairyLights ? BuildMode.Fairy : BuildMode.Light, () => Light = kind);
+
     public void PickRemove() => Pick(BuildMode.Remove, () => { });
 
     public void PickLane() => Pick(BuildMode.Lane, () => { });
@@ -135,7 +145,7 @@ public partial class BuildTool : Node3D
         }
 
         KeepOutRuns = runs.Count;
-        _keepOut = builder.BuildNode("KeepOut");
+        _keepOut = builder.IsEmpty ? new MeshInstance3D { Name = "KeepOut" } : builder.BuildNode("KeepOut");
         _keepOut.MaterialOverride = _keepOutMaterial;
         _keepOut.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
         _keepOut.Visible = Mode == BuildMode.KeepOut;
@@ -162,7 +172,9 @@ public partial class BuildTool : Node3D
             BuildMode.Ground => "Click a patch of grass, or hold the mouse button and drag to cover a stretch.",
             BuildMode.Lane => "Hold the mouse button and drag out a queue from the front of a gate, stall or toilets. Drag again from its end to turn a corner.",
             BuildMode.KeepOut => "Hold the mouse button and drag over ground customers must keep off. Start on marked ground to clear it.",
-            BuildMode.Remove => "Click a stage, a stall, a gate or a stretch of fence to take it down. You get the money back. Click staff to send them home.",
+            BuildMode.Light => "Click on the grass to put the light up.",
+            BuildMode.Fairy => "Hold the mouse button and drag to string fairy lights. The poles go in by themselves. Start on a pole to carry on from it.",
+            BuildMode.Remove => "Click a stage, a stall, a gate, a light or a stretch of fence to take it down. You get the money back. Click staff to send them home.",
             _ => "",
         };
         ClearGhost();
@@ -185,6 +197,14 @@ public partial class BuildTool : Node3D
     {
         var result = _game.BuildLane(from, to);
         Said(result, "Queue lane laid");
+        return result;
+    }
+
+    /// <summary>Strings fairy lights between two tiles. A drag that starts or ends by a pole ties on to it.</summary>
+    public BuildCheck DragFairyLights(TilePoint from, TilePoint to)
+    {
+        var result = _game.BuildFairyLights(from, to);
+        Said(result, "Fairy lights up");
         return result;
     }
 
@@ -260,6 +280,10 @@ public partial class BuildTool : Node3D
                 result = _game.BuildStall(Stall, x, y, Facing);
                 break;
             }
+
+            case BuildMode.Light:
+                result = _game.BuildLight(Light, at);
+                break;
 
             case BuildMode.Staff:
                 result = _game.HireStaff(Hire, at);
@@ -548,6 +572,40 @@ public partial class BuildTool : Node3D
                 break;
             }
 
+            case BuildMode.Light:
+            {
+                check = _game.CheckLight(Light, at);
+                pad = new TileRect(at.X, at.Y, 1, 1);
+                Ghost($"light{Light}", () => LightsView.Single(Light));
+                _ghost!.Position = LightsView.Middle(at);
+                _ghost.RotationDegrees = Vector3.Zero;
+                break;
+            }
+
+            case BuildMode.Fairy:
+            {
+                var site = _game.Site;
+                var (from, to) = (site.SnapToPole(_dragFrom ?? at), site.SnapToPole(at));
+                pad = new TileRect(to.X, to.Y, 1, 1);
+                if (_dragFrom is null)
+                {
+                    // Not dragging yet: show where the first pole would stand.
+                    check = new BuildCheck(true, 0, null);
+                    ClearGhostOnly();
+                    ShowPad(pad, true);
+                    Refused = false;
+                    Status = site.IsFairyPole(to) ? "Drag from this pole to carry the fairy lights on." : "Hold the mouse button and drag to string fairy lights.";
+                    return;
+                }
+
+                check = _game.CheckFairyLights(from, to);
+                var fairy = new FairyString(from, to);
+                Ghost($"fairy{fairy}", () => LightsView.Fairy(fairy));
+                _ghost!.Position = Vector3.Zero;
+                _ghost.RotationDegrees = Vector3.Zero;
+                break;
+            }
+
             case BuildMode.KeepOut:
             {
                 var from = _dragFrom ?? at;
@@ -622,6 +680,7 @@ public partial class BuildTool : Node3D
     private string Label() => Mode switch
     {
         BuildMode.Lane => "Queue lane",
+        BuildMode.Light or BuildMode.Fairy => Lighting.Of(Light).Name,
         BuildMode.Stage => Catalogue.Of(Stage).Name,
         BuildMode.Gate => Catalogue.Of(Gate).Name,
         BuildMode.Stall => Catalogue.Of(Stall).Name,
@@ -680,7 +739,7 @@ public partial class BuildTool : Node3D
                 break;
 
             case InputEventMouseButton { ButtonIndex: MouseButton.Left } click when _hovering:
-                if (Mode is BuildMode.Fence or BuildMode.Ground or BuildMode.Lane or BuildMode.KeepOut)
+                if (Mode is BuildMode.Fence or BuildMode.Ground or BuildMode.Lane or BuildMode.KeepOut or BuildMode.Fairy)
                 {
                     if (click.Pressed)
                     {
@@ -700,6 +759,10 @@ public partial class BuildTool : Node3D
                         else if (Mode == BuildMode.KeepOut)
                         {
                             DragKeepOut(from, _hover);
+                        }
+                        else if (Mode == BuildMode.Fairy)
+                        {
+                            DragFairyLights(from, _hover);
                         }
                         else
                         {
