@@ -106,8 +106,40 @@ public sealed partial class FestivalGame
         }
     }
 
-    /// <summary>How the price changes sales: 1 at the fair price, more below it, much less above.</summary>
-    public double PricePull => Math.Clamp(Math.Pow(FairPrice / TicketPrice, 1.5), 0.05, 2.2);
+    /// <summary>How the price changes sales: 1 at the fair price, more below it, and falling away quickly above it.</summary>
+    public double PricePull => PricePullAt(FairPrice / TicketPrice);
+
+    private static double PricePullAt(double value) => value >= 1 ? Math.Min(1.8, Math.Pow(value, 1.5)) : Math.Max(0.03, Math.Pow(value, 2.5));
+
+    /// <summary>
+    /// How keen the people still without a ticket are, from 1 in January down to <see cref="LastToBuy"/>
+    /// for the very last ticket: the keenest buy first, so the last few hundred take the most selling.
+    /// </summary>
+    public double Keenness => 1 - ((1 - LastToBuy) * Math.Min(1.0, (double)TicketsSold / Licence));
+
+    /// <summary>How keen the last buyer is, next to the first.</summary>
+    public const double LastToBuy = 0.45;
+
+    /// <summary>What has been taken for the tickets sold ahead.</summary>
+    public int TicketTakings => _salesLog.Sum(l => l.Tickets * l.Price);
+
+    /// <summary>
+    /// The mood people arrive in, from what they paid against what the line-up is worth: a bargain
+    /// starts the day well and a dear ticket has them expecting a lot.
+    /// </summary>
+    public double ArrivalMood
+    {
+        get
+        {
+            if (!SoldAhead || TicketsSold == 0)
+            {
+                return People.Crowd.StartingMood;
+            }
+
+            var paid = (double)TicketTakings / TicketsSold;
+            return People.Crowd.StartingMood + Math.Clamp(0.45 * ((FairPrice / Math.Max(1, paid)) - 1), -0.25, 0.08);
+        }
+    }
 
     /// <summary>Sets the ticket price in whole pounds. Tickets already sold keep what was paid for them.</summary>
     public void SetTicketPrice(int pounds)
@@ -132,7 +164,7 @@ public sealed partial class FestivalGame
         var week = turn >= SalesMonths.Count;
         var word = LastHappiness is { } h ? 0.6 + (0.5 * h / 100.0) : 1.0;
         var heard = (Licence * 0.035 * word) + (Math.Pow(AdvertReach, 0.85) * 0.12);
-        return heard * LineUpPull * PricePull * (week ? DayUrgency * ForecastPull : Urgency[turn]);
+        return heard * LineUpPull * PricePull * Keenness * (week ? DayUrgency * ForecastPull : Urgency[turn]);
     }
 
     /// <summary>

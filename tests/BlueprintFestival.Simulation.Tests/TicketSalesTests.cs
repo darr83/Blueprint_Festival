@@ -311,4 +311,70 @@ public class TicketSalesTests
         Assert.Equal("Monday", week.NextSalesTurn);
         Assert.Equal(game.Crowd.Expected, week.Crowd.Expected);
     }
+
+    [Fact]
+    public void A_dear_ticket_costs_far_more_sales_than_a_cheap_one_gains()
+    {
+        var fair = (int)Math.Round(Year().FairPrice);
+        var atFair = SellSixMonths(Selling(fair, "posters", "flyers", "localradio"));
+        var dear = SellSixMonths(Selling((int)Math.Round(fair * 1.3), "posters", "flyers", "localradio"));
+        var cheap = SellSixMonths(Selling((int)Math.Round(fair * 0.7), "posters", "flyers", "localradio"));
+
+        // Thirty per cent over the odds loses about half the buyers.
+        Assert.InRange(dear, atFair * 0.35, atFair * 0.65);
+        Assert.True(cheap > atFair);
+    }
+
+    [Fact]
+    public void The_last_tickets_are_the_hardest_to_sell()
+    {
+        var game = Selling((int)Math.Round(Year().FairPrice), "posters", "flyers", "localradio");
+        Assert.Equal(1, game.Keenness, 3);
+        SellSixMonths(game);
+        Assert.True(game.TicketsSold > 0 && !game.SoldOut);
+        Assert.InRange(game.Keenness, FestivalGame.LastToBuy, 0.999);
+        Assert.Equal(1 - ((1 - FestivalGame.LastToBuy) * game.TicketsSold / game.Licence), game.Keenness, 6);
+    }
+
+    [Fact]
+    public void People_arrive_in_a_better_mood_for_a_bargain_and_a_worse_one_for_a_dear_ticket()
+    {
+        double Arriving(double times)
+        {
+            var game = Year();
+            game.SetTicketPrice((int)Math.Round(game.FairPrice * times));
+            Assert.True(game.BookEvent());
+            game.SetAdvert("localradio", true);
+            SellSixMonths(game);
+            Assert.True(game.TicketsSold > 0);
+            Assert.Equal(game.TicketsSold * game.TicketPrice, game.TicketTakings);
+            return game.ArrivalMood;
+        }
+
+        var fair = Arriving(1);
+        Assert.InRange(fair, People.Crowd.StartingMood - 0.03, People.Crowd.StartingMood + 0.03);
+        Assert.True(Arriving(1.4) < fair - 0.08);
+        Assert.True(Arriving(0.7) > fair + 0.04);
+        Assert.True(Arriving(3) >= People.Crowd.StartingMood - 0.2501);
+
+        // The quick path, paid at the gate, arrives as it always did.
+        Assert.Equal(People.Crowd.StartingMood, Year().ArrivalMood);
+    }
+
+    [Fact]
+    public void A_better_act_lifts_the_mood_more()
+    {
+        Assert.True(People.Crowd.Enjoyed(5) > People.Crowd.Enjoyed(3) && People.Crowd.Enjoyed(3) > People.Crowd.Enjoyed(1));
+        Assert.True(People.Crowd.Enjoyed(5) >= 3 * People.Crowd.Enjoyed(1));
+        Assert.Equal(People.Crowd.Enjoyed(5), People.Crowd.Enjoyed(9));
+    }
+
+    [Fact]
+    public void The_council_wants_more_in_the_bank_before_a_bigger_field()
+    {
+        Assert.Equal(FestivalGame.NeedsFor(400), FestivalGame.NeedsToGrowTo(400));
+        Assert.Equal(4000, FestivalGame.NeedsToGrowTo(800));
+        Assert.Equal(25000, FestivalGame.NeedsToGrowTo(5000));
+        Assert.True(FestivalGame.NeedsToGrowTo(1500) > FestivalGame.NeedsFor(1500));
+    }
 }
