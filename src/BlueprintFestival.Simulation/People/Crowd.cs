@@ -89,6 +89,12 @@ public sealed class Party
 
     public bool IsOnSite => State is not (PartyState.Expected or PartyState.Gone);
 
+    /// <summary>Where this party's tent is pitched in the camping field, or null if they are going home tonight.</summary>
+    public TilePoint? Pitch { get; internal set; }
+
+    /// <summary>True if they are staying the night in the camping field.</summary>
+    public bool Camper => Pitch is not null;
+
     public bool IsWalking => State is PartyState.WalkingIn or PartyState.Strolling or PartyState.Leaving || (State is PartyState.Queuing or PartyState.AtStall && Moving);
 
     /// <summary>Which gate they are queuing at, or -1.</summary>
@@ -509,6 +515,47 @@ public sealed class Crowd
         return new TilePoint(party.FromWest ? 0 : _map.Width - 1, y);
     }
 
+    /// <summary>Where a party goes at the end of their day: back down the lane, or to their tent.</summary>
+    private TilePoint Home(Party party) => party.Pitch is { } pitch && party.Ticketed == true ? pitch : LaneEnd(party);
+
+    /// <summary>The share of the crowd that camps when camping is on offer.</summary>
+    public const double CamperShare = 0.35;
+
+    /// <summary>How many people have a tent in the camping field.</summary>
+    public int Campers => _parties.Where(p => p.Camper).Sum(p => p.Members.Count);
+
+    /// <summary>How many of them are through the gate, with the tent up.</summary>
+    public int CampersIn => _parties.Where(p => p.Camper && p.Ticketed == true).Sum(p => p.Members.Count);
+
+    /// <summary>How many campers have turned in for the night.</summary>
+    public int InTents => _parties.Where(p => p.Camper && p.Ticketed == true && p.State == PartyState.Gone).Sum(p => p.Members.Count);
+
+    /// <summary>The tents that are up: where, and whose (for a colour that stays the same).</summary>
+    public IEnumerable<(TilePoint Pitch, int Party)> Tents =>
+        _parties.Where(p => p.Camper && p.Ticketed == true).Select(p => (p.Pitch!.Value, p.Id));
+
+    /// <summary>A camper has come through the gate and paid for their pitch.</summary>
+    public event Action<int>? CamperArrived;
+
+    /// <summary>
+    /// Gives a share of the crowd a pitch in the camping field. They come like anyone else, stay for
+    /// the headliner, and walk to their tents at the end of the night and not out of the gate.
+    /// </summary>
+    public void PitchCamp()
+    {
+        var pitches = _map.Pitches();
+        var next = 0;
+        foreach (var party in _parties)
+        {
+            party.Pitch = null;
+            // The same parties camp every time the day is planned, whatever else changes.
+            if (next < pitches.Count && (uint)(party.Id * 2654435761u) % 100 < CamperShare * 100)
+            {
+                party.Pitch = pitches[next++];
+            }
+        }
+    }
+
     /// <summary>The part of a gate a party inside the fence walks out through, or null if there is no gate to use.</summary>
     private TilePoint? WayOut(Party party, TilePoint from)
     {
@@ -636,7 +683,7 @@ public sealed class Crowd
                     Send(party, _standableSet.Contains(party.Target) ? party.Target : SomewhereInField(party.Random), party.State);
                     break;
                 case PartyState.Leaving:
-                    Send(party, LaneEnd(party), PartyState.Leaving);
+                    Send(party, Home(party), PartyState.Leaving);
                     break;
                 case PartyState.Watching:
                     // The stage may have moved or gone: think again.
@@ -843,6 +890,10 @@ public sealed class Crowd
             LeaveQueue(party);
             party.Ticketed = true;
             TicketsSold?.Invoke(party.Members.Count);
+            if (party.Camper)
+            {
+                CamperArrived?.Invoke(party.Members.Count);
+            }
             Send(party, SomewhereInField(party.Random), PartyState.WalkingIn);
         }
     }
@@ -870,7 +921,12 @@ public sealed class Crowd
             {
                 // Time to go home, unless the headliner is worth staying on for.
                 party.StayDecided = true;
-                if (headliner is not null && now < headliner.End && now.TimeOfDay >= StayOnFrom && party.Mood >= 0.3 && party.Random.NextDouble() < headliner.Act.Draw)
+                if (party.Camper && party.Ticketed == true && headliner is not null && now < headliner.End && party.Mood >= 0.15)
+                {
+                    // With a tent to go back to there is no reason to miss the end.
+                    party.Leaves = headliner.End + TimeSpan.FromMinutes(party.Random.Between(1, 45));
+                }
+                else if (headliner is not null && now < headliner.End && now.TimeOfDay >= StayOnFrom && party.Mood >= 0.3 && party.Random.NextDouble() < headliner.Act.Draw)
                 {
                     // A big crowd takes longer to drift away at the end of the night.
                     party.Leaves = headliner.End + TimeSpan.FromMinutes(party.Random.Between(1, 14 + Math.Min(20, _parties.Count / 80.0)));
@@ -911,7 +967,7 @@ public sealed class Crowd
                     if (now >= party.Leaves || closing)
                     {
                         LeaveQueue(party);
-                        Send(party, LaneEnd(party), PartyState.Leaving);
+                        Send(party, Home(party), PartyState.Leaving);
                     }
                     else
                     {
@@ -933,7 +989,7 @@ public sealed class Crowd
                     if (now >= party.Leaves || closing)
                     {
                         LeaveStall(party);
-                        Send(party, LaneEnd(party), PartyState.Leaving);
+                        Send(party, Home(party), PartyState.Leaving);
                     }
                     else
                     {
@@ -946,7 +1002,7 @@ public sealed class Crowd
                     if (now >= party.Leaves || closing)
                     {
                         party.Watch = -1;
-                        Send(party, LaneEnd(party), PartyState.Leaving);
+                        Send(party, Home(party), PartyState.Leaving);
                     }
                     else if (party.Wants is not null && SeekStall(party, now))
                     {
@@ -972,7 +1028,7 @@ public sealed class Crowd
                     if (now >= party.Leaves || closing)
                     {
                         party.Watch = -1;
-                        Send(party, LaneEnd(party), PartyState.Leaving);
+                        Send(party, Home(party), PartyState.Leaving);
                     }
                     else if (SeekStall(party, now))
                     {
@@ -1584,7 +1640,7 @@ public sealed class Crowd
             (party.X, party.Y) = FieldMap.CentreOf(NearestWalkable(FieldMap.TileAt(party.X, party.Y)));
         }
 
-        Send(party, LaneEnd(party), PartyState.Leaving);
+        Send(party, Home(party), PartyState.Leaving);
         if (party.State != PartyState.Leaving)
         {
             // No way out just now: stand and try again as anyone else would.
@@ -1609,7 +1665,7 @@ public sealed class Crowd
     {
         var from = FieldMap.TileAt(party.X, party.Y);
         party.Target = target ?? from;
-        if (state == PartyState.Leaving && target is not null && WayOut(party, from) is { } gate
+        if (state == PartyState.Leaving && target is not null && target != party.Pitch && WayOut(party, from) is { } gate
             && _paths.FindPath(from, gate) is { } toGate && _paths.FindPath(gate, target.Value) is { } onward)
         {
             // Going home, people use the whole width of every gate instead of all cutting the same corner.

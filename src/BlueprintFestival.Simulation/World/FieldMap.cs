@@ -1,7 +1,7 @@
 namespace BlueprintFestival.Simulation.World;
 
 /// <summary>One of the fields a festival can be held on: its name, the biggest licence it takes, its size and the width of the way in.</summary>
-public sealed record FieldSize(string Name, int Holds, int MetresWide, int MetresDeep, int GapMetres);
+public sealed record FieldSize(string Name, int Holds, int MetresWide, int MetresDeep, int GapMetres, int CampMetres = 0);
 
 /// <summary>A position on the tile grid.</summary>
 public readonly record struct TilePoint(int X, int Y);
@@ -77,6 +77,17 @@ public sealed class FieldMap
     /// <summary>The track from the lane to the gap.</summary>
     public TileRect Track { get; private init; }
 
+    /// <summary>The grass of the camping field next door, or an empty rectangle if this field has none.</summary>
+    public TileRect Camp { get; private init; }
+
+    /// <summary>The hedge round the camping field, sharing the main field's east hedge.</summary>
+    public TileRect CampHedge { get; private init; }
+
+    /// <summary>The gateway through the east hedge into the camping field.</summary>
+    public TileRect CampGap { get; private init; }
+
+    public bool HasCamp => Camp.Width > 0;
+
     /// <summary>Where people come onto the map: the west end of the lane.</summary>
     public TilePoint LaneStart => new(0, Lane.Y + (Lane.Height / 2));
 
@@ -118,6 +129,35 @@ public sealed class FieldMap
     /// <summary>How many people the field's licence could allow at two square metres each.</summary>
     public int ComfortableCapacity => (int)(Field.Width * TileMetres * Field.Height * TileMetres / 2);
 
+    /// <summary>The pitches in the camping field, nearest the gateway first: one tent each, in rows with paths between.</summary>
+    public IReadOnlyList<TilePoint> Pitches()
+    {
+        const int across = 6;   // a tent every 3 m along a row
+        const int down = 7;     // rows 3.5 m apart
+        var pitches = new List<TilePoint>();
+        if (!HasCamp)
+        {
+            return pitches;
+        }
+
+        var middle = CampGap.Y + (CampGap.Height / 2);
+        for (var y = Camp.Y + 6; y < Camp.Bottom - 6; y += down)
+        {
+            if (Math.Abs(y - middle) < 8)
+            {
+                // The way in from the gateway is kept clear right across the field.
+                continue;
+            }
+
+            for (var x = Camp.X + 8; x < Camp.Right - 4; x += across)
+            {
+                pitches.Add(new TilePoint(x, y));
+            }
+        }
+
+        return pitches.OrderBy(p => Math.Abs(p.X - Camp.X) + Math.Abs(p.Y - middle)).ToList();
+    }
+
     /// <summary>
     /// The village field for a first festival: 60 m by 40 m of grass (room for a few hundred people),
     /// with the lane along the south side and the way in near the south-west corner.
@@ -129,7 +169,7 @@ public sealed class FieldMap
     {
         new FieldSize("the village field", 400, 60, 40, 6),
         new FieldSize("Home Farm meadow", 1500, 110, 70, 12),
-        new FieldSize("the showground", 5000, 180, 120, 24),
+        new FieldSize("the showground", 5000, 180, 120, 24, 90),
     };
 
     /// <summary>The smallest field that a licence for so many people fits on.</summary>
@@ -139,12 +179,15 @@ public sealed class FieldMap
     public static FieldMap ForLicence(int licence)
     {
         var size = SizeFor(licence);
-        return Create(size.MetresWide, size.MetresDeep, size.GapMetres);
+        return Create(size.MetresWide, size.MetresDeep, size.GapMetres, size.CampMetres);
     }
 
     public static FieldMap Create(int fieldMetresWide, int fieldMetresDeep) => Create(fieldMetresWide, fieldMetresDeep, 6);
 
-    public static FieldMap Create(int fieldMetresWide, int fieldMetresDeep, int gapMetres)
+    public static FieldMap Create(int fieldMetresWide, int fieldMetresDeep, int gapMetres) => Create(fieldMetresWide, fieldMetresDeep, gapMetres, 0);
+
+    /// <summary>A field with, if asked for, a camping field through the hedge on its east side.</summary>
+    public static FieldMap Create(int fieldMetresWide, int fieldMetresDeep, int gapMetres, int campMetresWide)
     {
         if (fieldMetresWide < 20 || fieldMetresDeep < 20)
         {
@@ -159,7 +202,8 @@ public sealed class FieldMap
 
         var fieldW = fieldMetresWide * 2;
         var fieldH = fieldMetresDeep * 2;
-        var width = fieldW + (2 * (hedge + margin));
+        var campW = Math.Max(0, campMetresWide) * 2;
+        var width = fieldW + (2 * (hedge + margin)) + (campW > 0 ? campW + hedge : 0);
         var height = margin + hedge + fieldH + hedge + laneGap + laneWidth + margin;
 
         var field = new TileRect(margin + hedge, margin + hedge, fieldW, fieldH);
@@ -168,10 +212,19 @@ public sealed class FieldMap
         var gap = new TileRect(field.X + (fieldW / 5), field.Bottom, gapWidth, hedge);
         var track = new TileRect(gap.X, hedgeLine.Bottom, gapWidth, laneGap);
 
-        var map = new FieldMap(width, height) { Field = field, HedgeLine = hedgeLine, Gap = gap, Lane = lane, Track = track };
+        // The camping field shares the east hedge, with a gateway through it halfway up.
+        const int campGate = 16;    // an 8 m gateway
+        var camp = campW > 0 ? new TileRect(hedgeLine.Right, field.Y, campW, fieldH) : default;
+        var campHedge = campW > 0 ? new TileRect(field.Right, margin, campW + (2 * hedge), fieldH + (2 * hedge)) : default;
+        var campGap = campW > 0 ? new TileRect(field.Right, field.Y + ((fieldH - campGate) / 2), hedge, campGate) : default;
+
+        var map = new FieldMap(width, height) { Field = field, HedgeLine = hedgeLine, Gap = gap, Lane = lane, Track = track, Camp = camp, CampHedge = campHedge, CampGap = campGap };
+        map.Fill(campHedge, Ground.Hedge);
         map.Fill(hedgeLine, Ground.Hedge);
+        map.Fill(camp, Ground.Grass);
         map.Fill(field, Ground.Grass);
         map.Fill(gap, Ground.Grass);
+        map.Fill(campGap, Ground.Grass);
         map.Fill(lane, Ground.Lane);
         map.Fill(track, Ground.Lane);
         return map;

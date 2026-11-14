@@ -31,7 +31,7 @@ brands or sponsors.
 | 9. Weather and mud: a forecast, rain, heat, ponchos, mud where wet grass is walked on, straw and trackway, and a bill from the farmer for worn-out grass | Done |
 | 10a. Growing up: a licence ladder from 200 to 5,000, three fields, a main stage, turnstiles and a toilet block, and crowds of thousands drawn and run at speed | Done |
 | 10b. A second stage with its own line-up, booked at planning, and a medical tent with six beds | Done |
-| 10c. Camping, as an option from 5,000 | Next |
+| 10c. Camping, as an option at 5,000: a camping field next door, tents, campers who stay the night | Done |
 | 11. Sound effects: the field, the weather, the crowd, stalls, building, the radio and buttons, with volume sliders | Done (files made with `tools/make_sounds.py`) |
 | 12. The acts' music | |
 
