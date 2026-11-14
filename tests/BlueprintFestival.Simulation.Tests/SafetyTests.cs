@@ -69,7 +69,8 @@ public class SafetyTests
         Assert.Equal(17 / 4.0, density.Worst);
         Assert.Equal((21.0, 31.0), density.WorstAt);
         Assert.Equal(Crowding.Busy, DensityMap.StatusOf(2));
-        Assert.Equal(Crowding.CrushRisk, DensityMap.StatusOf(4));
+        Assert.Equal(Crowding.Busy, DensityMap.StatusOf(4));
+        Assert.Equal(Crowding.CrushRisk, DensityMap.StatusOf(4.25));
     }
 
     [Fact]
@@ -156,7 +157,8 @@ public class SafetyTests
         var twice = true;
         RunTheDay(game, () =>
         {
-            if (!warned)
+            // Stop the act at the warning, and again for as long as the front is still packed.
+            if (!warned && (game.CrowdStatus != Crowding.CrushRisk || game.Clock.TickCount % 60 != 0))
             {
                 return;
             }

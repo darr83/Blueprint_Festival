@@ -103,7 +103,7 @@ public partial class SmokeTest : Node
                     var gap = opened.Game.Field.Gap;
                     Check(opened.TopBar.MoneyText == "£2,000", $"A new festival should have £2,000, not {opened.TopBar.MoneyText}.");
                     opened.BuildBar.Toggle(BuildMode.Stage);
-                    Check(opened.BuildBar.ChoiceCount == 3, "The build bar should offer three stages.");
+                    Check(opened.BuildBar.ChoiceCount == 4, "The build bar should offer four stages.");
                     Check(opened.BuildBar.Choose("stageBandstand"), "The bandstand should be on the build bar.");
                     Check(opened.Build.Mode == BuildMode.Stage, "Choosing a stage should hand it to the mouse.");
                     opened.Build.ShowGhost(new TilePoint(grass.X + 70, grass.Y + 18));
@@ -119,7 +119,7 @@ public partial class SmokeTest : Node
                     Check(!site.OpenWayIn, "With the gap fenced there should be no way in.");
 
                     opened.BuildBar.Toggle(BuildMode.Gate);
-                    Check(opened.BuildBar.ChoiceCount == 2 && opened.BuildBar.Choose("gateVillageGate"), "The build bar should offer two gates.");
+                    Check(opened.BuildBar.ChoiceCount == 3 && opened.BuildBar.Choose("gateVillageGate"), "The build bar should offer three gates.");
                     opened.Build.Turn();
                     Check(!opened.Build.Vertical, "Two turns should bring a gate back to lying across.");
                     Check(opened.Build.ClickAt(new TilePoint(gap.X + 6, gap.Y + 1)).Ok, "A gate should go in the fence.");
@@ -128,7 +128,7 @@ public partial class SmokeTest : Node
 
                     // Somewhere to eat, drink and go to the toilet.
                     opened.BuildBar.Toggle(BuildMode.Stall);
-                    Check(opened.BuildBar.ChoiceCount == 5, "The build bar should offer five stalls.");
+                    Check(opened.BuildBar.ChoiceCount == 6, "The build bar should offer six stalls.");
                     Check(opened.BuildBar.Choose("stallFoodVan") && opened.Build.Mode == BuildMode.Stall, "The food van should be on the build bar.");
                     opened.Build.ShowGhost(new TilePoint(grass.X + 20, grass.Y + 18));
                     Check(opened.Build.Status.Contains("£120"), $"The bar should show the hire price, not '{opened.Build.Status}'.");

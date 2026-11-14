@@ -124,7 +124,7 @@ public partial class YearScreen : Control
         game.Headliners.Select(h => new ActOffer(h.Act.Name, KindText(h.Act), h.Fee, h.Stars)).ToList(),
         game.HeadlinerPicked,
         game.Show.Slots.Take(6).Select(s => s.Act.Name).ToList(),
-        game.SupportFee / 6, game.EarlyForecast, game.PonchosOrdered, game.PonchoCost);
+        game.SupportFee / 6, game.EarlyForecast, game.PonchosOrdered, game.PonchoCost, game.Ground.Name, game.FieldRent);
 
     public static ResultsView ResultsOf(FestivalGame game)
     {

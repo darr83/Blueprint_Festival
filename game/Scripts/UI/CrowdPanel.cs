@@ -162,7 +162,7 @@ public partial class CrowdPanel : Control
             Warn(DensityView.BusyAmber, "The act has stopped",
                 $"The crowd is moving back from the front.{(hurtLine.Length > 0 ? " " + hurtLine : "")}\nThe music starts again in a few minutes.", pause: false, show: true);
         }
-        else if (day && _game.CrowdStatus == Crowding.CrushRisk)
+        else if (day && _game.CrushBuilding)
         {
             Warn(DensityView.CrushRed, $"Crush risk {Where(x, y)}",
                 $"{_game.Density.Worst:0.0} people per square metre. {(hurtLine.Length > 0 ? hurtLine : "People will be hurt if it stays like this.")}\nSecurity posted there turn people away before it gets this bad.",

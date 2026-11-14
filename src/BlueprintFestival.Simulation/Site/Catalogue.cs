@@ -11,6 +11,8 @@ public enum StageKind
 
     /// <summary>A hired stage with a steel frame, a roof, lights and proper speakers.</summary>
     HiredStage,
+
+    MainStage,
 }
 
 /// <summary>The kinds of fence.</summary>
@@ -37,6 +39,8 @@ public enum GateKind
 
     /// <summary>A steel arch with a banner, two lanes and a ticket hut.</summary>
     ArchGate,
+
+    TurnstileRow,
 }
 
 /// <summary>The stalls and services people use.</summary>
@@ -59,6 +63,8 @@ public enum StallKind
 
     /// <summary>A white tent with a green cross, where people who are unwell can lie down.</summary>
     FirstAidTent,
+
+    ToiletBlock,
 }
 
 /// <summary>What a person can need during the day.</summary>
@@ -112,6 +118,7 @@ public static class Catalogue
         new StageInfo(StageKind.FarmTrailer, "Farm trailer", 16, 6, 50, 2, "Lent by the farmer for the price of the diesel. Room for a duo."),
         new StageInfo(StageKind.Bandstand, "Bandstand", 12, 11, 400, 4, "A deck under a striped roof. Room for a small band."),
         new StageInfo(StageKind.HiredStage, "Hired stage", 24, 12, 1500, 5, "A proper stage with a roof, lights and big speakers."),
+        new StageInfo(StageKind.MainStage, "Main stage", 40, 20, 6000, 6, "A festival main stage: a big roof, a wall of speakers and room for any band."),
     };
 
     public static readonly IReadOnlyList<FenceInfo> Fences = new[]
@@ -126,6 +133,7 @@ public static class Catalogue
     {
         new GateInfo(GateKind.VillageGate, "Village gate", 8, 1, 30, 40, "Two posts and a ticket table. One queue."),
         new GateInfo(GateKind.ArchGate, "Arch gate", 12, 2, 10, 600, "A steel arch with two lanes and a ticket hut."),
+        new GateInfo(GateKind.TurnstileRow, "Turnstile row", 24, 4, 6, 2000, "Four fast lanes under one long arch, for when hundreds arrive at once."),
     };
 
     public static readonly IReadOnlyList<StallInfo> Stalls = new[]
@@ -136,6 +144,7 @@ public static class Catalogue
         new StallInfo(StallKind.Toilets, "Toilets", 8, 3, 40, Need.Toilet, 0, 75, 3, "Three cabins. People will not wait for ever."),
         new StallInfo(StallKind.WaterPoint, "Water point", 3, 2, 15, Need.Drink, 0, 20, 2, "Two taps. Free, so it earns nothing."),
         new StallInfo(StallKind.FirstAidTent, "First aid tent", 8, 6, 80, null, 0, 1200, 2, "Two beds under a green cross. First-aiders bring people here to rest."),
+        new StallInfo(StallKind.ToiletBlock, "Toilet block", 24, 3, 110, Need.Toilet, 0, 75, 9, "Nine cabins in a row, for a bigger crowd."),
     };
 
     /// <summary>The festival's share of what a stall takes, in pounds out of every hundred.</summary>
@@ -149,7 +158,7 @@ public static class Catalogue
     public static readonly IReadOnlyList<StaffInfo> Staff = new[]
     {
         new StaffInfo(StaffKind.TicketStaff, "Ticket staff", 40, "Checks tickets at a gate. One for each lane."),
-        new StaffInfo(StaffKind.Security, "Security", 60, "Stands where you put them and deals with trouble nearby."),
+        new StaffInfo(StaffKind.Security, "Security", 60, "Deals with trouble nearby. Behind a front barrier each one holds another 8 m of crowd."),
         new StaffInfo(StaffKind.FirstAider, "First-aider", 50, "Goes to anyone taken ill or hurt and looks after them."),
     };
 

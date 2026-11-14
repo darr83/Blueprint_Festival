@@ -43,7 +43,7 @@ public sealed partial class FestivalGame
         Seed = seed ?? StableHash(Name);
         Clock = new GameClock(start);
         Day = Clock.Now.Date;
-        Field = FieldMap.Village();
+        Field = Planned ? FieldMap.ForLicence(Licence) : FieldMap.Village();
         Site = new SiteLayout(Field);
         Crowd = new Crowd(Field, Site, Seed, Clock.Now);
         Show = new RunningOrder(Site, Seed, Clock.Now);

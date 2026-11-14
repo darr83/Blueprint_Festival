@@ -49,8 +49,26 @@ public sealed partial class FestivalGame
     /// <summary>How many people the parish council lets a first festival have.</summary>
     public const int FirstLicence = 200;
 
-    /// <summary>The biggest licence the village field can take. Bigger fields come later.</summary>
-    public const int BiggestLicence = 400;
+    /// <summary>
+    /// The licences a festival climbs through, one good year at a time. Up to 400 it stays on the
+    /// village field; then it moves to Home Farm meadow, and from 3,000 to the showground.
+    /// </summary>
+    public static readonly IReadOnlyList<int> Licences = new[] { 200, 400, 800, 1500, 3000, 5000 };
+
+    /// <summary>The biggest licence there is.</summary>
+    public const int BiggestLicence = 5000;
+
+    /// <summary>The licence a good year at this one earns: the next step up, or the same at the top.</summary>
+    public static int LicenceAfter(int licence) => Licences.FirstOrDefault(l => l > licence, BiggestLicence);
+
+    /// <summary>The field this year's festival is on.</summary>
+    public FieldSize Ground => Planned ? FieldMap.SizeFor(Licence) : FieldMap.Sizes[0];
+
+    /// <summary>
+    /// What the field and the licence cost for the year. The village field is lent for nothing;
+    /// a bigger one is rented, at £1 for each person the licence allows.
+    /// </summary>
+    public int FieldRent => Licence <= FieldMap.Sizes[0].Holds ? 0 : Licence;
 
     /// <summary>What the parish council lends, once, to a festival that has run out of money.</summary>
     public const int LoanAmount = 1000;
@@ -210,12 +228,17 @@ public sealed partial class FestivalGame
     {
         Need(Phase.Plan);
         var ponchos = PonchosOrdered ? PonchoCost : 0;
-        if (ActFees + ponchos > Money)
+        if (ActFees + ponchos + FieldRent > Money)
         {
             return false;
         }
 
         Spend("Act fees", ActFees);
+        if (FieldRent > 0)
+        {
+            Spend("Field rent and licence", FieldRent);
+        }
+
         if (ponchos > 0)
         {
             Spend("Rain ponchos", ponchos);
@@ -353,7 +376,7 @@ public sealed partial class FestivalGame
     }
 
     /// <summary>The least there must be in the bank to put on a year at a licence: the cheapest acts and a little over.</summary>
-    public static int NeedsFor(int licence) => (((6 * 40) + 150) * licence / FirstLicence) + 200;
+    public static int NeedsFor(int licence) => (((6 * 40) + 150) * licence / FirstLicence) + 200 + (licence <= FieldMap.Sizes[0].Holds ? 0 : licence);
 
     /// <summary>How the year went, once the field is handed back.</summary>
     public YearResult? Result
@@ -368,7 +391,8 @@ public sealed partial class FestivalGame
             var happy = Crowd.Happiness;
             var cleared = LitterCleared;
             var profit = TotalIncome - TotalSpending;
-            var bigger = Math.Min(BiggestLicence, Licence * 2);
+            var bigger = LicenceAfter(Licence);
+            var moving = FieldMap.SizeFor(bigger) != FieldMap.SizeFor(Licence);
             var good = Phase == Phase.Results && !_loanThisYear && happy >= HappyEnough && cleared >= TidyEnough && profit >= 0 && Untreated == 0 && !SeriousIncident;
             var next = good && Money >= NeedsFor(bigger) ? bigger : Licence;
             var verdict =
@@ -380,8 +404,9 @@ public sealed partial class FestivalGame
                 cleared < TidyEnough ? "The farmer is not happy with the state of the field. The licence stays as it is." :
                 profit < 0 ? "A good day, but it lost money. The licence stays as it is." :
                 bigger > Licence && next == Licence ? "A good festival, but there is not yet the money in the bank for a bigger one." :
-                next > Licence ? $"A good festival and a tidy field. The parish council raises the licence to {next:N0} people." :
-                "A good festival and a tidy field. The village field can take no more people than this.";
+                next > Licence && moving ? $"A good festival and a tidy field. The council raises the licence to {next:N0} people, and next year moves to {FieldMap.SizeFor(next).Name}." :
+                next > Licence ? $"A good festival and a tidy field. The council raises the licence to {next:N0} people." :
+                "A good festival and a tidy field. This is as big as a licence gets.";
             return new YearResult(Year, Crowd.Arrived, Crowd.Expected, happy, Crowd.WentHomeUnhappy, TotalIncome, TotalSpending, cleared, GrassWorn,
                 verdict, Licence, next, _loanThisYear, Phase == Phase.Closed, Treated, Untreated, TroubleSorted, TroubleIgnored,
                 CrushInjuries, PulledOut, SeriousIncident, _fieldRepair, Weather.Summary);

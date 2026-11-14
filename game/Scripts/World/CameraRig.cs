@@ -14,7 +14,7 @@ public partial class CameraRig : Node3D
     public const float PitchDegrees = 30f;
 
     public const float MinSize = 8f;
-    public const float MaxSize = 120f;
+    public const float MaxSize = 260f;
 
     private Camera3D _camera = null!;
     private FieldMap _map = null!;

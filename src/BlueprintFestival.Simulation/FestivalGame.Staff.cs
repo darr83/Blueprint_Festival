@@ -322,7 +322,10 @@ public sealed partial class FestivalGame
             }
 
             var wanted = incident.Kind == IncidentKind.Ill ? StaffKind.FirstAider : StaffKind.Security;
-            var nearest = _staff.Where(s => s.Kind == wanted && s.IsFree).OrderBy(s => Distance(s.X, s.Y, incident.X, incident.Y)).FirstOrDefault();
+            // Security behind a front barrier stay put while an act is on, and are the last to be sent otherwise.
+            var playing = Show.Playing(now) is not null;
+            var nearest = _staff.Where(s => s.Kind == wanted && s.IsFree && !(playing && InPit(s)))
+                .OrderBy(s => InPit(s) ? 1 : 0).ThenBy(s => Distance(s.X, s.Y, incident.X, incident.Y)).FirstOrDefault();
             if (nearest is not null)
             {
                 nearest.Incident = incident.Id;
@@ -375,7 +378,9 @@ public sealed partial class FestivalGame
         var packed = about.Where(p => Crowd.Density.At(p.X, p.Y) >= DensityMap.Busy).Sum(p => p.Members.Count);
         // Mud turns ankles.
         var slipping = Wetness <= 0 ? 0 : about.Where(p => MudAtPlace(p.X, p.Y) >= Slippery).Sum(p => p.Members.Count);
-        var illChance = (people + (parched * 3) + (packed * 2) + (slipping * 3)) * (evening ? 0.007 : 0.005) / 60;
+        // A big crowd has more go wrong in it, but not in step with its size: most of it is just more of the same people having a good day.
+        var size = Crowded(people) / Math.Max(1, people);
+        var illChance = (people + (parched * 3) + (packed * 2) + (slipping * 3)) * size * (evening ? 0.007 : 0.005) / 60;
         if (illRoll < illChance)
         {
             var party = about[(int)(whoIll * about.Count)];
@@ -384,7 +389,7 @@ public sealed partial class FestivalGame
         }
 
         // Trouble is rare by day and less rare once the bar has been open a while.
-        var troubleChance = (people + (packed * 2)) / 180.0 * (evening ? 0.6 : 0.25) / 60;
+        var troubleChance = (people + (packed * 2)) * size / 180.0 * (evening ? 0.6 : 0.25) / 60;
         if (troubleRoll < troubleChance)
         {
             var party = about[(int)(whoTrouble * about.Count)];
@@ -394,6 +399,9 @@ public sealed partial class FestivalGame
             }
         }
     }
+
+    /// <summary>How many people a crowd counts as when working out how much goes wrong: all of the first 400, and a dwindling share after.</summary>
+    public static double Crowded(int people) => people <= 400 ? people : 400 * Math.Pow(people / 400.0, 0.6);
 
     private static double Distance(double ax, double ay, double bx, double by) => Math.Sqrt(((ax - bx) * (ax - bx)) + ((ay - by) * (ay - by)));
 

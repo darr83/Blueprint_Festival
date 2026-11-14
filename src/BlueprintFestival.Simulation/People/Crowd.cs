@@ -254,6 +254,9 @@ public sealed class Crowd
     /// <summary>People per square metre at which nobody else can physically squeeze in.</summary>
     public const double PackedLimit = 6.5;
 
+    /// <summary>How far back from the front of the crowd people will still squeeze in tight for a big name, in metres.</summary>
+    public const double FrontDepth = 16;
+
     /// <summary>How hard it is raining, from 0 (dry) to 1 (pouring).</summary>
     public double Rain { get; set; }
 
@@ -486,8 +489,45 @@ public sealed class Crowd
 
     private TilePoint LaneEnd(Party party)
     {
-        var y = _map.Lane.Y + (_map.Lane.Height / 2) + (party.Id % 3) - 1;
+        // People spread across the whole width of the lane as they go.
+        var y = _map.Lane.Y + (party.Id % _map.Lane.Height);
         return new TilePoint(party.FromWest ? 0 : _map.Width - 1, y);
+    }
+
+    /// <summary>The part of a gate a party inside the fence walks out through, or null if there is no gate to use.</summary>
+    private TilePoint? WayOut(Party party, TilePoint from)
+    {
+        if (!_site.HasWorkingGate || _site.SideOf(from) != Side.Inside)
+        {
+            return null;
+        }
+
+        var wide = 0;
+        for (var i = 0; i < _site.Gates.Count; i++)
+        {
+            wide += _site.GateUses[i].InUse ? Math.Max(_site.Gates[i].Rect.Width, _site.Gates[i].Rect.Height) : 0;
+        }
+
+        var pick = (int)((uint)(party.Id * 7919) % (uint)Math.Max(1, wide));
+        for (var i = 0; i < _site.Gates.Count; i++)
+        {
+            if (!_site.GateUses[i].InUse)
+            {
+                continue;
+            }
+
+            var rect = _site.Gates[i].Rect;
+            var across = Math.Max(rect.Width, rect.Height);
+            if (pick < across)
+            {
+                var tile = rect.Width >= rect.Height ? new TilePoint(rect.X + pick, rect.Y) : new TilePoint(rect.X, rect.Y + pick);
+                return _map.IsWalkable(tile) ? tile : null;
+            }
+
+            pick -= across;
+        }
+
+        return null;
     }
 
     /// <summary>A place to stand in the field, well clear of the hedge. Null if there is nowhere.</summary>
@@ -817,7 +857,8 @@ public sealed class Crowd
                 party.StayDecided = true;
                 if (headliner is not null && now < headliner.End && now.TimeOfDay >= StayOnFrom && party.Mood >= 0.3 && party.Random.NextDouble() < headliner.Act.Draw)
                 {
-                    party.Leaves = headliner.End + TimeSpan.FromMinutes(party.Random.Between(1, 14));
+                    // A big crowd takes longer to drift away at the end of the night.
+                    party.Leaves = headliner.End + TimeSpan.FromMinutes(party.Random.Between(1, 14 + Math.Min(20, _parties.Count / 80.0)));
                 }
             }
 
@@ -1120,8 +1161,8 @@ public sealed class Crowd
         var queue = _stallQueues[party.Stall][party.StallLane];
         var place = queue.IndexOf(party);
 
-        // People only wait so long, unless they are already being served.
-        if (party.ServiceLeft < 0 && now - party.QueuedSince > TimeSpan.FromMinutes(PatienceMinutes))
+        // People only wait so long once they have joined the queue, unless they are already being served.
+        if (party.Path is null && party.ServiceLeft < 0 && now - party.QueuedSince > TimeSpan.FromMinutes(PatienceMinutes))
         {
             LeaveStall(party);
             party.GaveUp++;
@@ -1140,6 +1181,14 @@ public sealed class Crowd
             {
                 return;
             }
+
+            // The queue forms in the order people get there, so nobody waits behind someone who
+            // is still on their way across the field.
+            queue.Remove(party);
+            var behind = queue.FindIndex(p => p.Path is not null);
+            queue.Insert(behind < 0 ? queue.Count : behind, party);
+            place = queue.IndexOf(party);
+            party.QueuedSince = now;
         }
 
         var (x, y) = StallPlace(party.Stall, party.StallLane, place);
@@ -1252,6 +1301,12 @@ public sealed class Crowd
                 continue;
             }
 
+            // Only the field and the way in are measured. Out on the lane people have room to spread onto the verges.
+            if (!_map.HedgeLine.Contains(FieldMap.TileAt(party.X, party.Y)))
+            {
+                continue;
+            }
+
             foreach (var m in party.Members)
             {
                 yield return (party.X + m.OffsetX, party.Y + m.OffsetY);
@@ -1323,7 +1378,9 @@ public sealed class Crowd
             }
 
             var (x, y) = FieldMap.CentreOf(tile);
-            var limit = standBack ? DensityMap.Busy : Math.Min(Squeeze(draw), Stewarded?.Invoke(x, y) == true ? StewardLimit : PackedLimit);
+            // People only squeeze in to be near the front. Further back they stop where it is merely busy.
+            var keen = deep - nearest <= FrontDepth ? Squeeze(draw) : Math.Min(Squeeze(draw), StewardLimit);
+            var limit = standBack ? DensityMap.Busy : Math.Min(keen, Stewarded?.Invoke(x, y) == true ? StewardLimit : PackedLimit);
             if (Claimed(x, y, people) <= limit)
             {
                 return tile;
@@ -1480,7 +1537,18 @@ public sealed class Crowd
     {
         var from = FieldMap.TileAt(party.X, party.Y);
         party.Target = target ?? from;
-        party.Path = target is null ? null : _paths.FindPath(from, target.Value);
+        if (state == PartyState.Leaving && target is not null && WayOut(party, from) is { } gate
+            && _paths.FindPath(from, gate) is { } toGate && _paths.FindPath(gate, target.Value) is { } onward)
+        {
+            // Going home, people use the whole width of every gate instead of all cutting the same corner.
+            toGate.AddRange(onward);
+            party.Path = toGate;
+        }
+        else
+        {
+            party.Path = target is null ? null : _paths.FindPath(from, target.Value);
+        }
+
         party.PathIndex = 0;
         party.State = party.Path is null ? PartyState.Standing : state;
     }
