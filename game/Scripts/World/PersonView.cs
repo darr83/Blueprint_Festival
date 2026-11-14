@@ -12,6 +12,9 @@ public enum Pose
     Walking,
     Cheering,
     Dancing,
+
+    /// <summary>Holding a ticket out for the gate staff to see.</summary>
+    ShowingTicket,
 }
 
 /// <summary>
@@ -42,6 +45,8 @@ public partial class PersonView : Node3D
     private DanceMove _move;
     private float _through;
     private float _energy = 1;
+    private float _show;
+    private MeshInstance3D? _ticket;
 
     public PersonLook Look { get; private set; } = null!;
 
@@ -351,6 +356,7 @@ public partial class PersonView : Node3D
 
         _cheer = Mathf.MoveToward(_cheer, Pose == Pose.Cheering ? 1f : 0f, step * 4f);
         _dance = Mathf.MoveToward(_dance, Pose == Pose.Dancing ? 1f : 0f, step * 3f);
+        _show = Mathf.MoveToward(_show, Pose == Pose.ShowingTicket ? 1f : 0f, step * 5f);
         ApplyPose();
     }
 
@@ -372,6 +378,7 @@ public partial class PersonView : Node3D
         _stride = pose == Pose.Walking ? strideAt * Mathf.Tau : 0;
         _cheer = pose == Pose.Cheering ? 1 : 0;
         _dance = pose == Pose.Dancing ? 1 : 0;
+        _show = pose == Pose.ShowingTicket ? 1 : 0;
         ApplyPose();
     }
 
@@ -402,7 +409,24 @@ public partial class PersonView : Node3D
         }
 
         _armLeft.RotationDegrees = left;
+        right.X = Mathf.Lerp(right.X, -100f, _show);
         _armRight.RotationDegrees = right;
+
+        // The ticket is only made the first time this person holds one out.
+        if (_show > 0.05f && _ticket is null)
+        {
+            var card = new MeshBuilder();
+            card.Box(Vector3.Zero, new Vector3(0.15f, 0.24f, 0.016f), new Color("#FFF6D8"));
+            card.Box(new Vector3(0, 0.06f, 0), new Vector3(0.152f, 0.05f, 0.018f), new Color("#E8457E"));
+            _ticket = card.BuildNode("Ticket", new Vector3(0, -ArmLength - 0.1f, 0.02f));
+            _armRight.AddChild(_ticket);
+        }
+
+        if (_ticket is not null)
+        {
+            _ticket.Visible = _show > 0.05f;
+        }
+
         _upper.RotationDegrees = lean;
         _figure.Position = new Vector3(0, lift, 0);
         _figure.RotationDegrees = new Vector3(0, turn, 0);
