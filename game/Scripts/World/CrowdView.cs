@@ -1,5 +1,8 @@
 using System.Collections.Generic;
+using BlueprintFestival.Audio;
 using BlueprintFestival.Simulation;
+using BlueprintFestival.Simulation.Core;
+using BlueprintFestival.Simulation.Show;
 using BlueprintFestival.Simulation.Site;
 using Godot;
 
@@ -8,7 +11,8 @@ namespace BlueprintFestival.World;
 /// <summary>
 /// Draws everyone who is on the site. The rules move people once per tick; this glides each figure
 /// towards where the rules say they are, turns them to face the way they are going, and swings
-/// their arms and legs while they walk.
+/// their arms and legs while they walk. People watching an act dance in time to its music, each
+/// in the way that suits the sort of music.
 /// </summary>
 public partial class CrowdView : Node3D
 {
@@ -43,6 +47,11 @@ public partial class CrowdView : Node3D
     private FestivalGame _game = null!;
     private double _time;
     private int _cheerOutOfTen = 3;
+    private readonly StageBeat _mainBeat = new();
+    private readonly StageBeat _secondBeat = new();
+
+    /// <summary>The music being played, which the crowd dances in time to. Null dances to a steady beat.</summary>
+    public MusicPlayer? Music { get; set; }
 
     /// <summary>How many thought bubbles are showing.</summary>
     public int BubbleCount => _bubbles.Count;
@@ -52,6 +61,9 @@ public partial class CrowdView : Node3D
 
     /// <summary>How many people are drawn in full.</summary>
     public int InFull => _views.Count;
+
+    /// <summary>How many of the people drawn in full are dancing.</summary>
+    public int Dancers { get; private set; }
 
     /// <summary>How many people are drawn as simple figures, because the crowd is big or the view is far out.</summary>
     public int Simple { get; private set; }
@@ -139,6 +151,38 @@ public partial class CrowdView : Node3D
         (buffer[o + 12], buffer[o + 13], buffer[o + 14], buffer[o + 15]) = (colour.R, colour.G, colour.B, 1f);
     }
 
+    /// <summary>
+    /// The music someone watching is dancing to: the act on the stage nearer to them, if one is
+    /// playing. Null when no act is on (or it has been stopped).
+    /// </summary>
+    private (Genre Genre, double Beat)? BeatFor(Simulation.People.PersonOnSite person)
+    {
+        var main = _mainBeat.On ? _mainBeat : null;
+        var second = _secondBeat.On ? _secondBeat : null;
+        if (main is null || second is null)
+        {
+            return (main ?? second) is { } only ? (only.Genre, only.Beat) : null;
+        }
+
+        var nearer = main.DistanceSquared(person.X, person.Y) <= second.DistanceSquared(person.X, person.Y) ? main : second;
+        return (nearer.Genre, nearer.Beat);
+    }
+
+    /// <summary>How far a simple figure, far from the camera, bobs or jumps off the ground in time.</summary>
+    private static float SimpleLift((Genre Genre, double Beat) dance, int person)
+    {
+        var move = Dancing.MoveFor(dance.Genre, person);
+        var beats = Dancing.BeatsAMove(move);
+        var inBeat = Mathf.PosMod((float)Dancing.Through(dance.Beat, move, person) * beats, 1f);
+        var energy = (float)Dancing.Energy(person);
+        return move switch
+        {
+            DanceMove.Jump => Mathf.Sin(inBeat * Mathf.Pi) * 0.22f * energy,
+            DanceMove.Tap or DanceMove.Sway => 0,
+            _ => (0.5f + (0.5f * Mathf.Cos(inBeat * Mathf.Tau))) * 0.05f * energy,
+        };
+    }
+
     private void Sync(double delta, bool snap)
     {
         var speed = (int)_game.Clock.Speed;
@@ -149,6 +193,9 @@ public partial class CrowdView : Node3D
         }
 
         _cheerOutOfTen = _game.Show.Playing(_game.Now) is { Headliner: true } ? 5 : 3;
+        var held = _game.ActPaused || speed == 0;
+        _mainBeat.Update(_game, _game.Show, Music, held, delta);
+        _secondBeat.Update(_game, _game.SecondShow, Music, held, delta);
         var camera = GetViewport()?.GetCamera3D();
         var cameraYaw = camera?.GlobalRotation.Y ?? 0f;
         _people.Clear();
@@ -198,6 +245,7 @@ public partial class CrowdView : Node3D
         }
 
         _seen.Clear();
+        var dancers = 0;
         foreach (var person in _people)
         {
             // Someone unwell lies on the ground, or on a bed if they have been taken to the first aid tent.
@@ -228,7 +276,15 @@ public partial class CrowdView : Node3D
                 // People watching the stage put their arms up now and then, each in their own time;
                 // more of them, more often, for the headline act.
                 var cheering = person.Watching && ((person.Id * 7) + (int)(_time / 2.5)) % 10 < _cheerOutOfTen;
-                view.Pose = person.Walking && speed > 0 ? Pose.Walking : cheering ? Pose.Cheering : Pose.Standing;
+                var dance = person.Watching && !person.Walking ? BeatFor(person) : null;
+                if (dance is { } d)
+                {
+                    var move = Dancing.MoveFor(d.Genre, person.Id);
+                    view.Dance(move, (float)Dancing.Through(d.Beat, move, person.Id), (float)Dancing.Energy(person.Id));
+                }
+
+                view.Pose = person.Walking && speed > 0 ? Pose.Walking : dance is not null ? Pose.Dancing : cheering ? Pose.Cheering : Pose.Standing;
+                dancers += view.Pose == Pose.Dancing ? 1 : 0;
                 Bubble(person.Id, view, person.Wants, cameraYaw);
                 if (snap)
                 {
@@ -256,6 +312,11 @@ public partial class CrowdView : Node3D
             _shownStamp[person.Id] = _stamp;
             var tall = _heights[person.Id];
             var basis = person.Unwell ? new Basis(Vector3.Right, tilt).Scaled(Vector3.One * tall) : Basis.FromScale(Vector3.One * tall);
+            if (person.Watching && !person.Walking && BeatFor(person) is { } beat)
+            {
+                at += new Vector3(0, SimpleLift(beat, person.Id), 0);
+            }
+
             Put(_bodyBuffer, simple, basis, at + (basis * new Vector3(0, 0.58f, 0)), _topColours[person.Id]);
             Put(_headBuffer, simple, basis, at + (basis * new Vector3(0, 1.33f, 0)), _skinColours[person.Id]);
             Put(_hairBuffer, simple, basis, at + (basis * new Vector3(0, 1.39f, 0)), _hairColours[person.Id]);
@@ -263,6 +324,7 @@ public partial class CrowdView : Node3D
         }
 
         Simple = simple;
+        Dancers = dancers;
         foreach (var (node, buffer) in new[] { (_bodies, _bodyBuffer), (_heads, _headBuffer), (_hair, _hairBuffer) })
         {
             node.Visible = simple > 0;
@@ -299,4 +361,56 @@ public partial class CrowdView : Node3D
             _bubbles.Remove(id);
         }
     }
+}
+
+/// <summary>
+/// The beat at one stage, worked out once a frame: the song's own beat when its music is the music
+/// being heard, otherwise a steady beat suited to the act, counted from when it came on.
+/// </summary>
+internal sealed class StageBeat
+{
+    private int _slot = -1;
+    private double _clock;
+    private double _frontX;
+    private double _frontY;
+
+    /// <summary>True while an act is on at this stage and playing.</summary>
+    public bool On { get; private set; }
+
+    public Genre Genre { get; private set; }
+
+    /// <summary>How many beats into the song (or set) it is.</summary>
+    public double Beat { get; private set; }
+
+    public void Update(FestivalGame game, RunningOrder show, MusicPlayer? music, bool held, double delta)
+    {
+        var playing = game.Phase == Phase.Day ? show.Playing(game.Now) : null;
+        if (playing is null || show.Stage is not { } stage)
+        {
+            On = false;
+            _slot = -1;
+            return;
+        }
+
+        if (playing.Index != _slot)
+        {
+            _slot = playing.Index;
+            _clock = 0;
+        }
+
+        (_frontX, _frontY, _, _) = RunningOrder.Front(stage);
+        // Everyone stops when the act is stopped for the crowd's safety.
+        On = !game.ActPaused;
+        Genre = playing.Act.Genre;
+        if (!held)
+        {
+            _clock += delta;
+        }
+
+        Beat = music is not null && music.Heard == show && music.SongPlaying
+            ? Dancing.BeatNow(music.Beat, music.SongSeconds, Genre, music.SongSeconds)
+            : Dancing.BeatNow(null, 0, Genre, _clock);
+    }
+
+    public double DistanceSquared(double x, double y) => ((x - _frontX) * (x - _frontX)) + ((y - _frontY) * (y - _frontY));
 }

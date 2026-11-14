@@ -1,5 +1,6 @@
 using System;
 using BlueprintFestival.Simulation.People;
+using BlueprintFestival.Simulation.Show;
 using Godot;
 
 namespace BlueprintFestival.World;
@@ -10,6 +11,7 @@ public enum Pose
     Standing,
     Walking,
     Cheering,
+    Dancing,
 }
 
 /// <summary>
@@ -29,12 +31,17 @@ public partial class PersonView : Node3D
     private const float ArmLength = 0.42f;
 
     private Node3D _figure = null!;
+    private Node3D _upper = null!;
     private Node3D _armLeft = null!;
     private Node3D _armRight = null!;
     private Node3D _legLeft = null!;
     private Node3D _legRight = null!;
     private float _stride;
     private float _cheer;
+    private float _dance;
+    private DanceMove _move;
+    private float _through;
+    private float _energy = 1;
 
     public PersonLook Look { get; private set; } = null!;
 
@@ -64,6 +71,10 @@ public partial class PersonView : Node3D
 
         _figure = new Node3D { Name = "Figure", Scale = Vector3.One * (float)look.Height };
         AddChild(_figure);
+
+        // Everything above the hips hangs from here, so the body can lean and bend when dancing.
+        _upper = new Node3D { Name = "Upper", Position = new Vector3(0, HipY, 0) };
+        _figure.AddChild(_upper);
 
         // Children have bigger heads for their size, as real children do.
         var headR = HeadR * (kid ? 1.22f : look.Age == AgeGroup.Teenager ? 1.06f : 1f);
@@ -123,7 +134,9 @@ public partial class PersonView : Node3D
             BuildHat(body, look, headY, headR);
         }
 
-        _figure.AddChild(body.BuildNode("Body"));
+        var bodyNode = body.BuildNode("Body");
+        bodyNode.Position = new Vector3(0, -HipY, 0);
+        _upper.AddChild(bodyNode);
 
         // ---- arms: sleeves to match the top, a hand, and the festival wristband on the right wrist
         var sleeve = poncho ?? top;
@@ -277,9 +290,9 @@ public partial class PersonView : Node3D
             arm.Tube(new Vector3(0, -ArmLength + 0.085f, 0), new Vector3(thick * 1.2f, 0.035f, thick * 1.2f), band);
         }
 
-        var node = arm.BuildNode(name, new Vector3(side * (shoulder + 0.045f), ShoulderY, 0));
+        var node = arm.BuildNode(name, new Vector3(side * (shoulder + 0.045f), ShoulderY - HipY, 0));
         node.RotationDegrees = new Vector3(0, 0, side * 7f);
-        _figure.AddChild(node);
+        _upper.AddChild(node);
         return node;
     }
 
@@ -337,7 +350,19 @@ public partial class PersonView : Node3D
         }
 
         _cheer = Mathf.MoveToward(_cheer, Pose == Pose.Cheering ? 1f : 0f, step * 4f);
+        _dance = Mathf.MoveToward(_dance, Pose == Pose.Dancing ? 1f : 0f, step * 3f);
         ApplyPose();
+    }
+
+    /// <summary>
+    /// Sets how this person dances while their pose is <see cref="Pose.Dancing"/>: the move, how far
+    /// through it they are (0 is the moment the beat lands), and how hard they are going at it.
+    /// </summary>
+    public void Dance(DanceMove move, float through, float energy)
+    {
+        _move = move;
+        _through = through;
+        _energy = energy;
     }
 
     /// <summary>Sets the pose straight away, with the walk frozen at a point in its stride (0 to 1).</summary>
@@ -346,6 +371,7 @@ public partial class PersonView : Node3D
         Pose = pose;
         _stride = pose == Pose.Walking ? strideAt * Mathf.Tau : 0;
         _cheer = pose == Pose.Cheering ? 1 : 0;
+        _dance = pose == Pose.Dancing ? 1 : 0;
         ApplyPose();
     }
 
@@ -360,8 +386,96 @@ public partial class PersonView : Node3D
         // Cheering: both arms up and out, with a little wave.
         var wave = Mathf.Sin((float)Time.GetTicksMsec() / 140f + Look.Seed) * 8f * _cheer;
         var up = 155f * _cheer;
-        _armLeft.RotationDegrees = new Vector3(Mathf.Lerp(-armSwing, 0, _cheer), 0, -7f - up - wave);
-        _armRight.RotationDegrees = new Vector3(Mathf.Lerp(armSwing, 0, _cheer), 0, 7f + up - wave);
-        _figure.Position = new Vector3(0, Mathf.Abs(Mathf.Cos(_stride)) * 0.012f * (Pose == Pose.Walking ? 1 : 0), 0);
+        var left = new Vector3(Mathf.Lerp(-armSwing, 0, _cheer), 0, -7f - up - wave);
+        var right = new Vector3(Mathf.Lerp(armSwing, 0, _cheer), 0, 7f + up - wave);
+        var lift = Mathf.Abs(Mathf.Cos(_stride)) * 0.012f * (Pose == Pose.Walking ? 1 : 0);
+        var lean = Vector3.Zero;
+        var turn = 0f;
+        if (_dance > 0)
+        {
+            var (danceLeft, danceRight, danceLift, danceLean, danceTurn) = DancePose(_move, _through, _energy);
+            left = left.Lerp(danceLeft, _dance);
+            right = right.Lerp(danceRight, _dance);
+            lift = Mathf.Lerp(lift, danceLift, _dance);
+            lean = danceLean * _dance;
+            turn = danceTurn * _dance;
+        }
+
+        _armLeft.RotationDegrees = left;
+        _armRight.RotationDegrees = right;
+        _upper.RotationDegrees = lean;
+        _figure.Position = new Vector3(0, lift, 0);
+        _figure.RotationDegrees = new Vector3(0, turn, 0);
+    }
+
+    /// <summary>
+    /// Where the arms are, how high the body is lifted, and how the upper body leans, partway
+    /// through a dance move. Arm angles are in degrees: X swings an arm forward (negative) or back,
+    /// and Z lifts it out to the side (the left arm negative, the right positive).
+    /// </summary>
+    private static (Vector3 Left, Vector3 Right, float Lift, Vector3 Lean, float Turn) DancePose(DanceMove move, float through, float energy)
+    {
+        // How far through the beat itself, for moves that take two beats.
+        var beats = Dancing.BeatsAMove(move);
+        var inBeat = Mathf.PosMod(through * beats, 1f);
+        var second = through * beats >= 1f;
+
+        // A sharp hit on the beat that eases away: 1 on the beat, falling towards 0 by the next.
+        var hit = Mathf.Exp(-inBeat * 5f);
+
+        // A smooth rise and fall once a beat: 0 on the beat, 1 halfway between.
+        var wave = 0.5f - (0.5f * Mathf.Cos(inBeat * Mathf.Tau));
+        var e = energy;
+        switch (move)
+        {
+            case DanceMove.Bounce:
+            {
+                // Knees give on the beat and push back up; hands up, swaying the other way each beat.
+                var side = Mathf.Sin(through * Mathf.Tau) * 22f * e;
+                return (new Vector3(-20, 0, -150 - side), new Vector3(-20, 0, 150 - side), (0.07f * e * (1 - wave)) - 0.035f, new Vector3(4 * hit * e, 0, side * 0.25f), 0);
+            }
+
+            case DanceMove.HeadBang:
+            {
+                // Head and shoulders down on the beat, right fist punching up as it lands.
+                var nod = 26f * e * hit;
+                return (new Vector3(-25 - (10 * hit), 0, -18), new Vector3(-20, 0, 120 + (45 * (1 - hit) * e)), -0.03f * hit, new Vector3(nod, 0, 0), 0);
+            }
+
+            case DanceMove.Horns:
+            {
+                // A deep bang from the waist, both hands up making horns, pushed up on the beat.
+                var nod = 38f * e * hit;
+                var push = 20f * hit * e;
+                return (new Vector3(-30, 0, -140 - push), new Vector3(-30, 0, 140 + push), -0.05f * hit, new Vector3(nod, 0, 0), 0);
+            }
+
+            case DanceMove.Jump:
+            {
+                // Off the ground between beats and landing on the beat, alternate fists punching the air.
+                var air = Mathf.Sin(inBeat * Mathf.Pi) * 0.22f * e;
+                var punch = 165f - (35f * (1 - hit));
+                return (new Vector3(-10, 0, second ? -punch : -55), new Vector3(-10, 0, second ? 55 : punch), air, new Vector3(-4 * hit, 0, 0), 0);
+            }
+
+            case DanceMove.Sway:
+            {
+                // One way and back over two beats, hands clapping in front on each beat.
+                var sway = Mathf.Sin(through * Mathf.Tau) * 9f * e;
+                var open = 30f * (1 - hit);
+                return (new Vector3(-75, 0, 14 - open), new Vector3(-75, 0, -14 + open), 0, new Vector3(0, 0, sway), sway * 0.8f);
+            }
+
+            case DanceMove.Nod:
+            {
+                // A dip and a nod on the beat, right hand out in front pumping down with it.
+                var pump = 30f * hit * e;
+                return (new Vector3(5, 0, -10), new Vector3(-95 + pump, 0, 18), -0.04f * hit * e, new Vector3(12 * hit * e, 0, 0), second ? -4f : 4f);
+            }
+
+            default:
+                // Nodding along on the beat with hands by their sides.
+                return (new Vector3(0, 0, -7), new Vector3(0, 0, 7), -0.012f * hit, new Vector3(8 * hit * e, 0, 0), 0);
+        }
     }
 }

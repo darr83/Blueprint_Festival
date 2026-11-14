@@ -27,6 +27,7 @@ public partial class MusicPlayer : Node
     private int _slot = -1;
     private int _song;
     private float _level;
+    private BeatLibrary _beats = null!;
 
     /// <summary>The act whose music is on, or an empty string.</summary>
     public string Artist { get; private set; } = "";
@@ -36,6 +37,28 @@ public partial class MusicPlayer : Node
 
     /// <summary>How many songs the act that is on has.</summary>
     public int SongCount => _songs.Count;
+
+    /// <summary>The stage whose act is being heard, or null.</summary>
+    public RunningOrder? Heard { get; private set; }
+
+    /// <summary>The sort of music being heard.</summary>
+    public Genre Genre { get; private set; }
+
+    /// <summary>The beat of the song that is on, or null if it has none yet (or nothing is on).</summary>
+    public BeatInfo? Beat => _song >= 0 && _song < _songs.Count ? BeatLibrary.Of(Artist, _songs[_song]) : null;
+
+    /// <summary>True while a song is playing out loud.</summary>
+    public bool SongPlaying => _slot >= 0 && _player.Playing;
+
+    /// <summary>
+    /// How far into the song that is on the listener is, in seconds: where the player has got to,
+    /// plus the sound mixed since, less the time it takes to come out of the speakers.
+    /// </summary>
+    public double SongSeconds => !_player.Playing ? 0
+        : _player.GetPlaybackPosition() + (_player.StreamPaused ? 0 : AudioServer.GetTimeSinceLastMix()) - AudioServer.GetOutputLatency();
+
+    /// <summary>The songs still waiting to have their beat worked out.</summary>
+    public int BeatsWaiting => _beats.Waiting;
 
     /// <summary>An artist's songs in playing order, read from their folder.</summary>
     public static IReadOnlyList<SongFile> SongsOf(string artist)
@@ -67,17 +90,22 @@ public partial class MusicPlayer : Node
         _player = new AudioStreamPlayer { Name = "Song", Bus = AudioServer.GetBusIndex(Bus) >= 0 ? Bus : "Master", VolumeDb = -80 };
         AddChild(_player);
         _player.Finished += NextSong;
+        _beats = new BeatLibrary { Name = "Beats" };
+        AddChild(_beats);
     }
 
     public override void _Process(double delta)
     {
         var now = _game.Now;
-        var on = _game.Phase == Phase.Day ? _game.Show.Playing(now) ?? _game.SecondShow.Playing(now) : null;
+        var main = _game.Phase == Phase.Day ? _game.Show.Playing(now) : null;
+        var on = _game.Phase == Phase.Day ? main ?? _game.SecondShow.Playing(now) : null;
         var index = on?.Index ?? -1;
         if (index != _slot)
         {
             _slot = index;
             Artist = on?.Act.Name ?? "";
+            Heard = on is null ? null : main is not null ? _game.Show : _game.SecondShow;
+            Genre = on?.Act.Genre ?? Genre.Pop;
             _songs = on is null ? [] : SongsOf(on.Act.MusicFolder);
             _song = -1;
             if (on is null)
@@ -86,6 +114,8 @@ public partial class MusicPlayer : Node
             }
             else
             {
+                // Work out the beat of this act's songs first, if it is not known yet.
+                _beats.Hurry(on.Act.MusicFolder);
                 _level = 0;
                 NextSong();
             }
@@ -99,6 +129,15 @@ public partial class MusicPlayer : Node
         if (_slot < 0 && _level <= 0 && _player.Playing)
         {
             _player.Stop();
+        }
+    }
+
+    /// <summary>Jumps to a point in the song that is on, in seconds. Used for pictures.</summary>
+    public void SkipTo(double seconds)
+    {
+        if (_player.Playing)
+        {
+            _player.Seek((float)seconds);
         }
     }
 
