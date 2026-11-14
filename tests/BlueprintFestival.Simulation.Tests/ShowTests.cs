@@ -213,31 +213,4 @@ public class ShowTests
         public int GetHashCode(Act act) => act.Name.GetHashCode();
     }
 
-    [Fact]
-    public void An_act_always_plays_the_same_songs()
-    {
-        var first = new FestivalGame("One", null, 5).Show.Slots[0].Act;
-        var again = new FestivalGame("Two", null, 5).Show.Slots[0].Act;
-        Assert.Equal(first.Name, again.Name);
-        Assert.Equal(first.SongSeed, again.SongSeed);
-        Assert.Equal(first.Songs, again.Songs);
-        Assert.Equal(6, first.Songs.Count);
-        Assert.Equal(6, first.Songs.Select(s => s.Title).Distinct().Count());
-
-        // The songs hang on the name alone, so the act has them wherever and whenever it turns up.
-        Assert.Equal(first.Songs, ActGenerator.SongsFor(first.Name, first.Kind));
-        Assert.NotEqual(first.Songs[0], ActGenerator.SongsFor(first.Name + "x", first.Kind)[0]);
-    }
-
-    [Fact]
-    public void A_set_works_through_the_songs_in_order()
-    {
-        var game = new FestivalGame("Songs", null, 5);
-        var grass = game.Field.Field;
-        Assert.True(game.BuildStage(StageKind.Bandstand, grass.X + 40, grass.Y + 10, Facing.South).Ok);
-        var slot = game.Show.Slots[0];
-        Assert.Null(game.Show.SongNow(slot.Start.AddMinutes(-1)));
-        Assert.Equal(slot.Act.Songs[0], game.Show.SongNow(slot.Start));
-        Assert.Equal(slot.Act.Songs[5], game.Show.SongNow(slot.End.AddSeconds(-1)));
-    }
 }

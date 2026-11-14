@@ -56,6 +56,8 @@ public partial class FestivalScene : Node3D
 
     public CampView Camp { get; private set; } = null!;
 
+    public MusicPlayer Music { get; private set; } = null!;
+
     private ViewButtons _viewButtons = null!;
     private Label _hint = null!;
 
@@ -100,6 +102,10 @@ public partial class FestivalScene : Node3D
         Litter = new LitterView { Name = "Litter" };
         AddChild(Litter);
         Litter.Initialise(Game);
+
+        Music = new MusicPlayer { Name = "Music" };
+        AddChild(Music);
+        Music.Initialise(Game);
 
         Camp = new CampView { Name = "Camp" };
         AddChild(Camp);

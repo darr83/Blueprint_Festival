@@ -21,6 +21,7 @@ public partial class SoundBoard : Node
     public static readonly (string Bus, string Label)[] Sliders =
     [
         ("Master", "Everything"),
+        ("Music", "The acts' music"),
         ("Ambience", "Field and weather"),
         ("Crowd", "Crowd"),
         ("Effects", "Stalls, building and radio"),

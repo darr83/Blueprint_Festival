@@ -114,7 +114,7 @@ public partial class YearScreen : Control
     public static string KindText(Act act) => act.Kind switch
     {
         ActKind.Dj => "DJ",
-        ActKind.Solo => "Solo singer",
+        ActKind.Solo => "Solo guitarist",
         ActKind.Duo => "Duo",
         _ => $"{act.Members.Count switch { 3 => "Three", 4 => "Four", 5 => "Five", var n => n.ToString() }}-piece {(act.Kind == ActKind.FolkBand ? "folk band" : "band")}",
     };
@@ -123,9 +123,9 @@ public partial class YearScreen : Control
         game.Year, game.Name, game.Day.ToString("dddd d MMMM yyyy"), game.Licence, game.Money,
         FestivalGame.TicketPrices.Select(p => new TicketChoice(p, game.ExpectedAt(p))).ToList(),
         FestivalGame.TicketPrices.ToList().IndexOf(game.TicketPrice),
-        game.Headliners.Select(h => new ActOffer(h.Act.Name, KindText(h.Act), h.Fee, h.Stars)).ToList(),
+        game.Headliners.Select(h => new ActOffer(h.Act.Name, $"{KindText(h.Act)} · {Roster.NameOf(h.Act.Genre)}", h.Fee, h.Stars, $"{Roster.FansText(h.Act.Fans)} fans")).ToList(),
         game.HeadlinerPicked,
-        game.Show.Slots.Take(6).Select(s => s.Act.Name).ToList(),
+        game.Show.Slots.Take(6).Select(s => $"{s.Act.Name} ({Roster.NameOf(s.Act.Genre).ToLowerInvariant()})").ToList(),
         game.SupportFee / 6, game.EarlyForecast, game.PonchosOrdered, game.PonchoCost, game.Ground.Name, game.FieldRent,
         game.SecondStageBooked, game.SecondStageFee,
         game.CampingBooked, game.CampingOffered ? FestivalGame.CampingCost : 0, game.CampersExpected, FestivalGame.CampingFee);

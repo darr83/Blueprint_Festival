@@ -59,7 +59,12 @@ public sealed class RunningOrder
         Second = true;
         Booked = false;
         var random = GameRandom.FromSeed(seed, 8);
-        var taken = new HashSet<string>(main.Slots.Select(s => s.Act.Name));
+        var taken = new HashSet<string>();
+        foreach (var slot in main.Slots)
+        {
+            ActGenerator.Take(taken, slot.Act);
+        }
+
         for (var i = 0; i < SecondTimes.Length; i++)
         {
             var start = festivalDay.Date.AddHours(SecondTimes[i].Start);
@@ -123,19 +128,6 @@ public sealed class RunningOrder
     /// <summary>Who is on stage right now: the act's members who fit on the stage.</summary>
     public IReadOnlyList<BandRole> OnStage(DateTime now) =>
         Playing(now) is { } slot && Stage is { } stage ? slot.Act.On(Catalogue.Of(stage.Kind).Performers) : Array.Empty<BandRole>();
-
-    /// <summary>The song being played right now: the act works through its songs in order, each the same length.</summary>
-    public Song? SongNow(DateTime now)
-    {
-        if (Playing(now) is not { } slot)
-        {
-            return null;
-        }
-
-        var songs = slot.Act.Songs;
-        var through = (now - slot.Start).TotalSeconds / (slot.End - slot.Start).TotalSeconds;
-        return songs[Math.Min(songs.Count - 1, (int)(through * songs.Count))];
-    }
 
     /// <summary>The middle of the front edge of the stage in metres, and the way it faces.</summary>
     public static (double X, double Y, int DirX, int DirY) Front(PlacedStage stage) => SiteLayout.Front(stage.Rect, stage.Facing);

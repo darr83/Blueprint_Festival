@@ -214,13 +214,18 @@ public sealed partial class FestivalGame
     private void MakeOffers()
     {
         var random = GameRandom.FromSeed(Seed, 21);
-        var taken = new HashSet<string>(Show.Slots.Concat(SecondShow.Slots).Select(s => s.Act.Name));
+        var taken = new HashSet<string>();
+        foreach (var slot in Show.Slots.Concat(SecondShow.Slots))
+        {
+            ActGenerator.Take(taken, slot.Act);
+        }
+
         // There is always a cheap local act; one of the bigger names is busy that weekend.
         var stars = new List<int> { 2, 3, 4, 5 };
         stars.RemoveAt(1 + random.Next(3));
         foreach (var s in stars)
         {
-            var act = ActGenerator.Make(random, true, taken) with { Draw = 0.55 + (0.08 * s) };
+            var act = ActGenerator.MakeOffer(random, s, taken) with { Draw = 0.55 + (0.08 * s) };
             _offers.Add(new HeadlinerOffer(act, s, Scaled(FeeFor(s))));
         }
 
