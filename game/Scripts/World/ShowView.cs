@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using BlueprintFestival.Audio;
 using BlueprintFestival.Simulation;
 using BlueprintFestival.Simulation.Show;
 using BlueprintFestival.Simulation.Site;
@@ -8,12 +9,13 @@ namespace BlueprintFestival.World;
 
 /// <summary>
 /// Draws the show: whoever is on stage right now, with their instruments, and the stage lights.
-/// The rules say who is playing and when; this puts them on the first stage, moves them a little
-/// in time with the music, and brings the lights up as it gets dark.
+/// The rules say who is playing and when; this puts them on the first stage, has them play along
+/// with the music (see <see cref="BandMoves"/>), and brings the lights up as it gets dark.
 /// </summary>
 public partial class ShowView : Node3D
 {
-    private readonly List<(Node3D Node, BandRole Role, Vector3 At, float Phase)> _band = new();
+    private readonly List<BandMember> _band = new();
+    private readonly StageBeat _beat = new();
     private readonly List<(Light3D Light, float Full)> _lights = new();
     private readonly List<(StandardMaterial3D Material, Color Colour)> _beams = new();
     private FestivalGame _game = null!;
@@ -24,6 +26,15 @@ public partial class ShowView : Node3D
     private int _onStage = -1;
     private bool _djLights;
     private double _time;
+
+    /// <summary>The music player, so the band can play to the song that is heard.</summary>
+    public MusicPlayer? Music { get; set; }
+
+    /// <summary>What is going on at this stage, and its beat.</summary>
+    public StageBeat Beat => _beat;
+
+    /// <summary>The members of the act on stage, as they are drawn.</summary>
+    public IReadOnlyList<BandMember> Band => _band;
 
     /// <summary>How many performers are drawn on the stage.</summary>
     public int PerformerCount => _band.Count;
@@ -95,9 +106,12 @@ public partial class ShowView : Node3D
         var now = _game.Now;
         var show = Second ? _game.SecondShow : _game.Show;
         var stage = show.Stage;
-        // While an act is stopped to let the crowd ease, the stage is empty.
-        var slot = _game.ActPaused ? null : show.Playing(now);
-        var roles = _game.ActPaused ? System.Array.Empty<BandRole>() : show.OnStage(now);
+        var speed = (int)_game.Clock.Speed;
+        _beat.Update(_game, show, Music, _game.ActPaused || speed == 0, delta);
+        // While an act is stopped to let the crowd ease, the stage is empty. After a set the act
+        // stays on for a few minutes to take the applause.
+        var slot = _beat.Slot;
+        var roles = slot is null || stage is null ? System.Array.Empty<BandRole>() : slot.Act.On(Catalogue.Of(stage.Kind).Performers);
         if (stage != _stage || (slot?.Index ?? -1) != _slot || roles.Count != _onStage)
         {
             var dj = slot?.Act.Kind == ActKind.Dj;
@@ -128,27 +142,12 @@ public partial class ShowView : Node3D
             material.AlbedoColor = new Color(colour, 0.4f * LightStrength);
         }
 
-        // The band moves to the music unless the game is paused.
-        var speed = (int)_game.Clock.Speed;
-        if (speed > 0)
+        // The band plays to the music unless the game is paused.
+        var step = speed > 0 ? delta : 0;
+        _time += step;
+        foreach (var member in _band)
         {
-            _time += delta;
-        }
-
-        foreach (var (node, role, at, phase) in _band)
-        {
-            var beat = (float)(_time * 4.2) + phase;
-            var still = role is BandRole.Drummer or BandRole.Keys or BandRole.Dj;
-            node.Position = at + new Vector3(still ? 0 : Mathf.Sin(beat * 0.25f) * 0.12f, 0, 0);
-            var person = node.GetNode<PersonView>("Person");
-            person.Position = new Vector3(0, Mathf.Abs(Mathf.Sin(beat)) * (role == BandRole.Dj ? 0.07f : 0.035f), 0);
-            person.RotationDegrees = new Vector3(0, Mathf.Sin(beat * 0.5f) * (still ? 5f : 14f), 0);
-            if (role is BandRole.Singer or BandRole.Dj)
-            {
-                // Arms up for the big moments, down in between.
-                person.Pose = Mathf.Sin(beat * 0.11f) > (role == BandRole.Dj ? 0.3f : -0.2f) ? Pose.Cheering : Pose.Standing;
-                person.Animate(speed > 0 ? delta : 0);
-            }
+            BandMoves.Animate(member, _beat, _time, step);
         }
     }
 
@@ -174,7 +173,7 @@ public partial class ShowView : Node3D
             var performer = Performers.Build(roles[i], slot.Act.LookSeed + (i * 13));
             performer.Position = spots[i];
             _acts.AddChild(performer);
-            _band.Add((performer, roles[i], spots[i], i * 1.7f));
+            _band.Add(new BandMember(performer, roles[i], spots[i], i));
         }
     }
 
@@ -226,7 +225,7 @@ public partial class ShowView : Node3D
                 AlbedoColor = new Color(colours[i], 0f),
                 CullMode = BaseMaterial3D.CullModeEnum.Disabled,
             };
-            var tilt = new Vector3(52, (i - 2) * 16, 0);
+            var tilt = new Vector3(-52, (i - 2) * 16, 0);
             _rig.AddChild(new MeshInstance3D
             {
                 Mesh = new CylinderMesh { TopRadius = 0.08f * k, BottomRadius = 1.3f * k, Height = 11f * k, RadialSegments = 12, Rings = 1 },

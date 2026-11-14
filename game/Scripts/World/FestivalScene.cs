@@ -122,6 +122,8 @@ public partial class FestivalScene : Node3D
         AddChild(Crowd);
         Crowd.Initialise(Game);
         Crowd.Music = Music;
+        Acts.Music = Music;
+        SecondActs.Music = Music;
 
         Staff = new StaffView { Name = "Staff" };
         AddChild(Staff);

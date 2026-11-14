@@ -142,16 +142,20 @@ public class SoundTests
     }
 
     [Fact]
-    public void Every_act_is_cheered_on_and_clapped_off()
+    public void Every_act_is_cheered_on_and_clapped_and_cheered_off()
     {
         var (game, heard, _) = Fine.Value;
-        var cheers = heard.Count(h => h is Sounds.CheerSmall or Sounds.CheerMedium or Sounds.CheerBig);
+        var cheers = heard.Count(h => h is Sounds.CheerSmall or Sounds.CheerMedium or Sounds.CheerBig or Sounds.SetEndOvation);
         var claps = heard.Count(h => h is Sounds.ApplauseSmall or Sounds.ApplauseBig);
 
-        // One cheer as each act comes on, and one more as the headliner finishes.
-        Assert.InRange(cheers, game.Show.Slots.Count - 1, game.Show.Slots.Count + 1);
-        Assert.InRange(claps, game.Show.Slots.Count - 2, game.Show.Slots.Count);
+        // A cheer as each act comes on, and clapping and cheering together, louder, as each goes off.
+        var sets = game.Show.Slots.Count;
+        Assert.InRange(cheers, (2 * sets) - 2, 2 * sets);
+        Assert.InRange(claps, sets - 2, sets);
         Assert.Contains(Sounds.ApplauseBig, heard);
+        Assert.Contains(Sounds.SetEndOvation, heard);
+        Assert.Equal(Sounds.SongEndSmall, Sounds.SongEndFor(150));
+        Assert.Equal(Sounds.SongEndBig, Sounds.SongEndFor(3000));
     }
 
     [Fact]
