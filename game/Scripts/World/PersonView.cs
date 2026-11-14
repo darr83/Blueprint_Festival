@@ -501,11 +501,11 @@ public partial class PersonView : Node3D
 
         if (_clap > 0)
         {
-            // Clapping fast, each person in their own time: hands apart, then together in front.
-            var apart = 0.5f + (0.5f * Mathf.Sin(((float)Time.GetTicksMsec() / 1000f * Mathf.Tau * 3.2f) + (Look.Seed * 1.3f)));
-            var open = 26f * apart;
-            left = left.Lerp(new Vector3(-82, 0, 16 - open), _clap);
-            right = right.Lerp(new Vector3(-82, 0, -16 + open), _clap);
+            // Clapping fast, each person in their own time: hands apart, then snapping together in front.
+            var near = 0.5f + (0.5f * Mathf.Sin(((float)Time.GetTicksMsec() / 1000f * Mathf.Tau * 3.2f) + (Look.Seed * 1.3f)));
+            var open = 30f * (1 - Clapped(near));
+            left = left.Lerp(new Vector3(-82, 0, 21 - open), _clap);
+            right = right.Lerp(new Vector3(-82, 0, -21 + open), _clap);
         }
 
         if (_perform > 0)
@@ -546,6 +546,13 @@ public partial class PersonView : Node3D
     /// through a dance move. Arm angles are in degrees: X swings an arm forward (negative) or back,
     /// and Z lifts it out to the side (the left arm negative, the right positive).
     /// </summary>
+    /// <summary>
+    /// How shut the hands are in a clap, from 0 (apart) to 1 (palms together), given how near the
+    /// clap is (1 is the moment of the clap). The hands come together quickly and only touch right
+    /// at the clap, so the eye reads the moment of contact where the sound is.
+    /// </summary>
+    private static float Clapped(float near) => Mathf.Pow(Mathf.Clamp(near, 0f, 1f), 6f);
+
     private static (Vector3 Left, Vector3 Right, float Lift, Vector3 Lean, float Turn) DancePose(DanceMove move, float through, float energy)
     {
         // How far through the beat itself, for moves that take two beats.
@@ -596,10 +603,11 @@ public partial class PersonView : Node3D
 
             case DanceMove.Sway:
             {
-                // One way and back over two beats, hands clapping in front on each beat.
+                // One way and back over two hits, clapping in front on each hit: the hands meet only
+                // right on the hit (when the clap is heard) and are apart the rest of the time.
                 var sway = Mathf.Sin(through * Mathf.Tau) * 9f * e;
-                var open = 30f * (1 - hit);
-                return (new Vector3(-75, 0, 14 - open), new Vector3(-75, 0, -14 + open), 0, new Vector3(0, 0, sway), sway * 0.8f);
+                var open = 36f * (1 - Clapped(swell));
+                return (new Vector3(-75, 0, 20 - open), new Vector3(-75, 0, -20 + open), 0, new Vector3(0, 0, sway), sway * 0.8f);
             }
 
             case DanceMove.Nod:
