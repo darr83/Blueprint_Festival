@@ -8,8 +8,8 @@ namespace BlueprintFestival.World;
 /// <summary>
 /// What is going on at one stage, worked out once a frame: whether a song is playing, the stage
 /// is between songs or the act is taking its applause at the end; and the beat. The song's own beat
-/// is used when its music is the music being heard, otherwise a steady beat suited to the act,
-/// counted from when it came on. The crowd dances to this, and the band plays to it.
+/// is used when the act has songs to play (every stage plays its own at once), otherwise a steady
+/// beat suited to the act, counted from when it came on. The crowd dances to this, and the band plays to it.
 /// </summary>
 public sealed class StageBeat
 {
@@ -32,7 +32,7 @@ public sealed class StageBeat
     /// <summary>How many beats into the song (or set) it is.</summary>
     public double Beat { get; private set; }
 
-    /// <summary>True when this stage's music is the music being heard, with a real song playing.</summary>
+    /// <summary>True when this stage's own music is playing, a real song.</summary>
     public bool Heard { get; private set; }
 
     /// <summary>How loud the singing is right now, from 0 to 1, for the singer's mouth.</summary>
@@ -71,13 +71,14 @@ public sealed class StageBeat
             _clock += delta;
         }
 
-        var heard = music is not null && music.Heard == show && music.SongCount > 0;
-        Heard = heard && music!.SongPlaying;
+        var mine = music?.For(show);
+        var heard = mine is not null && mine.On && mine.SongCount > 0;
+        Heard = heard && mine!.SongPlaying;
         if (bowing is not null)
         {
             moment = StageMoment.Applause;
         }
-        else if (heard && !music!.SongPlaying)
+        else if (heard && !mine!.SongPlaying)
         {
             // Between two songs, or once the last song of the set has faded away.
             moment = StageMoment.BetweenSongs;
@@ -89,9 +90,9 @@ public sealed class StageBeat
 
         Set(moment, held ? 0 : delta);
         Beat = Heard
-            ? Dancing.BeatNow(music!.Beat, music.SongSeconds, Genre, music.SongSeconds)
+            ? Dancing.BeatNow(mine!.Beat, mine.SongSeconds, Genre, mine.SongSeconds)
             : Dancing.BeatNow(null, 0, Genre, _clock);
-        Voice = Heard ? music!.Voice : 0;
+        Voice = Heard ? mine!.Voice : 0;
     }
 
     public double DistanceSquared(double x, double y) => ((x - _frontX) * (x - _frontX)) + ((y - _frontY) * (y - _frontY));

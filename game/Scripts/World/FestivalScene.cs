@@ -160,6 +160,7 @@ public partial class FestivalScene : Node3D
         StageCam = new StageCam { Name = "StageCam" };
         AddChild(StageCam);
         StageCam.Initialise(Game, Camera);
+        Music.Follow(Camera, StageCam);
 
         Build = new BuildTool { Name = "BuildTool" };
         AddChild(Build);
@@ -288,6 +289,10 @@ public partial class FestivalScene : Node3D
                 break;
             case Key.B:
                 StageCam.Toggle(StageShot.Back);
+                break;
+            case Key.Tab:
+                // On a stage camera, on to the next stage.
+                StageCam.NextStage();
                 break;
             case Key.Escape:
                 if (StageCam.Showing is not null)
