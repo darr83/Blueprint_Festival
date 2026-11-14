@@ -14,11 +14,12 @@ public sealed record ArtistView(string Name, string Detail, int Stars, int Fee, 
 public sealed record PlanView(int Year, string Festival, string Date, int Licence, int Bank, IReadOnlyList<SlotView> Main, IReadOnlyList<SlotView>? Second,
     int Picked, string PickedName, IReadOnlyList<ArtistView> Artists, int Price, int FairPrice, int Pull, int Fees, int Acts, int ToPay,
     string Forecast = "", bool Ponchos = false, int PonchoCost = 0, string Field = "", int Rent = 0,
-    bool Camping = false, int CampingCost = 0, int Campers = 0, int CampingFee = 0);
+    bool Camping = false, int CampingCost = 0, int Campers = 0, int CampingFee = 0, TravelView? Travel = null);
 
 /// <summary>What the planning screen can do.</summary>
 public sealed record PlanActions(System.Action? Book = null, System.Action<int>? PickSlot = null, System.Action<string?>? PickArtist = null,
-    System.Action? ToggleSecond = null, System.Action<int>? Price = null, System.Action? Ponchos = null, System.Action? Camping = null, System.Action? Fields = null);
+    System.Action? ToggleSecond = null, System.Action<int>? Price = null, System.Action? Ponchos = null, System.Action? Camping = null, System.Action? Fields = null,
+    System.Action<int>? Parking = null, System.Action<int>? Buses = null);
 
 /// <summary>One way of advertising, and whether it is switched on.</summary>
 public sealed record AdvertView(string Id, string Name, int Cost, int Reach, string Reaches, bool On);
@@ -26,10 +27,10 @@ public sealed record AdvertView(string Id, string Name, int Cost, int Reach, str
 /// <summary>What the ticket sales screen shows.</summary>
 public sealed record SalesView(string Festival, int Licence, int Bank, int Turn, string? Next, int Sold, int Taken, int AdSpend, int Reach, int AdCost,
     int Forecast, int Price, int FairPrice, int Pull, IReadOnlyList<AdvertView> Adverts, IReadOnlyList<(string When, int Tickets, int Price, int AdCost)> Log,
-    IReadOnlyList<int> SoldAfter);
+    IReadOnlyList<int> SoldAfter, TravelView? Travel = null);
 
 /// <summary>What the build panel shows in build week. Day is null once every day is sold.</summary>
-public sealed record BuildWeekView(string? Day, int Sold, int Licence, int Forecast, int AdCost, int Price, int Fair);
+public sealed record BuildWeekView(string? Day, int Sold, int Licence, int Forecast, int AdCost, int Price, int Fair, TravelView? Travel = null);
 
 /// <summary>Tickets sold over the year as a line that climbs from January to the gates.</summary>
 public partial class SalesChart : Control
@@ -216,7 +217,7 @@ public static partial class YearPanels
         roster.AddThemeConstantOverride("separation", 5);
         columns.AddChild(roster);
         roster.AddChild(Section($"Artists for {view.PickedName}"));
-        var scroller = new ScrollContainer { CustomMinimumSize = new Vector2(500, 420), HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled, Name = "Artists" };
+        var scroller = new ScrollContainer { CustomMinimumSize = new Vector2(500, view.Travel is null ? 420 : 262), HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled, Name = "Artists" };
         roster.AddChild(scroller);
         var list = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
         list.AddThemeConstantOverride("separation", 4);
@@ -249,6 +250,11 @@ public static partial class YearPanels
         if (scroll > 0)
         {
             scroller.Ready += () => scroller.SetDeferred(ScrollContainer.PropertyName.ScrollVertical, (int)scroll);
+        }
+
+        if (view.Travel is not null)
+        {
+            roster.AddChild(Travel(view.Travel, does.Parking, does.Buses));
         }
 
         var extras = new HBoxContainer();
@@ -300,7 +306,8 @@ public static partial class YearPanels
     /// The ticket sales screen from January to June: the year across the top, the sales line, the
     /// adverts to switch on and off, the price, and a button that runs the month.
     /// </summary>
-    public static Control Sales(SalesView view, System.Action? run = null, System.Action<string>? toggleAdvert = null, System.Action<int>? price = null, bool busy = false)
+    public static Control Sales(SalesView view, System.Action? run = null, System.Action<string>? toggleAdvert = null, System.Action<int>? price = null, bool busy = false,
+        System.Action<int>? parking = null, System.Action<int>? buses = null)
     {
         var panel = Card(1060);
         var box = new VBoxContainer();
@@ -415,6 +422,10 @@ public static partial class YearPanels
         var pricing = Tile(false, 480);
         pricing.AddChild(PriceRow(view.Price, view.FairPrice, busy ? null : price));
         right.AddChild(pricing);
+        if (view.Travel is not null)
+        {
+            right.AddChild(Travel(view.Travel, busy ? null : parking, busy ? null : buses));
+        }
 
         var buttons = new HBoxContainer();
         buttons.AddThemeConstantOverride("separation", 12);

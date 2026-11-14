@@ -42,6 +42,19 @@ public enum PartyState
 /// <summary>One person in a party, and where they stand relative to its middle.</summary>
 public sealed record PartyMember(int Id, PersonLook Look, double OffsetX, double OffsetY);
 
+/// <summary>How a party gets to the festival.</summary>
+public enum Travel
+{
+    /// <summary>On foot along the lane.</summary>
+    OnFoot = 0,
+
+    /// <summary>By car, parked in a car park field.</summary>
+    Car = 1,
+
+    /// <summary>On a shuttle bus to the bus stop.</summary>
+    Bus = 2,
+}
+
 /// <summary>
 /// People come to a festival with their friends or family, not alone. A party arrives together,
 /// walks together at the pace of its slowest member, and goes home together.
@@ -63,7 +76,16 @@ public sealed class Party
 
     public IReadOnlyList<PartyMember> Members { get; }
 
-    public DateTime Arrives { get; }
+    public DateTime Arrives { get; internal set; }
+
+    /// <summary>When they would turn up if they walked: a bus rider comes on the next bus after this.</summary>
+    internal DateTime Planned { get; set; }
+
+    /// <summary>How they get to the festival and home again.</summary>
+    public Travel Travel { get; internal set; }
+
+    /// <summary>The parking bay their car is in, for a party that drives.</summary>
+    public TilePoint? Bay { get; internal set; }
 
     public DateTime Leaves { get; internal set; }
 
@@ -483,7 +505,11 @@ public sealed class Crowd
         Expected = 0;
         Plan(_day, Math.Max(1, people));
         SiteChanged();
+        Replanned?.Invoke();
     }
+
+    /// <summary>Raised when the crowd has been planned afresh, so how they travel can be worked out again.</summary>
+    public event Action? Replanned;
 
     private void Plan(DateTime day, int? people)
     {
@@ -531,6 +557,7 @@ public sealed class Crowd
             var needs = GameRandom.FromSeed(Seed, 5000 + _parties.Count);
             _parties.Add(new Party(_parties.Count, members, arrives, leaves, random.NextDouble() < 0.6, speed, GameRandom.FromSeed(Seed, 100 + _parties.Count))
             {
+                Planned = arrives,
                 Hunger = needs.Between(0.1, 0.5),
                 Thirst = needs.Between(0.1, 0.4),
                 Toilet = needs.Between(0, 0.3),
@@ -540,8 +567,79 @@ public sealed class Crowd
         }
     }
 
+    /// <summary>How often a shuttle bus pulls in at the stop.</summary>
+    public static readonly TimeSpan BusEvery = TimeSpan.FromMinutes(15);
+
+    /// <summary>How many people come in each car, on average.</summary>
+    public const double PeopleACar = 2.5;
+
+    /// <summary>Raised each time a car is parked.</summary>
+    public event Action? CarParked;
+
+    /// <summary>How many came each way, counted in people, among those who have arrived.</summary>
+    public int CameBy(Travel travel) => _parties.Where(p => p.State != PartyState.Expected && p.Travel == travel).Sum(p => p.Members.Count);
+
+    /// <summary>How many are planned to come each way, counted in people.</summary>
+    public int ComingBy(Travel travel) => _parties.Where(p => p.Travel == travel).Sum(p => p.Members.Count);
+
+    /// <summary>The bays with a car in them now: from when its party arrives until they have driven home. Campers' cars stay the night.</summary>
+    public IEnumerable<TilePoint> CarsParked => _parties
+        .Where(p => p.Travel == Travel.Car && p.Bay is not null && p.State != PartyState.Expected && (p.State != PartyState.Gone || (p.Camper && p.Ticketed == true)))
+        .Select(p => p.Bay!.Value).Distinct();
+
+    /// <summary>
+    /// Says how the crowd travels: so many people on foot, so many by car into the bays given
+    /// (two and a half people a car, so small parties share), so many by bus, and anyone left over on foot. The same parties travel
+    /// the same way every time. Bus riders turn up when the next bus pulls in.
+    /// </summary>
+    public void SetTravel(int onFoot, int byCar, int byBus, IReadOnlyList<TilePoint> bays)
+    {
+        var inCars = 0;
+        foreach (var party in _parties.OrderBy(p => (uint)(p.Id * 2246822519u) % 9973).ThenBy(p => p.Id))
+        {
+            var size = party.Members.Count;
+            party.Bay = null;
+            party.Arrives = party.Planned;
+            if (onFoot >= size)
+            {
+                party.Travel = Travel.OnFoot;
+                onFoot -= size;
+            }
+            else if (byCar >= size && (int)(inCars / PeopleACar) < bays.Count)
+            {
+                // Small parties share a lift, so a car park fills at two and a half people a space.
+                party.Travel = Travel.Car;
+                party.Bay = bays[(int)(inCars / PeopleACar)];
+                inCars += size;
+                byCar -= size;
+            }
+            else if (byBus >= size && _map.BusStop is not null)
+            {
+                party.Travel = Travel.Bus;
+                byBus -= size;
+                var late = (party.Planned - _day).Ticks % BusEvery.Ticks;
+                party.Arrives = late == 0 ? party.Planned : party.Planned + TimeSpan.FromTicks(BusEvery.Ticks - late);
+            }
+            else
+            {
+                party.Travel = Travel.OnFoot;
+            }
+        }
+    }
+
     private TilePoint LaneEnd(Party party)
     {
+        if (party.Travel == Travel.Car && party.Bay is { } bay)
+        {
+            return _map.IsWalkable(bay) ? bay : NearestWalkable(bay);
+        }
+
+        if (party.Travel == Travel.Bus && _map.BusStop is { } stop)
+        {
+            // They get off, and wait to get on, along the kerb by the stop.
+            return new TilePoint(stop.X - 6 + (party.Id % 13), stop.Y + (party.Id % 3));
+        }
+
         // People spread across the whole width of the lane as they go.
         var y = _map.Lane.Y + (party.Id % _map.Lane.Height);
         return new TilePoint(party.FromWest ? 0 : _map.Width - 1, y);
@@ -990,6 +1088,11 @@ public sealed class Crowd
                     {
                         var start = LaneEnd(party);
                         (party.X, party.Y) = FieldMap.CentreOf(start);
+                        if (party.Travel == Travel.Car && !_parties.Any(p => p != party && p.Bay == party.Bay && p.State != PartyState.Expected))
+                        {
+                            CarParked?.Invoke();
+                        }
+
                         party.Heading = party.FromWest ? Math.PI / 2 : -Math.PI / 2;
                         Arrive(party);
                     }

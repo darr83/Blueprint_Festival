@@ -322,6 +322,21 @@ public partial class SmokeTest : Node
                     plan.Year.UseField(null);
                     plan.Year.ConfirmFields();
                     Check(!plan.Year.ChoosingFields && plan.Year.HasCentrePanel, "Keeping the village green should move on to booking the acts.");
+                    // Everyone can walk to a village festival, so getting there is not on the screen yet.
+                    Check(BlueprintFestival.UI.YearScreen.TravelOf(game) is null && plan.FindChild("Travel", true, false) is null, "A village festival should not ask about parking or buses.");
+                    var driven = FestivalGame.StartYear(null, new YearSetup(4, 1500, 40000, false, 82, new[]
+                    {
+                        new BlueprintFestival.Simulation.World.FieldChoice("home", BlueprintFestival.Simulation.World.FieldUse.Music),
+                        new BlueprintFestival.Simulation.World.FieldChoice("glebe", BlueprintFestival.Simulation.World.FieldUse.CarPark),
+                    }));
+                    var onSaleBefore = driven.OnSale;
+                    driven.HireBuses(2);
+                    var travel = BlueprintFestival.UI.YearScreen.TravelOf(driven);
+                    Check(travel is { Spaces: > 0, Buses: 2 } && driven.OnSale == onSaleBefore + (2 * FestivalGame.BusSeats), "Buses and a car park should let more people buy a ticket.");
+                    var rows = BlueprintFestival.UI.YearPanels.Travel(travel!);
+                    Check(rows.FindChild("Buses", true, false) is not null && rows.FindChild("Parking", true, false) is not null, "The getting there rows should have the bus and parking buttons.");
+                    rows.Free();
+                    Check(plan.Parking.CarCount == 0 && !plan.Parking.BusInSight, "No cars or buses should be drawn for a village festival.");
                     Check(!plan.BuildBar.Visible, "Nothing should be built while planning.");
                     Check(game.Headliners.Count == 3, "Three headliners should be on offer.");
                     Check(plan.TopBar.TimeText == "08:00", "The clock should be stopped while planning.");

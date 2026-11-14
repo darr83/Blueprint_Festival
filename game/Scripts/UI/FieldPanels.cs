@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using BlueprintFestival.Simulation;
 using BlueprintFestival.Simulation.World;
 using Godot;
 
@@ -223,7 +224,7 @@ public static partial class YearPanels
             ("Room in the music fields", $"{plan.MusicRoom:N0}"),
             ("Tickets you can sell", $"{onSale:N0}"),
             ("Room for campers", $"{plan.CampingRoom:N0}"),
-            ("Parking spaces", $"{plan.ParkingSpaces:N0}"),
+            ("Parking spaces", plan.ParkingSpaces > 0 ? $"{plan.ParkingSpaces:N0}, bringing {(int)(plan.ParkingSpaces * FestivalGame.PeopleACar):N0}" : "0"),
         })
         {
             var row = new HBoxContainer();
@@ -238,6 +239,12 @@ public static partial class YearPanels
         if (notes.Count == 0 && plan.MusicRoom < view.Licence)
         {
             notes.Add($"Your licence allows {view.Licence:N0} but the music fields hold {plan.MusicRoom:N0}. A bigger music field would let you sell more.");
+        }
+
+        var canCome = FestivalGame.Walkers + (int)(plan.ParkingSpaces * FestivalGame.PeopleACar);
+        if (notes.Count == 0 && canCome < onSale)
+        {
+            notes.Add($"About {canCome:N0} can walk or park. Hire shuttle buses on the next screen, or rent a car park, to sell more tickets.");
         }
 
         if (notes.Count == 0 && plan.Rent > view.Bank)

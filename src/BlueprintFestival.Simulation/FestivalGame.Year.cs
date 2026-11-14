@@ -79,7 +79,7 @@ public sealed partial class FestivalGame
     public FieldPlan? Plan { get; private set; }
 
     /// <summary>The most tickets there are to sell: the licence, or the room in the music fields if that is less.</summary>
-    public int OnSale => Plan is null ? Licence : Math.Max(10, Math.Min(Licence, Plan.MusicRoom));
+    public int OnSale => Plan is null ? Licence : Math.Max(10, Math.Min(Math.Min(Licence, Plan.MusicRoom), Math.Max(CanGetHere, TicketsSold)));
 
     /// <summary>
     /// The same January with different fields rented: a fresh year on the new site, with the same
@@ -91,7 +91,7 @@ public sealed partial class FestivalGame
         Need(Phase.Plan);
         return plan.Problems(Licence, Year).Count > 0
             ? null
-            : StartYear(Name, new YearSetup(Year, Licence, Money, BailedOut, LastHappiness, plan.Save()));
+            : StartYear(Name, new YearSetup(Year, Licence, Money, BailedOut, LastHappiness, plan.Save())).TravellingLike(this);
     }
 
     /// <summary>Rent and licence fee for a year at a licence: nothing on the village field, then £1 a head.</summary>
@@ -470,6 +470,8 @@ public sealed partial class FestivalGame
     {
         Need(Phase.Build);
         FinishSales();
+        PayForBuses();
+        ApplyTravel();
         if (CampingBooked && Plan is not null)
         {
             // Tents go up round whatever was built in the camping field during the week.
@@ -655,7 +657,7 @@ public sealed partial class FestivalGame
     {
         Need(Phase.Results);
         var result = Result!;
-        return StartYear(Name, new YearSetup(Year + 1, result.LicenceNext, Money, BailedOut, result.Happy, Plan?.Save()));
+        return StartYear(Name, new YearSetup(Year + 1, result.LicenceNext, Money, BailedOut, result.Happy, Plan?.Save())).TravellingLike(this);
     }
 
     private YearSave SaveYear() => new(Year, Licence, Phase, Day, TicketPrice, HeadlinerPicked, Crowd.Expected, BailedOut, _loanThisYear, LastHappiness,
@@ -663,6 +665,8 @@ public sealed partial class FestivalGame
     {
         FieldRepair = _fieldRepair,
         Fields = Plan?.Save(),
+        Parking = ParkingCharge,
+        Buses = BusesHired,
         SecondStage = SecondStageBooked,
         Camping = CampingBooked,
         LineUp = Enumerable.Range(0, RunningOrder.SetsAStage).Select(i => Show.At(i)?.Name)
@@ -689,6 +693,8 @@ public sealed partial class FestivalGame
             }
         }
 
+        ParkingCharge = Math.Clamp(year.Parking ?? ParkingCharge, 0, DearestParking);
+        BusesHired = Math.Clamp(year.Buses, 0, MostBuses);
         RestoreSales(year.Sales);
         CampingBooked = Plan is null ? year.Camping && CampingOffered : CampingBooked;
         Phase = Enum.IsDefined(year.Phase) ? year.Phase : Phase.Plan;
@@ -717,6 +723,12 @@ public sealed partial class FestivalGame
 public sealed record YearSave(int Number, int Licence, Phase Phase, DateTime Day, int TicketPrice, int Headliner, int Turnout, bool BailedOut, bool Loan,
     int? LastHappiness, int LitterAtStart, List<LitterPiece>? Litter, int[]? Wear)
 {
+    /// <summary>What a car pays to park.</summary>
+    public int? Parking { get; init; }
+
+    /// <summary>Shuttle buses hired.</summary>
+    public int Buses { get; init; }
+
     /// <summary>The fields rented for the year, or null for a year on the field its licence was given.</summary>
     public List<FieldChoice>? Fields { get; init; }
 
