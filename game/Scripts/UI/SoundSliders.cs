@@ -16,7 +16,7 @@ public partial class SoundSliders : VBoxContainer
     public override void _Ready()
     {
         AddThemeConstantOverride("separation", 4);
-        AddChild(UiStyle.Body("Sound", size: 18));
+        AddChild(UiStyle.Caps("Sound"));
         foreach (var (bus, label) in SoundBoard.Sliders)
         {
             var row = new HBoxContainer();

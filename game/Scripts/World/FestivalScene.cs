@@ -72,9 +72,10 @@ public partial class FestivalScene : Node3D
         // A panel in the middle of the screen has the bottom of the screen to itself.
         _viewButtons.Visible = _hint.Visible = !Year.HasCentrePanel;
         var height = GetViewport().GetVisibleRect().Size.Y;
-        var lift = BuildBar.Visible ? BuildBar.Size.Y - 14 : 0;
-        _viewButtons.Position = new Vector2(_viewButtons.Position.X, height - _viewButtons.Size.Y - 16 - lift);
-        _hint.Position = new Vector2(_hint.Position.X, height - _hint.Size.Y - 18 - lift);
+        // The build buttons sit in the middle and the view buttons in the corner, level with them.
+        const float lift = 0;
+        _viewButtons.Position = new Vector2(_viewButtons.Position.X, height - _viewButtons.Size.Y - 22 - lift);
+        _hint.Position = new Vector2(_hint.Position.X, height - _hint.Size.Y - 22 - lift);
     }
 
 
@@ -161,6 +162,8 @@ public partial class FestivalScene : Node3D
         Year = new YearScreen { Name = "YearScreen" };
         _hud.AddChild(Year);
         Year.Initialise(Game, this);
+        // The badges along the top stay bright over a sheet of paper in the middle of the screen.
+        _hud.MoveChild(TopBar, -1);
         BuildBar.Visible = Game.CanBuild;
         _viewButtons = new ViewButtons { Name = "ViewButtons" };
         _hud.AddChild(_viewButtons);
@@ -185,7 +188,7 @@ public partial class FestivalScene : Node3D
         _hint.AddThemeColorOverride("font_color", new Color(1, 1, 1, 0.85f));
         _hint.AddThemeColorOverride("font_shadow_color", new Color(0, 0, 0, 0.5f));
         _hud.AddChild(_hint);
-        _hint.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.BottomLeft, Control.LayoutPresetMode.Minsize, 18);
+        _hint.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.BottomLeft, Control.LayoutPresetMode.Minsize, 22);
         _hint.GrowVertical = Control.GrowDirection.Begin;
 
         Sky.Apply(Game, Camera.Yaw);

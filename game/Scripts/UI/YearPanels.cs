@@ -14,17 +14,32 @@ public sealed record ResultsView(int Year, string Festival, int Came, int Expect
 /// </summary>
 public static partial class YearPanels
 {
+    /// <summary>A sheet of paper with bunting along the top, as wide as asked.</summary>
     internal static PanelContainer Card(int width)
     {
-        var panel = new PanelContainer { Theme = UiStyle.Theme, CustomMinimumSize = new Vector2(width, 0) };
-        panel.AddThemeStyleboxOverride("panel", UiStyle.Card(margin: 28, radius: 20));
-        return panel;
+        var small = width < 500;
+        return new Paper(small ? 22 : 34, small) { CustomMinimumSize = new Vector2(width, 0) };
     }
 
-    internal static Label Section(string text)
+    internal static Label Section(string text) => UiStyle.Caps(text);
+
+    /// <summary>The top of a sheet: a pink line of small capitals, the heading under it, and an ink rule.</summary>
+    internal static void Masthead(Container box, string kicker, string heading, Control? right = null, int size = 40)
     {
-        var label = UiStyle.Body(text.ToUpperInvariant(), muted: true, size: 13);
-        return label;
+        var row = new HBoxContainer();
+        var words = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+        words.AddThemeConstantOverride("separation", -2);
+        words.AddChild(UiStyle.Caps(kicker, pink: true, size: 13));
+        words.AddChild(UiStyle.Heading(heading, size));
+        row.AddChild(words);
+        if (right is not null)
+        {
+            right.SizeFlagsVertical = Control.SizeFlags.ShrinkEnd;
+            row.AddChild(right);
+        }
+
+        box.AddChild(row);
+        box.AddChild(UiStyle.Rule());
     }
 
     internal static PanelContainer Tile(bool picked, int width, System.Action? pressed = null)
@@ -43,37 +58,58 @@ public static partial class YearPanels
             };
         }
 
-        var box = UiStyle.Box(picked ? UiStyle.PinkTint : UiStyle.Surface, 12, picked ? UiStyle.StagePink : UiStyle.Border, 14);
-        if (picked)
-        {
-            box.BorderWidthBottom = box.BorderWidthTop = box.BorderWidthLeft = box.BorderWidthRight = 2;
-        }
-
-        tile.AddThemeStyleboxOverride("panel", box);
+        tile.AddThemeStyleboxOverride("panel", UiStyle.Outlined(picked ? UiStyle.SunTint : UiStyle.Surface, 10, 12, picked ? UiStyle.NightInk : UiStyle.Border));
         return tile;
     }
 
     internal static HBoxContainer MoneyRow(string what, string amount, bool strong = false, bool muted = false)
     {
         var row = new HBoxContainer();
-        var left = strong ? UiStyle.Heading(what, 18) : UiStyle.Body(what, muted, 15);
+        var left = strong ? UiStyle.Heading(what, 19) : UiStyle.Body(what, muted, 15);
         left.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
         row.AddChild(left);
-        row.AddChild(strong ? UiStyle.Heading(amount, 18) : UiStyle.Body(amount, muted, 15));
+        row.AddChild(strong ? UiStyle.Heading(amount, 19) : UiStyle.Body(amount, muted, 15, bold: !muted));
         return row;
     }
 
-    /// <summary>The results screen: how the day went, the money, the field, and what next year's licence is.</summary>
+    /// <summary>A big number in the poster font with small capitals under it.</summary>
+    internal static VBoxContainer BigNumber(string number, string caption, Color? colour = null, int size = 52, string? name = null)
+    {
+        var cell = new VBoxContainer();
+        cell.AddThemeConstantOverride("separation", -6);
+        var big = UiStyle.Heading(number, size);
+        if (name is not null)
+        {
+            big.Name = name;
+        }
+
+        if (colour is { } tint)
+        {
+            big.AddThemeColorOverride("font_color", tint);
+        }
+
+        cell.AddChild(big);
+        cell.AddChild(UiStyle.Caps(caption));
+        return cell;
+    }
+
+    /// <summary>The first sentence of some words, and the rest.</summary>
+    public static (string First, string After) Headline(string words)
+    {
+        var stop = words.IndexOf(". ", System.StringComparison.Ordinal);
+        return stop < 0 ? (words.TrimEnd('.'), "") : (words[..stop], words[(stop + 2)..]);
+    }
+
+    /// <summary>
+    /// The results screen, laid out as the front page of the parish newsletter: the council's verdict as
+    /// the headline, the day in four big numbers, then the money and how the field and the people fared.
+    /// </summary>
     public static Control Results(ResultsView view, System.Action? next = null, bool closed = false)
     {
-        var panel = Card(760);
+        var panel = Card(1040);
         var box = new VBoxContainer();
-        box.AddThemeConstantOverride("separation", 7);
+        box.AddThemeConstantOverride("separation", 10);
         panel.AddChild(box);
-
-        // Kept tight, so the whole panel and its button fit on a 900 pixel high screen.
-        box.AddChild(UiStyle.Heading($"Year {view.Year} results", 28));
-        box.AddChild(UiStyle.Body(view.Weather.Length > 0 ? $"{view.Festival}  ·  {view.Weather}" : view.Festival, muted: true, size: 15));
 
         var takings = 0;
         foreach (var (_, amount) in view.In)
@@ -88,32 +124,67 @@ public static partial class YearPanels
         }
 
         var profit = takings - costs;
-        var top = new HBoxContainer();
-        top.AddThemeConstantOverride("separation", 10);
-        foreach (var (big, small) in new[]
+        var grew = view.LicenceNext > view.LicenceNow;
+        var (headline, rest) = Headline(view.Verdict);
+
+        var kicker = UiStyle.Caps($"The parish newsletter  ·  Year {view.Year} results", pink: true, size: 13);
+        kicker.HorizontalAlignment = HorizontalAlignment.Center;
+        box.AddChild(kicker);
+        var said = UiStyle.Heading($"\u201C{headline}\u201D", headline.Length > 44 ? 30 : headline.Length > 30 ? 38 : 46);
+        said.HorizontalAlignment = HorizontalAlignment.Center;
+        said.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        said.CustomMinimumSize = new Vector2(940, 0);
+        box.AddChild(said);
+        if (rest.Length > 0)
         {
-            ($"{view.Came}", $"came, of {view.Expected} expected"),
-            ($"{view.Happy}%", view.WentHome > 0 ? $"happy. {view.WentHome} went home early" : "happy"),
-            ($"{(profit < 0 ? "-" : "")}£{System.Math.Abs(profit):N0}", profit >= 0 ? "profit" : "loss"),
+            var more = UiStyle.Body(rest, size: 15);
+            more.HorizontalAlignment = HorizontalAlignment.Center;
+            more.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+            more.CustomMinimumSize = new Vector2(940, 0);
+            box.AddChild(more);
+        }
+
+        var where = UiStyle.Body(view.Weather.Length > 0 ? $"{view.Festival}  ·  {view.Weather}" : view.Festival, muted: true, size: 14);
+        where.HorizontalAlignment = HorizontalAlignment.Center;
+        box.AddChild(where);
+        var licence = UiStyle.Heading(closed ? "The festival has closed" : grew ? $"Next year: licence for up to {view.LicenceNext:N0} people" : $"Next year: licence stays at {view.LicenceNext:N0} people", 20);
+        licence.HorizontalAlignment = HorizontalAlignment.Center;
+        if (grew)
+        {
+            licence.AddThemeColorOverride("font_color", UiStyle.StagePink);
+        }
+
+        box.AddChild(licence);
+        box.AddChild(UiStyle.Rule());
+
+        var top = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
+        top.AddThemeConstantOverride("separation", 70);
+        foreach (var (big, small, colour) in new (string, string, Color?)[]
+        {
+            ($"{view.Came:N0}", $"came, of {view.Expected:N0}", null),
+            ($"{view.Happy}%", view.WentHome > 0 ? $"happy  ·  {view.WentHome} left early" : "happy", view.Happy >= 70 ? UiStyle.FirstAidGreen : null),
+            ($"{(profit < 0 ? "-" : "")}£{System.Math.Abs(profit):N0}", profit >= 0 ? "profit" : "loss", profit >= 0 ? UiStyle.StagePink : null),
+            ($"{view.LitterCleared}%", "litter cleared", null),
         })
         {
-            var tile = Tile(false, 200);
-            var inner = new VBoxContainer();
-            inner.AddChild(UiStyle.Heading(big, 30));
-            inner.AddChild(UiStyle.Body(small, muted: true, size: 14));
-            tile.AddChild(inner);
-            top.AddChild(tile);
+            var cell = BigNumber(big, small, colour, 50);
+            foreach (var child in cell.GetChildren())
+            {
+                ((Label)child).HorizontalAlignment = HorizontalAlignment.Center;
+            }
+
+            top.AddChild(cell);
         }
 
         box.AddChild(top);
-        box.AddChild(new Control { CustomMinimumSize = new Vector2(0, 4) });
+        box.AddChild(UiStyle.Rule(1));
 
         var columns = new HBoxContainer();
-        columns.AddThemeConstantOverride("separation", 36);
+        columns.AddThemeConstantOverride("separation", 40);
         foreach (var (title, lines, total) in new[] { ("Money in", view.In, takings), ("Money out", view.Out, costs) })
         {
             var column = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
-            column.AddThemeConstantOverride("separation", 5);
+            column.AddThemeConstantOverride("separation", 3);
             column.AddChild(Section(title));
             foreach (var (what, amount) in lines)
             {
@@ -125,33 +196,31 @@ public static partial class YearPanels
             columns.AddChild(column);
         }
 
-        box.AddChild(columns);
-        box.AddChild(new Control { CustomMinimumSize = new Vector2(0, 4) });
-
-        box.AddChild(Section("The field afterwards"));
-        box.AddChild(MoneyRow("Litter cleared", $"{view.LitterCleared}%"));
-        box.AddChild(MoneyRow("Grass worn out", view.FieldRepair > 0 ? $"{view.GrassWorn}%. The farmer charged £{view.FieldRepair:N0} to put it right" : $"{view.GrassWorn}%"));
-        box.AddChild(Section("People looked after"));
+        var after = new VBoxContainer { CustomMinimumSize = new Vector2(290, 0) };
+        after.AddThemeConstantOverride("separation", 3);
+        after.AddChild(Section("The field afterwards"));
+        after.AddChild(Wrapped(view.FieldRepair > 0 ? $"Grass worn out: {view.GrassWorn}%. The farmer charged £{view.FieldRepair:N0} to put it right." : $"Grass worn out: {view.GrassWorn}%.", 290));
+        after.AddChild(new Control { CustomMinimumSize = new Vector2(0, 6) });
+        after.AddChild(Section("People looked after"));
         var crush = (view.CrushInjuries > 0 ? $", {view.CrushInjuries} hurt in a crush" : "") + (view.PulledOut > 0 ? $", {view.PulledOut} lifted out of a crush in time" : "");
-        box.AddChild(MoneyRow("Taken ill or hurt", (view.Untreated > 0 ? $"{view.Treated} treated, {view.Untreated} left with no help" : $"{view.Treated} treated") + crush));
-        box.AddChild(MoneyRow("Trouble", view.TroubleIgnored > 0 ? $"{view.TroubleSorted} sorted out, {view.TroubleIgnored} nobody dealt with" : $"{view.TroubleSorted} sorted out"));
+        after.AddChild(Wrapped("Taken ill or hurt: " + (view.Untreated > 0 ? $"{view.Treated} treated, {view.Untreated} left with no help" : $"{view.Treated} treated") + crush + ".", 290));
+        after.AddChild(Wrapped("Trouble: " + (view.TroubleIgnored > 0 ? $"{view.TroubleSorted} sorted out, {view.TroubleIgnored} nobody dealt with" : $"{view.TroubleSorted} sorted out") + ".", 290));
+        columns.AddChild(after);
+        box.AddChild(columns);
 
-        var verdict = new PanelContainer();
-        var grew = view.LicenceNext > view.LicenceNow;
-        verdict.AddThemeStyleboxOverride("panel", UiStyle.Box(grew ? UiStyle.PinkTint : UiStyle.Ground, 12, grew ? UiStyle.StagePink : UiStyle.Border, 16));
-        var words = new VBoxContainer();
-        words.AddChild(Section("The parish council says"));
-        var said = UiStyle.Body(view.Verdict, size: 16);
-        said.AutowrapMode = TextServer.AutowrapMode.WordSmart;
-        words.AddChild(said);
-        words.AddChild(UiStyle.Heading(closed ? "The festival has closed" : grew ? $"Next year: licence for up to {view.LicenceNext:N0} people" : $"Next year: licence stays at {view.LicenceNext:N0} people", 19));
-        verdict.AddChild(words);
-        box.AddChild(verdict);
-
-        var buttons = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.End };
+        var buttons = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
         buttons.AddChild(UiStyle.Button(closed ? "Back to the menu" : $"Plan year {view.Year + 1}", next ?? (() => { })));
+        box.AddChild(new Control { CustomMinimumSize = new Vector2(0, 2) });
         box.AddChild(buttons);
         return panel;
+    }
+
+    internal static Label Wrapped(string text, int width, bool muted = false, int size = 14)
+    {
+        var label = UiStyle.Body(text, muted, size);
+        label.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        label.CustomMinimumSize = new Vector2(width, 0);
+        return label;
     }
 
     /// <summary>The small panel shown while building. In a year that sells ahead it is build week, and each day sells the last tickets.</summary>
@@ -162,7 +231,8 @@ public static partial class YearPanels
         var box = new VBoxContainer();
         box.AddThemeConstantOverride("separation", 8);
         panel.AddChild(box);
-        box.AddChild(UiStyle.Heading(week is null ? "Build day" : week.Day is null ? "Build week: ready" : $"Build week: {week.Day}", 22));
+        box.AddChild(UiStyle.Caps(week is null ? "Friday" : "Build week", pink: true));
+        box.AddChild(UiStyle.Heading(week is null ? "Build day" : week.Day ?? "Ready to open", 28));
         var words = UiStyle.Body(week is null
             ? "Friday. Nobody is here yet and the clock is stopped. Put up what you need, then open the gates."
             : "Nobody is here yet and the clock is stopped. Put up what you need. Ending each day sells that day's tickets.", muted: true, size: 14);
@@ -172,7 +242,7 @@ public static partial class YearPanels
         if (forecast.Length > 0)
         {
             var weather = new PanelContainer();
-            weather.AddThemeStyleboxOverride("panel", UiStyle.Box(UiStyle.Ground, 10, UiStyle.Border, 12));
+            weather.AddThemeStyleboxOverride("panel", UiStyle.Box(UiStyle.SunTint, 8, null, 12));
             var lines = new VBoxContainer();
             lines.AddChild(Section(week is null ? "Tomorrow's weather" : "Saturday's weather"));
             var said = UiStyle.Body(forecast, size: 15);
@@ -225,14 +295,15 @@ public static partial class YearPanels
         var box = new VBoxContainer();
         box.AddThemeConstantOverride("separation", 8);
         panel.AddChild(box);
-        box.AddChild(UiStyle.Heading("The morning after", 22));
+        box.AddChild(UiStyle.Caps("Sunday", pink: true));
+        box.AddChild(UiStyle.Heading("The morning after", 28));
         var words = UiStyle.Body("The farmer wants his field back as he lent it. Click litter to pick it up, or pay for help.", muted: true, size: 14);
         words.AutowrapMode = TextServer.AutowrapMode.WordSmart;
         words.CustomMinimumSize = new Vector2(300, 0);
         box.AddChild(words);
         box.AddChild(MoneyRow("Litter left", $"{litterLeft} of {litterAtStart}"));
         var bar = new ProgressBar { Value = 100.0 * (litterAtStart - litterLeft) / System.Math.Max(1, litterAtStart), ShowPercentage = false, CustomMinimumSize = new Vector2(0, 14) };
-        bar.AddThemeStyleboxOverride("fill", UiStyle.Box(new Color("#1E9E52"), 7));
+        bar.AddThemeStyleboxOverride("fill", UiStyle.Box(UiStyle.FirstAidGreen, 7));
         bar.AddThemeStyleboxOverride("background", UiStyle.Box(UiStyle.Border, 7));
         box.AddChild(bar);
         box.AddChild(new Control { CustomMinimumSize = new Vector2(0, 4) });

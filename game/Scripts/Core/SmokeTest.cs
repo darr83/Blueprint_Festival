@@ -26,6 +26,24 @@ public partial class SmokeTest : Node
     private const string FestivalName = "Smoke Test Fayre";
     private const double TimeoutSeconds = 120;
 
+    private static BlueprintFestival.UI.Paper? FindPaper(Node from)
+    {
+        foreach (var child in from.GetChildren())
+        {
+            if (child is BlueprintFestival.UI.Paper paper)
+            {
+                return paper;
+            }
+
+            if (FindPaper(child) is { } deeper)
+            {
+                return deeper;
+            }
+        }
+
+        return null;
+    }
+
     private enum Stage { Menu, Opening, Running, ShowTime, Paused, Turning, BackToMenu, Loading, Planning, Building, Tidying, Results, NextYear, Done }
 
     private Stage _stage = Stage.Menu;
@@ -99,6 +117,13 @@ public partial class SmokeTest : Node
                     Check(opened.Game.Crowd.OnSite == 0 && opened.Crowd.Count == 0, "Nobody should be there before the gates open.");
                     Check(opened.Game.Crowd.Expected is >= 100 and <= 200, "A village festival should expect 100 to 200 people.");
                     Check(opened.TopBar.PeopleText == $"On site 0 of {opened.Game.Crowd.Expected}", $"The top bar should count people, not say '{opened.TopBar.PeopleText}'.");
+
+                    // The festival programme look: its own fonts, icons drawn from lines, and the badges clear of the field.
+                    Check(BlueprintFestival.UI.UiStyle.Serif != ThemeDB.FallbackFont && BlueprintFestival.UI.UiStyle.Sans != ThemeDB.FallbackFont, "The poster font and the text font should load from the Fonts folder.");
+                    Check(BlueprintFestival.UI.UiStyle.Icon("stage").GetWidth() >= 48 && BlueprintFestival.UI.UiStyle.Icon("stage") == BlueprintFestival.UI.UiStyle.Icon("stage"), "Icons should be drawn once and kept.");
+                    Check(opened.TopBar.MouseFilter == Control.MouseFilterEnum.Ignore && opened.TopBar.Size.Y < BlueprintFestival.UI.UiStyle.TopClear, "The badges along the top should let clicks through to the field and stay clear of the side panels.");
+                    Check(BlueprintFestival.UI.YearPanels.Headline("A good festival and a tidy field. The council raises the licence to 400 people.") == ("A good festival and a tidy field", "The council raises the licence to 400 people."), "The results headline should be the verdict's first sentence.");
+                    Check(BlueprintFestival.UI.YearPanels.Headline("Rained off") == ("Rained off", ""), "A verdict of one sentence should be all headline.");
 
                     // Build a first festival with the build bar: a bandstand, the gap fenced, a gate in it.
                     var site = opened.Game.Site;
@@ -515,6 +540,7 @@ public partial class SmokeTest : Node
                 if (_stageTime > 0.4 && Festival is { } results)
                 {
                     Check(results.Year.Showing == Phase.Results && results.Year.HasCentrePanel, "The results screen should be up.");
+                    Check(FindPaper(results.Year) is { } sheet && sheet.Size.Y <= results.GetViewport().GetVisibleRect().Size.Y - BlueprintFestival.UI.UiStyle.TopClear + 14, "The results should be printed on a sheet of paper that fits under the top badges.");
                     Check(results.Litter.Count == 0, "The cleared litter should be gone from the field.");
                     var again = FestivalGame.Load(SaveData.FromJson(results.Game.Save().ToJson()));
                     Check(again.Phase == Phase.Results && again.Result == results.Game.Result, "The results should save and load.");

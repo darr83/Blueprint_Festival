@@ -40,49 +40,55 @@ public partial class BuildBar : VBoxContainer
         AddThemeConstantOverride("separation", 8);
         MouseFilter = MouseFilterEnum.Ignore;
 
-        _status = UiStyle.Body("", size: 15);
-        _status.HorizontalAlignment = HorizontalAlignment.Center;
-        _status.AddThemeColorOverride("font_color", Colors.White);
-        _status.AddThemeColorOverride("font_outline_color", new Color(0.11f, 0.17f, 0.21f, 0.9f));
-        _status.AddThemeConstantOverride("outline_size", 6);
-        _status.MouseFilter = MouseFilterEnum.Ignore;
+        _status = Outlined("", 15);
         AddChild(_status);
 
         _choicePanel = new PanelContainer { Visible = false, SizeFlagsHorizontal = SizeFlags.ShrinkCenter };
-        _choicePanel.AddThemeStyleboxOverride("panel", UiStyle.Card(margin: 10, radius: 14));
+        _choicePanel.AddThemeStyleboxOverride("panel", UiStyle.Card(margin: 12, radius: 14));
         _choiceRow = new HBoxContainer();
         _choiceRow.AddThemeConstantOverride("separation", 8);
         _choicePanel.AddChild(_choiceRow);
         AddChild(_choicePanel);
 
-        var bar = new PanelContainer { SizeFlagsHorizontal = SizeFlags.ShrinkCenter };
-        bar.AddThemeStyleboxOverride("panel", UiStyle.Card(margin: 8, radius: 14));
-        var row = new HBoxContainer();
-        row.AddThemeConstantOverride("separation", 6);
-        bar.AddChild(row);
-        AddChild(bar);
+        // A row of round buttons, each with its name underneath, straight on the field.
+        var row = new HBoxContainer { SizeFlagsHorizontal = SizeFlags.ShrinkCenter, MouseFilter = MouseFilterEnum.Ignore };
+        row.AddThemeConstantOverride("separation", 14);
+        AddChild(row);
 
-        var title = UiStyle.Body("Build", muted: true, size: 14);
-        row.AddChild(new Control { CustomMinimumSize = new Vector2(4, 0) });
-        row.AddChild(title);
-        AddTab(row, BuildMode.Stage, "Stages", "Somewhere for the acts to play");
-        AddTab(row, BuildMode.Fence, "Fences", "Keep people in, out, or in a line");
-        AddTab(row, BuildMode.Gate, "Gates", "Where tickets are checked");
-        AddTab(row, BuildMode.Stall, "Stalls", "Food, drink, toilets and water");
-        AddTab(row, BuildMode.Staff, "Staff", "Ticket staff, security and first aid");
-        AddTab(row, BuildMode.Ground, "Ground", "Straw, trackway and paths, to keep feet out of the mud");
-        AddTab(row, BuildMode.Remove, "Take down", "Remove something and get the money back");
+        AddTab(row, BuildMode.Stage, "stage", "Stages", "Somewhere for the acts to play");
+        AddTab(row, BuildMode.Fence, "fence", "Fences", "Keep people in, out, or in a line");
+        AddTab(row, BuildMode.Gate, "gate", "Gates", "Where tickets are checked");
+        AddTab(row, BuildMode.Stall, "stall", "Stalls", "Food, drink, toilets and water");
+        AddTab(row, BuildMode.Staff, "staff", "Staff", "Ticket staff, security and first aid");
+        AddTab(row, BuildMode.Ground, "ground", "Ground", "Straw, trackway and paths, to keep feet out of the mud");
+        AddTab(row, BuildMode.Remove, "remove", "Take down", "Remove something and get the money back");
 
         SetAnchorsAndOffsetsPreset(LayoutPreset.BottomWide, LayoutPresetMode.Minsize, 14);
         GrowVertical = GrowDirection.Begin;
     }
 
-    private void AddTab(Container row, BuildMode mode, string text, string tip)
+    private static Label Outlined(string text, int size)
     {
-        var button = UiStyle.SecondaryButton(text, () => Toggle(mode), Sounds.Tab);
+        var label = UiStyle.Body(text, size: size, bold: true);
+        label.HorizontalAlignment = HorizontalAlignment.Center;
+        label.AddThemeColorOverride("font_color", Colors.White);
+        label.AddThemeColorOverride("font_outline_color", new Color(0.1f, 0.12f, 0.08f, 0.85f));
+        label.AddThemeConstantOverride("outline_size", 5);
+        label.MouseFilter = MouseFilterEnum.Ignore;
+        return label;
+    }
+
+    private void AddTab(Container row, BuildMode mode, string icon, string text, string tip)
+    {
+        var button = UiStyle.RoundButton(icon, () => Toggle(mode), 62, floating: true, sound: Sounds.Tab);
         button.ToggleMode = true;
         button.TooltipText = tip;
-        row.AddChild(button);
+        button.SizeFlagsHorizontal = SizeFlags.ShrinkCenter;
+        var column = new VBoxContainer { CustomMinimumSize = new Vector2(72, 0), MouseFilter = MouseFilterEnum.Ignore };
+        column.AddThemeConstantOverride("separation", 4);
+        column.AddChild(button);
+        column.AddChild(Outlined(text, 13));
+        row.AddChild(column);
         _tabs[mode] = button;
     }
 
@@ -192,12 +198,50 @@ public partial class BuildBar : VBoxContainer
         return true;
     }
 
+    /// <summary>The icon for a thing to build, from its key: toilets get a door, first aid a green cross, and so on.</summary>
+    private static (string Icon, Color Colour) IconOf(string key)
+    {
+        var k = key.ToLowerInvariant();
+        var booth = k.StartsWith("stall") || k.StartsWith("staff");
+        return booth && (k.Contains("aid") || k.Contains("medical")) ? ("cross", UiStyle.FirstAidGreen)
+            : booth && k.Contains("toilet") ? ("door", UiStyle.StagePink)
+            : booth && k.Contains("water") ? ("drop", UiStyle.StagePink)
+            : k.StartsWith("stallbar") ? ("glass", UiStyle.StagePink)
+            : k.StartsWith("stalltea") ? ("cup", UiStyle.StagePink)
+            : booth && k.Contains("security") ? ("shield", UiStyle.StagePink)
+            : booth && k.Contains("ticket") ? ("ticket", UiStyle.StagePink)
+            : k.StartsWith("stage") ? ("stage", UiStyle.StagePink)
+            : k.StartsWith("fence") ? ("fence", UiStyle.StagePink)
+            : k.StartsWith("gate") ? ("gate", UiStyle.StagePink)
+            : k.StartsWith("staff") ? ("staff", UiStyle.StagePink)
+            : k.StartsWith("ground") ? ("ground", UiStyle.StagePink)
+            : ("stall", UiStyle.StagePink);
+    }
+
     private void AddChoice(string key, string name, string price, string tip, System.Action pick)
     {
-        var button = UiStyle.SecondaryButton($"{name}\n{price}", pick);
+        // A card: the icon, the name, and the price in the poster font.
+        var button = UiStyle.Button("", pick);
+        button.ThemeTypeVariation = UiStyle.ChoiceCard;
         button.ToggleMode = true;
         button.TooltipText = tip;
-        button.CustomMinimumSize = new Vector2(150, 0);
+        button.CustomMinimumSize = new Vector2(124, 104);
+        var column = new VBoxContainer { MouseFilter = MouseFilterEnum.Ignore, Alignment = AlignmentMode.Center };
+        column.AddThemeConstantOverride("separation", 1);
+        column.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect, LayoutPresetMode.Minsize, 6);
+        var (icon, colour) = IconOf(key);
+        column.AddChild(UiStyle.IconView(icon, 30, colour));
+        var title = UiStyle.Body(name, size: 13, bold: true);
+        title.HorizontalAlignment = HorizontalAlignment.Center;
+        title.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        title.MaxLinesVisible = 2;
+        title.MouseFilter = MouseFilterEnum.Ignore;
+        column.AddChild(title);
+        var cost = UiStyle.Heading(price, 15);
+        cost.HorizontalAlignment = HorizontalAlignment.Center;
+        cost.MouseFilter = MouseFilterEnum.Ignore;
+        column.AddChild(cost);
+        button.AddChild(column);
         _choiceRow.AddChild(button);
         _choices[key] = button;
     }

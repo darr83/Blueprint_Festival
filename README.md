@@ -64,6 +64,7 @@ game/                               Godot project (open this folder in Godot)
   Scenes/                           Main menu and festival scenes
   Audio/                            The list of sound effects (sounds.json) and their files
   Music/                            A folder for each artist's songs
+  Fonts/                            The poster font (Fraunces) and the text font (Inter), both free to ship
   Scripts/Audio/                    The sound board and what the festival sounds like
   Scripts/Core/                     Game manager, saves, launch test, screenshot tool
   Scripts/UI/                       Look and feel, menus, top bar, view buttons
@@ -77,6 +78,13 @@ docs/screenshots/                   Screenshots from each step
 
 The rules live in `src/` as plain C#, so they can be tested quickly without starting Godot. The
 `game/` project only draws the world and takes input.
+
+## The look
+
+Every screen is styled as a festival programme: white paper with pink and sunflower bunting, poster
+headings, the ticket price on a ticket stub and the results as a parish newsletter. The shared pieces
+(colours, fonts, icons, bunting, the ticket) are all in `game/Scripts/UI/UiStyle.cs`. The mock-ups it
+was chosen from are in `docs/screenshots/step-17-mockup/`.
 
 ## Running it
 

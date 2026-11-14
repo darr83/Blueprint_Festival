@@ -82,7 +82,7 @@ public partial class EstateMap : Control
 
     public override void _Draw()
     {
-        var font = GetThemeDefaultFont();
+        var font = UiStyle.SansSemi;
         var s = Scale;
         DrawRect(new Rect2(Vector2.Zero, Size), Land);
 
@@ -173,8 +173,8 @@ public static partial class YearPanels
         var box = new VBoxContainer();
         box.AddThemeConstantOverride("separation", 8);
         panel.AddChild(box);
-        box.AddChild(UiStyle.Heading($"January: choose your fields for year {view.Year}", 26));
-        box.AddChild(UiStyle.Body($"{view.Festival}  ·  Licence for up to {view.Licence:N0} people  ·  £{view.Bank:N0} in the bank  ·  Click a field, then say what it is for", muted: true, size: 15));
+        Masthead(box, $"January  ·  {view.Festival}  ·  Year {view.Year}", "Choose your fields",
+            UiStyle.Body($"Licence for up to {view.Licence:N0} people  ·  £{view.Bank:N0} in the bank  ·  Click a field, then say what it is for", muted: true, size: 14), 36);
 
         var columns = new HBoxContainer();
         columns.AddThemeConstantOverride("separation", 16);
