@@ -18,26 +18,26 @@ public partial class MainMenu : Control
         SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
         Theme = UiStyle.Theme;
 
-        AddChild(new ColorRect { Color = UiStyle.Ground, AnchorRight = 1, AnchorBottom = 1 });
-        AddChild(new ColorRect { Color = UiStyle.StagePink, AnchorRight = 1, OffsetBottom = 10 });
-        AddChild(new ColorRect { Color = UiStyle.Sunflower, AnchorRight = 1, OffsetTop = 10, OffsetBottom = 14 });
+        AddChild(new ColorRect { Color = UiStyle.Surface, AnchorRight = 1, AnchorBottom = 1 });
+        AddChild(new Bunting { AnchorRight = 1, OffsetBottom = 34, FlagWidth = 52 });
 
         var centre = new CenterContainer { AnchorRight = 1, AnchorBottom = 1 };
         AddChild(centre);
 
-        var column = new VBoxContainer { CustomMinimumSize = new Vector2(400, 0) };
-        column.AddThemeConstantOverride("separation", 14);
+        var column = new VBoxContainer { CustomMinimumSize = new Vector2(420, 0) };
+        column.AddThemeConstantOverride("separation", 12);
         centre.AddChild(column);
 
-        var title = UiStyle.Heading("Blueprint Festival", 56);
+        var kicker = UiStyle.Caps("Plan it  ·  build it  ·  run it  ·  tidy up", pink: true, size: 13);
+        kicker.HorizontalAlignment = HorizontalAlignment.Center;
+        column.AddChild(kicker);
+        var title = UiStyle.Heading("Blueprint Festival", 64);
         title.HorizontalAlignment = HorizontalAlignment.Center;
         column.AddChild(title);
-        var subtitle = UiStyle.Body("Plan it, build it, run it, tidy up.", muted: true);
-        subtitle.HorizontalAlignment = HorizontalAlignment.Center;
-        column.AddChild(subtitle);
-        column.AddChild(new Control { CustomMinimumSize = new Vector2(0, 20) });
+        column.AddChild(UiStyle.Rule());
+        column.AddChild(new Control { CustomMinimumSize = new Vector2(0, 14) });
 
-        column.AddChild(UiStyle.Body("Name your festival", muted: true, size: 14));
+        column.AddChild(UiStyle.Caps("Name your festival"));
         _name = new LineEdit { PlaceholderText = FestivalGame.DefaultName, MaxLength = FestivalGame.MaxNameLength };
         _name.TextSubmitted += _ => StartNew();
         column.AddChild(_name);
@@ -57,7 +57,7 @@ public partial class MainMenu : Control
         _message.AutowrapMode = TextServer.AutowrapMode.WordSmart;
         column.AddChild(_message);
 
-        var version = UiStyle.Body("Step 11: sound", muted: true, size: 13);
+        var version = UiStyle.Body("Step 17: the festival programme look", muted: true, size: 13);
         AddChild(version);
         version.SetAnchorsAndOffsetsPreset(LayoutPreset.BottomLeft, LayoutPresetMode.Minsize, 18);
         version.GrowVertical = GrowDirection.Begin;

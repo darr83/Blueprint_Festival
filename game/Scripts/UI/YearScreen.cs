@@ -158,8 +158,10 @@ public partial class YearScreen : Control
 
     private void Centre(Control panel)
     {
-        AddChild(new ColorRect { Color = new Color(0.11f, 0.17f, 0.21f, 0.45f), AnchorRight = 1, AnchorBottom = 1, MouseFilter = MouseFilterEnum.Stop });
-        var centre = new CenterContainer { AnchorRight = 1, AnchorBottom = 1 };
+        AddChild(new ColorRect { Color = new Color(UiStyle.NightInk, 0.38f), AnchorRight = 1, AnchorBottom = 1, MouseFilter = MouseFilterEnum.Stop });
+
+        // The sheet sits in the middle of what is left under the badges along the top.
+        var centre = new CenterContainer { AnchorRight = 1, AnchorBottom = 1, OffsetTop = UiStyle.TopClear - 14, OffsetBottom = -8 };
         AddChild(centre);
         centre.AddChild(panel);
         HasCentrePanel = true;
@@ -168,9 +170,9 @@ public partial class YearScreen : Control
     private void Side(Control panel)
     {
         AddChild(panel);
-        panel.SetAnchorsAndOffsetsPreset(LayoutPreset.TopRight, LayoutPresetMode.Minsize, 18);
+        panel.SetAnchorsAndOffsetsPreset(LayoutPreset.TopRight, LayoutPresetMode.Minsize, 22);
         panel.GrowHorizontal = GrowDirection.Begin;
-        panel.Position = new Vector2(panel.Position.X, 62);
+        panel.Position = new Vector2(panel.Position.X, UiStyle.TopClear);
         _side = panel;
     }
 
@@ -207,8 +209,8 @@ public partial class YearScreen : Control
         {
             var at = game.SetOf(a.Name);
             var kind = a.Kind switch { ActKind.Dj => "DJ", ActKind.Solo => "Solo guitarist", ActKind.Duo => "Duo", ActKind.FolkBand => "Folk band", _ => "Band" };
-            return new ArtistView(a.Name, $"{kind}  ·  {Roster.NameOf(a.Genre)}  ·  {Roster.FansText(a.Fans)} fans", a.Rating, game.FeeOf(a.Rating),
-                at is { } set && set != picked ? $"on the {StageName(set)} at {TimeOf(game, set)}, click to swap" : "", at == picked);
+            return new ArtistView(a.Name, $"{kind} · {Roster.NameOf(a.Genre)} · {Roster.FansText(a.Fans)} fans", a.Rating, game.FeeOf(a.Rating),
+                at is { } set && set != picked ? $"Booked for the {StageName(set)} at {TimeOf(game, set)}" : "", at == picked);
         }).ToList(),
         game.TicketPrice, (int)System.Math.Round(game.FairPrice), (int)System.Math.Round(game.LineUpPull * 100), game.ActFees, game.LineUp.Count(), game.PlanCost,
         game.EarlyForecast, game.PonchosOrdered, game.PonchoCost,
