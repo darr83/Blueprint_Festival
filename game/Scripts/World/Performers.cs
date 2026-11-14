@@ -136,7 +136,7 @@ public static class Performers
     public static Node3D Stick()
     {
         var b = new MeshBuilder();
-        b.Tube(new Vector3(0, 0, 0.5f), new Vector3(0.024f, 1f, 0.024f), Cream, new Vector3(90, 0, 0));
+        b.Tube(new Vector3(0, 0, 0.5f), new Vector3(0.04f, 1f, 0.04f), Cream, new Vector3(90, 0, 0));
         return b.BuildNode("Stick");
     }
 
