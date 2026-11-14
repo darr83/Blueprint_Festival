@@ -270,6 +270,12 @@ public partial class FestivalScene : Node3D
             case Key.Key4:
                 Game.Clock.SetSpeed(GameSpeed.Fastest);
                 break;
+            case Key.Key5:
+                Game.Clock.SetSpeed(GameSpeed.Testing16);
+                break;
+            case Key.Key6:
+                Game.Clock.SetSpeed(GameSpeed.Testing32);
+                break;
             case Key.N:
                 Game.SkipToNextAct();
                 break;

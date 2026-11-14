@@ -59,7 +59,7 @@ brands or sponsors.
 | Build | Pick from the build bar, click to place, drag for fence, ground cover and paths |
 | Turn the piece being placed | R |
 | Stop building | Right-click or Esc |
-| Speed 1x / 2x / 4x / 8x | 1 / 2 / 3 / 4 |
+| Speed 1x / 2x / 4x / 8x (16x / 32x for testing) | 1 / 2 / 3 / 4 (5 / 6) |
 | Menu (save, main menu) | Esc |
 
 ## Layout
