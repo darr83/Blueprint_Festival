@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using BlueprintFestival.Core;
 using BlueprintFestival.Simulation;
+using BlueprintFestival.Simulation.Sales;
 using BlueprintFestival.Simulation.Show;
 using BlueprintFestival.World;
 using Godot;
@@ -25,6 +26,19 @@ public partial class YearScreen : Control
     private int _litterShown = -1;
     private int _moneyShown = int.MinValue;
     private Control? _side;
+    private int _slot = RunningOrder.SetsAStage - 1;
+    private float _run = -1;
+    private int _turnShown = -1;
+    private int _priceShown = -1;
+
+    /// <summary>How long a month takes to run on the sales screen, in seconds.</summary>
+    public const float MonthSeconds = 2.4f;
+
+    /// <summary>True while a month is running on the sales screen.</summary>
+    public bool Running => _run >= 0;
+
+    /// <summary>The set picked on the planning screen, which the next artist clicked is booked for.</summary>
+    public int SlotPicked => _slot;
 
     /// <summary>Which part of the year is on screen.</summary>
     public Phase Showing => _shown ?? Phase.Day;
@@ -46,7 +60,28 @@ public partial class YearScreen : Control
 
     public override void _Process(double delta)
     {
+        if (Running)
+        {
+            _run += (float)delta / MonthSeconds;
+            if (_run >= 1)
+            {
+                FinishRun();
+            }
+            else if (FindChild("Chart", true, false) is SalesChart chart)
+            {
+                chart.Shown = _run;
+                chart.QueueRedraw();
+                if (FindChild("Sold", true, false) is Label sold)
+                {
+                    sold.Text = $"{Mathf.RoundToInt(chart.SoldShown):N0}";
+                }
+            }
+
+            return;
+        }
+
         if (_shown != _game.Phase
+            || (_game.Phase == Phase.Build && (_turnShown != _game.SalesTurn || _priceShown != _game.TicketPrice))
             || (_game.Phase == Phase.Tidy && _litterShown != _game.Litter.Count)
             || (_game.Phase == Phase.Build && _moneyShown != _game.Money))
         {
@@ -61,24 +96,37 @@ public partial class YearScreen : Control
 
     private void Rebuild()
     {
-        foreach (var child in GetChildren())
+        var old = GetChildren();
+
+        var scroll = FindChild("Artists", true, false) is ScrollContainer artists ? artists.ScrollVertical : 0;
+        _shown = Running ? Phase.Sell : _game.Phase;
+        _turnShown = _game.SalesTurn;
+        _priceShown = _game.TicketPrice;
+        _litterShown = _game.Litter.Count;
+        _moneyShown = _game.Money;
+        _side = null;
+        HasCentrePanel = false;
+        foreach (var child in old)
         {
             RemoveChild(child);
             child.QueueFree();
         }
 
-        _shown = _game.Phase;
-        _litterShown = _game.Litter.Count;
-        _moneyShown = _game.Money;
-        _side = null;
-        HasCentrePanel = false;
-        switch (_game.Phase)
+        switch (_shown)
         {
             case Phase.Plan:
-                Centre(YearPanels.Plan(PlanOf(_game), StartBuilding, PickTicket, PickHeadliner, TogglePonchos, ToggleSecondStage, ToggleCamping));
+                Centre(YearPanels.Plan(PlanOf(_game, _slot), new PlanActions(BookEvent, PickSlot, PickArtist, ToggleStage, ChangePrice, TogglePonchos, ToggleCamping), scroll));
+                break;
+            case Phase.Sell:
+                Centre(YearPanels.Sales(SalesOf(_game, Running), RunMonth, ToggleAdvert, ChangePrice, Running));
+                if (Running && FindChild("Chart", true, false) is SalesChart chart)
+                {
+                    chart.Shown = 0;
+                }
+
                 break;
             case Phase.Build:
-                Side(YearPanels.BuildDay(_game.Crowd.Expected, _game.Money, OpenGates, _game.Weather.Summary));
+                Side(YearPanels.BuildDay(_game.Crowd.Expected, _game.Money, OpenGates, _game.Weather.Summary, WeekOf(_game), NextDay, ChangePrice));
                 break;
             case Phase.Tidy:
                 Side(YearPanels.Tidy(_game.Litter.Count, _game.LitterAtStart, _game.ScoutsFee, () => PayScouts(), HandBack));
@@ -119,16 +167,58 @@ public partial class YearScreen : Control
         _ => $"{act.Members.Count switch { 3 => "Three", 4 => "Four", 5 => "Five", var n => n.ToString() }}-piece {(act.Kind == ActKind.FolkBand ? "folk band" : "band")}",
     };
 
-    public static PlanView PlanOf(FestivalGame game) => new(
+    private static string TimeOf(FestivalGame game, int set)
+    {
+        var show = set >= RunningOrder.SecondBase ? game.SecondShow : game.Show;
+        return show.TimeOf(set - show.Base).Start.ToString("HH:mm");
+    }
+
+    private static string StageName(int set) => set >= RunningOrder.SecondBase ? "second stage" : "main stage";
+
+    private static IReadOnlyList<SlotView> SlotsOf(FestivalGame game, RunningOrder show) => Enumerable.Range(0, RunningOrder.SetsAStage).Select(i =>
+    {
+        var set = show.Base + i;
+        var act = show.At(set);
+        return new SlotView(set, TimeOf(game, set), act?.Name, act is null ? "" : Roster.NameOf(act.Genre), act?.Rating ?? 0, act is null ? 0 : game.FeeOf(act.Rating));
+    }).ToList();
+
+    /// <summary>What the planning screen shows, with one set picked to book an artist for.</summary>
+    public static PlanView PlanOf(FestivalGame game, int picked = 3) => new(
         game.Year, game.Name, game.Day.ToString("dddd d MMMM yyyy"), game.Licence, game.Money,
-        FestivalGame.TicketPrices.Select(p => new TicketChoice(p, game.ExpectedAt(p))).ToList(),
-        FestivalGame.TicketPrices.ToList().IndexOf(game.TicketPrice),
-        game.Headliners.Select(h => new ActOffer(h.Act.Name, $"{KindText(h.Act)} · {Roster.NameOf(h.Act.Genre)}", h.Fee, h.Stars, $"{Roster.FansText(h.Act.Fans)} fans")).ToList(),
-        game.HeadlinerPicked,
-        game.Show.Slots.Take(6).Select(s => $"{s.Act.Name} ({Roster.NameOf(s.Act.Genre).ToLowerInvariant()})").ToList(),
-        game.SupportFee / 6, game.EarlyForecast, game.PonchosOrdered, game.PonchoCost, game.Ground.Name, game.FieldRent,
-        game.SecondStageBooked, game.SecondStageFee,
+        SlotsOf(game, game.Show), game.SecondStageBooked ? SlotsOf(game, game.SecondShow) : null,
+        picked, $"the {StageName(picked)} at {TimeOf(game, picked)}",
+        Roster.Artists.Select(a =>
+        {
+            var at = game.SetOf(a.Name);
+            var kind = a.Kind switch { ActKind.Dj => "DJ", ActKind.Solo => "Solo guitarist", ActKind.Duo => "Duo", ActKind.FolkBand => "Folk band", _ => "Band" };
+            return new ArtistView(a.Name, $"{kind}  ·  {Roster.NameOf(a.Genre)}  ·  {Roster.FansText(a.Fans)} fans", a.Rating, game.FeeOf(a.Rating),
+                at is { } set && set != picked ? $"on the {StageName(set)} at {TimeOf(game, set)}, click to swap" : "", at == picked);
+        }).ToList(),
+        game.TicketPrice, (int)System.Math.Round(game.FairPrice), (int)System.Math.Round(game.LineUpPull * 100), game.ActFees, game.LineUp.Count(), game.PlanCost,
+        game.EarlyForecast, game.PonchosOrdered, game.PonchoCost, game.Ground.Name, game.FieldRent,
         game.CampingBooked, game.CampingOffered ? FestivalGame.CampingCost : 0, game.CampersExpected, FestivalGame.CampingFee);
+
+    /// <summary>What the ticket sales screen shows.</summary>
+    public static SalesView SalesOf(FestivalGame game, bool running = false)
+    {
+        // While a month plays out, the screen is still on that month.
+        var turn = running ? game.SalesTurn - 1 : game.SalesTurn;
+        var after = new List<int> { 0 };
+        foreach (var line in game.SalesLog)
+        {
+            after.Add(after[^1] + line.Tickets);
+        }
+
+        return new SalesView(game.Name, game.Licence, game.Money, turn, turn < FestivalGame.SalesMonths.Count ? FestivalGame.SalesMonths[turn] : null, game.TicketsSold,
+            game.SalesLog.Sum(l => l.Taken), game.SalesLog.Sum(l => l.AdCost), game.AdvertReach, game.AdvertCost, game.SalesForecast,
+            game.TicketPrice, (int)System.Math.Round(game.FairPrice), (int)System.Math.Round(game.LineUpPull * 100),
+            Adverts.All.Select(a => new AdvertView(a.Id, a.Name, a.Cost, a.Reach, a.Reaches, game.AdvertOn(a.Id))).ToList(),
+            game.SalesLog.Select(l => (l.When, l.Tickets, l.Price, l.AdCost)).ToList(), after);
+    }
+
+    /// <summary>What the build panel shows in build week, or null in a year whose tickets are paid for at the gate.</summary>
+    public static BuildWeekView? WeekOf(FestivalGame game) => !game.SoldAhead ? null
+        : new BuildWeekView(game.NextSalesTurn, game.TicketsSold, game.Licence, game.SalesForecast, game.AdvertCost, game.TicketPrice, (int)System.Math.Round(game.FairPrice));
 
     public static ResultsView ResultsOf(FestivalGame game)
     {
@@ -144,6 +234,102 @@ public partial class YearScreen : Control
     {
         _game.ChooseTicket(FestivalGame.TicketPrices[index]);
         SoundBoard.Cue(Sounds.Click);
+        Rebuild();
+    }
+
+    /// <summary>Picks the set that the next artist clicked is booked for.</summary>
+    public void PickSlot(int set)
+    {
+        _slot = set;
+        SoundBoard.Cue(Sounds.Click);
+        Rebuild();
+    }
+
+    /// <summary>Books an artist for the set picked, or with null leaves it empty.</summary>
+    public void PickArtist(string? artist)
+    {
+        SoundBoard.Cue(_game.BookAct(_slot, artist) ? Sounds.Click : Sounds.Refuse);
+        Rebuild();
+    }
+
+    /// <summary>Adds a second stage with empty sets to fill, or takes it away again.</summary>
+    public void ToggleStage()
+    {
+        if (_game.SecondStageBooked)
+        {
+            _game.BookSecondStage(false);
+            _slot = RunningOrder.SetsAStage - 1;
+        }
+        else
+        {
+            _game.AddEmptySecondStage();
+            _slot = RunningOrder.SecondBase;
+        }
+
+        SoundBoard.Cue(Sounds.Click);
+        Rebuild();
+    }
+
+    /// <summary>Puts the ticket price up or down by some pounds.</summary>
+    public void ChangePrice(int pounds)
+    {
+        _game.SetTicketPrice(_game.TicketPrice + pounds);
+        Rebuild();
+    }
+
+    public void ToggleAdvert(string id)
+    {
+        _game.SetAdvert(id, !_game.AdvertOn(id));
+        SoundBoard.Cue(Sounds.Click);
+        Rebuild();
+    }
+
+    /// <summary>Books the acts and puts the tickets on sale: on to the sales screen.</summary>
+    public void BookEvent()
+    {
+        if (_game.BookEvent())
+        {
+            Rebuild();
+        }
+        else
+        {
+            SoundBoard.Cue(Sounds.Refuse);
+        }
+    }
+
+    /// <summary>Runs the next month of ticket sales and plays it out on the chart.</summary>
+    public void RunMonth()
+    {
+        if (Running)
+        {
+            return;
+        }
+
+        if (_game.RunSales() is null)
+        {
+            SoundBoard.Cue(Sounds.Refuse);
+            return;
+        }
+
+        _run = 0;
+        Rebuild();
+    }
+
+    /// <summary>Jumps to the end of the month that is running.</summary>
+    public void FinishRun()
+    {
+        _run = -1;
+        Rebuild();
+    }
+
+    /// <summary>Ends a day of build week, which sells that day's tickets.</summary>
+    public void NextDay()
+    {
+        if (_game.RunSales() is null)
+        {
+            SoundBoard.Cue(Sounds.Refuse);
+        }
+
         Rebuild();
     }
 

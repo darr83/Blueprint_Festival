@@ -8,26 +8,21 @@ namespace BlueprintFestival.Simulation.Show;
 public sealed record Slot(int Index, Act Act, DateTime Start, DateTime End, bool Headliner);
 
 /// <summary>
-/// The day's music. Seven acts are made up from the festival's seed and play one after another,
-/// the headliner last. They play on the first stage the player has put up; with no stage there
-/// is no show.
+/// The music on one stage. A stage has four two-hour sets, at two, four, six and eight o'clock,
+/// and any of them may be left empty. It starts with acts made up from the festival's seed, and
+/// the player books who they like. The acts play on the stage the player has put up; with no
+/// stage there is no show.
 /// </summary>
 public sealed class RunningOrder
 {
-    /// <summary>When each set starts (hours after midnight) and how long it lasts (minutes).</summary>
+    /// <summary>When each set starts (hours after midnight) and how long it lasts (minutes). The same on every stage.</summary>
     private static readonly (double Start, int Minutes)[] Times =
     {
-        (12, 45), (13.25, 45), (14.5, 45), (16, 45), (17.5, 60), (19.25, 60), (20.75, 75),
+        (14, 120), (16, 120), (18, 120), (20, 120),
     };
 
-    /// <summary>
-    /// When each set on the second stage starts and how long it lasts. They overlap the main
-    /// stage's sets, so the crowd has a choice and splits between the two.
-    /// </summary>
-    private static readonly (double Start, int Minutes)[] SecondTimes =
-    {
-        (13, 40), (14.25, 40), (15.5, 40), (16.75, 40), (18.5, 45), (20.25, 45),
-    };
+    /// <summary>How many sets a stage has in the day.</summary>
+    public static int SetsAStage => Times.Length;
 
     /// <summary>Sets on the second stage are numbered from here, so a set's number says which stage it is on.</summary>
     public const int SecondBase = 100;
@@ -38,24 +33,26 @@ public sealed class RunningOrder
     private readonly SiteLayout _site;
     private readonly List<Slot> _slots = new();
 
+    private readonly DateTime _day;
+
     public RunningOrder(SiteLayout site, int seed, DateTime festivalDay)
     {
         _site = site;
+        _day = festivalDay.Date;
         var random = GameRandom.FromSeed(seed, 7);
         var taken = new HashSet<string>();
         for (var i = 0; i < Times.Length; i++)
         {
-            var headliner = i == Times.Length - 1;
-            var start = festivalDay.Date.AddHours(Times[i].Start);
-            _slots.Add(new Slot(i, ActGenerator.Make(random, headliner, taken), start, start.AddMinutes(Times[i].Minutes), headliner));
+            Put(i, ActGenerator.Make(random, i == Times.Length - 1, taken));
         }
     }
 
-    /// <summary>The line-up for a second stage: six smaller local acts, none of them already on the main stage. It plays only once it is booked.</summary>
+    /// <summary>The line-up for a second stage: four smaller local acts, none of them already on the main stage. It plays only once it is booked.</summary>
     public RunningOrder(SiteLayout site, int seed, DateTime festivalDay, RunningOrder main)
     {
         ArgumentNullException.ThrowIfNull(main);
         _site = site;
+        _day = festivalDay.Date;
         Second = true;
         Booked = false;
         var random = GameRandom.FromSeed(seed, 8);
@@ -65,13 +62,53 @@ public sealed class RunningOrder
             ActGenerator.Take(taken, slot.Act);
         }
 
-        for (var i = 0; i < SecondTimes.Length; i++)
+        for (var i = 0; i < Times.Length; i++)
         {
-            var start = festivalDay.Date.AddHours(SecondTimes[i].Start);
             var act = ActGenerator.Make(random, false, taken);
-            _slots.Add(new Slot(SecondBase + i, act with { Draw = act.Draw * SecondDraw }, start, start.AddMinutes(SecondTimes[i].Minutes), false));
+            Put(SecondBase + i, act with { Draw = act.Draw * SecondDraw });
         }
     }
+
+    /// <summary>The number of this stage's first set.</summary>
+    public int Base => Second ? SecondBase : 0;
+
+    /// <summary>When a set starts and ends, by its place in the day (0 to 3).</summary>
+    public (DateTime Start, DateTime End) TimeOf(int place)
+    {
+        var start = _day.AddHours(Times[place].Start);
+        return (start, start.AddMinutes(Times[place].Minutes));
+    }
+
+    private void Put(int index, Act? act)
+    {
+        _slots.RemoveAll(s => s.Index == index);
+        if (act is not null)
+        {
+            var (start, end) = TimeOf(index - Base);
+            _slots.Add(new Slot(index, act, start, end, false));
+        }
+
+        // The last act of the night on the main stage is the headliner.
+        _slots.Sort((a, b) => a.Index.CompareTo(b.Index));
+        for (var i = 0; i < _slots.Count; i++)
+        {
+            _slots[i] = _slots[i] with { Headliner = !Second && i == _slots.Count - 1 };
+        }
+    }
+
+    /// <summary>Books an act for a set, or with null leaves the set empty.</summary>
+    public void Book(int index, Act? act)
+    {
+        if (index < Base || index >= Base + Times.Length)
+        {
+            throw new ArgumentOutOfRangeException(nameof(index), index, "No such set on this stage.");
+        }
+
+        Put(index, act);
+    }
+
+    /// <summary>Who is booked for a set, or null if it is empty.</summary>
+    public Act? At(int index) => _slots.FirstOrDefault(s => s.Index == index)?.Act;
 
     /// <summary>True for the second stage's line-up.</summary>
     public bool Second { get; }
@@ -89,13 +126,14 @@ public sealed class RunningOrder
         return site.Stages.Select((stage, built) => (stage, built)).OrderByDescending(s => Catalogue.Of(s.stage.Kind).Cost).ThenBy(s => s.built).Select(s => s.stage).ToList();
     }
 
+    /// <summary>The sets that have an act booked, in the order they play.</summary>
     public IReadOnlyList<Slot> Slots => _slots;
 
     /// <summary>Books a different act for the last set of the night.</summary>
     public void SetHeadliner(Act act)
     {
         ArgumentNullException.ThrowIfNull(act);
-        _slots[^1] = _slots[^1] with { Act = act };
+        Put(Base + Times.Length - 1, act);
     }
 
     /// <summary>The stage the acts play on, or null if none has been put up.</summary>

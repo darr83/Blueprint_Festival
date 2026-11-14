@@ -1,4 +1,5 @@
 using BlueprintFestival.Simulation.Core;
+using BlueprintFestival.Simulation.Sales;
 using BlueprintFestival.Simulation.Show;
 using BlueprintFestival.Simulation.Site;
 using BlueprintFestival.Simulation.World;
@@ -25,6 +26,9 @@ public enum Phase
 
     /// <summary>The festival has run out of money for good.</summary>
     Closed,
+
+    /// <summary>January to June: the acts are booked and tickets are on sale, a month at a time. It comes between Plan and Build.</summary>
+    Sell,
 }
 
 /// <summary>What a year starts with, carried over from the one before.</summary>
@@ -123,24 +127,112 @@ public sealed partial class FestivalGame
     /// <summary>Which headliner is picked, counting from 0.</summary>
     public int HeadlinerPicked { get; private set; } = 1;
 
-    /// <summary>What the six acts before the headliner cost between them.</summary>
-    public int SupportFee => 6 * Scaled(40);
+    /// <summary>What an act with so many stars charges at a village festival. It goes up with the size of the licence.</summary>
+    private static int BaseFee(int stars) => stars switch { <= 1 => 25, 2 => 45, 3 => 110, 4 => 350, _ => 750 };
 
-    /// <summary>What the acts cost in all with the headliner picked, and the second stage's acts if they are booked.</summary>
-    public int ActFees => SupportFee + (_offers.Count > 0 ? _offers[HeadlinerPicked].Fee : 0) + (SecondStageBooked ? SecondStageFee : 0);
+    /// <summary>What an artist charges to play this festival.</summary>
+    public int FeeOf(int stars) => Scaled(BaseFee(stars));
 
-    /// <summary>What the six acts for a second stage cost between them.</summary>
-    public int SecondStageFee => SecondShow.Slots.Count * Scaled(40);
+    /// <summary>Every set that has an act booked, on the stages in use.</summary>
+    public IEnumerable<Slot> LineUp => SecondShow.Booked ? Show.Slots.Concat(SecondShow.Slots) : Show.Slots;
 
-    /// <summary>True if acts are booked for a second stage. They play on the second biggest stage on the field.</summary>
+    /// <summary>What all the acts booked cost.</summary>
+    public int ActFees => LineUp.Sum(s => FeeOf(s.Act.Rating));
+
+    /// <summary>What the second stage's acts cost, booked or not.</summary>
+    public int SecondStageFee => SecondShow.Slots.Sum(s => FeeOf(s.Act.Rating));
+
+    /// <summary>True if acts are booked for a second stage.</summary>
     public bool SecondStageBooked => SecondShow.Booked;
 
-    /// <summary>Books a line-up for a second stage, or cancels it. Only while planning.</summary>
+    /// <summary>Books or cancels the second stage's acts. Its four sets keep whoever was in them.</summary>
     public void BookSecondStage(bool book)
     {
         Need(Phase.Plan);
         SecondShow.Booked = book;
     }
+
+    /// <summary>Adds a second stage with every set empty, for the player to fill.</summary>
+    public void AddEmptySecondStage()
+    {
+        Need(Phase.Plan);
+        for (var i = 0; i < RunningOrder.SetsAStage; i++)
+        {
+            SecondShow.Book(RunningOrder.SecondBase + i, null);
+        }
+
+        SecondShow.Booked = true;
+    }
+
+    private RunningOrder StageOf(int set) => set >= RunningOrder.SecondBase ? SecondShow : Show;
+
+    /// <summary>The set an artist is booked for, or null if they are not playing.</summary>
+    public int? SetOf(string artist) => LineUp.FirstOrDefault(s => s.Act.Name == artist)?.Index;
+
+    /// <summary>
+    /// Books an artist from the roster for a set, or with null leaves the set empty. An artist
+    /// who is already playing another set swaps places with whoever was here. False if there is no
+    /// such artist or set.
+    /// </summary>
+    public bool BookAct(int set, string? artist)
+    {
+        Need(Phase.Plan);
+        var place = set - StageOf(set).Base;
+        if (place < 0 || place >= RunningOrder.SetsAStage || (set >= RunningOrder.SecondBase && !SecondShow.Booked))
+        {
+            return false;
+        }
+
+        if (artist is null)
+        {
+            StageOf(set).Book(set, null);
+        }
+        else if (Roster.Named(artist) is { } found)
+        {
+            var here = StageOf(set).At(set);
+            if (SetOf(artist) is { } other && other != set)
+            {
+                Place(other, here is null ? null : Roster.Named(here.Name));
+            }
+            else
+            {
+                // Whoever the seed booked for the stage not in use must not be booked twice.
+                foreach (var show in new[] { Show, SecondShow })
+                {
+                    foreach (var slot in show.Slots.Where(s => s.Act.Name == artist && s.Index != set).ToList())
+                    {
+                        show.Book(slot.Index, null);
+                    }
+                }
+            }
+
+            Place(set, found);
+        }
+        else
+        {
+            return false;
+        }
+
+        Crowd.Replan(ExpectedAt(TicketPrice));
+        return true;
+    }
+
+    private void Place(int set, Artist? artist)
+    {
+        var show = StageOf(set);
+        if (artist is null)
+        {
+            show.Book(set, null);
+            return;
+        }
+
+        var closing = !show.Second && set == RunningOrder.SetsAStage - 1;
+        var act = ActGenerator.Of(artist, closing);
+        show.Book(set, show.Second ? act with { Draw = act.Draw * RunningOrder.SecondDraw } : act);
+    }
+
+    /// <summary>How many stars the last act on the main stage has, or none with an empty stage.</summary>
+    public int HeadlineStars => Show.Slots.LastOrDefault()?.Act.Rating ?? 0;
 
     /// <summary>What the farmer charges for the camping field, with its toilets and taps.</summary>
     public const int CampingCost = 2500;
@@ -209,8 +301,6 @@ public sealed partial class FestivalGame
 
     private int Scaled(int pounds) => pounds * Licence / FirstLicence;
 
-    private static int FeeFor(int stars) => stars switch { <= 2 => 150, 3 => 300, 4 => 500, _ => 750 };
-
     private void MakeOffers()
     {
         var random = GameRandom.FromSeed(Seed, 21);
@@ -226,30 +316,56 @@ public sealed partial class FestivalGame
         foreach (var s in stars)
         {
             var act = ActGenerator.MakeOffer(random, s, taken) with { Draw = 0.55 + (0.08 * s) };
-            _offers.Add(new HeadlinerOffer(act, s, Scaled(FeeFor(s))));
+            _offers.Add(new HeadlinerOffer(act, s, FeeOf(s)));
         }
+
+        Show.SetHeadliner(_offers[HeadlinerPicked].Act);
 
         Crowd.Replan(ExpectedAt(TicketPrice));
     }
 
-    /// <summary>How many people would probably come at a ticket price, with the headliner picked.</summary>
+    /// <summary>The share of the licence that comes at a price, before the line-up and the weather.</summary>
+    private static double TurnoutShare(int price)
+    {
+        var prices = TicketPrices;
+        if (price <= prices[0])
+        {
+            return TurnoutAtPrice[0];
+        }
+
+        for (var i = 1; i < prices.Count; i++)
+        {
+            if (price <= prices[i])
+            {
+                var along = (double)(price - prices[i - 1]) / (prices[i] - prices[i - 1]);
+                return TurnoutAtPrice[i - 1] + ((TurnoutAtPrice[i] - TurnoutAtPrice[i - 1]) * along);
+            }
+        }
+
+        return Math.Max(0.05, TurnoutAtPrice[^1] - (0.05 * (price - prices[^1])));
+    }
+
+    /// <summary>How many people would probably come at a ticket price, with the line-up as booked, if the whole year sold in one go.</summary>
     public int ExpectedAt(int price)
     {
-        var i = TicketPrices.ToList().IndexOf(price);
-        if (i < 0)
+        if (price < 1)
         {
-            throw new ArgumentOutOfRangeException(nameof(price), price, "Not a ticket price on offer.");
+            throw new ArgumentOutOfRangeException(nameof(price), price, "Not a ticket price.");
         }
 
         var word = LastHappiness is { } h ? 0.6 + (0.5 * h / 100.0) : 1.0;
-        var pull = _offers.Count > 0 ? 0.85 + (0.05 * _offers[HeadlinerPicked].Stars) : 1.0;
-        return Math.Clamp((int)Math.Round(Licence * TurnoutAtPrice[i] * word * pull * ForecastPull), 10, Licence);
+        var pull = _offers.Count > 0 ? 0.85 + (0.05 * HeadlineStars) : 1.0;
+        return Math.Clamp((int)Math.Round(Licence * TurnoutShare(price) * word * pull * ForecastPull), 10, Licence);
     }
 
     public void ChooseTicket(int price)
     {
         Need(Phase.Plan);
-        ExpectedAt(price);
+        if (!TicketPrices.Contains(price))
+        {
+            throw new ArgumentOutOfRangeException(nameof(price), price, "Not a ticket price on offer.");
+        }
+
         TicketPrice = price;
         Crowd.Replan(ExpectedAt(TicketPrice));
     }
@@ -263,20 +379,21 @@ public sealed partial class FestivalGame
         }
 
         HeadlinerPicked = index;
+        Show.SetHeadliner(_offers[index].Act);
         Crowd.Replan(ExpectedAt(TicketPrice));
     }
 
-    /// <summary>Books the acts and puts the tickets on sale. False if the bank cannot cover the fees.</summary>
-    public bool ConfirmPlan()
+    /// <summary>What has to be paid on the day the plan is agreed: the acts, the field, and anything ordered.</summary>
+    public int PlanCost => ActFees + (PonchosOrdered ? PonchoCost : 0) + FieldRent + (CampingBooked ? CampingCost : 0);
+
+    private bool PayForPlan()
     {
-        Need(Phase.Plan);
-        var ponchos = PonchosOrdered ? PonchoCost : 0;
-        var camping = CampingBooked ? CampingCost : 0;
-        if (ActFees + ponchos + FieldRent + camping > Money)
+        if (PlanCost > Money)
         {
             return false;
         }
 
+        var ponchos = PonchosOrdered ? PonchoCost : 0;
         Spend("Act fees", ActFees);
         if (FieldRent > 0)
         {
@@ -288,9 +405,24 @@ public sealed partial class FestivalGame
             Spend("Rain ponchos", ponchos);
         }
 
-        if (camping > 0)
+        if (CampingBooked)
         {
-            Spend("Camping field", camping);
+            Spend("Camping field", CampingCost);
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Books the acts and sells the whole year's tickets in one go, to be paid for at the gate:
+    /// the quick way to a build day. False if the bank cannot cover the fees.
+    /// </summary>
+    public bool ConfirmPlan()
+    {
+        Need(Phase.Plan);
+        if (!PayForPlan())
+        {
+            return false;
         }
 
         ApplyPlan(Turnout());
@@ -303,7 +435,6 @@ public sealed partial class FestivalGame
 
     private void ApplyPlan(int people)
     {
-        Show.SetHeadliner(_offers[HeadlinerPicked].Act);
         Crowd.Replan(people);
         if (CampingBooked)
         {
@@ -315,6 +446,7 @@ public sealed partial class FestivalGame
     public void OpenGates()
     {
         Need(Phase.Build);
+        FinishSales();
         Phase = Phase.Day;
     }
 
@@ -492,13 +624,31 @@ public sealed partial class FestivalGame
         FieldRepair = _fieldRepair,
         SecondStage = SecondStageBooked,
         Camping = CampingBooked,
+        LineUp = Enumerable.Range(0, RunningOrder.SetsAStage).Select(i => Show.At(i)?.Name)
+            .Concat(Enumerable.Range(0, RunningOrder.SetsAStage).Select(i => SecondShow.At(RunningOrder.SecondBase + i)?.Name)).ToList(),
+        Sales = SaveSales(),
     };
 
     private void RestoreYear(YearSave year)
     {
-        TicketPrice = TicketPrices.Contains(year.TicketPrice) ? year.TicketPrice : Catalogue.TicketPrice;
+        TicketPrice = Math.Clamp(year.TicketPrice, 1, MaxTicketPrice);
         HeadlinerPicked = Math.Clamp(year.Headliner, 0, _offers.Count - 1);
+        Show.SetHeadliner(_offers[HeadlinerPicked].Act);
         SecondShow.Booked = year.SecondStage;
+        if (year.LineUp is { } names && names.Count == 2 * RunningOrder.SetsAStage)
+        {
+            for (var i = 0; i < names.Count; i++)
+            {
+                var set = i < RunningOrder.SetsAStage ? i : RunningOrder.SecondBase + i - RunningOrder.SetsAStage;
+                // An act already in its set is left as it is, so it plays out the same after a load.
+                if (StageOf(set).At(set)?.Name != names[i])
+                {
+                    Place(set, names[i] is { } name ? Roster.Named(name) : null);
+                }
+            }
+        }
+
+        RestoreSales(year.Sales);
         CampingBooked = year.Camping && CampingOffered;
         Phase = Enum.IsDefined(year.Phase) ? year.Phase : Phase.Plan;
         if (Phase != Phase.Plan)
@@ -534,4 +684,10 @@ public sealed record YearSave(int Number, int Licence, Phase Phase, DateTime Day
 
     /// <summary>True if the camping field was taken.</summary>
     public bool Camping { get; init; }
+
+    /// <summary>Who is booked for each set: the main stage's four, then the second stage's four. Null is an empty set.</summary>
+    public List<string?>? LineUp { get; init; }
+
+    /// <summary>How ticket selling is going, for a year that sells its tickets ahead.</summary>
+    public SalesSave? Sales { get; init; }
 }

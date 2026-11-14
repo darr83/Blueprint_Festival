@@ -636,7 +636,7 @@ public sealed partial class FestivalGame
     }
 
     private StaffSave SaveStaff() => new(
-        _staff.Select(s => new StaffMemberSave(s.Id, s.Kind, s.Tile, s.PostX, s.PostY, s.PostHeading, s.X, s.Y, s.Heading, s.State, s.Incident)).ToList(),
+        _staff.Select(s => new StaffMemberSave(s.Id, s.Kind, s.Tile, s.PostX, s.PostY, s.PostHeading, s.X, s.Y, s.Heading, s.State, s.Incident) { Path = s.Path?.Skip(s.PathIndex).ToList() }).ToList(),
         _incidents.Select(i => new IncidentSave(i.Id, i.Kind, i.X, i.Y, i.Party, i.Started, i.Staff, i.Left, i.Resting, i.Crush) { Tent = i.Tent, Bed = i.Bed }).ToList(),
         _chance.State, _nextStaff, _nextIncident, Treated, Untreated, TroubleSorted, TroubleIgnored);
 
@@ -653,9 +653,17 @@ public sealed partial class FestivalGame
             _incidents.Add(new Incident(i.Id, i.Kind, i.X, i.Y, i.Party, i.Started) { Staff = i.Staff, Left = i.Left, Resting = i.Resting, Crush = i.Crush, Tent = i.Tent, Bed = i.Bed });
         }
 
-        // Anyone who was walking somewhere works out their way again.
+        // Anyone who was walking somewhere carries on along the way they were going, or works it out again if the save does not say.
+        var ways = (save.Staff ?? new()).Where(s => s.Path is { Count: > 0 }).ToDictionary(s => s.Id, s => s.Path!);
         foreach (var member in _staff)
         {
+            if (ways.TryGetValue(member.Id, out var way) && member.State is StaffState.Going or StaffState.Escorting or StaffState.Returning && way.All(Field.IsWalkable))
+            {
+                member.Path = way.ToList();
+                member.PathIndex = 0;
+                continue;
+            }
+
             var incident = _incidents.FirstOrDefault(i => i.Id == member.Incident);
             switch (member.State)
             {
@@ -680,7 +688,11 @@ public sealed partial class FestivalGame
 }
 
 /// <summary>One member of staff as written to a save file.</summary>
-public sealed record StaffMemberSave(int Id, StaffKind Kind, TilePoint Tile, double PostX, double PostY, double PostHeading, double X, double Y, double Heading, StaffState State, int Incident);
+public sealed record StaffMemberSave(int Id, StaffKind Kind, TilePoint Tile, double PostX, double PostY, double PostHeading, double X, double Y, double Heading, StaffState State, int Incident)
+{
+    /// <summary>The rest of the way they were walking, if they were walking.</summary>
+    public List<TilePoint>? Path { get; init; }
+}
 
 /// <summary>One incident as written to a save file.</summary>
 public sealed record IncidentSave(int Id, IncidentKind Kind, double X, double Y, int Party, DateTime Started, int Staff, int Left, bool Resting, bool Crush = false)

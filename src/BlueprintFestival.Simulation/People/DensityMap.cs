@@ -93,6 +93,42 @@ public sealed class DensityMap
             _counts[(sy * Across) + sx]++;
         }
 
+        Summarise();
+    }
+
+    /// <summary>The count in every square that has anyone in it, for a save file.</summary>
+    public Dictionary<int, int> Save()
+    {
+        var kept = new Dictionary<int, int>();
+        for (var i = 0; i < _counts.Length; i++)
+        {
+            if (_counts[i] != 0)
+            {
+                kept[i] = _counts[i];
+            }
+        }
+
+        return kept;
+    }
+
+    /// <summary>Puts back the counts from a save file, so the crowd moves on just as it would have.</summary>
+    public void Restore(Dictionary<int, int> counts)
+    {
+        ArgumentNullException.ThrowIfNull(counts);
+        Array.Clear(_counts);
+        foreach (var (square, people) in counts)
+        {
+            if (square >= 0 && square < _counts.Length)
+            {
+                _counts[square] = Math.Max(0, people);
+            }
+        }
+
+        Summarise();
+    }
+
+    private void Summarise()
+    {
         Worst = 0;
         RedSquares = AmberSquares = 0;
         for (var i = 0; i < _counts.Length; i++)
