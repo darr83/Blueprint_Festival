@@ -32,6 +32,9 @@ public enum BuildMode
 
     /// <summary>Dragging out a string of fairy lights: the poles go in by themselves.</summary>
     Fairy,
+
+    /// <summary>Putting up a big screen with its speakers. It is on the Stages group of the build bar.</summary>
+    Screen,
 }
 
 /// <summary>
@@ -72,6 +75,8 @@ public partial class BuildTool : Node3D
     public GroundKind Ground { get; private set; }
 
     public LightKind Light { get; private set; }
+
+    public ScreenKind Screen { get; private set; }
 
     public Facing Facing { get; private set; } = Facing.South;
 
@@ -120,6 +125,8 @@ public partial class BuildTool : Node3D
     public void PickGround(GroundKind kind) => Pick(BuildMode.Ground, () => Ground = kind);
 
     public void PickLight(LightKind kind) => Pick(kind == LightKind.FairyLights ? BuildMode.Fairy : BuildMode.Light, () => Light = kind);
+
+    public void PickScreen(ScreenKind kind) => Pick(BuildMode.Screen, () => Screen = kind);
 
     public void PickRemove() => Pick(BuildMode.Remove, () => { });
 
@@ -173,8 +180,9 @@ public partial class BuildTool : Node3D
             BuildMode.Lane => "Hold the mouse button and drag out a queue from the front of a gate, stall or toilets. Drag again from its end to turn a corner.",
             BuildMode.KeepOut => "Hold the mouse button and drag over ground customers must keep off. Start on marked ground to clear it.",
             BuildMode.Light => "Click on the grass to put the light up.",
+            BuildMode.Screen => "Click on the grass to put the screen up. R turns it. It shows the nearest stage to the people in front of it.",
             BuildMode.Fairy => "Hold the mouse button and drag to string fairy lights. The poles go in by themselves. Start on a pole to carry on from it.",
-            BuildMode.Remove => "Click a stage, a stall, a gate, a light or a stretch of fence to take it down. You get the money back. Click staff to send them home.",
+            BuildMode.Remove => "Click a stage, a screen, a stall, a gate, a light or a stretch of fence to take it down. You get the money back. Click staff to send them home.",
             _ => "",
         };
         ClearGhost();
@@ -242,6 +250,12 @@ public partial class BuildTool : Node3D
         return (at.X - (rect.Width / 2), at.Y - (rect.Height / 2));
     }
 
+    private (int X, int Y) ScreenCorner(TilePoint at)
+    {
+        var rect = new PlacedScreen(Screen, 0, 0, Facing).Rect;
+        return (at.X - (rect.Width / 2), at.Y - (rect.Height / 2));
+    }
+
     private (int X, int Y) StallCorner(TilePoint at)
     {
         var rect = new PlacedStall(Stall, 0, 0, Facing).Rect;
@@ -290,6 +304,13 @@ public partial class BuildTool : Node3D
             case BuildMode.Light:
                 result = _game.BuildLight(Light, at);
                 break;
+
+            case BuildMode.Screen:
+            {
+                var (x, y) = ScreenCorner(at);
+                result = _game.BuildScreen(Screen, x, y, Facing);
+                break;
+            }
 
             case BuildMode.Staff:
                 result = _game.HireStaff(Hire, at);
@@ -417,7 +438,7 @@ public partial class BuildTool : Node3D
         Refused = !result.Ok;
         SoundBoard.Cue(!result.Ok ? Sounds.Refuse : Mode switch
         {
-            BuildMode.Stage => Sounds.BuildStage,
+            BuildMode.Stage or BuildMode.Screen => Sounds.BuildStage,
             BuildMode.Fence or BuildMode.Lane => Sounds.BuildFence,
             BuildMode.Gate => Sounds.BuildGate,
             BuildMode.Staff => Sounds.HireStaff,
@@ -579,6 +600,17 @@ public partial class BuildTool : Node3D
                 break;
             }
 
+            case BuildMode.Screen:
+            {
+                var (x, y) = ScreenCorner(at);
+                check = _game.CheckScreen(Screen, x, y, Facing);
+                pad = new PlacedScreen(Screen, x, y, Facing).Rect;
+                Ghost($"screen{Screen}", () => ScreenView.Model(Screen));
+                _ghost!.Position = SiteView.Middle(pad);
+                _ghost.RotationDegrees = new Vector3(0, SiteView.Turn(Facing), 0);
+                break;
+            }
+
             case BuildMode.Light:
             {
                 check = _game.CheckLight(Light, at);
@@ -688,6 +720,7 @@ public partial class BuildTool : Node3D
     {
         BuildMode.Lane => "Queue lane",
         BuildMode.Light or BuildMode.Fairy => Lighting.Of(Light).Name,
+        BuildMode.Screen => BigScreens.Of(Screen).Name,
         BuildMode.Stage => Catalogue.Of(Stage).Name,
         BuildMode.Gate => Catalogue.Of(Gate).Name,
         BuildMode.Stall => Catalogue.Of(Stall).Name,

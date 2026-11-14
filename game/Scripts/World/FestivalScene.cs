@@ -40,6 +40,9 @@ public partial class FestivalScene : Node3D
     /// <summary>The path lights, floodlights and fairy lights.</summary>
     public LightsView Lights { get; private set; } = null!;
 
+    /// <summary>The big screens, showing the stages live.</summary>
+    public ScreenView Screens { get; private set; } = null!;
+
     public ShowView Acts { get; private set; } = null!;
 
     /// <summary>The acts on the second stage.</summary>
@@ -107,6 +110,10 @@ public partial class FestivalScene : Node3D
         Lights = new LightsView { Name = "Lights" };
         AddChild(Lights);
         Lights.Initialise(Game);
+
+        Screens = new ScreenView { Name = "BigScreens" };
+        AddChild(Screens);
+        Screens.Initialise(Game);
 
         Acts = new ShowView { Name = "Show" };
         AddChild(Acts);

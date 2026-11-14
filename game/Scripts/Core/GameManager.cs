@@ -83,10 +83,6 @@ public partial class GameManager : Node
             {
                 AddChild(new SoundShots(arg["--sound-shots=".Length..]) { Name = "SoundShots" });
             }
-            else if (arg.StartsWith("--screen-mock=", StringComparison.Ordinal))
-            {
-                AddChild(new ScreenMockShots(arg["--screen-mock=".Length..]) { Name = "ScreenMockShots" });
-            }
             else if (arg.StartsWith("--cam-shots=", StringComparison.Ordinal))
             {
                 AddChild(new CamShots(arg["--cam-shots=".Length..]) { Name = "CamShots" });

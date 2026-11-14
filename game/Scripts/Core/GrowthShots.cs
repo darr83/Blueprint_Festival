@@ -126,7 +126,7 @@ public partial class GrowthShots : Node
     }
 
     /// <summary>Builds a site to match the licence: turnstiles, a main stage with a barrier, and stalls down both sides.</summary>
-    internal static void Build(FestivalGame game)
+    private static void Build(FestivalGame game)
     {
         var licence = game.Licence;
         var gap = game.Field.Gap;
