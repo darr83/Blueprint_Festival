@@ -269,7 +269,7 @@ public sealed partial class FestivalGame
             return 0;
         }
 
-        var line = Site.StageAt(tile) is not null ? "Stage" : Site.StallAt(tile) is not null ? "Stalls and toilets" : "Fences and gates";
+        var line = Site.LightRefundAt(tile) > 0 ? LightsLine : Site.StageAt(tile) is not null ? "Stage" : Site.StallAt(tile) is not null ? "Stalls and toilets" : "Fences and gates";
         var refund = Site.RemoveAt(tile);
         if (refund != 0)
         {
