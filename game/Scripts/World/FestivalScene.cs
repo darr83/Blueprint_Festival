@@ -56,6 +56,8 @@ public partial class FestivalScene : Node3D
 
     public CampView Camp { get; private set; } = null!;
 
+    public ParkingView Parking { get; private set; } = null!;
+
     public MusicPlayer Music { get; private set; } = null!;
 
     private ViewButtons _viewButtons = null!;
@@ -110,6 +112,10 @@ public partial class FestivalScene : Node3D
         Camp = new CampView { Name = "Camp" };
         AddChild(Camp);
         Camp.Initialise(Game);
+
+        Parking = new ParkingView { Name = "Parking" };
+        AddChild(Parking);
+        Parking.Initialise(Game);
 
         Crowd = new CrowdView { Name = "Crowd" };
         AddChild(Crowd);

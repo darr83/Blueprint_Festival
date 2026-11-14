@@ -65,6 +65,14 @@ public sealed partial class FestivalGame
             }
         };
         Crowd.CamperArrived += people => Earn("Camping", people * CampingFee);
+        Crowd.CarParked += () =>
+        {
+            if (ParkingCharge > 0)
+            {
+                Earn("Parking", ParkingCharge);
+            }
+        };
+        Crowd.Replanned += ApplyTravel;
         // The stallholders keep most of what they take; the festival gets its share for the pitch.
         Crowd.Served += (kind, _, paid) => Earn(Catalogue.Of(kind).Name, ((paid * Catalogue.PitchShare) + 50) / 100);
         Crowd.Dropped += (x, y) => _litter.Add(new LitterPiece(Math.Round(x, 2), Math.Round(y, 2)));

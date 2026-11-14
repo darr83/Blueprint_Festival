@@ -140,6 +140,9 @@ public class EstateTests
         var planned = later.WithFields(Plan(("home", FieldUse.Music), ("ten", FieldUse.Food)))!;
         Assert.Equal(3000, planned.Licence);
         Assert.Equal(30000, planned.Money);
+        // Only the villagers can walk there until buses are hired; then the music field is the limit.
+        Assert.Equal(FestivalGame.Walkers, planned.OnSale);
+        planned.HireBuses(FestivalGame.MostBuses);
         Assert.Equal(Estate.Find("home")!.RoomFor(FieldUse.Music), planned.OnSale);
         Assert.Equal(Estate.Find("home")!.Rent + Estate.Find("ten")!.Rent, planned.FieldRent);
         Assert.Equal(planned.ActFees + planned.FieldRent, planned.PlanCost);
@@ -163,6 +166,7 @@ public class EstateTests
     {
         var game = FestivalGame.StartYear("Larkmoor Festival", new YearSetup(4, 1500, 40000, false, 80))
             .WithFields(Plan(("home", FieldUse.Music), ("ten", FieldUse.Food)))!;
+        game.HireBuses(10);
         Assert.True(game.ConfirmPlan());
         var grass = game.Field.Fields.ToDictionary(f => f.Info.Id, f => f.Grass);
         var (music, food) = (grass["home"], grass["ten"]);

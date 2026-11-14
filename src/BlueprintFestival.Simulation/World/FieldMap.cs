@@ -142,6 +142,50 @@ public sealed class FieldMap
 
     private readonly List<(int A, int B, TileRect Door)> _doors = new();
 
+    /// <summary>Where the bus stops on the lane, or null on a map with no bus stop.</summary>
+    public TilePoint? BusStop { get; private init; }
+
+    /// <summary>A parking bay is 2.5 m wide and 5 m long.</summary>
+    public const int BayWide = 5;
+
+    public const int BayLong = 10;
+
+    /// <summary>
+    /// The parking bays in every car park, nearest its way out first: the middle tile of each.
+    /// Bays are in double rows with a lane to drive along between them, and each car park has
+    /// as many as its field holds.
+    /// </summary>
+    public IReadOnlyList<TilePoint> ParkingBays()
+    {
+        var bays = new List<TilePoint>();
+        foreach (var park in Fields.Where(f => f.Use == FieldUse.CarPark && f.Info.OnLane))
+        {
+            var g = park.Grass;
+            var mine = new List<TilePoint>();
+            // Two rows nose to nose, then a 6 m lane, all the way up the field, and one last row if there is room.
+            for (var y = g.Y + 2; y + BayLong <= g.Bottom - 2; y += BayLong)
+            {
+                var row = (y - g.Y - 2) % ((2 * BayLong) + 12);
+                if (row >= 2 * BayLong)
+                {
+                    y += 12 - BayLong;
+                    continue;
+                }
+
+                for (var x = g.X + 2; x + BayWide <= g.Right - 2; x += BayWide)
+                {
+                    mine.Add(new TilePoint(x + (BayWide / 2), y + (BayLong / 2)));
+                }
+            }
+
+            var north = park.Info.Bottom <= Estate.LaneTop;
+            var door = new TilePoint(g.X + (g.Width / 2), north ? g.Bottom : g.Y);
+            bays.AddRange(mine.OrderBy(b => Math.Abs(b.X - door.X) + Math.Abs(b.Y - door.Y)).ThenBy(b => b.Y).ThenBy(b => b.X).Take(park.Info.RoomFor(FieldUse.CarPark)));
+        }
+
+        return bays;
+    }
+
     /// <summary>Which rented field a tile is in, counting a gateway as one of the fields it joins; -1 out on the lane.</summary>
     private int RegionOf(TilePoint p)
     {
@@ -495,7 +539,8 @@ public sealed class FieldMap
 
         var byTrack = !wayIn.OnLane;
         var x0 = rented.Min(f => f.X);
-        var x1 = rented.Max(f => f.Right);
+        var x1 = Math.Max(rented.Max(f => f.Right), Estate.BusStopX + 12);
+        x0 = Math.Min(x0, Estate.BusStopX - 12);
         var y0 = Math.Min(rented.Min(f => f.Y), Estate.LaneTop);
         var y1 = Math.Max(rented.Max(f => f.Bottom), Estate.LaneBottom);
         if (byTrack)
@@ -607,6 +652,7 @@ public sealed class FieldMap
             Fields = fields,
             Gateways = gateways,
             Tracks = tracks,
+            BusStop = new TilePoint((Estate.BusStopX - ox) * 2, lane.Y + 1),
         };
         map._campDoors.AddRange(campDoors);
         doors.Add((rented.IndexOf(wayIn), -1, gap));

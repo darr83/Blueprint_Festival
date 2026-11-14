@@ -20,7 +20,8 @@ public partial class FieldShots : Node
     {
         "1_year_one_the_village_green", "2_choosing_fields_for_a_big_year", "3_a_field_that_does_not_join_up",
         "4_the_site_laid_out_across_the_fields", "5_music_field_and_food_field_on_the_day", "6_the_gateway_between_two_fields",
-        "7_camping_field_at_night",
+        "7_camping_field_at_night", "8_getting_there_on_the_planning_screen", "9_getting_there_while_tickets_sell",
+        "10_the_car_park_filling_up", "11_the_shuttle_bus_at_the_stop", "12_cars_buses_and_the_whole_site",
     };
 
     private readonly string _directory;
@@ -84,6 +85,8 @@ public partial class FieldShots : Node
             case 6:
                 GameManager.Instance.ChangeFields(FestivalGame.StartYear(null, new YearSetup(6, 5000, 90000, false, 82, Camping.Save())));
                 break;
+            case 7:
+            case 8:
             default:
                 GameManager.Instance.ChangeFields(FestivalGame.StartYear(null, new YearSetup(4, 1500, 40000, false, 82, Middling.Save())));
                 break;
@@ -160,12 +163,68 @@ public partial class FieldShots : Node
                 year.SelectField("top");
                 year.UseField(FieldUse.CarPark);
                 break;
+            case 7:
+                for (var i = 0; i < 6; i++)
+                {
+                    year.ChangeBuses(1);
+                }
+
+                year.ChangeParking(1);
+                year.ToggleStage();
+                break;
+            case 8:
+                for (var i = 0; i < 3; i++)
+                {
+                    year.ChangeBuses(1);
+                }
+
+                year.BookEvent();
+                foreach (var advert in new[] { "posters", "paper", "localradio" })
+                {
+                    year.ToggleAdvert(advert);
+                }
+
+                for (var i = 0; i < 3; i++)
+                {
+                    year.RunMonth();
+                    year.FinishRun();
+                }
+
+                break;
+            case 9:
+                game.HireBuses(6);
+                year.StartBuilding();
+                Build(game);
+                game.OpenGates();
+                StageShots.RunTo(game, 13.6);
+                f.Camera.LookAt(Middle(grass["glebe"]).X + 4, Middle(grass["glebe"]).Z + 4, 46f);
+                f.Parking.Refresh();
+                break;
+            case 10:
+                game.HireBuses(6);
+                year.StartBuilding();
+                Build(game);
+                game.OpenGates();
+                StageShots.RunTo(game, 12.0 + (1.2 / 60));
+                f.Camera.LookAt(game.Field.BusStop!.Value.X * 0.5f - 4, game.Field.BusStop!.Value.Y * 0.5f - 6, 26f);
+                break;
+            case 11:
+                game.HireBuses(6);
+                year.StartBuilding();
+                Build(game);
+                game.OpenGates();
+                StageShots.RunTo(game, 15.0 + (1.0 / 60));
+                f.Camera.LookAt(game.Field.Width * 0.25f, game.Field.Height * 0.25f, 150f);
+                f.Parking.Refresh();
+                break;
             case 3:
+                game.HireBuses(6);
                 year.StartBuilding();
                 Build(game);
                 f.Camera.LookAt(Middle(game.Field.HedgeLine).X - 12, Middle(game.Field.HedgeLine).Z + 8, 125f);
                 break;
             case 4:
+                game.HireBuses(6);
                 year.StartBuilding();
                 Build(game);
                 game.OpenGates();
@@ -173,6 +232,7 @@ public partial class FieldShots : Node
                 f.Camera.LookAt(Middle(game.Field.HedgeLine).X + 14, Middle(game.Field.HedgeLine).Z + 6, 105f);
                 break;
             case 5:
+                game.HireBuses(6);
                 year.StartBuilding();
                 Build(game);
                 game.OpenGates();
@@ -180,6 +240,7 @@ public partial class FieldShots : Node
                 f.Camera.LookAt(grass["home"].Right * 0.5f, Middle(grass["home"]).Z, 34f);
                 break;
             case 6:
+                game.HireBuses(30);
                 year.StartBuilding();
                 Build(game);
                 game.OpenGates();
@@ -189,14 +250,14 @@ public partial class FieldShots : Node
                 break;
         }
 
-        if (_shot >= 3)
+        if (_shot is >= 3 and not (7 or 8))
         {
             game.Clock.SetSpeed(GameSpeed.Paused);
             f.Camera.Snap();
             f.Sky.Apply(game, f.Camera.Yaw, settle: true);
         }
 
-        GD.Print($"[fields] {Names[_shot]}: {game.Phase} {game.Now:HH:mm}, licence {game.Licence}, on sale {game.OnSale}, rent £{game.FieldRent}, map {game.Field.Width}x{game.Field.Height}, on site {game.Crowd.OnSite} of {game.Crowd.Expected}, watching {game.Crowd.Watching}, in tents {game.Crowd.InTents}, happy {game.Crowd.Happiness}, choosing {year.ChoosingFields}, problems {year.Draft.Problems(game.Licence, game.Year).Count}");
+        GD.Print($"[fields] {Names[_shot]}: {game.Phase} {game.Now:HH:mm}, licence {game.Licence}, on sale {game.OnSale}, rent £{game.FieldRent}, map {game.Field.Width}x{game.Field.Height}, on site {game.Crowd.OnSite} of {game.Crowd.Expected}, watching {game.Crowd.Watching}, in tents {game.Crowd.InTents}, happy {game.Crowd.Happiness}, cars {f.Parking.CarCount}, bus in sight {f.Parking.BusInSight}, by bus {game.Crowd.CameBy(BlueprintFestival.Simulation.People.Travel.Bus)}, can get here {game.CanGetHere}, choosing {year.ChoosingFields}, problems {year.Draft.Problems(game.Licence, game.Year).Count}");
     }
 
     public override void _Process(double delta)
