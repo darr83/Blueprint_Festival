@@ -10,6 +10,9 @@ installed). The game plays whatever files are there and is silent for the rest.
                             python3 tools/make_sounds.py --only till,fry --force    make these again
                             python3 tools/make_sounds.py --level    bring every file to the same peak
 
+Sounds with a "voice" are spoken announcements: the prompt is read out by that ElevenLabs voice,
+then made to sound like a field PA (thin, with an echo) with "lead" seconds of quiet first.
+
 The key is read from the ELEVENLABS_API_KEY environment variable and is never printed or saved.
 The acts' music is not made here.
 """
@@ -27,6 +30,9 @@ from pathlib import Path
 
 AUDIO = Path(__file__).resolve().parent.parent / "game" / "Audio"
 URL = "https://api.elevenlabs.io/v1/sound-generation?output_format=mp3_44100_128"
+SPEECH_URL = "https://api.elevenlabs.io/v1/text-to-speech/{voice}?output_format=mp3_44100_128"
+PA_FILTER = ("highpass=f=280,lowpass=f=4200,acompressor=threshold=-18dB:ratio=4:attack=5:release=80,"
+             "aecho=0.8:0.55:180|420:0.32|0.18,apad=pad_dur=0.6,loudnorm=I=-16:TP=-1.5")
 ENDINGS = ("ogg", "wav", "mp3")
 PEAK_DB = -1.0
 
@@ -36,13 +42,22 @@ def existing(sound_id):
 
 
 def ask(key, sound):
-    body = json.dumps({
-        "text": sound["prompt"],
-        "duration_seconds": sound["seconds"],
-        "loop": sound["loop"],
-        "prompt_influence": 0.45,
-    }).encode()
-    request = urllib.request.Request(URL, data=body, headers={"xi-api-key": key, "Content-Type": "application/json"})
+    if sound.get("voice"):
+        url = SPEECH_URL.format(voice=sound["voice"])
+        body = json.dumps({
+            "text": sound["prompt"],
+            "model_id": "eleven_multilingual_v2",
+            "voice_settings": {"stability": 0.5, "similarity_boost": 0.75, "style": 0.2},
+        }).encode()
+    else:
+        url = URL
+        body = json.dumps({
+            "text": sound["prompt"],
+            "duration_seconds": sound["seconds"],
+            "loop": sound["loop"],
+            "prompt_influence": 0.45,
+        }).encode()
+    request = urllib.request.Request(url, data=body, headers={"xi-api-key": key, "Content-Type": "application/json"})
     for attempt in range(4):
         try:
             with urllib.request.urlopen(request, timeout=180) as response:
@@ -91,6 +106,22 @@ def keep_from_onset(path, seconds):
                     f"atrim=0:{seconds},afade=t=out:st={seconds - fade:.3f}:d={fade:.3f}",
                     "-c:a", "libvorbis", "-q:a", "5", str(out)], check=True)
     out.replace(path)
+
+
+def save_speech(sound_id, mp3, lead):
+    """An announcement over the field PA: thin and echoing, after a moment's quiet."""
+    for ending in ENDINGS:
+        (AUDIO / f"{sound_id}.{ending}").unlink(missing_ok=True)
+    raw = AUDIO / f"{sound_id}.mp3"
+    raw.write_bytes(mp3)
+    if not shutil.which("ffmpeg"):
+        return raw
+    ogg = AUDIO / f"{sound_id}.ogg"
+    delay = int(lead * 1000)
+    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", str(raw), "-af", f"{PA_FILTER},adelay={delay}:all=1",
+                    "-ar", "44100", "-c:a", "libvorbis", "-q:a", "5", str(ogg)], check=True)
+    raw.unlink()
+    return ogg
 
 
 def save(sound_id, mp3, keep=None):
@@ -155,7 +186,8 @@ def main():
     failed = []
     for number, sound in enumerate(todo, 1):
         try:
-            path = save(sound["id"], ask(key, sound), sound.get("keep"))
+            path = (save_speech(sound["id"], ask(key, sound), sound.get("lead", 0)) if sound.get("voice")
+                    else save(sound["id"], ask(key, sound), sound.get("keep")))
             print(f"[{number}/{len(todo)}] {sound['id']}: {path.name}, {path.stat().st_size // 1024} KB", flush=True)
         except RuntimeError as error:
             failed.append(sound["id"])

@@ -6,7 +6,11 @@ namespace BlueprintFestival.UI;
 /// <summary>What the results screen shows.</summary>
 public sealed record ResultsView(int Year, string Festival, int Came, int Expected, int Happy, int WentHome, IReadOnlyList<(string What, int Amount)> In,
     IReadOnlyList<(string What, int Amount)> Out, int LitterCleared, int GrassWorn, string Verdict, int LicenceNow, int LicenceNext,
-    int Treated = 0, int Untreated = 0, int TroubleSorted = 0, int TroubleIgnored = 0, int CrushInjuries = 0, int PulledOut = 0, int FieldRepair = 0, string Weather = "");
+    int Treated = 0, int Untreated = 0, int TroubleSorted = 0, int TroubleIgnored = 0, int CrushInjuries = 0, int PulledOut = 0, int FieldRepair = 0, string Weather = "")
+{
+    /// <summary>What the player did about crushes: announcements, security sent in, acts cancelled, and people hurt in a crush left alone.</summary>
+    public (int Announcements, int SecuritySent, int ActsCancelled, int HurtLeftAlone) CrushChoices { get; init; }
+}
 
 /// <summary>
 /// The screens of the festival year that sit over the field: planning before, results after.
@@ -14,6 +18,33 @@ public sealed record ResultsView(int Year, string Festival, int Came, int Expect
 /// </summary>
 public static partial class YearPanels
 {
+    /// <summary>What was done about crushes, in words, or null if nothing had to be.</summary>
+    public static string? CrushLine((int Announcements, int SecuritySent, int ActsCancelled, int HurtLeftAlone) c)
+    {
+        var parts = new List<string>();
+        if (c.Announcements > 0)
+        {
+            parts.Add(c.Announcements == 1 ? "the music stopped once for an announcement" : $"the music stopped {c.Announcements} times for announcements");
+        }
+
+        if (c.SecuritySent > 0)
+        {
+            parts.Add(c.SecuritySent == 1 ? "security sent in once" : $"security sent in {c.SecuritySent} times");
+        }
+
+        if (c.ActsCancelled > 0)
+        {
+            parts.Add(c.ActsCancelled == 1 ? "one act cancelled" : $"{c.ActsCancelled} acts cancelled");
+        }
+
+        if (c.HurtLeftAlone > 0)
+        {
+            parts.Add($"{c.HurtLeftAlone} hurt in a crush left alone");
+        }
+
+        return parts.Count == 0 ? null : "Crushes: " + string.Join(", ", parts) + ".";
+    }
+
     /// <summary>A sheet of paper with bunting along the top, as wide as asked.</summary>
     internal static PanelContainer Card(int width)
     {
@@ -204,6 +235,11 @@ public static partial class YearPanels
         after.AddChild(Section("People looked after"));
         var crush = (view.CrushInjuries > 0 ? $", {view.CrushInjuries} hurt in a crush" : "") + (view.PulledOut > 0 ? $", {view.PulledOut} lifted out of a crush in time" : "");
         after.AddChild(Wrapped("Taken ill or hurt: " + (view.Untreated > 0 ? $"{view.Treated} treated, {view.Untreated} left with no help" : $"{view.Treated} treated") + crush + ".", 290));
+        if (CrushLine(view.CrushChoices) is { } choices)
+        {
+            after.AddChild(Wrapped(choices, 290));
+        }
+
         after.AddChild(Wrapped("Trouble: " + (view.TroubleIgnored > 0 ? $"{view.TroubleSorted} sorted out, {view.TroubleIgnored} nobody dealt with" : $"{view.TroubleSorted} sorted out") + ".", 290));
         columns.AddChild(after);
         box.AddChild(columns);

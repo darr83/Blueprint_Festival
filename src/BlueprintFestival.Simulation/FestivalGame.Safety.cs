@@ -6,6 +6,22 @@ using BlueprintFestival.Simulation.World;
 
 namespace BlueprintFestival.Simulation;
 
+/// <summary>What the player can do when a crush is building.</summary>
+public enum CrushChoice
+{
+    /// <summary>Stop the music while the PA asks everyone to step back, then start again.</summary>
+    Announce,
+
+    /// <summary>Send the nearest security in to hold the spot and lift people out.</summary>
+    SendSecurity,
+
+    /// <summary>End the act's set there and then.</summary>
+    CancelAct,
+
+    /// <summary>Leave it and hope the crowd sorts itself out.</summary>
+    LeaveIt,
+}
+
 /// <summary>
 /// Crowd safety. The crowd is measured in two-metre squares every minute. A square that stays a
 /// crush risk hurts people; enough of them hurt and the day is called off. The player prevents it
@@ -19,8 +35,25 @@ public sealed partial class FestivalGame
     /// <summary>How many people are hurt in crushes before the day is called off.</summary>
     public const int SeriousAt = 5;
 
-    /// <summary>How long an act stops for when the player pauses it.</summary>
-    public const double PauseMinutes = 6;
+    /// <summary>How long an act stops for while the PA asks the crowd to step back.</summary>
+    public const double PauseMinutes = 4;
+
+    /// <summary>How many security go when the player sends them into a crush.</summary>
+    public const int SecurityCallOut = 3;
+
+    /// <summary>The overtime paid to each member of security sent into a crush, in pounds.</summary>
+    public const int Overtime = 25;
+
+    /// <summary>How much mood everyone watching a stage loses when the music stops for an announcement.</summary>
+    public const double AnnounceMood = 0.03;
+
+    /// <summary>How much mood the people watching an act lose when it is cancelled, and everyone else on site.</summary>
+    public const double CancelMoodWatching = 0.12;
+
+    public const double CancelMoodEveryone = 0.04;
+
+    /// <summary>The chance each minute that a crush the player chose to leave alone eases by itself.</summary>
+    public const double SettlesByItself = 0.08;
 
     /// <summary>How far from where they stand a member of security keeps the crowd in hand, in metres.</summary>
     public const double GuardReach = 3.5;
@@ -31,6 +64,10 @@ public sealed partial class FestivalGame
     private readonly Dictionary<int, int> _redMinutes = new();
     private readonly Dictionary<PlacedStage, double> _barriers = new();
     private GameRandom _danger = null!;
+    private GameRandom _settle = null!;
+    private readonly Dictionary<int, DateTime> _cutShort = new();
+    private bool _handled;
+    private bool _leftAlone;
     private DateTime _pausedUntil;
     private bool _wasRed;
 
@@ -59,8 +96,41 @@ public sealed partial class FestivalGame
     /// <summary>True once so many people have been hurt that the day was called off.</summary>
     public bool SeriousIncident { get; private set; }
 
-    /// <summary>How many times the player has paused an act today.</summary>
+    /// <summary>How many times the player has stopped the music for an announcement today.</summary>
     public int ActsPaused { get; private set; }
+
+    /// <summary>How many times the player has sent security into a crush today.</summary>
+    public int SecuritySent { get; private set; }
+
+    /// <summary>How many acts the player has cancelled today.</summary>
+    public int ActsCancelled { get; private set; }
+
+    /// <summary>How many times the player has chosen to leave a crush alone today.</summary>
+    public int TimesLeftAlone { get; private set; }
+
+    /// <summary>People hurt in a crush the player did nothing about. The council hears about every one.</summary>
+    public int HurtLeftAlone { get; private set; }
+
+    /// <summary>True once the player has done something about the crush going on now (announced, sent security or cancelled the act).</summary>
+    public bool CrushHandled => _handled;
+
+    /// <summary>True once the player has chosen to leave the crush going on now alone.</summary>
+    public bool CrushLeftAlone => _leftAlone;
+
+    /// <summary>How much of the crowd still listens to an announcement: everyone the first time, fewer each time after.</summary>
+    public double AnnouncementHeard => ActsPaused switch { 0 => 1, 1 => 0.67, _ => 0.34 };
+
+    /// <summary>How many security could be sent into a crush right now.</summary>
+    public int SecurityFree => Math.Min(SecurityCallOut, _staff.Count(s => s.Kind == StaffKind.Security && s.IsFree));
+
+    /// <summary>The act on at the stage nearest the crush, if one is on.</summary>
+    public Slot? ActAtCrush => ShowAtCrush()?.Playing(Now);
+
+    /// <summary>Raised when the player stops the music for an announcement, with which announcement it is (counting from 0).</summary>
+    public event Action<int>? Announced;
+
+    /// <summary>Raised when the player cancels an act.</summary>
+    public event Action<Slot>? ActCancelled;
 
     /// <summary>True while an act is stopped to let the crowd ease.</summary>
     public bool ActPaused => Clock.Now < _pausedUntil;
@@ -74,6 +144,7 @@ public sealed partial class FestivalGame
     private void StartSafety()
     {
         _danger = GameRandom.FromSeed(Seed, 47);
+        _settle = GameRandom.FromSeed(Seed, 48);
         Crowd.Stewarded = Stewarded;
         Crowd.BarrierDepth = BarrierDepth;
         Site.Changed += _barriers.Clear;
@@ -193,7 +264,7 @@ public sealed partial class FestivalGame
     {
         foreach (var s in _staff)
         {
-            if (s.Kind == StaffKind.Security && s.State == StaffState.AtPost && Distance(s.X, s.Y, x, y) <= GuardReach)
+            if (s.Kind == StaffKind.Security && s.State is StaffState.AtPost or StaffState.Holding && Distance(s.X, s.Y, x, y) <= GuardReach)
             {
                 return true;
             }
@@ -230,18 +301,158 @@ public sealed partial class FestivalGame
             return false;
         }
 
+        var heard = AnnouncementHeard;
         _pausedUntil = Now.AddMinutes(PauseMinutes);
-        ActsPaused++;
-        Crowd.Ease();
+        Crowd.Ease(heard);
         foreach (var show in new[] { Show, SecondShow })
         {
             if (show.Playing(Now) is not null && show.Stage is { } stage)
             {
                 var (fx, fy, _, _) = RunningOrder.Front(stage);
-                Crowd.Upset(fx, fy, 40, 0.015);
+                Crowd.Upset(fx, fy, 40, AnnounceMood);
             }
         }
 
+        Announced?.Invoke(ActsPaused);
+        ActsPaused++;
+        _handled = true;
+        return true;
+    }
+
+    /// <summary>Stops the music while the PA asks everyone to step back. The same as pausing the act.</summary>
+    public bool Announce() => PauseAct();
+
+    /// <summary>Does what the player chose for the crush going on. False if it could not be done.</summary>
+    public bool Choose(CrushChoice choice) => choice switch
+    {
+        CrushChoice.Announce => Announce(),
+        CrushChoice.SendSecurity => SendSecurity() > 0,
+        CrushChoice.CancelAct => CancelAct(),
+        _ => LeaveIt(),
+    };
+
+    /// <summary>
+    /// Where the crush is worst, in metres: the most packed square security do not have in hand,
+    /// or the most packed square of all.
+    /// </summary>
+    public (double X, double Y) CrushSpot
+    {
+        get
+        {
+            var best = -1;
+            var worst = 0.0;
+            foreach (var square in _redMinutes.Keys)
+            {
+                var (sx, sy) = (square % Density.Across, square / Density.Across);
+                var perMetre = Density.In(sx, sy);
+                if (!InHand(square) && perMetre > worst)
+                {
+                    (best, worst) = (square, perMetre);
+                }
+            }
+
+            return best < 0 ? Density.WorstAt : DensityMap.CentreOf(best % Density.Across, best / Density.Across);
+        }
+    }
+
+    /// <summary>The line-up of the stage with an act on whose front is nearest the crush, or null if no act is on.</summary>
+    private RunningOrder? ShowAtCrush()
+    {
+        var (x, y) = CrushSpot;
+        return new[] { Show, SecondShow }
+            .Where(show => show.Playing(Now) is not null && show.Stage is not null)
+            .OrderBy(show =>
+            {
+                var (fx, fy, _, _) = RunningOrder.Front(show.Stage!);
+                return Distance(fx, fy, x, y);
+            })
+            .FirstOrDefault();
+    }
+
+    /// <summary>
+    /// Sends the nearest free security into the crush. They walk there, stand in it for ten
+    /// minutes keeping the crowd back and lifting people out, then go back to their posts, which
+    /// stand empty meanwhile. Each is paid overtime. The music plays on. Returns how many went.
+    /// </summary>
+    public int SendSecurity()
+    {
+        if (Phase != Phase.Day || Density.RedSquares == 0)
+        {
+            return 0;
+        }
+
+        var (x, y) = CrushSpot;
+        var going = _staff.Where(s => s.Kind == StaffKind.Security && s.IsFree)
+            .OrderBy(s => Distance(s.X, s.Y, x, y)).Take(SecurityCallOut).ToList();
+        for (var i = 0; i < going.Count; i++)
+        {
+            // Spread a little across the crush rather than all in one spot.
+            var (hx, hy) = (x + ((i - 1) * 2.0), y + ((i % 2) * 1.0));
+            if (!Field.IsWalkable(FieldMap.TileAt(hx, hy)))
+            {
+                (hx, hy) = (x, y);
+            }
+
+            var member = going[i];
+            (member.HoldX, member.HoldY) = (hx, hy);
+            Walk(member, hx, hy, StaffState.Sent);
+        }
+
+        if (going.Count > 0)
+        {
+            Spend("Security overtime", Overtime * going.Count);
+            SecuritySent++;
+            _handled = true;
+        }
+
+        return going.Count;
+    }
+
+    /// <summary>
+    /// Cancels the act on at the stage nearest the crush. They walk off there and then, and the
+    /// crowd spreads out at once. Everyone who was watching is let down, everyone else a little, and
+    /// some of the act's fans go home. The fee is not given back. False if no act is on.
+    /// </summary>
+    public bool CancelAct()
+    {
+        if (Phase != Phase.Day || ShowAtCrush() is not { } show || show.Playing(Now) is not { } slot || show.Stage is null)
+        {
+            return false;
+        }
+
+        Crowd.Ease();
+        Crowd.Upset(0, 0, 1e6, CancelMoodEveryone);
+        foreach (var party in Crowd.Parties.Where(p => p.IsOnSite && p.Watch == slot.Index).ToList())
+        {
+            party.Mood = Math.Max(0, party.Mood - (CancelMoodWatching - CancelMoodEveryone));
+            if ((uint)party.Id * 2246822519u % 4 == 0)
+            {
+                // One fan in four has come for this act alone and goes home.
+                Crowd.GoHome(party, unhappy: false);
+            }
+        }
+
+        show.CutShort(slot.Index, Now);
+        _cutShort[slot.Index] = Now;
+        ActsCancelled++;
+        _handled = true;
+        ActCancelled?.Invoke(slot);
+        return true;
+    }
+
+    /// <summary>
+    /// Leaves the crush alone. The music plays on and nobody is put out, and now and then a crowd
+    /// sorts itself out. Anyone hurt in it counts against the festival. False if there is no crush.
+    /// </summary>
+    public bool LeaveIt()
+    {
+        if (Phase != Phase.Day || _leftAlone || (!CrushBuilding && Density.RedSquares == 0))
+        {
+            return false;
+        }
+
+        _leftAlone = true;
+        TimesLeftAlone++;
         return true;
     }
 
@@ -254,11 +465,21 @@ public sealed partial class FestivalGame
         }
 
         var density = Crowd.Density;
+        LiftOut();
         if (density.RedSquares == 0)
         {
+            // The crush is over: the next one is a fresh choice.
             _redMinutes.Clear();
             _wasRed = false;
+            _handled = false;
+            _leftAlone = false;
             return;
+        }
+
+        if (_leftAlone && !_handled && _settle.NextDouble() < SettlesByItself)
+        {
+            // Left alone, people at the front sometimes sort it out themselves.
+            Crowd.Ease(0.6);
         }
 
         for (var sy = 0; sy < density.Down; sy++)
@@ -292,6 +513,26 @@ public sealed partial class FestivalGame
         }
     }
 
+    /// <summary>Once a minute, security sent into a crush lift a few people out of the packed squares around them.</summary>
+    private void LiftOut()
+    {
+        foreach (var guard in _staff.Where(s => s.State == StaffState.Holding))
+        {
+            var lifted = 0;
+            foreach (var party in Crowd.Parties.Where(p => p.State is PartyState.Watching or PartyState.Standing && Distance(p.X, p.Y, guard.X, guard.Y) <= GuardReach + 1
+                && Density.At(p.X, p.Y) > DensityMap.Busy).ToList())
+            {
+                Crowd.MoveBack(party);
+                party.Mood = Math.Max(0, party.Mood - 0.02);
+                PulledOut++;
+                if (++lifted == 3)
+                {
+                    break;
+                }
+            }
+        }
+    }
+
     /// <summary>Someone in a packed square goes down, unless security can get them out first.</summary>
     private void Hurt(int squareX, int squareY, DateTime now)
     {
@@ -315,6 +556,11 @@ public sealed partial class FestivalGame
         Crowd.TakeIll(party);
         _incidents.Add(new Incident(_nextIncident++, IncidentKind.Ill, party.X, party.Y, party.Id, now) { Crush = true });
         CrushInjuries++;
+        if (!_handled)
+        {
+            HurtLeftAlone++;
+        }
+
         Crowd.Upset(party.X, party.Y, 8, 0.04);
         CrushInjury?.Invoke(party.X, party.Y);
         if (CrushInjuries >= SeriousAt && !SeriousIncident)
@@ -331,6 +577,14 @@ public sealed partial class FestivalGame
     {
         RedMinutes = _redMinutes.Count > 0 ? new Dictionary<int, int>(_redMinutes) : null,
         Warned = _wasRed,
+        SecuritySent = SecuritySent,
+        ActsCancelled = ActsCancelled,
+        TimesLeftAlone = TimesLeftAlone,
+        HurtLeftAlone = HurtLeftAlone,
+        Handled = _handled,
+        LeftAlone = _leftAlone,
+        Settle = _settle.State,
+        CutShort = _cutShort.Count > 0 ? new Dictionary<int, DateTime>(_cutShort) : null,
         Places = Crowd.SavePlaces(),
     };
 
@@ -339,6 +593,18 @@ public sealed partial class FestivalGame
         (CrushInjuries, PulledOut, SeriousIncident, ActsPaused, _pausedUntil) = (save.CrushInjuries, save.PulledOut, save.SeriousIncident, save.ActsPaused, save.PausedUntil);
         _danger = new GameRandom(save.Danger);
         _wasRed = save.Warned;
+        (SecuritySent, ActsCancelled, TimesLeftAlone, HurtLeftAlone, _handled, _leftAlone) =
+            (save.SecuritySent, save.ActsCancelled, save.TimesLeftAlone, save.HurtLeftAlone, save.Handled, save.LeftAlone);
+        if (save.Settle != 0)
+        {
+            _settle = new GameRandom(save.Settle);
+        }
+
+        foreach (var (set, at) in save.CutShort ?? new())
+        {
+            (set >= RunningOrder.SecondBase ? SecondShow : Show).CutShort(set, at);
+            _cutShort[set] = at;
+        }
         Crowd.RestorePlaces(save.Places);
         _redMinutes.Clear();
         foreach (var (square, minutes) in save.RedMinutes ?? new())
@@ -365,4 +631,24 @@ public sealed record SafetySave(int CrushInjuries, int PulledOut, bool SeriousIn
 
     /// <summary>The places the audience have picked to watch from.</summary>
     public WatchingPlaces? Places { get; init; }
+
+    public int SecuritySent { get; init; }
+
+    public int ActsCancelled { get; init; }
+
+    public int TimesLeftAlone { get; init; }
+
+    public int HurtLeftAlone { get; init; }
+
+    /// <summary>True if the player had already done something about the crush going on.</summary>
+    public bool Handled { get; init; }
+
+    /// <summary>True if the player had chosen to leave the crush going on alone.</summary>
+    public bool LeftAlone { get; init; }
+
+    /// <summary>The dice for a crush left alone sorting itself out.</summary>
+    public ulong Settle { get; init; }
+
+    /// <summary>Sets that were cancelled, by number, and when.</summary>
+    public Dictionary<int, DateTime>? CutShort { get; init; }
 }

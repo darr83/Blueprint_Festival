@@ -5,7 +5,11 @@ using BlueprintFestival.Simulation.World;
 namespace BlueprintFestival.Simulation.Show;
 
 /// <summary>One set in the day: who plays, and from when to when.</summary>
-public sealed record Slot(int Index, Act Act, DateTime Start, DateTime End, bool Headliner);
+public sealed record Slot(int Index, Act Act, DateTime Start, DateTime End, bool Headliner)
+{
+    /// <summary>True for a set that was ended early, so the act walked off before the end.</summary>
+    public bool CutShort { get; init; }
+}
 
 /// <summary>
 /// The music on one stage. A stage has four sets, at two, four, six and eight o'clock, and any of
@@ -163,11 +167,11 @@ public sealed class RunningOrder
 
     /// <summary>
     /// The set that has just finished, while its act is still on stage taking the applause (for
-    /// <see cref="Performing.BowMinutes"/> after the end), or null. Not after the music was called off.
+    /// <see cref="Performing.BowMinutes"/> after the end), or null. Not after the music was called off, nor after a set that was cancelled.
     /// </summary>
     public Slot? Bowing(DateTime now) =>
         Stage is null || CalledOff is not null ? null
-        : _slots.FirstOrDefault(s => now >= s.End && now < s.End.AddMinutes(Performing.BowMinutes) && Playing(now) is null);
+        : _slots.FirstOrDefault(s => !s.CutShort && now >= s.End && now < s.End.AddMinutes(Performing.BowMinutes) && Playing(now) is null);
 
     /// <summary>True in the gap after a set has finished and before the next one starts.</summary>
     public bool Changeover(DateTime now) => Stage is not null && CalledOff is null && Playing(now) is null && Next(now) is not null && _slots.Any(s => s.End <= now);
@@ -177,6 +181,19 @@ public sealed class RunningOrder
 
     /// <summary>Calls off the rest of the day's music from a moment on.</summary>
     public void CallOff(DateTime from) => CalledOff = from;
+
+    /// <summary>Ends a set early, from a moment on: the act walks off and the stage stands empty until the next set. False if the set is not on then.</summary>
+    public bool CutShort(int index, DateTime at)
+    {
+        var place = _slots.FindIndex(s => s.Index == index);
+        if (place < 0 || at < _slots[place].Start || at >= _slots[place].End)
+        {
+            return false;
+        }
+
+        _slots[place] = _slots[place] with { End = at, CutShort = true };
+        return true;
+    }
 
     /// <summary>The next set still to start, or null once the last has begun.</summary>
     public Slot? Next(DateTime now) => CalledOff is not null ? null : _slots.FirstOrDefault(s => s.Start > now);

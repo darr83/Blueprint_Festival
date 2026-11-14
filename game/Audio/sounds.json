@@ -398,6 +398,50 @@
       "prompt": "A public address system clicking on with a soft hum and a tap on a microphone."
     },
     {
+      "id": "pa_step_back_1",
+      "bus": "Effects",
+      "seconds": 11.7,
+      "loop": false,
+      "volume": 1.0,
+      "gap": 0.0,
+      "voice": "JBFqnCBsd6RMkjVDRZzb",
+      "lead": 1.6,
+      "prompt": "Hello everyone. Can we all take a big step back from the front, please? Just one big step back. Look after each other, and we'll get the music going again in a minute."
+    },
+    {
+      "id": "pa_step_back_2",
+      "bus": "Effects",
+      "seconds": 10.5,
+      "loop": false,
+      "volume": 1.0,
+      "gap": 0.0,
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "lead": 1.6,
+      "prompt": "Can I have your attention, please. It's getting far too tight at the front. Everyone, please take two steps back, slowly. Thank you."
+    },
+    {
+      "id": "pa_step_back_3",
+      "bus": "Effects",
+      "seconds": 13.1,
+      "loop": false,
+      "volume": 1.0,
+      "gap": 0.0,
+      "voice": "onwK4e9ZLuTAKqWW03F9",
+      "lead": 1.6,
+      "prompt": "Right then, folks. The people at the front need some room. Please move back slowly, and keep an eye on the person next to you. Thanks, everyone."
+    },
+    {
+      "id": "pa_restart",
+      "bus": "Effects",
+      "seconds": 6.2,
+      "loop": false,
+      "volume": 1.0,
+      "gap": 0.0,
+      "voice": "JBFqnCBsd6RMkjVDRZzb",
+      "lead": 0.9,
+      "prompt": "Thank you, everyone. That's much better. Let's give them a big welcome back!"
+    },
+    {
       "id": "rain_start",
       "bus": "Ambience",
       "seconds": 4,
