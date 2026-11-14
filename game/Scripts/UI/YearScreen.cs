@@ -131,7 +131,7 @@ public partial class YearScreen : Control
                 }
 
                 Centre(YearPanels.Plan(PlanOf(_game, _slot), new PlanActions(BookEvent, PickSlot, PickArtist, ToggleStage, ChangePrice, TogglePonchos, ToggleCamping,
-                    _game.Plan is null ? null : ChangeFields, ChangeParking, ChangeBuses), scroll));
+                    _game.Plan is null ? null : ChangeFields, ChangeParking, ChangeBuses, MoveSet), scroll));
                 break;
             case Phase.Sell:
                 Centre(YearPanels.Sales(SalesOf(_game, Running), RunMonth, ToggleAdvert, ChangePrice, Running, ChangeParking, ChangeBuses));
@@ -197,7 +197,11 @@ public partial class YearScreen : Control
     {
         var set = show.Base + i;
         var act = show.At(set);
-        return new SlotView(set, TimeOf(game, set), act?.Name, act is null ? "" : Roster.NameOf(act.Genre), act?.Rating ?? 0, act is null ? 0 : game.FeeOf(act.Rating));
+        return new SlotView(set, TimeOf(game, set), act?.Name, act is null ? "" : Roster.NameOf(act.Genre), act?.Rating ?? 0, act is null ? 0 : game.FeeOf(act.Rating))
+        {
+            CanEarlier = game.CanMoveSet(set, -1),
+            CanLater = game.CanMoveSet(set, 1),
+        };
     }).ToList();
 
     /// <summary>What the planning screen shows, with one set picked to book an artist for.</summary>
@@ -264,6 +268,15 @@ public partial class YearScreen : Control
     {
         _slot = set;
         SoundBoard.Cue(Sounds.Click);
+        Rebuild();
+    }
+
+    /// <summary>Moves a set an hour earlier or later, and picks it.</summary>
+    public void MoveSet(int set, int hours)
+    {
+        var moved = _game.MoveSet(set, hours);
+        _slot = set;
+        SoundBoard.Cue(moved ? Sounds.Click : Sounds.Refuse);
         Rebuild();
     }
 

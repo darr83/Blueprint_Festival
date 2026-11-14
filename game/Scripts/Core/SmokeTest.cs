@@ -446,6 +446,10 @@ public partial class SmokeTest : Node
                     Check(game.SecondStageBooked && game.SecondShow.Slots.Count == 0 && plan.Year.SlotPicked == RunningOrder.SecondBase, "Adding a second stage should give four empty sets.");
                     plan.Year.PickArtist("DJ Haybale");
                     Check(game.SecondShow.At(RunningOrder.SecondBase)?.Name == "DJ Haybale", "An artist should be bookable for the second stage.");
+                    plan.Year.MoveSet(RunningOrder.SecondBase, -1);
+                    Check(game.SecondShow.HourOf(0) == 13 && game.Show.HourOf(0) == 14, "The arrows should move a second stage set an hour earlier without moving the main stage.");
+                    plan.Year.MoveSet(RunningOrder.SecondBase, 1);
+                    Check(game.SecondShow.HourOf(0) == 14, "And back again.");
                     plan.Year.ToggleStage();
                     Check(!game.SecondStageBooked && game.LineUp.Count() == 3, "Taking the second stage away should take its acts off the bill.");
                     var view = BlueprintFestival.UI.YearScreen.PlanOf(game, plan.Year.SlotPicked);

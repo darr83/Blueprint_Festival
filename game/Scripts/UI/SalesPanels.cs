@@ -5,7 +5,14 @@ using Godot;
 namespace BlueprintFestival.UI;
 
 /// <summary>One set on a stage: when it is, and who is booked for it, if anyone.</summary>
-public sealed record SlotView(int Set, string Time, string? Name, string Detail, int Stars, int Fee);
+public sealed record SlotView(int Set, string Time, string? Name, string Detail, int Stars, int Fee)
+{
+    /// <summary>True if the set can start an hour earlier.</summary>
+    public bool CanEarlier { get; init; }
+
+    /// <summary>True if the set can start an hour later.</summary>
+    public bool CanLater { get; init; }
+}
 
 /// <summary>One artist who could be booked for the set that is picked.</summary>
 public sealed record ArtistView(string Name, string Detail, int Stars, int Fee, string Note, bool Here);
@@ -19,7 +26,7 @@ public sealed record PlanView(int Year, string Festival, string Date, int Licenc
 /// <summary>What the planning screen can do.</summary>
 public sealed record PlanActions(System.Action? Book = null, System.Action<int>? PickSlot = null, System.Action<string?>? PickArtist = null,
     System.Action? ToggleSecond = null, System.Action<int>? Price = null, System.Action? Ponchos = null, System.Action? Camping = null, System.Action? Fields = null,
-    System.Action<int>? Parking = null, System.Action<int>? Buses = null);
+    System.Action<int>? Parking = null, System.Action<int>? Buses = null, System.Action<int, int>? MoveSet = null);
 
 /// <summary>One way of advertising, and whether it is switched on.</summary>
 public sealed record AdvertView(string Id, string Name, int Cost, int Reach, string Reaches, bool On);
@@ -183,7 +190,7 @@ public static partial class YearPanels
     }
 
     /// <summary>One line of the running order: the time in pink, the act in the poster font, the music, the stars and the fee.</summary>
-    private static Control SlotTile(SlotView slot, bool picked, System.Action<int>? pick)
+    private static Control SlotTile(SlotView slot, bool picked, System.Action<int>? pick, System.Action<int, int>? move = null)
     {
         var tile = Tile(picked, 400, pick is null ? null : () => pick(slot.Set));
         var line = UiStyle.Box(picked ? UiStyle.SunTint : UiStyle.Surface, picked ? 6 : 0);
@@ -202,7 +209,21 @@ public static partial class YearPanels
         var time = UiStyle.Heading(slot.Time, 18);
         time.AddThemeColorOverride("font_color", UiStyle.StagePink);
         time.CustomMinimumSize = new Vector2(56, 0);
-        row.AddChild(time);
+        if (move is not null)
+        {
+            // An hour earlier or later; the other sets on the stage move along to make room.
+            var times = new HBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
+            times.AddThemeConstantOverride("separation", 2);
+            times.AddChild(HourButton(false, slot.CanEarlier ? () => move(slot.Set, -1) : null));
+            time.HorizontalAlignment = HorizontalAlignment.Center;
+            times.AddChild(time);
+            times.AddChild(HourButton(true, slot.CanLater ? () => move(slot.Set, 1) : null));
+            row.AddChild(times);
+        }
+        else
+        {
+            row.AddChild(time);
+        }
         var name = UiStyle.Heading(slot.Name ?? "Nobody yet", 21);
         name.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
         name.ClipText = true;
@@ -224,6 +245,17 @@ public static partial class YearPanels
 
         tile.AddChild(row);
         return tile;
+    }
+
+    /// <summary>A small arrow that moves a set an hour earlier or later; greyed out when there is no room.</summary>
+    private static Button HourButton(bool later, System.Action? pressed)
+    {
+        var button = UiStyle.RoundButton(later ? "›" : "‹", pressed ?? (() => { }), 24);
+        button.Name = later ? "Later" : "Earlier";
+        button.Disabled = pressed is null;
+        button.TooltipText = pressed is null ? "No room to move this set" : later ? "Start an hour later" : "Start an hour earlier";
+        button.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
+        return button;
     }
 
     /// <summary>A card to switch an extra on and off: a tick box, what it is, and a line about it.</summary>
@@ -286,7 +318,7 @@ public static partial class YearPanels
         bill.AddChild(Section("Main stage"));
         foreach (var slot in view.Main)
         {
-            bill.AddChild(SlotTile(slot, slot.Set == view.Picked, does.PickSlot));
+            bill.AddChild(SlotTile(slot, slot.Set == view.Picked, does.PickSlot, does.MoveSet));
         }
 
         bill.AddChild(new Control { CustomMinimumSize = new Vector2(0, 8) });
@@ -305,14 +337,14 @@ public static partial class YearPanels
         {
             foreach (var slot in view.Second)
             {
-                bill.AddChild(SlotTile(slot, slot.Set == view.Picked, does.PickSlot));
+                bill.AddChild(SlotTile(slot, slot.Set == view.Picked, does.PickSlot, does.MoveSet));
             }
         }
 
         bill.AddChild(new Control { CustomMinimumSize = new Vector2(0, 6), SizeFlagsVertical = Control.SizeFlags.ExpandFill });
         bill.AddChild(PriceTicket(view.Price, view.FairPrice, does.Price, "Admit", $"{view.Licence:N0}"));
         var summary = UiStyle.Body($"{view.Acts} acts  ·  fees £{view.Fees:N0}  ·  line-up pull {view.Pull}%", muted: true, size: 13);
-        summary.TooltipText = "Sets are an hour and a half, at 14:00, 16:00, 18:00 and 20:00, with half an hour's break after each, and any can be left empty. Every act helps sell tickets by its stars and fans, the last act on the main stage most of all. Four kinds of music or more bring a wider crowd.";
+        summary.TooltipText = "Sets are an hour and a half and can start on any hour from 12:00 to 21:00 (the arrows by each time), with the next set on that stage on the next hour after it ends at the earliest. Any can be left empty, and the two stages can start and finish at different times. Every act helps sell tickets by its stars and fans, the last act on the main stage most of all. Four kinds of music or more bring a wider crowd.";
         summary.MouseFilter = Control.MouseFilterEnum.Stop;
         bill.AddChild(summary);
 

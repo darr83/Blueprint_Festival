@@ -252,6 +252,32 @@ public sealed partial class FestivalGame
         return true;
     }
 
+    /// <summary>
+    /// Moves a set some hours earlier or later (any hour from midday to nine in the evening). The
+    /// other sets on the stage are pushed along to stay two hours apart. False if there is no room.
+    /// </summary>
+    public bool MoveSet(int set, int hours)
+    {
+        Need(Phase.Plan);
+        if (set >= RunningOrder.SecondBase && !SecondShow.Booked)
+        {
+            return false;
+        }
+
+        if (!StageOf(set).Move(set, hours))
+        {
+            return false;
+        }
+
+        Crowd.Replan(ExpectedAt(TicketPrice));
+        return true;
+    }
+
+    /// <summary>True if a set can be moved some hours earlier or later.</summary>
+    public bool CanMoveSet(int set, int hours) =>
+        Phase == Phase.Plan && (set < RunningOrder.SecondBase || SecondShow.Booked)
+        && RunningOrder.Moved(StageOf(set).Hours, set - StageOf(set).Base, hours) is not null;
+
     private void Place(int set, Artist? artist)
     {
         var show = StageOf(set);
@@ -701,6 +727,8 @@ public sealed partial class FestivalGame
         LineUp = Enumerable.Range(0, RunningOrder.SetsAStage).Select(i => Show.At(i)?.Name)
             .Concat(Enumerable.Range(0, RunningOrder.SetsAStage).Select(i => SecondShow.At(RunningOrder.SecondBase + i)?.Name)).ToList(),
         Sales = SaveSales(),
+        MainHours = Show.Hours.ToList(),
+        SecondHours = SecondShow.Hours.ToList(),
     };
 
     private void RestoreYear(YearSave year)
@@ -709,6 +737,16 @@ public sealed partial class FestivalGame
         HeadlinerPicked = Math.Clamp(year.Headliner, 0, _offers.Count - 1);
         Show.SetHeadliner(_offers[HeadlinerPicked].Act);
         SecondShow.Booked = year.SecondStage;
+        if (year.MainHours is { } mainHours)
+        {
+            Show.SetHours(mainHours);
+        }
+
+        if (year.SecondHours is { } secondHours)
+        {
+            SecondShow.SetHours(secondHours);
+        }
+
         if (year.LineUp is { } names && names.Count == 2 * RunningOrder.SetsAStage)
         {
             for (var i = 0; i < names.Count; i++)
@@ -766,6 +804,12 @@ public sealed record YearSave(int Number, int Licence, Phase Phase, DateTime Day
 
     /// <summary>True if acts were booked for a second stage.</summary>
     public bool SecondStage { get; init; }
+
+    /// <summary>The hour each set starts on the main stage, or null in an older save (two, four, six and eight).</summary>
+    public List<int>? MainHours { get; init; }
+
+    /// <summary>The hour each set starts on the second stage, or null in an older save.</summary>
+    public List<int>? SecondHours { get; init; }
 
     /// <summary>True if the camping field was taken.</summary>
     public bool Camping { get; init; }
