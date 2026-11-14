@@ -68,6 +68,7 @@ public partial class BuildBar : VBoxContainer
         AddTab(row, BuildMode.Gate, "Gates", "Where tickets are checked");
         AddTab(row, BuildMode.Stall, "Stalls", "Food, drink, toilets and water");
         AddTab(row, BuildMode.Staff, "Staff", "Ticket staff, security and first aid");
+        AddTab(row, BuildMode.Ground, "Ground", "Straw and trackway, to keep feet out of the mud");
         AddTab(row, BuildMode.Remove, "Take down", "Remove something and get the money back");
 
         SetAnchorsAndOffsetsPreset(LayoutPreset.BottomWide, LayoutPresetMode.Minsize, 14);
@@ -143,6 +144,12 @@ public partial class BuildBar : VBoxContainer
                 break;
             }
 
+            case BuildMode.Ground:
+                AddChoice($"ground{GroundKind.Straw}", "Straw", $"£{FestivalGame.CostOf(GroundKind.Straw)} a patch",
+                    "Scattered on wet ground it soaks up most of the mud. It can go down on the day, once you see where the mud is.\nA patch is 2 m square.", () => _tool.PickGround(GroundKind.Straw));
+                AddChoice($"ground{GroundKind.Trackway}", "Trackway", $"£{FestivalGame.CostOf(GroundKind.Trackway)} a patch",
+                    "Metal panels. No mud at all, and the grass underneath comes to no harm.\nA patch is 2 m square.", () => _tool.PickGround(GroundKind.Trackway));
+                break;
             case BuildMode.Remove:
                 _tool.PickRemove();
                 break;
@@ -203,6 +210,7 @@ public partial class BuildBar : VBoxContainer
             BuildMode.Fence => $"fence{_tool.Fence}",
             BuildMode.Gate => $"gate{_tool.Gate}",
             BuildMode.Stall => $"stall{_tool.Stall}",
+            BuildMode.Ground => $"ground{_tool.Ground}",
             _ => "",
         };
         foreach (var (key, button) in _choices)

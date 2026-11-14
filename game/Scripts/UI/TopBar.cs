@@ -24,6 +24,7 @@ public partial class TopBar : PanelContainer
     private FestivalGame _game = null!;
     private Label _name = null!;
     private Label _date = null!;
+    private Label _weather = null!;
     private Label _time = null!;
     private Label _light = null!;
     private Label _people = null!;
@@ -106,6 +107,9 @@ public partial class TopBar : PanelContainer
         _light = UiStyle.Body("", muted: true, size: 14);
         _light.Visible = false;
         row.AddChild(_light);
+        _weather = UiStyle.Body("", size: 15);
+        _weather.MouseFilter = MouseFilterEnum.Stop;
+        row.AddChild(_weather);
         _date = UiStyle.Body("", muted: true);
         _date.MouseFilter = MouseFilterEnum.Stop;
         row.AddChild(_date);
@@ -135,6 +139,14 @@ public partial class TopBar : PanelContainer
         Refresh();
     }
 
+    /// <summary>The weather in a word or two, as the top bar shows it.</summary>
+    public static string WeatherWord(FestivalGame game) =>
+        game.RainNow > 0.7 ? "Heavy rain" : game.RainNow > 0.05 ? "Raining" :
+        game.Weather.Kind == WeatherKind.Hot ? $"Hot {game.Weather.High}°C" :
+        game.Weather.Wet ? (game.Phase == Phase.Day ? "Dry for now" : game.Weather.Word) : $"Fine {game.Weather.High}°C";
+
+    public string WeatherText => _weather.Text;
+
     public override void _Process(double delta) => Refresh();
 
     private void Refresh()
@@ -147,7 +159,9 @@ public partial class TopBar : PanelContainer
         _queue.Text = _game.Crowd.Queuing > 0 ? $"Queuing {_game.Crowd.Queuing}" : "";
 
         // There is not room for both: the queue matters more than the date while there is one.
-        _date.Visible = _queue.Text.Length == 0;
+        // On the day itself the weather takes the date's place: the date does not change, and the weather does.
+        _date.Visible = _queue.Text.Length == 0 && _game.Phase != Phase.Day;
+        _time.TooltipText = _date.TooltipText;
         _money.Text = $"£{_game.Money:N0}";
         _mood.Text = $"Happy {_game.Crowd.Happiness}%";
         var music = _game.Show;
@@ -157,6 +171,8 @@ public partial class TopBar : PanelContainer
             : music.Playing(now) is { } on ? $"Now: {on.Act.Name} until {on.End.ToString("HH:mm", British)}"
             : music.Next(now) is { } next ? $"Next: {next.Act.Name} at {next.Start.ToString("HH:mm", British)}"
             : "The music has finished";
+        _weather.Text = WeatherWord(_game);
+        _weather.TooltipText = _game.Weather.Summary + (_game.Wetness > 0.05 ? $" The ground is {(_game.Wetness > 0.6 ? "sodden" : _game.Wetness > 0.3 ? "wet" : "damp")}." : "");
         var light = _game.Light;
         _light.Text = light >= 1 ? "Daylight" : light <= 0 ? "Night" : now.Hour < 12 ? "Dawn" : "Dusk";
         foreach (var (speed, button) in _speedButtons)

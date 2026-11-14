@@ -73,10 +73,10 @@ public partial class YearScreen : Control
         switch (_game.Phase)
         {
             case Phase.Plan:
-                Centre(YearPanels.Plan(PlanOf(_game), StartBuilding, PickTicket, PickHeadliner));
+                Centre(YearPanels.Plan(PlanOf(_game), StartBuilding, PickTicket, PickHeadliner, TogglePonchos));
                 break;
             case Phase.Build:
-                Side(YearPanels.BuildDay(_game.Crowd.Expected, _game.Money, OpenGates));
+                Side(YearPanels.BuildDay(_game.Crowd.Expected, _game.Money, OpenGates, _game.Weather.Summary));
                 break;
             case Phase.Tidy:
                 Side(YearPanels.Tidy(_game.Litter.Count, _game.LitterAtStart, _game.ScoutsFee, () => PayScouts(), HandBack));
@@ -124,14 +124,14 @@ public partial class YearScreen : Control
         game.Headliners.Select(h => new ActOffer(h.Act.Name, KindText(h.Act), h.Fee, h.Stars)).ToList(),
         game.HeadlinerPicked,
         game.Show.Slots.Take(6).Select(s => s.Act.Name).ToList(),
-        game.SupportFee / 6);
+        game.SupportFee / 6, game.EarlyForecast, game.PonchosOrdered, game.PonchoCost);
 
     public static ResultsView ResultsOf(FestivalGame game)
     {
         var r = game.Result!;
         return new ResultsView(r.Year, $"{game.Name}, {game.Day:dddd d MMMM yyyy}", r.Came, r.Expected, r.Happy, r.WentHome,
             Lines(game.Income), Lines(game.Spending), r.LitterCleared, r.GrassWorn, r.Verdict, r.LicenceNow, r.LicenceNext,
-            r.Treated, r.Untreated, r.TroubleSorted, r.TroubleIgnored, r.CrushInjuries, r.PulledOut);
+            r.Treated, r.Untreated, r.TroubleSorted, r.TroubleIgnored, r.CrushInjuries, r.PulledOut, r.FieldRepair, r.Weather);
     }
 
     private static List<(string What, int Amount)> Lines(IEnumerable<LedgerLine> lines) => lines.Select(l => (l.What, l.Amount)).ToList();
@@ -139,6 +139,12 @@ public partial class YearScreen : Control
     public void PickTicket(int index)
     {
         _game.ChooseTicket(FestivalGame.TicketPrices[index]);
+        Rebuild();
+    }
+
+    public void TogglePonchos()
+    {
+        _game.OrderPonchos(!_game.PonchosOrdered);
         Rebuild();
     }
 
