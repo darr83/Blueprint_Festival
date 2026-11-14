@@ -153,6 +153,7 @@ public partial class FestivalScene : Node3D
         TopBar = new TopBar { Name = "TopBar" };
         _hud.AddChild(TopBar);
         TopBar.Initialise(Game, OpenMenu);
+        _hud.AddChild(TopBar.SkipButton);
         Money = new MoneyPanel { Name = "MoneyPanel" };
         _hud.AddChild(Money);
         Money.Initialise(Game);
@@ -179,7 +180,7 @@ public partial class FestivalScene : Node3D
         };
         Game.CrushWarning += OnCrushWarning;
 
-        _hint = UiStyle.Body("Q / E turn view    WASD move    Wheel zoom    Space pause    C crowd view", muted: true, size: 13);
+        _hint = UiStyle.Body("Q / E turn view    WASD move    Wheel zoom    Space pause    N next act    C crowd view", muted: true, size: 13);
         _hint.Theme = UiStyle.Theme;
         _hint.AddThemeColorOverride("font_color", new Color(1, 1, 1, 0.85f));
         _hint.AddThemeColorOverride("font_shadow_color", new Color(0, 0, 0, 0.5f));
@@ -245,6 +246,9 @@ public partial class FestivalScene : Node3D
                 break;
             case Key.Key4:
                 Game.Clock.SetSpeed(GameSpeed.Fastest);
+                break;
+            case Key.N:
+                Game.SkipToNextAct();
                 break;
             case Key.C:
                 _viewFromWarning = false;

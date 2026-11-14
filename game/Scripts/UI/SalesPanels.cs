@@ -208,7 +208,7 @@ public static partial class YearPanels
 
         var summary = UiStyle.Body($"{view.Acts} acts  ·  fees £{view.Fees:N0}  ·  line-up pull {view.Pull}%  ·  worth about £{view.FairPrice} a ticket", size: 14);
         bill.AddChild(summary);
-        var how = UiStyle.Body("Sets are two hours, from 14:00 to 22:00, and any can be left empty. Every act helps sell tickets by its stars and fans, the last act on the main stage most of all. Four kinds of music or more bring a wider crowd.", muted: true, size: 13);
+        var how = UiStyle.Body("Sets are an hour and a half, at 14:00, 16:00, 18:00 and 20:00, with half an hour's break after each, and any can be left empty. Every act helps sell tickets by its stars and fans, the last act on the main stage most of all. Four kinds of music or more bring a wider crowd.", muted: true, size: 13);
         how.AutowrapMode = TextServer.AutowrapMode.WordSmart;
         how.CustomMinimumSize = new Vector2(440, 0);
         bill.AddChild(how);

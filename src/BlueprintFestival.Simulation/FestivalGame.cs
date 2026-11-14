@@ -263,7 +263,76 @@ public sealed partial class FestivalGame
     public double Light => Daylight.At(Clock.Now);
 
     /// <summary>Moves the game on by an amount of real time. Returns the number of ticks run.</summary>
-    public int Advance(double realSeconds) => Phase == Phase.Day ? Clock.Advance(realSeconds) : 0;
+    public int Advance(double realSeconds)
+    {
+        if (Phase != Phase.Day)
+        {
+            SkippingTo = null;
+            return 0;
+        }
+
+        return SkippingTo is null ? Clock.Advance(realSeconds) : RunSkip();
+    }
+
+    /// <summary>The most ticks a skip runs in one frame, and the longest it may take over them, so the game keeps drawing.</summary>
+    public const int SkipTicksAFrame = 600;
+
+    private static readonly TimeSpan SkipFrameBudget = TimeSpan.FromMilliseconds(14);
+
+    /// <summary>The start of the next set on either stage, or null once the last has begun or with no music to come.</summary>
+    public Slot? NextAct
+    {
+        get
+        {
+            var next = new[] { Show, SecondShow }.Where(s => s.Stage is not null).Select(s => s.Next(Now)).Where(s => s is not null).ToList();
+            return next.Count == 0 ? null : next.MinBy(s => s!.Start);
+        }
+    }
+
+    /// <summary>While the player is skipping to the next act, the time the game is hurrying on to.</summary>
+    public DateTime? SkippingTo { get; private set; }
+
+    /// <summary>
+    /// Hurries the day on to the start of the next act. Nothing is missed out: every second in
+    /// between still happens, only as fast as the computer can run it, whatever the speed and even
+    /// when paused. False if there is no act still to come.
+    /// </summary>
+    public bool SkipToNextAct()
+    {
+        if (Phase != Phase.Day || NextAct is not { } next)
+        {
+            return false;
+        }
+
+        SkippingTo = next.Start;
+        _skipFromCrush = CrushBuilding;
+        return true;
+    }
+
+    /// <summary>Stops a skip where it has got to.</summary>
+    public void StopSkipping() => SkippingTo = null;
+
+    private bool _skipFromCrush;
+
+    private int RunSkip()
+    {
+        var started = System.Diagnostics.Stopwatch.StartNew();
+        var ticks = 0;
+        while (SkippingTo is { } until && ticks < SkipTicksAFrame && (ticks < 8 || started.Elapsed < SkipFrameBudget))
+        {
+            if (Phase != Phase.Day || Clock.Now >= until || (CrushBuilding && !_skipFromCrush))
+            {
+                // There, or something needs the player: a crush that starts to build is not to be hurried past.
+                SkippingTo = null;
+                break;
+            }
+
+            Clock.Step();
+            ticks++;
+        }
+
+        return ticks;
+    }
 
     /// <summary>Tidies a name the player typed; an empty one becomes the default.</summary>
     public static string CleanName(string? name)

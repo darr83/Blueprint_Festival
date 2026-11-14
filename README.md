@@ -114,8 +114,10 @@ The volume sliders are in the pause menu (Esc) and on the main menu, and are rem
   up to £5 nobody minds, and each pound over that puts off some drivers. Cars fill the bays
   through the day and the bus pulls in at the stop on the lane every quarter of an hour. Parking
   and buses can be changed in January, while tickets sell and in build week.
-- **January.** You book the line-up. Each stage has four two-hour sets, at 14:00, 16:00, 18:00 and
-  20:00. Any of the 25 artists can play any set, an artist plays once, and a set can be left empty.
+- **January.** You book the line-up. Each stage has four sets, at 14:00, 16:00, 18:00 and 20:00. An act
+  plays for an hour and a half and the stage is then empty for half an hour, when people go for a
+  drink, some food or the toilet. On the day, Skip to next act (or N) hurries the clock on to the
+  next set. Any of the 25 artists can play any set, an artist plays once, and a set can be left empty.
   You can add a second stage for four more sets. You set the ticket price in whole pounds.
 - **January to June.** Tickets are on sale and each month is one turn. You switch adverts on and
   off (15 of them, from posters in shop windows to national TV), change the price if you like, and

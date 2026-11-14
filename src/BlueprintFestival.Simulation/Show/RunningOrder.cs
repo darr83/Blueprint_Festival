@@ -8,17 +8,24 @@ namespace BlueprintFestival.Simulation.Show;
 public sealed record Slot(int Index, Act Act, DateTime Start, DateTime End, bool Headliner);
 
 /// <summary>
-/// The music on one stage. A stage has four two-hour sets, at two, four, six and eight o'clock,
-/// and any of them may be left empty. It starts with acts made up from the festival's seed, and
+/// The music on one stage. A stage has four sets, at two, four, six and eight o'clock, and any of
+/// them may be left empty. An act plays for an hour and a half, and the stage then stands empty
+/// for half an hour while the next act sets up and people go for a drink, some food or the toilet. It starts with acts made up from the festival's seed, and
 /// the player books who they like. The acts play on the stage the player has put up; with no
 /// stage there is no show.
 /// </summary>
 public sealed class RunningOrder
 {
+    /// <summary>How long an act plays for, in minutes.</summary>
+    public const int SetMinutes = 90;
+
+    /// <summary>How long the stage stands empty after a set before the next one starts, in minutes.</summary>
+    public const int BreakMinutes = 30;
+
     /// <summary>When each set starts (hours after midnight) and how long it lasts (minutes). The same on every stage.</summary>
     private static readonly (double Start, int Minutes)[] Times =
     {
-        (14, 120), (16, 120), (18, 120), (20, 120),
+        (14, SetMinutes), (16, SetMinutes), (18, SetMinutes), (20, SetMinutes),
     };
 
     /// <summary>How many sets a stage has in the day.</summary>
@@ -153,6 +160,9 @@ public sealed class RunningOrder
 
     /// <summary>The set that is on right now, or null between sets or with no stage.</summary>
     public Slot? Playing(DateTime now) => Stage is null || now >= CalledOff ? null : _slots.FirstOrDefault(s => now >= s.Start && now < s.End);
+
+    /// <summary>True in the gap after a set has finished and before the next one starts.</summary>
+    public bool Changeover(DateTime now) => Stage is not null && CalledOff is null && Playing(now) is null && Next(now) is not null && _slots.Any(s => s.End <= now);
 
     /// <summary>When the rest of the day's music was called off, if it was.</summary>
     public DateTime? CalledOff { get; private set; }

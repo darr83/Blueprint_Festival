@@ -32,6 +32,13 @@ public partial class TopBar : PanelContainer
     private Label _queue = null!;
     private Label _show = null!;
     private Label _mood = null!;
+    private Button _skip = null!;
+
+    /// <summary>
+    /// The button that hurries the day on to the next act. There is no room for it in the bar, so
+    /// the scene hangs it just below, under the line that says who is on.
+    /// </summary>
+    public Button SkipButton => _skip;
 
     /// <summary>How happy people are, as the bar says it.</summary>
     public string MoodText => _mood.Text;
@@ -101,6 +108,18 @@ public partial class TopBar : PanelContainer
         _show.MouseFilter = MouseFilterEnum.Stop;
         row.AddChild(new Control { CustomMinimumSize = new Vector2(10, 0) });
         row.AddChild(_show);
+        _skip = UiStyle.SecondaryButton("Skip to next act", () =>
+        {
+            if (_game.SkippingTo is null)
+            {
+                _game.SkipToNextAct();
+            }
+            else
+            {
+                _game.StopSkipping();
+            }
+        });
+        _skip.Theme = UiStyle.Theme;
 
         row.AddChild(new Control { SizeFlagsHorizontal = SizeFlags.ExpandFill });
 
@@ -188,6 +207,19 @@ public partial class TopBar : PanelContainer
         {
             _show.TooltipText = "";
         }
+        var upNext = _game.Phase == Phase.Day ? _game.NextAct : null;
+        _skip.Visible = _game.Phase == Phase.Day && music.Stage is not null;
+        _skip.Disabled = upNext is null && _game.SkippingTo is null;
+        _skip.Position = new Vector2(_show.GlobalPosition.X, Size.Y + 8);
+        _skip.Text = _game.SkippingTo is not null ? "Skipping..." : "Skip to next act";
+        _skip.TooltipText = _game.SkippingTo is not null ? "Click to stop skipping"
+            : upNext is null ? "There are no more acts to come today"
+            : $"Hurry the day on to {upNext.Act.Name} at {upNext.Start.ToString("HH:mm", British)} (N)";
+        if (music.Stage is not null && music.Changeover(now) && music.Next(now) is { } after && !_show.Text.StartsWith("Second stage:", System.StringComparison.Ordinal))
+        {
+            _show.Text = $"Stage empty. Next: {after.Act.Name} at {after.Start.ToString("HH:mm", British)}";
+        }
+
         _weather.Text = WeatherWord(_game);
         _weather.TooltipText = _game.Weather.Summary + (_game.Wetness > 0.05 ? $" The ground is {(_game.Wetness > 0.6 ? "sodden" : _game.Wetness > 0.3 ? "wet" : "damp")}." : "");
         var light = _game.Light;
