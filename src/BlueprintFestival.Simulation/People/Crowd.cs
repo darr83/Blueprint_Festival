@@ -461,6 +461,9 @@ public sealed class Crowd
     /// <summary>Raised when someone drops a piece of litter: where, in metres.</summary>
     public event Action<double, double>? Dropped;
 
+    /// <summary>Asked when a party is about to let go of some rubbish: true if it went in a bin instead.</summary>
+    public Func<Party, int, bool>? Binned { get; set; }
+
     /// <summary>Whether a party is the sort to drop its rubbish. About half are, always the same ones.</summary>
     public bool Untidy(Party party) => (unchecked((uint)((Seed * 131) + (party.Id * 7919))) % 100) < 55;
 
@@ -1647,6 +1650,12 @@ public sealed class Crowd
             {
                 // Anyone already on their way out takes it home with them.
                 var pieces = _map.InFestival(FieldMap.TileAt(party.X, party.Y)) ? Math.Max(1, party.Members.Count / 2) : 0;
+                if (pieces > 0 && Binned?.Invoke(party, pieces) == true)
+                {
+                    // There was a bin within a few steps, and it went in there.
+                    pieces = 0;
+                }
+
                 for (var i = 0; i < pieces; i++)
                 {
                     var angle = (party.Id * 2.4) + (party.Spent * 0.7) + (i * 2.1);

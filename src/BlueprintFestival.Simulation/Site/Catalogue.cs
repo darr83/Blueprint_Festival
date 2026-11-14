@@ -69,6 +69,9 @@ public enum StallKind
 
     /// <summary>A big white tent with a green cross and six beds, for a big festival.</summary>
     MedicalTent,
+
+    /// <summary>A litter bin. People passing with rubbish in their hands mostly use it.</summary>
+    Bin,
 }
 
 /// <summary>What a person can need during the day.</summary>
@@ -110,6 +113,9 @@ public enum StaffKind
     TicketStaff,
     Security,
     FirstAider,
+
+    /// <summary>Picks up litter and empties the bins.</summary>
+    Cleaner,
 }
 
 /// <summary>One kind of staff: what they are called, what they cost for the day, and what they do.</summary>
@@ -150,6 +156,7 @@ public static class Catalogue
         new StallInfo(StallKind.FirstAidTent, "First aid tent", 8, 6, 80, null, 0, 1200, 2, "Two beds under a green cross. First-aiders bring people to the nearest free bed to rest."),
         new StallInfo(StallKind.ToiletBlock, "Toilet block", 24, 3, 110, Need.Toilet, 0, 75, 9, "Nine cabins in a row, for a bigger crowd."),
         new StallInfo(StallKind.MedicalTent, "Medical tent", 16, 10, 450, null, 0, 600, 6, "Six beds under a green cross. People are back on their feet in half the time."),
+        new StallInfo(StallKind.Bin, "Litter bin", 2, 2, 10, null, 0, 0, 0, "Most people with rubbish in their hands use a bin if one is within a dozen steps. It holds 40 pieces, then a cleaner has to empty it."),
     };
 
     /// <summary>The festival's share of what a stall takes, in pounds out of every hundred.</summary>
@@ -163,8 +170,9 @@ public static class Catalogue
     public static readonly IReadOnlyList<StaffInfo> Staff = new[]
     {
         new StaffInfo(StaffKind.TicketStaff, "Ticket staff", 40, "Checks tickets at a gate. One for each lane."),
-        new StaffInfo(StaffKind.Security, "Security", 60, "Deals with trouble nearby. Behind a front barrier each one holds another 8 m of crowd."),
+        new StaffInfo(StaffKind.Security, "Security", 60, "Walks a beat and deals with trouble. Behind a front barrier each one holds another 8 m of crowd."),
         new StaffInfo(StaffKind.FirstAider, "First-aider", 50, "Goes to anyone taken ill or hurt and looks after them."),
+        new StaffInfo(StaffKind.Cleaner, "Cleaner", 35, "Walks the field picking up litter, and empties the bins when they fill."),
     };
 
     public static StaffInfo Of(StaffKind kind) => Staff[(int)kind];

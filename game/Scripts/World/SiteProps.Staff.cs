@@ -12,11 +12,13 @@ public static partial class SiteProps
     private static readonly Color MedicGreen = new("#1F6B45");
     private static readonly Color HiVis = new("#E4F03C");
     private static readonly Color Reflective = new("#D9DEE2");
+    private static readonly Color CleanerOrange = new("#F28C28");
 
     /// <summary>
     /// One member of staff in uniform, facing south (+Z). Ticket staff wear the festival's pink
     /// with a sunflower cap and lanyard, security wear black under a hi-vis tabard, and first-aiders
-    /// wear white and green with a green cross and carry a kit bag.
+    /// wear white and green with a green cross and carry a kit bag. Cleaners wear teal under an orange
+    /// tabard and a sun hat, with a litter picker in one hand and a black sack in the other.
     /// </summary>
     public static Node3D Staff(StaffKind kind, int seed)
     {
@@ -32,6 +34,10 @@ public static partial class SiteProps
             {
                 Top = TopStyle.LongSleeve, TopColour = "#26292E", LegColour = "#26292E", Feet = Footwear.Boots, FeetColour = "#1B1B1E", Hat = Hat.Cap, HatColour = "#26292E",
                 Build = System.Math.Max(1.1, look.Build), Height = System.Math.Max(1.0, look.Height),
+            },
+            StaffKind.Cleaner => look with
+            {
+                Top = TopStyle.TShirt, TopColour = "#2FB7A8", LegColour = "#4A5560", Feet = Footwear.Boots, FeetColour = "#3A3F46", Hat = Hat.Cap, HatColour = "#F28C28",
             },
             _ => look with
             {
@@ -61,6 +67,17 @@ public static partial class SiteProps
                 b.Box(new Vector3(0, 0.95f * h, 0), new Vector3(0.378f, 0.045f * h, 0.283f), Reflective);
                 b.Box(new Vector3(0.12f, 1.05f * h, 0.14f), new Vector3(0.05f, 0.09f * h, 0.03f), Black);
                 b.Tube(new Vector3(0.135f, 1.13f * h, 0.14f), new Vector3(0.012f, 0.08f * h, 0.012f), Black);
+                break;
+
+            case StaffKind.Cleaner:
+                // An orange tabard with one reflective band, a litter picker down the right side and a black sack on the left.
+                b.Box(new Vector3(0, 0.9f * h, 0), new Vector3(0.37f, 0.4f * h, 0.275f), CleanerOrange);
+                b.Box(new Vector3(0, 0.86f * h, 0), new Vector3(0.378f, 0.05f * h, 0.283f), Reflective);
+                b.Tube(new Vector3(0.27f, 0.5f * h, 0.16f), new Vector3(0.025f, 0.95f * h, 0.025f), Steel, new Vector3(18, 0, 0));
+                b.Box(new Vector3(0.27f, 0.93f * h, 0.02f), new Vector3(0.04f, 0.12f * h, 0.05f), Black);
+                b.Box(new Vector3(0.27f, 0.07f * h, 0.31f), new Vector3(0.07f, 0.03f, 0.05f), Black);
+                b.Ball(new Vector3(-0.3f, 0.38f * h, 0.02f), new Vector3(0.32f, 0.46f * h, 0.3f), Black);
+                b.Tube(new Vector3(-0.3f, 0.64f * h, 0.02f), new Vector3(0.07f, 0.1f * h, 0.07f), Black);
                 break;
 
             default:

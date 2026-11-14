@@ -264,7 +264,7 @@ public sealed partial class FestivalGame
     {
         foreach (var s in _staff)
         {
-            if (s.Kind == StaffKind.Security && s.State is StaffState.AtPost or StaffState.Holding && Distance(s.X, s.Y, x, y) <= GuardReach)
+            if (s.Kind == StaffKind.Security && s.State is StaffState.AtPost or StaffState.Holding or StaffState.Patrolling or StaffState.Looking && Distance(s.X, s.Y, x, y) <= GuardReach)
             {
                 return true;
             }

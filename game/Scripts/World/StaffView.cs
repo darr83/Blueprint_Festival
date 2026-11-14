@@ -58,6 +58,10 @@ public partial class StaffView : Node3D
 
             var person = view.GetChild<PersonView>(0);
             person.Pose = member.IsWalking && speed > 0 ? Pose.Walking : Pose.Standing;
+
+            // A cleaner picking something up leans down to it.
+            var lean = member.State == StaffState.Picking ? 0.38f : 0f;
+            person.Rotation = new Vector3(snap ? lean : Mathf.Lerp(person.Rotation.X, lean, Mathf.Min(1f, (float)delta * 8f)), 0, 0);
             if (snap)
             {
                 person.SetPose(person.Pose, (member.Id % 8) / 8f);

@@ -145,7 +145,7 @@ public partial class YearScreen : Control
                 Side(YearPanels.BuildDay(_game.Crowd.Expected, _game.Money, OpenGates, _game.Weather.Summary, WeekOf(_game), NextDay, ChangePrice, TravelOf(_game), ChangeParking, ChangeBuses));
                 break;
             case Phase.Tidy:
-                Side(YearPanels.Tidy(_game.Litter.Count, _game.LitterAtStart, _game.ScoutsFee, () => PayScouts(), HandBack));
+                Side(YearPanels.Tidy(_game.Litter.Count, _game.LitterAtStart, _game.ScoutsFee, () => PayScouts(), HandBack, _game.LitterPicked, _game.LitterBinned));
                 break;
             case Phase.Results:
                 Centre(YearPanels.Results(ResultsOf(_game), NextYear));

@@ -37,6 +37,9 @@ public static partial class SiteProps
                 return FirstAidTent();
             case StallKind.MedicalTent:
                 return MedicalTent();
+            case StallKind.Bin:
+                Bin(b, node);
+                break;
             default:
                 WaterPoint(b, node);
                 break;
@@ -297,6 +300,29 @@ public static partial class SiteProps
         b.Box(new Vector3(0, 2.62f, 0.27f), new Vector3(2.5f, 0.42f, 0.04f), TealDark);
         b.Tube(new Vector3(-1.2f, 2.5f, 0.27f), new Vector3(0.04f, 0.3f, 0.04f), SteelDark);
         b.Tube(new Vector3(1.2f, 2.5f, 0.27f), new Vector3(0.04f, 0.3f, 0.04f), SteelDark);
+    }
+
+    /// <summary>
+    /// A litter bin: a sunflower-yellow drum with a pink band and a dark rim, on a 1 m square of
+    /// ground. A child called "Rubbish" (bags and cups heaped over the rim) is shown once it is nearly full.
+    /// </summary>
+    private static void Bin(MeshBuilder b, Node3D node)
+    {
+        b.Tube(new Vector3(0, 0.45f, 0), new Vector3(0.62f, 0.9f, 0.62f), Sunflower);
+        b.Tube(new Vector3(0, 0.62f, 0), new Vector3(0.64f, 0.16f, 0.64f), Pink);
+        b.Tube(new Vector3(0, 0.9f, 0), new Vector3(0.68f, 0.06f, 0.68f), Charcoal);
+        b.Tube(new Vector3(0, 0.03f, 0), new Vector3(0.66f, 0.06f, 0.66f), Charcoal);
+        b.Tube(new Vector3(0, 0.915f, 0), new Vector3(0.54f, 0.04f, 0.54f), Black);
+
+        var full = new MeshBuilder();
+        full.Ball(new Vector3(-0.08f, 0.98f, 0.02f), new Vector3(0.4f, 0.3f, 0.38f), Black);
+        full.Ball(new Vector3(0.16f, 0.96f, -0.1f), new Vector3(0.26f, 0.22f, 0.26f), Charcoal);
+        full.Tube(new Vector3(0.14f, 1.05f, 0.14f), new Vector3(0.08f, 0.13f, 0.08f), Cream, new Vector3(24, 0, 18));
+        full.Box(new Vector3(-0.2f, 1.04f, -0.14f), new Vector3(0.16f, 0.02f, 0.12f), Colors.White, new Vector3(20, 30, 10));
+        full.Ball(new Vector3(0.42f, 0.12f, 0.2f), new Vector3(0.34f, 0.26f, 0.3f), Black);
+        var rubbish = full.BuildNode("Rubbish");
+        rubbish.Visible = false;
+        node.AddChild(rubbish);
     }
 
     private static void WaterPoint(MeshBuilder b, Node3D node)

@@ -156,7 +156,7 @@ public partial class SmokeTest : Node
 
                     // Somewhere to eat, drink and go to the toilet.
                     opened.BuildBar.Toggle(BuildMode.Stall);
-                    Check(opened.BuildBar.ChoiceCount == 6, "The build bar should offer six stalls.");
+                    Check(opened.BuildBar.ChoiceCount == 7, "The build bar should offer six stalls and the litter bin.");
                     Check(opened.BuildBar.Choose("stallFoodVan") && opened.Build.Mode == BuildMode.Stall, "The food van should be on the build bar.");
                     opened.Build.ShowGhost(new TilePoint(grass.X + 20, grass.Y + 18));
                     Check(opened.Build.Status.Contains("£120"), $"The bar should show the hire price, not '{opened.Build.Status}'.");
@@ -484,7 +484,8 @@ public partial class SmokeTest : Node
 
                     // Staff from the build bar: someone on the gate, a first-aider, security, and a first aid tent.
                     build.BuildBar.Toggle(BuildMode.Staff);
-                    Check(build.BuildBar.ChoiceCount == 5, "The Staff tab should offer three kinds of staff, the first aid tent and the medical tent.");
+                    Check(build.BuildBar.ChoiceCount == 7, "The Staff tab should offer four kinds of staff, the first aid tent, the medical tent and the litter bin.");
+                    Check(build.BuildBar.Choose("staffCleaner") && build.BuildBar.Choose("stallBin"), "Cleaners and litter bins should be on the staff tab.");
                     Check(build.BuildBar.Choose("staffTicketStaff") && build.Build.Mode == BuildMode.Staff, "Ticket staff should be on the build bar.");
                     Check(!build.Build.ClickAt(new TilePoint(grass.X + 40, grass.Y + 40)).Ok && build.Build.Refused, "Ticket staff should only go on a gate.");
                     Check(build.Build.ClickAt(new TilePoint(gap.X + 4, gap.Y + 1)).Ok && game.OpenLanes(0) == 1, "Ticket staff should open the gate's lane.");

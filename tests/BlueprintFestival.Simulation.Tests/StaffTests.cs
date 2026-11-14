@@ -36,9 +36,9 @@ public class StaffTests
     }
 
     [Fact]
-    public void There_are_three_kinds_of_staff_each_with_a_wage()
+    public void There_are_four_kinds_of_staff_each_with_a_wage()
     {
-        Assert.Equal(3, Catalogue.Staff.Count);
+        Assert.Equal(4, Catalogue.Staff.Count);
         Assert.All(Enum.GetValues<StaffKind>(), k => Assert.Equal(k, Catalogue.Of(k).Kind));
         Assert.All(Catalogue.Staff, s => Assert.True(s.Wage > 0 && s.Name.Length > 0 && s.About.Length > 0));
         Assert.Null(Catalogue.Of(StallKind.FirstAidTent).Serves);

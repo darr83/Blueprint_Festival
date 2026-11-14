@@ -129,7 +129,7 @@ public class CrushChoiceTests
         RunMinutes(game, 12);
         Assert.DoesNotContain(game.Staff, s => s.State is StaffState.Sent or StaffState.Holding);
         RunMinutes(game, 15);
-        Assert.All(game.Staff.Where(s => s.Kind == StaffKind.Security), s => Assert.True(s.State is StaffState.AtPost or StaffState.Returning));
+        Assert.All(game.Staff.Where(s => s.Kind == StaffKind.Security), s => Assert.True(s.IsFree, "Back on their own patch, at their post or walking their beat."));
         RunToTheEnd(game);
         Assert.False(game.SeriousIncident);
     }

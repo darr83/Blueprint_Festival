@@ -79,6 +79,7 @@ public sealed partial class FestivalGame
         Clock.Ticked += Tick;
         _wear = new int[WearColumns * WearRows];
         StartStaff();
+        StartRounds();
         StartSafety();
         StartWeather();
         if (Planned)

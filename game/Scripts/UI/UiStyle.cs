@@ -100,6 +100,8 @@ public static class UiStyle
         ["cross"] = "<path d='M9 3h6v6h6v6h-6v6H9v-6H3V9h6z'/>",
         ["drop"] = "<path d='M12 3c4 5 6 8 6 11a6 6 0 0 1-12 0c0-3 2-6 6-11z'/>",
         ["door"] = "<path d='M6 21V4h12v17M3 21h18'/><path d='M14.5 12.5h.01'/>",
+        ["bin"] = "<path d='M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6'/>",
+        ["broom"] = "<path d='M19 3l-7 9M9.5 10.5l4 3.5-3 7H3.5c2-2 3.5-5 3-8z'/><path d='M7 20l1.5-3M10.5 20.5l1-2.5'/>",
         ["shield"] = "<path d='M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z'/>",
         ["ticket"] = "<path d='M3 8a2 2 0 0 0 0 4v4h18v-4a2 2 0 0 0 0-4V4H3z'/><path d='M14 5v2M14 9v2M14 13v2'/>",
         ["cup"] = "<path d='M5 8h11v5a5 5 0 0 1-5 5h-1a5 5 0 0 1-5-5z'/><path d='M16 9h2a2 2 0 0 1 0 5h-2M4 21h13'/>",
