@@ -10,11 +10,16 @@ public partial class ViewButtons : PanelContainer
     private Button? _crowd;
     private Button? _front;
     private Button? _back;
+    private Button? _nextStage;
+    private StageCam? _stageCam;
 
     /// <summary>The stage camera buttons, for the launch test: out front at the band, and at the back looking at the crowd.</summary>
     public Button? FrontCamButton => _front;
 
     public Button? BackCamButton => _back;
+
+    /// <summary>The button that moves a stage camera on to the next stage, shown while one is on and there is more than one stage.</summary>
+    public Button? NextStageButton => _nextStage;
 
     /// <summary>Shows the crowd view button as on or off.</summary>
     public void SetCrowdView(bool on)
@@ -45,10 +50,16 @@ public partial class ViewButtons : PanelContainer
         {
             _front = CamButton(row, "camband", "Stage cam out front: watch the band (F). Press again or Esc to go back", () => stageCam.Toggle(StageShot.Front));
             _back = CamButton(row, "camcrowd", "Stage cam at the back of the stage: look out at the crowd (B). Press again or Esc to go back", () => stageCam.Toggle(StageShot.Back));
+            _stageCam = stageCam;
+            _nextStage = UiStyle.ChipButton("", () => stageCam.NextStage());
+            _nextStage.TooltipText = "Move the stage cam on to the next stage (Tab)";
+            _nextStage.Visible = false;
+            row.AddChild(_nextStage);
             stageCam.Changed += () =>
             {
                 _front.SetPressedNoSignal(stageCam.Showing == StageShot.Front);
                 _back.SetPressedNoSignal(stageCam.Showing == StageShot.Back);
+                ShowNextStage();
             };
         }
 
@@ -62,6 +73,25 @@ public partial class ViewButtons : PanelContainer
         SetAnchorsAndOffsetsPreset(LayoutPreset.BottomRight, LayoutPresetMode.Minsize, 22);
         GrowHorizontal = GrowDirection.Begin;
         GrowVertical = GrowDirection.Begin;
+    }
+
+    public override void _Process(double delta) => ShowNextStage();
+
+    /// <summary>The next-stage button names the stage being filmed, and shows only when there is another stage to go to.</summary>
+    private void ShowNextStage()
+    {
+        if (_nextStage is null || _stageCam is null)
+        {
+            return;
+        }
+
+        var show = _stageCam.Showing is not null && _stageCam.StageCount > 1;
+        _nextStage.Visible = show;
+        var text = show ? $"{_stageCam.FilmingName}  ›" : "";
+        if (_nextStage.Text != text)
+        {
+            _nextStage.Text = text;
+        }
     }
 
     private static Button CamButton(Container row, string icon, string tip, System.Func<bool> pressed)

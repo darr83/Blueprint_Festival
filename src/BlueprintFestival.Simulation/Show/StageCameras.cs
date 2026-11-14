@@ -47,6 +47,56 @@ public static class StageCameras
         return game.Show.Stage ?? game.SecondShow.Stage ?? (game.Site.Stages.Count > 0 ? game.Site.Stages[0] : null);
     }
 
+    /// <summary>Every stage on the site, the main stage first, in the order the cameras go round them.</summary>
+    public static IReadOnlyList<PlacedStage> All(FestivalGame game)
+    {
+        ArgumentNullException.ThrowIfNull(game);
+        return RunningOrder.InOrder(game.Site);
+    }
+
+    /// <summary>
+    /// The stage to film when the player has picked one: that stage while it is still up, otherwise
+    /// the usual choice (see <see cref="Pick(FestivalGame)"/>).
+    /// </summary>
+    public static PlacedStage? Pick(FestivalGame game, PlacedStage? chosen)
+    {
+        ArgumentNullException.ThrowIfNull(game);
+        return chosen is not null && game.Site.Stages.Contains(chosen) ? chosen : Pick(game);
+    }
+
+    /// <summary>The next stage round from one, back to the first after the last; null with no stage.</summary>
+    public static PlacedStage? After(FestivalGame game, PlacedStage? current)
+    {
+        var all = All(game);
+        if (all.Count == 0)
+        {
+            return null;
+        }
+
+        var at = current is null ? -1 : IndexOf(all, current);
+        return all[(at + 1) % all.Count];
+    }
+
+    /// <summary>What the player calls a stage: Stage 1 is the main stage, Stage 2 the next, and so on.</summary>
+    public static string Name(FestivalGame game, PlacedStage stage)
+    {
+        var at = IndexOf(All(game), stage);
+        return at < 0 ? "Stage" : $"Stage {at + 1}";
+    }
+
+    private static int IndexOf(IReadOnlyList<PlacedStage> all, PlacedStage stage)
+    {
+        for (var i = 0; i < all.Count; i++)
+        {
+            if (all[i] == stage)
+            {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
     /// <summary>Where the camera goes for a shot of a stage.</summary>
     public static CameraShot Of(PlacedStage stage, StageShot shot)
     {

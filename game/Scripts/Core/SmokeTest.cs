@@ -287,7 +287,7 @@ public partial class SmokeTest : Node
                     var onStage = music.OnStage(show.Game.Now);
                     Check(music.Playing(show.Game.Now) is not null && onStage.Count > 0, "An act should be playing at a quarter past two.");
                     Check(show.Acts.PerformerCount == onStage.Count, $"The act should be drawn on the stage: {show.Acts.PerformerCount} drawn, {onStage.Count} playing.");
-                    Check(show.TopBar.ShowText.StartsWith($"Now: {music.Playing(show.Game.Now)!.Act.Name}", StringComparison.Ordinal), $"The top bar should say who is on, not '{show.TopBar.ShowText}'.");
+                    Check(show.TopBar.ShowText.StartsWith($"On now: {music.Playing(show.Game.Now)!.Act.Name}", StringComparison.Ordinal), $"The top bar should say who is on, not '{show.TopBar.ShowText}'.");
                     Check(show.Game.Crowd.Watching > 0, "Some people should be watching the act.");
                     Check(show.TopBar.SkipButton.Visible && !show.TopBar.SkipButton.Disabled && show.TopBar.SkipButton.Text == "Skip to next act", "The top bar should offer to skip to the next act while there is one to come.");
                     Check(music.Playing(show.Game.Now)!.End == show.Game.Now.Date.AddHours(15.5), "The first act should play until half past three.");
@@ -446,6 +446,10 @@ public partial class SmokeTest : Node
                     Check(game.SecondStageBooked && game.SecondShow.Slots.Count == 0 && plan.Year.SlotPicked == RunningOrder.SecondBase, "Adding a second stage should give four empty sets.");
                     plan.Year.PickArtist("DJ Haybale");
                     Check(game.SecondShow.At(RunningOrder.SecondBase)?.Name == "DJ Haybale", "An artist should be bookable for the second stage.");
+                    plan.Year.MoveSet(RunningOrder.SecondBase, -1);
+                    Check(game.SecondShow.HourOf(0) == 13 && game.Show.HourOf(0) == 14, "The arrows should move a second stage set an hour earlier without moving the main stage.");
+                    plan.Year.MoveSet(RunningOrder.SecondBase, 1);
+                    Check(game.SecondShow.HourOf(0) == 14, "And back again.");
                     plan.Year.ToggleStage();
                     Check(!game.SecondStageBooked && game.LineUp.Count() == 3, "Taking the second stage away should take its acts off the bill.");
                     var view = BlueprintFestival.UI.YearScreen.PlanOf(game, plan.Year.SlotPicked);
@@ -663,6 +667,13 @@ public partial class SmokeTest : Node
         Check(show.StageCam.Showing == StageShot.Front && show.StageCam.Camera.Current, "The front stage cam should take over the view.");
         Check(show.StageCam.Camera.GlobalPosition.Y > 1.5f, "The front stage cam should be up above the crowd's heads.");
         Check(show.StageCam.Filming?.Kind == show.Game.Show.Stage?.Kind, "The stage cam should be on the stage that is playing.");
+        Check(show.Music.Stages.Count == 2 && show.Music.For(show.Game.Show) is not null && show.Music.For(show.Game.SecondShow) is not null, "Each stage should have its own music player.");
+        var stages = show.StageCam.StageCount;
+        Check(buttons.NextStageButton is { } next && next.Visible == (stages > 1), "The next-stage button should show only when there is another stage to go to.");
+        var filmed = show.StageCam.FilmingStage;
+        show._UnhandledInput(new InputEventKey { Keycode = Key.Tab, Pressed = true });
+        Check(show.StageCam.Showing == StageShot.Front && (stages > 1 ? show.StageCam.FilmingStage != filmed : show.StageCam.FilmingStage == filmed),
+            "Tab should move the stage cam to the next stage, or stay put with only one.");
         buttons.BackCamButton.ButtonPressed = true;
         Check(show.StageCam.Showing == StageShot.Back && !buttons.FrontCamButton.ButtonPressed, "The back stage cam should take over from the front one.");
         buttons.BackCamButton.ButtonPressed = false;

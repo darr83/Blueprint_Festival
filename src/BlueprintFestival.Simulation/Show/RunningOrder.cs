@@ -12,9 +12,12 @@ public sealed record Slot(int Index, Act Act, DateTime Start, DateTime End, bool
 }
 
 /// <summary>
-/// The music on one stage. A stage has four sets, at two, four, six and eight o'clock, and any of
-/// them may be left empty. An act plays for an hour and a half, and the stage then stands empty
-/// for half an hour while the next act sets up and people go for a drink, some food or the toilet. It starts with acts made up from the festival's seed, and
+/// The music on one stage. A stage has four sets, at two, four, six and eight o'clock to begin
+/// with, and any of them may be left empty. The player can move each set to start at any hour from
+/// midday to nine in the evening, so two stages can start and finish at different times (or
+/// overlap; that is up to the player). An act plays for an hour and a half, and the next set on
+/// the same stage can start on the next hour after that at the earliest, so the stage stands empty
+/// for at least half an hour while the next act sets up and people go for a drink, some food or the toilet. It starts with acts made up from the festival's seed, and
 /// the player books who they like. The acts play on the stage the player has put up; with no
 /// stage there is no show.
 /// </summary>
@@ -26,14 +29,25 @@ public sealed class RunningOrder
     /// <summary>How long the stage stands empty after a set before the next one starts, in minutes.</summary>
     public const int BreakMinutes = 30;
 
-    /// <summary>When each set starts (hours after midnight) and how long it lasts (minutes). The same on every stage.</summary>
-    private static readonly (double Start, int Minutes)[] Times =
-    {
-        (14, SetMinutes), (16, SetMinutes), (18, SetMinutes), (20, SetMinutes),
-    };
+    /// <summary>When each set starts to begin with, in hours after midnight.</summary>
+    public static readonly IReadOnlyList<int> FirstHours = new[] { 14, 16, 18, 20 };
+
+    /// <summary>The earliest a set can start: midday.</summary>
+    public const int EarliestHour = 12;
+
+    /// <summary>The latest a set can start: nine in the evening, so it ends at half past ten.</summary>
+    public const int LatestHour = 21;
+
+    /// <summary>
+    /// The fewest hours from the start of one set to the start of the next on the same stage: an
+    /// hour and a half of music, then the next hour.
+    /// </summary>
+    public const int HoursApart = 2;
 
     /// <summary>How many sets a stage has in the day.</summary>
-    public static int SetsAStage => Times.Length;
+    public static int SetsAStage => FirstHours.Count;
+
+    private readonly int[] _hours = FirstHours.ToArray();
 
     /// <summary>Sets on the second stage are numbered from here, so a set's number says which stage it is on.</summary>
     public const int SecondBase = 100;
@@ -52,9 +66,9 @@ public sealed class RunningOrder
         _day = festivalDay.Date;
         var random = GameRandom.FromSeed(seed, 7);
         var taken = new HashSet<string>();
-        for (var i = 0; i < Times.Length; i++)
+        for (var i = 0; i < SetsAStage; i++)
         {
-            Put(i, ActGenerator.Make(random, i == Times.Length - 1, taken));
+            Put(i, ActGenerator.Make(random, i == SetsAStage - 1, taken));
         }
     }
 
@@ -73,7 +87,7 @@ public sealed class RunningOrder
             ActGenerator.Take(taken, slot.Act);
         }
 
-        for (var i = 0; i < Times.Length; i++)
+        for (var i = 0; i < SetsAStage; i++)
         {
             var act = ActGenerator.Make(random, false, taken);
             Put(SecondBase + i, act with { Draw = act.Draw * SecondDraw });
@@ -86,8 +100,78 @@ public sealed class RunningOrder
     /// <summary>When a set starts and ends, by its place in the day (0 to 3).</summary>
     public (DateTime Start, DateTime End) TimeOf(int place)
     {
-        var start = _day.AddHours(Times[place].Start);
-        return (start, start.AddMinutes(Times[place].Minutes));
+        var start = _day.AddHours(_hours[place]);
+        return (start, start.AddMinutes(SetMinutes));
+    }
+
+    /// <summary>The hour a set starts, by its place in the day (0 to 3).</summary>
+    public int HourOf(int place) => _hours[place];
+
+    /// <summary>The hour each set starts, in order.</summary>
+    public IReadOnlyList<int> Hours => _hours;
+
+    /// <summary>
+    /// Where the sets would start if one were moved some hours earlier or later: the sets after it
+    /// (or before it) are pushed along to keep them <see cref="HoursApart"/> apart. Null if that
+    /// would take a set before midday or after nine.
+    /// </summary>
+    public static int[]? Moved(IReadOnlyList<int> hours, int place, int by)
+    {
+        ArgumentNullException.ThrowIfNull(hours);
+        if (place < 0 || place >= hours.Count)
+        {
+            return null;
+        }
+
+        var moved = hours.ToArray();
+        moved[place] += by;
+        for (var i = place + 1; i < moved.Length; i++)
+        {
+            moved[i] = Math.Max(moved[i], moved[i - 1] + HoursApart);
+        }
+
+        for (var i = place - 1; i >= 0; i--)
+        {
+            moved[i] = Math.Min(moved[i], moved[i + 1] - HoursApart);
+        }
+
+        return moved[0] < EarliestHour || moved[^1] > LatestHour ? null : moved;
+    }
+
+    /// <summary>Moves a set some hours earlier or later, pushing the others along as needed. False if there is no room.</summary>
+    public bool Move(int index, int by)
+    {
+        if (Moved(_hours, index - Base, by) is not { } moved)
+        {
+            return false;
+        }
+
+        SetHours(moved);
+        return true;
+    }
+
+    /// <summary>Sets when every set starts, as a save has it. False (and nothing changes) if the hours do not fit the rules.</summary>
+    public bool SetHours(IReadOnlyList<int> hours)
+    {
+        ArgumentNullException.ThrowIfNull(hours);
+        if (hours.Count != SetsAStage || hours[0] < EarliestHour || hours[^1] > LatestHour
+            || Enumerable.Range(1, hours.Count - 1).Any(i => hours[i] - hours[i - 1] < HoursApart))
+        {
+            return false;
+        }
+
+        for (var i = 0; i < _hours.Length; i++)
+        {
+            _hours[i] = hours[i];
+        }
+
+        for (var i = 0; i < _slots.Count; i++)
+        {
+            var (start, end) = TimeOf(_slots[i].Index - Base);
+            _slots[i] = _slots[i] with { Start = start, End = end };
+        }
+
+        return true;
     }
 
     private void Put(int index, Act? act)
@@ -110,7 +194,7 @@ public sealed class RunningOrder
     /// <summary>Books an act for a set, or with null leaves the set empty.</summary>
     public void Book(int index, Act? act)
     {
-        if (index < Base || index >= Base + Times.Length)
+        if (index < Base || index >= Base + SetsAStage)
         {
             throw new ArgumentOutOfRangeException(nameof(index), index, "No such set on this stage.");
         }
@@ -144,7 +228,7 @@ public sealed class RunningOrder
     public void SetHeadliner(Act act)
     {
         ArgumentNullException.ThrowIfNull(act);
-        Put(Base + Times.Length - 1, act);
+        Put(Base + SetsAStage - 1, act);
     }
 
     /// <summary>The stage the acts play on, or null if none has been put up.</summary>
