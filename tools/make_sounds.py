@@ -8,6 +8,7 @@ installed). The game plays whatever files are there and is silent for the rest.
     ELEVENLABS_API_KEY=...  python3 tools/make_sounds.py            make what is missing
                             python3 tools/make_sounds.py --list     show what is there and what is not
                             python3 tools/make_sounds.py --only till,fry --force    make these again
+                            python3 tools/make_sounds.py --level    bring every file to the same peak
 
 The key is read from the ELEVENLABS_API_KEY environment variable and is never printed or saved.
 The acts' music is not made here.
@@ -27,6 +28,7 @@ from pathlib import Path
 AUDIO = Path(__file__).resolve().parent.parent / "game" / "Audio"
 URL = "https://api.elevenlabs.io/v1/sound-generation?output_format=mp3_44100_128"
 ENDINGS = ("ogg", "wav", "mp3")
+PEAK_DB = -1.0
 
 
 def existing(sound_id):
@@ -58,6 +60,27 @@ def ask(key, sound):
             raise RuntimeError(f"Could not reach ElevenLabs: {error.reason}") from None
 
 
+def peak_db(path):
+    """The loudest point in a sound file, in dB below full scale."""
+    found = subprocess.run(["ffmpeg", "-i", str(path), "-af", "volumedetect", "-f", "null", "-"], capture_output=True, text=True)
+    for line in found.stderr.splitlines():
+        if "max_volume:" in line:
+            return float(line.split("max_volume:")[1].split()[0])
+    return PEAK_DB
+
+
+def level(path):
+    """Brings a file already made to the same peak as the rest."""
+    gain = PEAK_DB - peak_db(path)
+    if abs(gain) < 0.5:
+        return False
+    out = path.with_name(path.stem + ".levelled" + path.suffix)
+    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", str(path), "-af", f"volume={gain:.2f}dB",
+                    "-c:a", "libvorbis", "-q:a", "5", str(out)], check=True)
+    out.replace(path)
+    return True
+
+
 def save(sound_id, mp3):
     for ending in ENDINGS:
         (AUDIO / f"{sound_id}.{ending}").unlink(missing_ok=True)
@@ -66,9 +89,12 @@ def save(sound_id, mp3):
     raw.write_bytes(mp3)
     if not shutil.which("ffmpeg"):
         return raw
-    # Ogg loops without the tiny gap an mp3 leaves at the join.
+    # Ogg loops without the tiny gap an mp3 leaves at the join. ElevenLabs makes some sounds very
+    # quiet, so every file is brought up (or down) to the same peak; sounds.json sets the mix.
     ogg = AUDIO / f"{sound_id}.ogg"
-    done = subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", str(raw), "-c:a", "libvorbis", "-q:a", "5", str(ogg)], check=False)
+    gain = PEAK_DB - peak_db(raw)
+    done = subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", str(raw), "-af", f"volume={gain:.2f}dB",
+                           "-c:a", "libvorbis", "-q:a", "5", str(ogg)], check=False)
     if done.returncode != 0 or not ogg.exists():
         ogg.unlink(missing_ok=True)
         return raw
@@ -80,6 +106,7 @@ def main():
     parser = argparse.ArgumentParser(description="Make the game's sound effects with ElevenLabs.")
     parser.add_argument("--only", help="make only these sounds: names with commas between them")
     parser.add_argument("--force", action="store_true", help="make a sound again even if its file is there")
+    parser.add_argument("--level", action="store_true", help="bring the .ogg files already made to the same peak, and make nothing")
     parser.add_argument("--list", action="store_true", help="show what is there and what is missing, and make nothing")
     args = parser.parse_args()
 
@@ -96,6 +123,11 @@ def main():
             found = existing(sound["id"])
             print(f"{'have' if found else 'MISSING':8}{sound['id']:18}{sound['seconds']:>5}s  {found.name if found else ''}")
         print(f"{sum(1 for s in sounds if existing(s['id']))} of {len(sounds)} sounds have files.")
+        return
+
+    if args.level:
+        changed = [s["id"] for s in sounds if (path := existing(s["id"])) and path.suffix == ".ogg" and level(path)]
+        print(f"Levelled {len(changed)} of {len(sounds)}.")
         return
 
     todo = [s for s in sounds if args.force or not existing(s["id"])]
