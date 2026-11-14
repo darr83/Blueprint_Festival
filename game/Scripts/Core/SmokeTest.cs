@@ -418,8 +418,9 @@ public partial class SmokeTest : Node
                     plan.Year.TogglePonchos();
                     Check(!game.PonchosOrdered, "Clicking the ponchos again should cancel them.");
                     var board = SoundBoard.Instance;
-                    Check(board is { Listed: 58 }, "The sound board should be loaded with all 58 sounds on its list.");
+                    Check(board is { Listed: 62 }, "The sound board should be loaded with all 62 sounds on its list.");
                     Check(Sounds.Loops.All(board!.Knows) && board.Knows(Sounds.Till), "The sound board should know the background sounds and the till.");
+                    Check(board.Announcements == (50, 50), $"All 50 announcements introducing the acts should be loaded with their files, not {board.Announcements}.");
                     Check(board.Asked(Sounds.Notebook) == 1, "The planning notebook should be heard opening.");
                     Check(board.Asked(Sounds.Ponchos) == 1, "Ordering ponchos should be heard.");
                     board.SetVolume("Crowd", 0.5f, save: false);

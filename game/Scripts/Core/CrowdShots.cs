@@ -14,24 +14,33 @@ namespace BlueprintFestival.Core;
 /// <summary>
 /// Pictures of crowd safety from a real game, run with: godot --path game -- --crowd-shots=DIR
 /// (needs a display). Nothing is posed: each picture plays a festival day until the thing it
-/// shows has happened.
+/// shows has happened. With --crush-shots=DIR it shows the four things the player can do about
+/// a crush instead.
 /// </summary>
 public partial class CrowdShots : Node
 {
-    private static readonly string[] Scenes =
+    private static readonly string[] CrowdScenes =
     {
         "1_crowd_view_on_a_good_day", "2_a_big_name_packs_the_front", "3_people_hurt_in_the_crush", "4_the_act_paused",
         "5_front_barrier_and_security", "6_the_day_called_off", "7_results_after_a_crush",
     };
 
+    private static readonly string[] ChoiceScenes =
+    {
+        "1_the_four_choices", "2_the_music_stops_for_an_announcement", "3_the_front_after_the_announcement", "4_security_going_in",
+        "5_security_holding_the_front", "6_the_act_cancelled", "7_left_alone", "8_results_after_leaving_it",
+    };
+
+    private readonly string[] _scenes;
     private readonly string _directory;
     private int _scene = -1;
     private int _frame;
     private bool _ready;
 
-    public CrowdShots(string directory)
+    public CrowdShots(string directory, bool choices = false)
     {
         _directory = directory;
+        _scenes = choices ? ChoiceScenes : CrowdScenes;
     }
 
     public CrowdShots() : this("shots")
@@ -46,7 +55,7 @@ public partial class CrowdShots : Node
 
     public override void _Process(double delta)
     {
-        if (_scene < 0 || _scene >= Scenes.Length)
+        if (_scene < 0 || _scene >= _scenes.Length)
         {
             return;
         }
@@ -73,7 +82,7 @@ public partial class CrowdShots : Node
 
         if (_frame == 30)
         {
-            var path = $"{_directory}/{Scenes[_scene]}.png";
+            var path = $"{_directory}/{_scenes[_scene]}.png";
             GetViewport().GetTexture().GetImage().SavePng(path);
             GD.Print($"[crowd] {path}");
             NextScene();
@@ -85,7 +94,7 @@ public partial class CrowdShots : Node
         _scene++;
         _ready = false;
         _frame = 0;
-        if (_scene >= Scenes.Length)
+        if (_scene >= _scenes.Length)
         {
             GD.Print("[crowd] Done.");
             GetTree().Quit(0);
@@ -93,7 +102,7 @@ public partial class CrowdShots : Node
         }
 
         var only = OS.GetEnvironment("SHOTS_ONLY");
-        if (only.Length > 0 && !Scenes[_scene].Contains(only, StringComparison.Ordinal))
+        if (only.Length > 0 && !_scenes[_scene].Contains(only, StringComparison.Ordinal))
         {
             NextScene();
             return;
@@ -130,7 +139,7 @@ public partial class CrowdShots : Node
         var game = festival.Game;
         var f = game.Field.Field;
         var gap = game.Field.Gap;
-        var name = Scenes[_scene];
+        var name = _scenes[_scene];
         var bigName = name != "1_crowd_view_on_a_good_day";
         var stars = bigName ? game.Headliners.Max(h => h.Stars) : game.Headliners.Min(h => h.Stars);
         festival.Camera.ShowWholeField();
@@ -150,6 +159,14 @@ public partial class CrowdShots : Node
         game.HireStaff(StaffKind.FirstAider, new TilePoint(f.X + 96, f.Y + 30));
         var stage = game.Show.Stage!;
         var rect = stage.Rect;
+        if (name is "4_security_going_in" or "5_security_holding_the_front")
+        {
+            // Three security on the gate side of the field, well away from the stage.
+            game.HireStaff(StaffKind.Security, new TilePoint(gap.X - 6, gap.Y - 4));
+            game.HireStaff(StaffKind.Security, new TilePoint(gap.X + 10, gap.Y - 4));
+            game.HireStaff(StaffKind.Security, new TilePoint(f.X + 40, f.Y + 40));
+        }
+
         if (name == "5_front_barrier_and_security")
         {
             game.BuildFence(FenceKind.CrowdBarrier, new TilePoint(rect.X - 2, rect.Bottom + 4), new TilePoint(rect.Right + 1, rect.Bottom + 4));
@@ -201,6 +218,67 @@ public partial class CrowdShots : Node
                 festival.Camera.LookAt((float)sx - 6, (float)sy + 12, 30f);
                 break;
 
+            case "1_the_four_choices":
+                RunUntil(game, () => warned);
+                RunFor(game, 1);
+                festival.SetCrowdView(true);
+                festival.Camera.LookAt((float)sx, (float)sy + 6, 16f);
+                break;
+
+            case "2_the_music_stops_for_an_announcement":
+                RunUntil(game, () => warned);
+                festival.CrowdSafety.Choose(CrushChoice.Announce);
+                RunFor(game, 0.3);
+                festival.Camera.LookAt((float)sx, (float)sy + 6, 16f);
+                break;
+
+            case "3_the_front_after_the_announcement":
+                RunUntil(game, () => warned);
+                festival.CrowdSafety.Choose(CrushChoice.Announce);
+                RunFor(game, 3);
+                festival.SetCrowdView(true);
+                festival.Camera.LookAt((float)sx, (float)sy + 8, 18f);
+                break;
+
+            case "4_security_going_in":
+                RunUntil(game, () => warned);
+                festival.CrowdSafety.Choose(CrushChoice.SendSecurity);
+                RunFor(game, 1.5);
+                festival.Camera.LookAt((float)sx, (float)sy + 16, 30f);
+                break;
+
+            case "5_security_holding_the_front":
+                RunUntil(game, () => warned);
+                festival.CrowdSafety.Choose(CrushChoice.SendSecurity);
+                RunUntil(game, () => game.Staff.Count(s => s.State == StaffState.Holding) >= 2);
+                RunFor(game, 3);
+                festival.SetCrowdView(true);
+                festival.Camera.LookAt((float)sx, (float)sy + 5, 14f);
+                break;
+
+            case "6_the_act_cancelled":
+                RunUntil(game, () => warned);
+                festival.CrowdSafety.Choose(CrushChoice.CancelAct);
+                RunFor(game, 2);
+                festival.Camera.LookAt((float)sx, (float)sy + 10, 22f);
+                break;
+
+            case "7_left_alone":
+                RunUntil(game, () => warned);
+                festival.CrowdSafety.Choose(CrushChoice.LeaveIt);
+                RunUntil(game, () => game.CrushInjuries >= 2);
+                festival.SetCrowdView(true);
+                festival.Camera.LookAt((float)sx, (float)sy + 4, 12f);
+                break;
+
+            case "8_results_after_leaving_it":
+                RunUntil(game, () => warned);
+                game.LeaveIt();
+                RunUntil(game, () => false, 30);
+                festival.Year.PayScouts();
+                festival.Year.HandBack();
+                break;
+
             case "7_results_after_a_crush":
                 RunUntil(game, () => false, 30);
                 festival.Year.PayScouts();
@@ -209,6 +287,6 @@ public partial class CrowdShots : Node
         }
 
         game.Clock.SetSpeed(GameSpeed.Paused);
-        GD.Print($"[crowd] {name}: {game.Now:HH:mm}, bank after building £{bank}, on site {game.Crowd.OnSite}, worst {game.Density.Worst:0.0}, red {game.Density.RedSquares}, hurt {game.CrushInjuries}, lifted out {game.PulledOut}, paused {game.ActsPaused}, called off {game.SeriousIncident}, card '{festival.CrowdSafety.WarningText}'");
+        GD.Print($"[crowd] {name}: {game.Now:HH:mm}, bank after building £{bank}, on site {game.Crowd.OnSite}, worst {game.Density.Worst:0.0}, red {game.Density.RedSquares}, hurt {game.CrushInjuries}, lifted out {game.PulledOut}, paused {game.ActsPaused}, security sent {game.SecuritySent}, cancelled {game.ActsCancelled}, hurt left alone {game.HurtLeftAlone}, happy {game.Crowd.Happiness}%, money £{game.Money}, called off {game.SeriousIncident}, card '{festival.CrowdSafety.WarningText}'");
     }
 }

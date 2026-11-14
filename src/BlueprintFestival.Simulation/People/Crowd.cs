@@ -2498,11 +2498,14 @@ public sealed class Crowd
 
     /// <summary>
     /// Eases a packed crowd: everyone watching from a busy square moves further back. Returns how
-    /// many people moved.
+    /// many people moved. With a share under 1 only that share of them listen; the rest stay put.
     /// </summary>
-    public int Ease() => Ease(Show, false) + Ease(Second, true);
+    public int Ease(double share = 1) => Ease(Show, false, share) + Ease(Second, true, share);
 
-    private int Ease(RunningOrder? show, bool second)
+    /// <summary>True for a party that does as it is asked, when only a share of people do. The same people never listen.</summary>
+    public static bool Listens(Party party, double share) => share >= 1 || ((uint)party.Id * 2654435761u % 1000) / 1000.0 < share;
+
+    private int Ease(RunningOrder? show, bool second, double share)
     {
         if (show?.Playing(_now) is not { } slot || show.Stage is not { } stage)
         {
@@ -2513,7 +2516,7 @@ public sealed class Crowd
         var moved = 0;
         foreach (var party in _parties)
         {
-            if (party.State != PartyState.Watching || party.Watch != slot.Index || Density.At(party.X, party.Y) < DensityMap.Busy)
+            if (party.State != PartyState.Watching || party.Watch != slot.Index || Density.At(party.X, party.Y) < DensityMap.Busy || !Listens(party, share))
             {
                 continue;
             }

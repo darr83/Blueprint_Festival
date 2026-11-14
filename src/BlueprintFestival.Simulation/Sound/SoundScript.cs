@@ -1,3 +1,4 @@
+using BlueprintFestival.Simulation.Show;
 using BlueprintFestival.Simulation.Site;
 
 namespace BlueprintFestival.Simulation.Sound;
@@ -49,6 +50,10 @@ public static class Sounds
     public const string AllClear = "all_clear";
     public const string PaStop = "pa_stop";
     public const string PaStart = "pa_start";
+    public const string StepBack1 = "pa_step_back_1";
+    public const string StepBack2 = "pa_step_back_2";
+    public const string StepBack3 = "pa_step_back_3";
+    public const string PaRestart = "pa_restart";
     public const string RainStart = "rain_start";
     public const string MudSquelch = "mud_squelch";
     public const string LitterPick = "litter_pick";
@@ -66,6 +71,9 @@ public static class Sounds
 
     /// <summary>One clap of the crowd clapping along, each a little different; one plays on each clap of the beat.</summary>
     public static readonly IReadOnlyList<string> Claps = [Clap1, Clap2, Clap3];
+
+    /// <summary>The PA announcements asking a packed crowd to step back, in a different voice each; they take turns.</summary>
+    public static readonly IReadOnlyList<string> StepBack = new[] { StepBack1, StepBack2, StepBack3 };
 
     /// <summary>The sounds that play round and round for as long as they are wanted.</summary>
     public static readonly IReadOnlyList<string> Loops =
@@ -102,6 +110,8 @@ public sealed class SoundScript : IDisposable
     private int _sorted;
     private int _litter;
     private int _polls;
+    private readonly HashSet<(int Stage, DateTime Start)> _announced = [];
+    private readonly Dictionary<string, int> _lastTake = [];
 
     public SoundScript(FestivalGame game)
     {
@@ -111,6 +121,8 @@ public sealed class SoundScript : IDisposable
         game.Crowd.Served += OnServed;
         game.CrushWarning += OnCrushWarning;
         game.CrushInjury += OnCrushInjury;
+        game.Announced += OnAnnounced;
+        game.ActCancelled += OnActCancelled;
         Poll();
     }
 
@@ -126,6 +138,16 @@ public sealed class SoundScript : IDisposable
         _game.Crowd.Served -= OnServed;
         _game.CrushWarning -= OnCrushWarning;
         _game.CrushInjury -= OnCrushInjury;
+        _game.Announced -= OnAnnounced;
+        _game.ActCancelled -= OnActCancelled;
+    }
+
+    private void OnAnnounced(int which) => Cue?.Invoke(Sounds.StepBack[which % Sounds.StepBack.Count]);
+
+    private void OnActCancelled(Slot slot)
+    {
+        Cue?.Invoke(Sounds.PaStop);
+        Cue?.Invoke(Sounds.Groan);
     }
 
     /// <summary>Which crowd murmur fits this many people, each as a loudness from 0 to 1.</summary>
@@ -256,7 +278,15 @@ public sealed class SoundScript : IDisposable
             {
                 Cue?.Invoke(Sounds.Groan);
             }
+            else if (game.MusicOn)
+            {
+                // The music comes back with a thank you over the PA.
+                Cue?.Invoke(Sounds.PaRestart);
+            }
         }
+
+        Announce(game.Show, 0, Announcements.MainStageMinutes);
+        Announce(game.SecondShow, 1, Announcements.SecondStageMinutes);
 
         // People are still walking over as an act comes on, so count some of the field as well as those already watching.
         var crowd = Math.Max(game.Crowd.Watching, game.Crowd.InField / 4);
@@ -286,6 +316,30 @@ public sealed class SoundScript : IDisposable
         {
             Cue?.Invoke(CheerFor(watching));
         }
+    }
+
+    /// <summary>
+    /// A few minutes before an act goes on, the PA tells the field who is coming, using the
+    /// artist's two announcements in turn. Each set is announced once.
+    /// </summary>
+    private void Announce(Show.RunningOrder show, int stage, int minutes)
+    {
+        var game = _game;
+        if (show.Stage is null || show.CalledOff is not null)
+        {
+            return;
+        }
+
+        var next = show.Next(game.Now);
+        if (next is null || next.Start - game.Now > TimeSpan.FromMinutes(minutes) || !_announced.Add((stage, next.Start))
+            || Show.Roster.Named(next.Act.Name) is null)
+        {
+            return;
+        }
+
+        var take = (_lastTake.GetValueOrDefault(next.Act.Name) % Announcements.Takes) + 1;
+        _lastTake[next.Act.Name] = take;
+        Cue?.Invoke(Announcements.IdFor(next.Act.Name, take));
     }
 
     private void Trouble()

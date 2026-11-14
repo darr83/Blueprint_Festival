@@ -198,7 +198,8 @@ public class SoundTests
         script.Cue += heard.Add;
         Assert.True(game.PauseAct());
         script.Poll();
-        Assert.Equal(new[] { Sounds.PaStop, Sounds.Groan }, heard);
+        // The first announcement asking people to step back, then the music stopping.
+        Assert.Equal(new[] { Sounds.StepBack1, Sounds.PaStop, Sounds.Groan }, heard);
 
         while (game.ActPaused)
         {
@@ -206,6 +207,6 @@ public class SoundTests
         }
 
         script.Poll();
-        Assert.Equal(Sounds.PaStart, heard[^1]);
+        Assert.Equal(new[] { Sounds.PaStart, Sounds.PaRestart }, heard.TakeLast(2));
     }
 }

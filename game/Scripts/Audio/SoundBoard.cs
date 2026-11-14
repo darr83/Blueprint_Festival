@@ -15,6 +15,7 @@ namespace BlueprintFestival.Audio;
 public partial class SoundBoard : Node
 {
     public const string ListPath = "res://Audio/sounds.json";
+    public const string AnnouncementsPath = "res://Audio/Announcements/announcements.json";
     public const string SettingsPath = "user://settings.cfg";
 
     /// <summary>The volume sliders, in the order they are shown: the bus and what the player calls it.</summary>
@@ -31,7 +32,7 @@ public partial class SoundBoard : Node
     private const int Voices = 12;
     private const float FadePerSecond = 0.6f;
 
-    private sealed record Sound(string Id, string Bus, bool Loop, float Volume, double Gap, AudioStream? Stream);
+    private sealed record Sound(string Id, string Bus, bool Loop, float Volume, double Gap, AudioStream? Stream, bool Spoken = false);
 
     private readonly Dictionary<string, Sound> _sounds = [];
     private readonly Dictionary<string, int> _asked = [];
@@ -44,8 +45,12 @@ public partial class SoundBoard : Node
 
     public static SoundBoard? Instance { get; private set; }
 
-    /// <summary>How many sounds are on the list.</summary>
-    public int Listed => _sounds.Count;
+    /// <summary>How many sounds are on the list, not counting the announcements of the acts.</summary>
+    public int Listed => _sounds.Values.Count(s => !s.Spoken);
+
+    /// <summary>How many PA announcements introducing the acts are loaded, and how many have a file.</summary>
+    public (int Listed, int WithFiles) Announcements =>
+        (_sounds.Values.Count(s => s.Spoken), _sounds.Values.Count(s => s.Spoken && s.Stream is not null));
 
     /// <summary>How many of them have a sound file to play.</summary>
     public int WithFiles => _sounds.Values.Count(s => s.Stream is not null);
@@ -72,6 +77,7 @@ public partial class SoundBoard : Node
         }
 
         LoadList();
+        LoadAnnouncements();
         LoadSettings();
         for (var i = 0; i < Voices; i++)
         {
@@ -106,11 +112,35 @@ public partial class SoundBoard : Node
         }
     }
 
-    private static AudioStream? StreamFor(string id, bool loop)
+    /// <summary>The PA announcements that introduce each act, from their own list and folder.</summary>
+    private void LoadAnnouncements()
+    {
+        if (!FileAccess.FileExists(AnnouncementsPath))
+        {
+            return;
+        }
+
+        using var file = FileAccess.Open(AnnouncementsPath, FileAccess.ModeFlags.Read);
+        if (Json.ParseString(file.GetAsText()).Obj is not Godot.Collections.Dictionary list
+            || list["announcements"].Obj is not Godot.Collections.Array lines)
+        {
+            GD.PushWarning("The list of announcements could not be read.");
+            return;
+        }
+
+        foreach (var entry in lines)
+        {
+            var d = entry.AsGodotDictionary();
+            var id = d["id"].AsString();
+            _sounds[id] = new Sound(id, "Effects", false, (float)d["volume"].AsDouble(), 0, StreamFor(id, false, "res://Audio/Announcements"), Spoken: true);
+        }
+    }
+
+    private static AudioStream? StreamFor(string id, bool loop, string folder = "res://Audio")
     {
         foreach (var ending in new[] { "ogg", "wav", "mp3" })
         {
-            var path = $"res://Audio/{id}.{ending}";
+            var path = $"{folder}/{id}.{ending}";
             if (!ResourceLoader.Exists(path) || ResourceLoader.Load(path) is not AudioStream stream)
             {
                 continue;
@@ -176,7 +206,7 @@ public partial class SoundBoard : Node
         voice.Bus = sound.Bus;
         voice.VolumeDb = Mathf.LinearToDb(sound.Volume * Mathf.Clamp(level, 0.001f, 1f));
         // A touch of difference each time, so a row of tills does not sound like one till.
-        voice.PitchScale = sound.Bus == "Effects" ? _random.RandfRange(0.94f, 1.06f) : 1f;
+        voice.PitchScale = sound.Bus == "Effects" && !sound.Spoken ? _random.RandfRange(0.94f, 1.06f) : 1f;
         voice.Play();
         return true;
     }
