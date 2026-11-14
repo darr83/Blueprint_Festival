@@ -31,9 +31,13 @@ public partial class ShowView : Node3D
     /// <summary>How bright the stage lights are, from 0 (off, by day) to 1 (a set at night).</summary>
     public float LightStrength { get; private set; }
 
-    public void Initialise(FestivalGame game)
+    /// <summary>True for the view of the second stage's acts.</summary>
+    public bool Second { get; private set; }
+
+    public void Initialise(FestivalGame game, bool second = false)
     {
         _game = game;
+        Second = second;
         _acts = new Node3D { Name = "Acts" };
         AddChild(_acts);
         _rig = new Node3D { Name = "Lights" };
@@ -89,7 +93,7 @@ public partial class ShowView : Node3D
     private void Sync(double delta)
     {
         var now = _game.Now;
-        var show = _game.Show;
+        var show = Second ? _game.SecondShow : _game.Show;
         var stage = show.Stage;
         // While an act is stopped to let the crowd ease, the stage is empty.
         var slot = _game.ActPaused ? null : show.Playing(now);

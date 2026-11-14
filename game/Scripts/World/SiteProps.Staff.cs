@@ -99,11 +99,30 @@ public static partial class SiteProps
     /// The first aid tent, open to the south (+Z): a white frame tent 4 m wide and 3 m deep with a
     /// green cross on the gable and on a flag, and two camp beds inside.
     /// </summary>
-    public static Node3D FirstAidTent()
+    public static Node3D FirstAidTent() => AidTent("First aid tent", "FIRST AID", 4f, 3f, 2.9f, new[] { (-1.15f, -0.1f), (1.15f, -0.1f) });
+
+    /// <summary>
+    /// The medical tent for a big festival, open to the south (+Z): 8 m wide and 5 m deep, with six
+    /// beds in two rows, a green cross on the gable and a taller flag.
+    /// </summary>
+    public static Node3D MedicalTent()
     {
-        var node = new Node3D { Name = "First aid tent" };
+        var beds = new (float X, float Z)[6];
+        for (var bed = 0; bed < beds.Length; bed++)
+        {
+            // The same places the rules put people in: see FestivalGame.BedPlace.
+            beds[bed] = (((bed % 3) - 1) * 2.4f, 2.5f - (bed < 3 ? 1.7f : 3.6f));
+        }
+
+        return AidTent("Medical tent", "MEDICAL", 8f, 5f, 3.7f, beds);
+    }
+
+    /// <summary>A white frame tent with a green cross, open to the south, with a camp bed at each place given (centre of the bed, in metres from the middle of the tent).</summary>
+    private static Node3D AidTent(string name, string sign, float w, float d, float ridge, (float X, float Z)[] beds)
+    {
+        var node = new Node3D { Name = name };
         var b = new MeshBuilder();
-        const float w = 4f, d = 3f, eaves = 2.0f, ridge = 2.9f;
+        const float eaves = 2.0f;
         foreach (var x in new[] { -w / 2, w / 2 })
         {
             foreach (var z in new[] { -d / 2, d / 2 })
@@ -114,36 +133,40 @@ public static partial class SiteProps
 
         // Back and side walls, and a pitched roof in two slopes.
         b.Box(new Vector3(0, eaves / 2, -d / 2), new Vector3(w, eaves, 0.04f), Colors.White);
-        b.Box(new Vector3(-w / 2, eaves / 2, -1.0f), new Vector3(0.04f, eaves, 1.0f), Colors.White);
-        b.Box(new Vector3(w / 2, eaves / 2, -1.0f), new Vector3(0.04f, eaves, 1.0f), Colors.White);
+        b.Box(new Vector3(-w / 2, eaves / 2, -d / 3), new Vector3(0.04f, eaves, d / 3), Colors.White);
+        b.Box(new Vector3(w / 2, eaves / 2, -d / 3), new Vector3(0.04f, eaves, d / 3), Colors.White);
         var slope = Mathf.RadToDeg(Mathf.Atan2(ridge - eaves, w / 2));
         var length = Mathf.Sqrt(((ridge - eaves) * (ridge - eaves)) + (w * w / 4)) + 0.2f;
         b.Box(new Vector3(-w / 4, (eaves + ridge) / 2, 0), new Vector3(length, 0.05f, d + 0.3f), Colors.White, new Vector3(0, 0, slope));
         b.Box(new Vector3(w / 4, (eaves + ridge) / 2, 0), new Vector3(length, 0.05f, d + 0.3f), Colors.White, new Vector3(0, 0, -slope));
         b.Box(new Vector3(0, eaves - 0.14f, d / 2), new Vector3(w, 0.28f, 0.04f), FirstAidGreen);
-        Painted(node, "FIRST AID", new Vector3(0, eaves - 0.14f, (d / 2) + 0.03f), w - 1.2f, 0.2f, Colors.White);
-        GreenCross(b, new Vector3(0, eaves + 0.42f, (d / 2) + 0.16f), 0.5f);
+        Painted(node, sign, new Vector3(0, eaves - 0.14f, (d / 2) + 0.03f), Mathf.Min(w - 1.2f, 3.2f), 0.2f, Colors.White);
+        GreenCross(b, new Vector3(0, eaves + ((ridge - eaves) * 0.47f), (d / 2) + 0.16f), 0.5f * ((ridge - eaves) / 0.9f));
 
-        // Two camp beds with green blankets, and a kit box.
-        foreach (var x in new[] { -1.15f, 1.15f })
+        // Camp beds with green blankets, heads to the back of the tent.
+        foreach (var (x, z) in beds)
         {
-            b.Box(new Vector3(x, 0.42f, -0.35f), new Vector3(0.8f, 0.08f, 1.9f), Canvas);
-            b.Box(new Vector3(x, 0.47f, -0.05f), new Vector3(0.82f, 0.05f, 1.2f), MedicGreen);
-            b.Ball(new Vector3(x, 0.5f, -1.1f), new Vector3(0.5f, 0.14f, 0.3f), Colors.White);
-            foreach (var z in new[] { -1.2f, 0.5f })
+            b.Box(new Vector3(x, 0.42f, z - 0.25f), new Vector3(0.8f, 0.08f, 1.9f), Canvas);
+            b.Box(new Vector3(x, 0.47f, z + 0.05f), new Vector3(0.82f, 0.05f, 1.2f), MedicGreen);
+            b.Ball(new Vector3(x, 0.5f, z - 1.0f), new Vector3(0.5f, 0.14f, 0.3f), Colors.White);
+            foreach (var leg in new[] { -1.1f, 0.6f })
             {
-                b.Box(new Vector3(x - 0.35f, 0.2f, z), new Vector3(0.05f, 0.4f, 0.05f), SteelDark);
-                b.Box(new Vector3(x + 0.35f, 0.2f, z), new Vector3(0.05f, 0.4f, 0.05f), SteelDark);
+                b.Box(new Vector3(x - 0.35f, 0.2f, z + leg), new Vector3(0.05f, 0.4f, 0.05f), SteelDark);
+                b.Box(new Vector3(x + 0.35f, 0.2f, z + leg), new Vector3(0.05f, 0.4f, 0.05f), SteelDark);
             }
         }
 
-        b.Box(new Vector3(0, 0.25f, -1.1f), new Vector3(0.6f, 0.5f, 0.4f), MedicGreen);
-        b.Box(new Vector3(0, 0.3f, -0.89f), new Vector3(0.07f, 0.22f, 0.01f), Colors.White);
-        b.Box(new Vector3(0, 0.3f, -0.89f), new Vector3(0.22f, 0.07f, 0.01f), Colors.White);
+        // A kit box against the back wall.
+        var kit = (-d / 2) + 0.4f;
+        var kitX = beds.Length > 2 ? 1.2f : 0f;
+        b.Box(new Vector3(kitX, 0.25f, kit), new Vector3(0.6f, 0.5f, 0.4f), MedicGreen);
+        b.Box(new Vector3(kitX, 0.3f, kit + 0.21f), new Vector3(0.07f, 0.22f, 0.01f), Colors.White);
+        b.Box(new Vector3(kitX, 0.3f, kit + 0.21f), new Vector3(0.22f, 0.07f, 0.01f), Colors.White);
 
         // A flag on a pole so the tent can be found from across the field.
-        b.Tube(new Vector3((w / 2) + 0.25f, 2.2f, d / 2), new Vector3(0.06f, 4.4f, 0.06f), Steel);
-        GreenCross(b, new Vector3((w / 2) + 0.82f, 3.95f, d / 2), 0.55f);
+        var pole = ridge + 1.5f;
+        b.Tube(new Vector3((w / 2) + 0.25f, pole / 2, d / 2), new Vector3(0.06f, pole, 0.06f), Steel);
+        GreenCross(b, new Vector3((w / 2) + 0.82f, pole - 0.45f, d / 2), 0.55f);
         node.AddChild(b.BuildNode("Shapes"));
         return node;
     }

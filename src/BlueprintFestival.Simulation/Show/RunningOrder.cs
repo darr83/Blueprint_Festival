@@ -20,6 +20,21 @@ public sealed class RunningOrder
         (12, 45), (13.25, 45), (14.5, 45), (16, 45), (17.5, 60), (19.25, 60), (20.75, 75),
     };
 
+    /// <summary>
+    /// When each set on the second stage starts and how long it lasts. They overlap the main
+    /// stage's sets, so the crowd has a choice and splits between the two.
+    /// </summary>
+    private static readonly (double Start, int Minutes)[] SecondTimes =
+    {
+        (13, 40), (14.25, 40), (15.5, 40), (16.75, 40), (18.5, 45), (20.25, 45),
+    };
+
+    /// <summary>Sets on the second stage are numbered from here, so a set's number says which stage it is on.</summary>
+    public const int SecondBase = 100;
+
+    /// <summary>How much of the crowd a second stage act draws beside the same act on the main stage.</summary>
+    public const double SecondDraw = 0.55;
+
     private readonly SiteLayout _site;
     private readonly List<Slot> _slots = new();
 
@@ -36,6 +51,39 @@ public sealed class RunningOrder
         }
     }
 
+    /// <summary>The line-up for a second stage: six smaller local acts, none of them already on the main stage. It plays only once it is booked.</summary>
+    public RunningOrder(SiteLayout site, int seed, DateTime festivalDay, RunningOrder main)
+    {
+        ArgumentNullException.ThrowIfNull(main);
+        _site = site;
+        Second = true;
+        Booked = false;
+        var random = GameRandom.FromSeed(seed, 8);
+        var taken = new HashSet<string>(main.Slots.Select(s => s.Act.Name));
+        for (var i = 0; i < SecondTimes.Length; i++)
+        {
+            var start = festivalDay.Date.AddHours(SecondTimes[i].Start);
+            var act = ActGenerator.Make(random, false, taken);
+            _slots.Add(new Slot(SecondBase + i, act with { Draw = act.Draw * SecondDraw }, start, start.AddMinutes(SecondTimes[i].Minutes), false));
+        }
+    }
+
+    /// <summary>True for the second stage's line-up.</summary>
+    public bool Second { get; }
+
+    /// <summary>True if the acts have been booked. The main stage's always are; the second stage's are a choice at planning.</summary>
+    public bool Booked { get; set; } = true;
+
+    /// <summary>
+    /// The stages in the order the acts use them: the biggest is the main stage, the next biggest
+    /// the second stage, and of two the same the one put up first.
+    /// </summary>
+    public static IReadOnlyList<PlacedStage> InOrder(SiteLayout site)
+    {
+        ArgumentNullException.ThrowIfNull(site);
+        return site.Stages.Select((stage, built) => (stage, built)).OrderByDescending(s => Catalogue.Of(s.stage.Kind).Cost).ThenBy(s => s.built).Select(s => s.stage).ToList();
+    }
+
     public IReadOnlyList<Slot> Slots => _slots;
 
     /// <summary>Books a different act for the last set of the night.</summary>
@@ -46,7 +94,19 @@ public sealed class RunningOrder
     }
 
     /// <summary>The stage the acts play on, or null if none has been put up.</summary>
-    public PlacedStage? Stage => _site.Stages.Count > 0 ? _site.Stages[0] : null;
+    public PlacedStage? Stage
+    {
+        get
+        {
+            var place = Second ? 1 : 0;
+            if (!Booked || _site.Stages.Count <= place)
+            {
+                return null;
+            }
+
+            return _site.Stages.Count == 1 ? _site.Stages[0] : InOrder(_site)[place];
+        }
+    }
 
     /// <summary>The set that is on right now, or null between sets or with no stage.</summary>
     public Slot? Playing(DateTime now) => Stage is null || now >= CalledOff ? null : _slots.FirstOrDefault(s => now >= s.Start && now < s.End);

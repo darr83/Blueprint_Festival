@@ -32,6 +32,9 @@ public partial class FestivalScene : Node3D
 
     public ShowView Acts { get; private set; } = null!;
 
+    /// <summary>The acts on the second stage.</summary>
+    public ShowView SecondActs { get; private set; } = null!;
+
     public MoneyPanel Money { get; private set; } = null!;
 
     public BuildBar BuildBar { get; private set; } = null!;
@@ -85,6 +88,9 @@ public partial class FestivalScene : Node3D
         Acts = new ShowView { Name = "Show" };
         AddChild(Acts);
         Acts.Initialise(Game);
+        SecondActs = new ShowView { Name = "SecondShow" };
+        AddChild(SecondActs);
+        SecondActs.Initialise(Game, second: true);
 
         Litter = new LitterView { Name = "Litter" };
         AddChild(Litter);

@@ -139,8 +139,11 @@ public partial class BuildBar : VBoxContainer
                     AddChoice($"staff{s.Kind}", s.Name, $"£{s.Wage:N0} a day", s.About, () => _tool.PickStaff(s.Kind));
                 }
 
-                var tent = Catalogue.Of(StallKind.FirstAidTent);
-                AddChoice($"stall{tent.Kind}", tent.Name, $"£{tent.Cost:N0}", $"{tent.About}\n{tent.Width / 2f:0.#} m wide, {tent.Depth / 2f:0.#} m deep.", () => _tool.PickStall(tent.Kind));
+                foreach (var tent in Catalogue.Stalls.Where(s => FestivalGame.HasBeds(s.Kind)))
+                {
+                    AddChoice($"stall{tent.Kind}", tent.Name, $"£{tent.Cost:N0}", $"{tent.About}\n{tent.Width / 2f:0.#} m wide, {tent.Depth / 2f:0.#} m deep.", () => _tool.PickStall(tent.Kind));
+                }
+
                 break;
             }
 

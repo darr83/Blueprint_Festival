@@ -302,6 +302,11 @@ public partial class SmokeTest : Node
                     Check(game.PonchosOrdered && game.PonchoCost == game.Crowd.Expected, "Clicking the ponchos should order one for everyone expected.");
                     plan.Year.TogglePonchos();
                     Check(!game.PonchosOrdered, "Clicking the ponchos again should cancel them.");
+                    var before = game.ActFees;
+                    plan.Year.ToggleSecondStage();
+                    Check(game.SecondStageBooked && game.ActFees == before + game.SecondStageFee, "Clicking the second stage should book its acts.");
+                    plan.Year.ToggleSecondStage();
+                    Check(!game.SecondStageBooked && game.ActFees == before, "Clicking the second stage again should cancel them.");
                     var fees = game.ActFees;
                     plan.Year.StartBuilding();
                     Check(game.Phase == Phase.Build && game.Money == 2000 - fees, $"Starting to build should pay the acts £{fees}, leaving £{2000 - fees}, not £{game.Money}.");
@@ -330,13 +335,14 @@ public partial class SmokeTest : Node
 
                     // Staff from the build bar: someone on the gate, a first-aider, security, and a first aid tent.
                     build.BuildBar.Toggle(BuildMode.Staff);
-                    Check(build.BuildBar.ChoiceCount == 4, "The Staff tab should offer three kinds of staff and the first aid tent.");
+                    Check(build.BuildBar.ChoiceCount == 5, "The Staff tab should offer three kinds of staff, the first aid tent and the medical tent.");
                     Check(build.BuildBar.Choose("staffTicketStaff") && build.Build.Mode == BuildMode.Staff, "Ticket staff should be on the build bar.");
                     Check(!build.Build.ClickAt(new TilePoint(grass.X + 40, grass.Y + 40)).Ok && build.Build.Refused, "Ticket staff should only go on a gate.");
                     Check(build.Build.ClickAt(new TilePoint(gap.X + 4, gap.Y + 1)).Ok && game.OpenLanes(0) == 1, "Ticket staff should open the gate's lane.");
                     Check(build.BuildBar.Choose("staffFirstAider") && build.Build.ClickAt(new TilePoint(grass.X + 50, grass.Y + 30)).Ok, "A first-aider should be posted on the grass.");
                     Check(build.BuildBar.Choose("staffSecurity") && build.Build.ClickAt(new TilePoint(grass.X + 70, grass.Y + 28)).Ok, "Security should be posted on the grass.");
                     Check(build.BuildBar.Choose("stallFirstAidTent") && build.Build.ClickAt(new TilePoint(grass.X + 56, grass.Y + 8)).Ok, "The first aid tent should go up.");
+                    Check(build.BuildBar.Choose("stallMedicalTent"), "The medical tent should be on the staff tab.");
                     build.BuildBar.Close();
                     Check(game.Staff.Count == 3 && game.Spending.Any(l => l.What == "Staff wages" && l.Amount == 150), "Three staff should be hired for £150.");
                     build.Year.OpenGates();

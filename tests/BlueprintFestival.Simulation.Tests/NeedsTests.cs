@@ -29,7 +29,7 @@ public class NeedsTests
     [Fact]
     public void Every_stall_has_a_name_a_size_a_price_and_a_need_it_answers()
     {
-        Assert.Equal(7, Catalogue.Stalls.Count);
+        Assert.Equal(8, Catalogue.Stalls.Count);
         Assert.All(Enum.GetValues<StallKind>(), k => Assert.Equal(k, Catalogue.Of(k).Kind));
         Assert.All(Catalogue.Stalls, s => Assert.True(s.Cost > 0 && s.Width > 0 && s.Depth > 0 && s.Servers >= 1 && s.SecondsPerPerson > 0 && s.Name.Length > 0));
         Assert.All(Enum.GetValues<Need>(), n => Assert.Contains(Catalogue.Stalls, s => s.Serves == n));

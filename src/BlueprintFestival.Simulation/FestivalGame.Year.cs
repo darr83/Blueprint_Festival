@@ -126,8 +126,21 @@ public sealed partial class FestivalGame
     /// <summary>What the six acts before the headliner cost between them.</summary>
     public int SupportFee => 6 * Scaled(40);
 
-    /// <summary>What the acts cost in all with the headliner picked.</summary>
-    public int ActFees => SupportFee + (_offers.Count > 0 ? _offers[HeadlinerPicked].Fee : 0);
+    /// <summary>What the acts cost in all with the headliner picked, and the second stage's acts if they are booked.</summary>
+    public int ActFees => SupportFee + (_offers.Count > 0 ? _offers[HeadlinerPicked].Fee : 0) + (SecondStageBooked ? SecondStageFee : 0);
+
+    /// <summary>What the six acts for a second stage cost between them.</summary>
+    public int SecondStageFee => SecondShow.Slots.Count * Scaled(40);
+
+    /// <summary>True if acts are booked for a second stage. They play on the second biggest stage on the field.</summary>
+    public bool SecondStageBooked => SecondShow.Booked;
+
+    /// <summary>Books a line-up for a second stage, or cancels it. Only while planning.</summary>
+    public void BookSecondStage(bool book)
+    {
+        Need(Phase.Plan);
+        SecondShow.Booked = book;
+    }
 
     public bool CanBuild => Phase is Phase.Build or Phase.Day;
 
@@ -176,7 +189,7 @@ public sealed partial class FestivalGame
     private void MakeOffers()
     {
         var random = GameRandom.FromSeed(Seed, 21);
-        var taken = new HashSet<string>(Show.Slots.Select(s => s.Act.Name));
+        var taken = new HashSet<string>(Show.Slots.Concat(SecondShow.Slots).Select(s => s.Act.Name));
         // There is always a cheap local act; one of the bigger names is busy that weekend.
         var stars = new List<int> { 2, 3, 4, 5 };
         stars.RemoveAt(1 + random.Next(3));
@@ -425,12 +438,14 @@ public sealed partial class FestivalGame
         LitterAtStart, _litter.ToList(), _wear.ToArray())
     {
         FieldRepair = _fieldRepair,
+        SecondStage = SecondStageBooked,
     };
 
     private void RestoreYear(YearSave year)
     {
         TicketPrice = TicketPrices.Contains(year.TicketPrice) ? year.TicketPrice : Catalogue.TicketPrice;
         HeadlinerPicked = Math.Clamp(year.Headliner, 0, _offers.Count - 1);
+        SecondShow.Booked = year.SecondStage;
         Phase = Enum.IsDefined(year.Phase) ? year.Phase : Phase.Plan;
         if (Phase != Phase.Plan)
         {
@@ -459,4 +474,7 @@ public sealed record YearSave(int Number, int Licence, Phase Phase, DateTime Day
 {
     /// <summary>What the farmer charged for worn-out grass, once the field is handed back.</summary>
     public int FieldRepair { get; init; }
+
+    /// <summary>True if acts were booked for a second stage.</summary>
+    public bool SecondStage { get; init; }
 }
