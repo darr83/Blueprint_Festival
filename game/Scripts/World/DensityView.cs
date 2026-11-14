@@ -1,5 +1,5 @@
-using System;
-using System.Collections.Generic;
+using BlueprintFestival.Simulation;
+using BlueprintFestival.Simulation.People;
 using BlueprintFestival.Simulation.World;
 using Godot;
 
@@ -8,79 +8,62 @@ namespace BlueprintFestival.World;
 /// <summary>
 /// The crowd view: the field cut into two-metre squares, each tinted by how many people stand in
 /// every square metre of it. Green is comfortable, amber is busy and red is a crush risk; these
-/// three colours are kept for safety and used nowhere else.
+/// three colours are kept for safety and used nowhere else. The squares come from the rules,
+/// which measure the crowd again every minute.
 /// </summary>
 public partial class DensityView : Node3D
 {
-    /// <summary>The side of one measured square, in metres.</summary>
-    public const double Square = 2.0;
-
-    /// <summary>People per square metre at which a square turns amber.</summary>
-    public const double Busy = 2.0;
-
-    /// <summary>People per square metre at which a square turns red.</summary>
-    public const double Crush = 4.0;
-
     public static readonly Color Comfortable = new("#3FA657");
     public static readonly Color BusyAmber = new("#F0A81E");
     public static readonly Color CrushRed = new("#DC3B34");
 
+    private FestivalGame _game = null!;
     private MeshInstance3D? _squares;
-    private readonly List<Label3D> _labels = new();
+    private Label3D _label = null!;
+    private StandardMaterial3D _material = null!;
+    private double _sinceDrawn = 1;
+    private bool _showing;
 
-    /// <summary>The busiest square found the last time the view was drawn, in people per square metre.</summary>
-    public double Worst { get; private set; }
-
-    /// <summary>Where the busiest square is, in metres.</summary>
-    public Vector2 WorstAt { get; private set; }
-
-    /// <summary>Draws the view for people standing at these places (in metres) on a field.</summary>
-    public void Draw(IEnumerable<(double X, double Y)> people, TileRect field)
+    /// <summary>Whether the crowd view is switched on.</summary>
+    public bool Showing
     {
-        _squares?.QueueFree();
-        foreach (var label in _labels)
+        get => _showing;
+        set
         {
-            label.QueueFree();
-        }
-
-        _labels.Clear();
-        const double t = FieldMap.TileMetres;
-        var left = field.X * t;
-        var top = field.Y * t;
-        var across = (int)Math.Ceiling(field.Width * t / Square);
-        var down = (int)Math.Ceiling(field.Height * t / Square);
-        var counts = new int[across, down];
-        foreach (var (x, y) in people)
-        {
-            var cx = (int)Math.Floor((x - left) / Square);
-            var cy = (int)Math.Floor((y - top) / Square);
-            if (cx >= 0 && cy >= 0 && cx < across && cy < down)
+            _showing = value;
+            Visible = value;
+            if (value)
             {
-                counts[cx, cy]++;
+                Redraw();
             }
         }
+    }
 
-        var b = new MeshBuilder();
-        Worst = 0;
-        for (var cx = 0; cx < across; cx++)
-        {
-            for (var cy = 0; cy < down; cy++)
-            {
-                var perMetre = counts[cx, cy] / (Square * Square);
-                var colour = perMetre >= Crush ? CrushRed : perMetre >= Busy ? BusyAmber : Comfortable;
-                colour.A = perMetre >= Crush ? 0.5f : perMetre >= Busy ? 0.38f : 0.14f;
-                var centre = new Vector3((float)(left + ((cx + 0.5) * Square)), 0.05f, (float)(top + ((cy + 0.5) * Square)));
-                b.Box(centre, new Vector3((float)Square - 0.08f, 0.02f, (float)Square - 0.08f), colour);
-                if (perMetre > Worst)
-                {
-                    Worst = perMetre;
-                    WorstAt = new Vector2(centre.X, centre.Z);
-                }
-            }
-        }
+    /// <summary>How many squares are tinted amber or red right now.</summary>
+    public int Tinted { get; private set; }
 
-        _squares = b.BuildNode("Squares");
-        _squares.MaterialOverride = new StandardMaterial3D
+    /// <summary>What the label over the busiest square says, or nothing if nowhere is busy.</summary>
+    public string LabelText => _label.Visible ? _label.Text : "";
+
+    public static Color ColourOf(Crowding status) => status switch
+    {
+        Crowding.CrushRisk => CrushRed,
+        Crowding.Busy => BusyAmber,
+        _ => Comfortable,
+    };
+
+    /// <summary>The word for how crowded somewhere is.</summary>
+    public static string Word(Crowding status) => status switch
+    {
+        Crowding.CrushRisk => "Crush risk",
+        Crowding.Busy => "Busy",
+        _ => "Comfortable",
+    };
+
+    public void Initialise(FestivalGame game)
+    {
+        _game = game;
+        _material = new StandardMaterial3D
         {
             VertexColorUseAsAlbedo = true,
             VertexColorIsSrgb = true,
@@ -89,33 +72,76 @@ public partial class DensityView : Node3D
             NoDepthTest = true,
             RenderPriority = 5,
         };
-        _squares.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
-        AddChild(_squares);
-    }
-
-    /// <summary>Writes a label over a place on the field, such as "Crush risk 4.8 per m²".</summary>
-    public void Label(double x, double y, string text, int size = 44)
-    {
-        var label = new Label3D
+        _label = new Label3D
         {
-            Text = text,
-            FontSize = size * 4,
-            PixelSize = 0.0026f,
+            FontSize = 176,
+            PixelSize = 0.00028f,
+            FixedSize = true,
             Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
             NoDepthTest = true,
             RenderPriority = 10,
             OutlineRenderPriority = 9,
-            Modulate = Colors.White,
             OutlineModulate = new Color("#1D2B36"),
             OutlineSize = 36,
-            FixedSize = true,
-            Position = new Vector3((float)x, 2.6f, (float)y),
+            Visible = false,
         };
-        label.PixelSize = 0.00028f;
-        _labels.Add(label);
-        AddChild(label);
+        AddChild(_label);
+        Visible = false;
     }
 
-    /// <summary>The word for a number of people per square metre.</summary>
-    public static string Word(double perMetre) => perMetre >= Crush ? "Crush risk" : perMetre >= Busy ? "Busy" : "Comfortable";
+    public override void _Process(double delta)
+    {
+        _sinceDrawn += delta;
+        if (_showing && _sinceDrawn > 0.4)
+        {
+            Redraw();
+        }
+    }
+
+    /// <summary>Draws the squares again from the rules' latest measure.</summary>
+    public void Redraw()
+    {
+        _sinceDrawn = 0;
+        _squares?.QueueFree();
+        var density = _game.Density;
+        var field = _game.Field.Field;
+        var b = new MeshBuilder();
+        const float side = (float)DensityMap.SquareMetres;
+        Tinted = 0;
+        for (var sy = 0; sy < density.Down; sy++)
+        {
+            for (var sx = 0; sx < density.Across; sx++)
+            {
+                var perMetre = density.In(sx, sy);
+                var status = DensityMap.StatusOf(perMetre);
+                var (x, y) = DensityMap.CentreOf(sx, sy);
+                if (status == Crowding.Comfortable && !field.Contains(FieldMap.TileAt(x, y)))
+                {
+                    // Outside the field only the squares that matter are drawn.
+                    continue;
+                }
+
+                var colour = ColourOf(status);
+                colour.A = status switch { Crowding.CrushRisk => 0.5f, Crowding.Busy => 0.38f, _ => 0.14f };
+                b.Box(new Vector3((float)x, 0.05f, (float)y), new Vector3(side - 0.08f, 0.02f, side - 0.08f), colour);
+                if (status != Crowding.Comfortable)
+                {
+                    Tinted++;
+                }
+            }
+        }
+
+        _squares = b.BuildNode("Squares");
+        _squares.MaterialOverride = _material;
+        _squares.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
+        AddChild(_squares);
+
+        var worst = DensityMap.StatusOf(density.Worst);
+        _label.Visible = worst != Crowding.Comfortable;
+        if (_label.Visible)
+        {
+            _label.Text = $"{Word(worst)}  {density.Worst:0.0} per m²";
+            _label.Position = new Vector3((float)density.WorstAt.X, 2.8f, (float)density.WorstAt.Y);
+        }
+    }
 }

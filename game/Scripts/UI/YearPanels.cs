@@ -16,7 +16,7 @@ public sealed record PlanView(int Year, string Festival, string Date, int Licenc
 /// <summary>What the results screen shows.</summary>
 public sealed record ResultsView(int Year, string Festival, int Came, int Expected, int Happy, int WentHome, IReadOnlyList<(string What, int Amount)> In,
     IReadOnlyList<(string What, int Amount)> Out, int LitterCleared, int GrassWorn, string Verdict, int LicenceNow, int LicenceNext,
-    int Treated = 0, int Untreated = 0, int TroubleSorted = 0, int TroubleIgnored = 0);
+    int Treated = 0, int Untreated = 0, int TroubleSorted = 0, int TroubleIgnored = 0, int CrushInjuries = 0, int PulledOut = 0);
 
 /// <summary>
 /// The screens of the festival year that sit over the field: planning before, results after.
@@ -163,12 +163,12 @@ public static class YearPanels
     {
         var panel = Card(760);
         var box = new VBoxContainer();
-        box.AddThemeConstantOverride("separation", 10);
+        box.AddThemeConstantOverride("separation", 7);
         panel.AddChild(box);
 
-        box.AddChild(UiStyle.Heading($"Year {view.Year} results", 32));
+        // Kept tight, so the whole panel and its button fit on a 900 pixel high screen.
+        box.AddChild(UiStyle.Heading($"Year {view.Year} results", 28));
         box.AddChild(UiStyle.Body(view.Festival, muted: true, size: 15));
-        box.AddChild(new Control { CustomMinimumSize = new Vector2(0, 4) });
 
         var takings = 0;
         foreach (var (_, amount) in view.In)
@@ -226,11 +226,10 @@ public static class YearPanels
         box.AddChild(Section("The field afterwards"));
         box.AddChild(MoneyRow("Litter cleared", $"{view.LitterCleared}%"));
         box.AddChild(MoneyRow("Grass worn to mud", $"{view.GrassWorn}%"));
-        box.AddChild(new Control { CustomMinimumSize = new Vector2(0, 4) });
         box.AddChild(Section("People looked after"));
-        box.AddChild(MoneyRow("Taken ill or hurt", view.Untreated > 0 ? $"{view.Treated} treated, {view.Untreated} left with no help" : $"{view.Treated} treated"));
+        var crush = (view.CrushInjuries > 0 ? $", {view.CrushInjuries} hurt in a crush" : "") + (view.PulledOut > 0 ? $", {view.PulledOut} lifted out of a crush in time" : "");
+        box.AddChild(MoneyRow("Taken ill or hurt", (view.Untreated > 0 ? $"{view.Treated} treated, {view.Untreated} left with no help" : $"{view.Treated} treated") + crush));
         box.AddChild(MoneyRow("Trouble", view.TroubleIgnored > 0 ? $"{view.TroubleSorted} sorted out, {view.TroubleIgnored} nobody dealt with" : $"{view.TroubleSorted} sorted out"));
-        box.AddChild(new Control { CustomMinimumSize = new Vector2(0, 4) });
 
         var verdict = new PanelContainer();
         var grew = view.LicenceNext > view.LicenceNow;
@@ -243,7 +242,6 @@ public static class YearPanels
         words.AddChild(UiStyle.Heading(closed ? "The festival has closed" : grew ? $"Next year: licence for up to {view.LicenceNext:N0} people" : $"Next year: licence stays at {view.LicenceNext:N0} people", 19));
         verdict.AddChild(words);
         box.AddChild(verdict);
-        box.AddChild(new Control { CustomMinimumSize = new Vector2(0, 6) });
 
         var buttons = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.End };
         buttons.AddChild(UiStyle.Button(closed ? "Back to the menu" : $"Plan year {view.Year + 1}", next ?? (() => { })));

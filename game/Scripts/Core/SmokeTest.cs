@@ -324,12 +324,28 @@ public partial class SmokeTest : Node
                     build.Year.OpenGates();
                     Check(game.Phase == Phase.Day, "Opening the gates should start the day.");
 
-                    // Run the whole day in one go.
+                    // Run to the middle of the afternoon and look at the crowd view.
                     var guard = 0;
+                    while (game.Phase == Phase.Day && game.Now.TimeOfDay < System.TimeSpan.FromHours(15) && guard++ < 70000)
+                    {
+                        game.Clock.Step();
+                    }
+
+                    Check(!build.Density.Showing && !build.CrowdSafety.KeyShown, "The crowd view should start switched off.");
+                    build.SetCrowdView(true);
+                    Check(build.Density.Showing && build.CrowdSafety.KeyShown, "The crowd view button should switch the view and its key on.");
+                    Check(game.Density.Worst > 0 && game.Density.Worst < 6.6, $"The crowd should be measured: worst {game.Density.Worst}.");
+                    Check(build.CrowdSafety.WarningText.Length == 0 || build.CrowdSafety.WarningText.StartsWith("Crush risk", System.StringComparison.Ordinal), "A quiet afternoon should have no warning but a crush risk.");
+                    build.SetCrowdView(false);
+                    Check(!build.Density.Showing && !build.CrowdSafety.KeyShown, "The crowd view should switch off again.");
+
+                    // Then the rest of the day in one go.
                     while (game.Phase == Phase.Day && guard++ < 70000)
                     {
                         game.Clock.Step();
                     }
+
+                    Check(!game.PauseAct(), "No act can be paused once the day is over.");
 
                     Check(game.Phase == Phase.Tidy, "The day should end with the morning after.");
                     Check(game.Crowd.ThroughGates > 50 && game.Income.Count >= 3, "People should have come, paid and eaten.");
