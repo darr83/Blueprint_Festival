@@ -29,6 +29,9 @@ public sealed class QueueLine
     /// <summary>How many places were fenced in by the player as a queue lane, counted from the front.</summary>
     public int Fenced { get; internal set; }
 
+    /// <summary>The open end of the player's queue lane, in metres, where people walk in. Null if the queue has no lane.</summary>
+    public (double X, double Y)? Mouth { get; internal set; }
+
     internal void Add(double x, double y) => _places.Add((x, y));
 
     /// <summary>How many people are standing in the line (not counting anyone still walking to it).</summary>

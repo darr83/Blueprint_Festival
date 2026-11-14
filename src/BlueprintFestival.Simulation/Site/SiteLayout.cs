@@ -79,6 +79,10 @@ public sealed class SiteLayout
     private readonly List<PlacedStall> _stalls = new();
     private readonly Dictionary<TilePoint, FenceKind> _fence = new();
     private readonly List<GateUse> _gateUses = new();
+    private readonly List<List<TilePoint>> _lanes = new();
+    private readonly Dictionary<TilePoint, int> _laneOf = new();
+    private readonly HashSet<TilePoint> _barriers = new();
+    private readonly HashSet<TilePoint> _keepOut = new();
     private Side[] _sides;
 
     public SiteLayout(FieldMap map)
@@ -119,7 +123,252 @@ public sealed class SiteLayout
 
     public PlacedStall? StallAt(TilePoint p) => _stalls.FirstOrDefault(s => s.Rect.Contains(p));
 
-    public bool IsEmpty(TilePoint p) => !_fence.ContainsKey(p) && StageAt(p) is null && GateAt(p) is null && StallAt(p) is null;
+    public bool IsEmpty(TilePoint p) => !_fence.ContainsKey(p) && StageAt(p) is null && GateAt(p) is null && StallAt(p) is null && !_laneOf.ContainsKey(p) && !_barriers.Contains(p);
+
+    /// <summary>The queue lanes the player has laid: each is the tiles people stand along, in order from one end to the other.</summary>
+    public IReadOnlyList<IReadOnlyList<TilePoint>> Lanes => _lanes;
+
+    /// <summary>The tiles with a queue lane's barrier on them. The barriers go up by themselves down both sides of every lane.</summary>
+    public IReadOnlyCollection<TilePoint> LaneBarriers => _barriers;
+
+    /// <summary>Which queue lane a tile is part of, or -1.</summary>
+    public int LaneAt(TilePoint p) => _laneOf.TryGetValue(p, out var lane) ? lane : _barriers.Contains(p) ? BarrierLane(p) : -1;
+
+    /// <summary>True if a tile is somewhere people queue in a lane (not its barrier).</summary>
+    public bool IsLane(TilePoint p) => _laneOf.ContainsKey(p);
+
+    /// <summary>True if a queue lane's barrier stands on a tile.</summary>
+    public bool IsBarrier(TilePoint p) => _barriers.Contains(p);
+
+    /// <summary>The tiles the public are kept off. Staff can still walk and stand there.</summary>
+    public IReadOnlyCollection<TilePoint> KeepOut => _keepOut;
+
+    public bool IsKeptClear(TilePoint p) => _keepOut.Contains(p);
+
+    /// <summary>What a queue lane costs for each metre, barriers and all.</summary>
+    public const int LaneCostPerMetre = 6;
+
+    /// <summary>The fewest tiles a queue lane can be: room for a couple of people.</summary>
+    public const int ShortestLane = 4;
+
+    public static int LaneCost(int tiles) => ((LaneCostPerMetre * tiles) + 1) / 2;
+
+    private static bool Touching(TilePoint a, TilePoint b) => Math.Abs(a.X - b.X) + Math.Abs(a.Y - b.Y) == 1;
+
+    private static bool Near(TilePoint a, TilePoint b) => Math.Max(Math.Abs(a.X - b.X), Math.Abs(a.Y - b.Y)) <= 1;
+
+    private int BarrierLane(TilePoint p)
+    {
+        for (var i = 0; i < _lanes.Count; i++)
+        {
+            if (_lanes[i].Any(q => Near(p, q)))
+            {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
+    /// <summary>
+    /// The lane a drag starting on a tile would carry on, and from which end: a drag that starts on
+    /// the last tile of a lane, or right beside it, makes that lane longer (round a corner if it
+    /// goes off sideways). Otherwise it starts a new lane.
+    /// </summary>
+    private (int Lane, bool AtStart) Joins(TilePoint from)
+    {
+        for (var i = 0; i < _lanes.Count; i++)
+        {
+            var lane = _lanes[i];
+            if (from == lane[^1] || (Touching(from, lane[^1]) && !_laneOf.ContainsKey(from)))
+            {
+                return (i, false);
+            }
+
+            if (from == lane[0] || (Touching(from, lane[0]) && !_laneOf.ContainsKey(from)))
+            {
+                return (i, true);
+            }
+        }
+
+        return (-1, false);
+    }
+
+    /// <summary>The tiles a drag would add as queue lane, in order, and the lane they would be added to.</summary>
+    private (List<TilePoint> Fresh, int Lane, bool AtStart) LaneDrag(TilePoint from, TilePoint to)
+    {
+        var (lane, atStart) = Joins(from);
+        var fresh = Line(from, to).ToList();
+        if (lane >= 0 && _laneOf.ContainsKey(from))
+        {
+            fresh.RemoveAt(0);
+        }
+
+        return (fresh, lane, atStart);
+    }
+
+    /// <summary>
+    /// Whether a queue lane can be dragged out between two tiles. It needs clear grass, and a tile
+    /// between it and any other stretch of lane so that there is room for the barrier.
+    /// </summary>
+    public BuildCheck CheckLane(TilePoint from, TilePoint to)
+    {
+        var (fresh, lane, atStart) = LaneDrag(from, to);
+        if (fresh.Count == 0)
+        {
+            return BuildCheck.No("There is a queue lane there already.");
+        }
+
+        if (lane < 0 && fresh.Count < ShortestLane)
+        {
+            return BuildCheck.No("Drag further: a queue lane is at least 2 m long.");
+        }
+
+        // The tiles already in the lane nearest the join, which the new ones are allowed to be beside.
+        var chain = lane < 0 ? new List<TilePoint>() : atStart ? _lanes[lane].Take(2).Reverse().ToList() : _lanes[lane].Skip(Math.Max(0, _lanes[lane].Count - 2)).ToList();
+        if (chain.Count > 0 && !Touching(chain[^1], fresh[0]))
+        {
+            return BuildCheck.No("Start from the very end of the lane to carry it on.");
+        }
+
+        foreach (var p in fresh)
+        {
+            if (!TakesLane(p))
+            {
+                return BuildCheck.No("A queue lane can only go on the grass, or on the track up to the field.");
+            }
+
+            if (_fence.ContainsKey(p) || StageAt(p) is not null || GateAt(p) is not null || StallAt(p) is not null || _laneOf.ContainsKey(p))
+            {
+                return BuildCheck.No("Something is already built there.");
+            }
+
+            var allowed = chain.Skip(Math.Max(0, chain.Count - 2)).ToList();
+            foreach (var q in _laneOf.Keys)
+            {
+                if (Near(p, q) && !allowed.Contains(q))
+                {
+                    return BuildCheck.No("Leave a tile between the rows of a queue for the barrier.");
+                }
+            }
+
+            chain.Add(p);
+        }
+
+        return new BuildCheck(true, LaneCost(fresh.Count), null);
+    }
+
+    /// <summary>Lays a queue lane, or carries one on from its end. The barriers either side go up by themselves.</summary>
+    public BuildCheck AddLane(TilePoint from, TilePoint to)
+    {
+        var check = CheckLane(from, to);
+        if (check.Ok)
+        {
+            var (fresh, lane, atStart) = LaneDrag(from, to);
+            if (lane < 0)
+            {
+                _lanes.Add(fresh);
+            }
+            else if (atStart)
+            {
+                fresh.Reverse();
+                _lanes[lane].InsertRange(0, fresh);
+            }
+            else
+            {
+                _lanes[lane].AddRange(fresh);
+            }
+
+            Refresh();
+        }
+
+        return check;
+    }
+
+    private static IEnumerable<TilePoint> Box(TilePoint from, TilePoint to)
+    {
+        for (var y = Math.Min(from.Y, to.Y); y <= Math.Max(from.Y, to.Y); y++)
+        {
+            for (var x = Math.Min(from.X, to.X); x <= Math.Max(from.X, to.X); x++)
+            {
+                yield return new TilePoint(x, y);
+            }
+        }
+    }
+
+    /// <summary>Whether the box between two tiles can be marked "no customers" (or cleared again). It costs nothing.</summary>
+    public BuildCheck CheckKeepOut(TilePoint from, TilePoint to, bool keepOut)
+    {
+        var any = Box(from, to).Any(p => keepOut ? CanKeepClear(p) && !_keepOut.Contains(p) : _keepOut.Contains(p));
+        return any ? new BuildCheck(true, 0, null)
+            : BuildCheck.No(keepOut ? "Customers can only be kept off clear grass." : "No ground here is marked.");
+    }
+
+    private bool CanKeepClear(TilePoint p) => _map[p] == Ground.Grass && IsEmpty(p);
+
+    /// <summary>Marks the box between two tiles "no customers", or clears the mark. Staff still go there.</summary>
+    public BuildCheck SetKeepOut(TilePoint from, TilePoint to, bool keepOut)
+    {
+        var check = CheckKeepOut(from, to, keepOut);
+        if (check.Ok)
+        {
+            foreach (var p in Box(from, to))
+            {
+                if (!keepOut)
+                {
+                    _keepOut.Remove(p);
+                }
+                else if (CanKeepClear(p))
+                {
+                    _keepOut.Add(p);
+                }
+            }
+
+            Refresh();
+        }
+
+        return check;
+    }
+
+    /// <summary>The tiles in a set as straight runs: across first, then whatever is left as runs up and down.</summary>
+    public static List<(int X, int Y, int Length, bool Vertical)> RunsOf(IReadOnlyCollection<TilePoint> tiles)
+    {
+        var runs = new List<(int, int, int, bool)>();
+        var all = tiles as HashSet<TilePoint> ?? new HashSet<TilePoint>(tiles);
+        var used = new HashSet<TilePoint>();
+        var ordered = all.OrderBy(p => p.Y).ThenBy(p => p.X).ToList();
+        foreach (var vertical in new[] { false, true })
+        {
+            var (dx, dy) = vertical ? (0, 1) : (1, 0);
+            foreach (var p in ordered)
+            {
+                if (used.Contains(p))
+                {
+                    continue;
+                }
+
+                var length = 1;
+                for (var q = new TilePoint(p.X + dx, p.Y + dy); !used.Contains(q) && all.Contains(q); q = new TilePoint(q.X + dx, q.Y + dy))
+                {
+                    length++;
+                }
+
+                if (!vertical && length == 1)
+                {
+                    continue;
+                }
+
+                for (var i = 0; i < length; i++)
+                {
+                    used.Add(new TilePoint(p.X + (i * dx), p.Y + (i * dy)));
+                }
+
+                runs.Add((p.X, p.Y, length, vertical));
+            }
+        }
+
+        return runs;
+    }
 
     /// <summary>The middle of the front edge of something in metres, and the way it faces.</summary>
     public static (double X, double Y, int DirX, int DirY) Front(TileRect r, Facing facing)
@@ -190,6 +439,9 @@ public sealed class SiteLayout
 
     private bool IsBuildable(TilePoint p) => _map[p] == Ground.Grass;
 
+    /// <summary>A queue lane can go on the grass, or on a track off the lane (people queue down the track to a gate in the gap).</summary>
+    private bool TakesLane(TilePoint p) => IsBuildable(p) || (_map[p] == Ground.Lane && (_map.Track.Contains(p) || _map.Tracks.Any(t => t.Contains(p))));
+
     private static IEnumerable<TilePoint> TilesOf(TileRect r)
     {
         for (var y = r.Y; y < r.Bottom; y++)
@@ -256,7 +508,7 @@ public sealed class SiteLayout
                 return BuildCheck.No("Fence can only go on the grass.");
             }
 
-            if (StageAt(p) is not null || GateAt(p) is not null || StallAt(p) is not null)
+            if (StageAt(p) is not null || GateAt(p) is not null || StallAt(p) is not null || _laneOf.ContainsKey(p) || _barriers.Contains(p))
             {
                 return BuildCheck.No("Something is already built there.");
             }
@@ -285,7 +537,7 @@ public sealed class SiteLayout
                 return BuildCheck.No("A gate can only go on the grass.");
             }
 
-            if (StageAt(p) is not null || GateAt(p) is not null || StallAt(p) is not null)
+            if (StageAt(p) is not null || GateAt(p) is not null || StallAt(p) is not null || _laneOf.ContainsKey(p) || _barriers.Contains(p))
             {
                 return BuildCheck.No("Something is already built there.");
             }
@@ -359,6 +611,11 @@ public sealed class SiteLayout
             return Catalogue.Of(stall.Kind).Cost;
         }
 
+        if (LaneAt(p) is >= 0 and var lane && !_fence.ContainsKey(p))
+        {
+            return LaneCost(_lanes[lane].Count);
+        }
+
         return _fence.TryGetValue(p, out var kind) ? FenceCost(kind, FenceRunThrough(p).Count) : 0;
     }
 
@@ -405,6 +662,10 @@ public sealed class SiteLayout
             {
                 _fence.Remove(q);
             }
+        }
+        else if (LaneAt(p) is >= 0 and var lane)
+        {
+            _lanes.RemoveAt(lane);
         }
         else
         {
@@ -468,7 +729,9 @@ public sealed class SiteLayout
         return (x + (use.OutX * metresOut), y + (use.OutY * metresOut));
     }
 
-    public SiteSave Save() => new(_stages.ToList(), _gates.ToList(), FenceRuns(), _stalls.ToList());
+    public SiteSave Save() => new(_stages.ToList(), _gates.ToList(), FenceRuns(), _stalls.ToList(),
+        _lanes.Count == 0 ? null : _lanes.Select(l => l.ToList()).ToList(),
+        _keepOut.Count == 0 ? null : RunsOf(_keepOut).Select(r => r.Vertical ? new TileRect(r.X, r.Y, 1, r.Length) : new TileRect(r.X, r.Y, r.Length, 1)).ToList());
 
     /// <summary>Puts back a saved layout, skipping anything that no longer fits.</summary>
     public void Restore(SiteSave save)
@@ -477,6 +740,10 @@ public sealed class SiteLayout
         _gates.Clear();
         _fence.Clear();
         _stalls.Clear();
+        _lanes.Clear();
+        _laneOf.Clear();
+        _barriers.Clear();
+        _keepOut.Clear();
         foreach (var s in save.Stages ?? new())
         {
             if (CheckStage(s.Kind, s.X, s.Y, s.Facing).Ok)
@@ -518,13 +785,39 @@ public sealed class SiteLayout
             }
         }
 
+        foreach (var lane in save.Lanes ?? new())
+        {
+            if (lane.Count >= 2 && Enumerable.Range(1, lane.Count - 1).All(i => Touching(lane[i - 1], lane[i])) && lane.All(p => TakesLane(p) && IsEmpty(p)))
+            {
+                _lanes.Add(lane.ToList());
+                foreach (var p in lane)
+                {
+                    _laneOf[p] = _lanes.Count - 1;
+                }
+            }
+        }
+
+        foreach (var r in save.KeepOut ?? new())
+        {
+            foreach (var p in TilesOf(r))
+            {
+                if (_map.InBounds(p.X, p.Y) && _map[p] == Ground.Grass)
+                {
+                    _keepOut.Add(p);
+                }
+            }
+        }
+
         Refresh();
     }
 
     /// <summary>Works out again what is blocked and which ground is inside the gates.</summary>
     private void Refresh()
     {
-        _map.SetBlocked(_stages.SelectMany(s => TilesOf(s.Rect)).Concat(_stalls.SelectMany(s => TilesOf(s.Rect))).Concat(_fence.Keys));
+        LayBarriers();
+        _keepOut.RemoveWhere(p => _fence.ContainsKey(p) || StageAt(p) is not null || StallAt(p) is not null || GateAt(p) is not null || _laneOf.ContainsKey(p) || _barriers.Contains(p));
+        _map.SetBlocked(_stages.SelectMany(s => TilesOf(s.Rect)).Concat(_stalls.SelectMany(s => TilesOf(s.Rect))).Concat(_fence.Keys).Concat(_laneOf.Keys).Concat(_barriers));
+        _map.SetStaffOnly(_keepOut);
 
         var width = _map.Width;
         _sides = new Side[width * _map.Height];
@@ -555,6 +848,51 @@ public sealed class SiteLayout
         HasWorkingGate = _gateUses.Any(u => u.InUse);
         OpenWayIn = !HasWorkingGate && TilesOf(_map.Field).Any(p => SideOf(p) == Side.Outside);
         Changed?.Invoke();
+    }
+
+    /// <summary>
+    /// Works out where the barriers of the queue lanes stand: on every tile round a lane, leaving
+    /// both ends open. Two rows of a lane a tile apart share the barrier between them.
+    /// </summary>
+    private void LayBarriers()
+    {
+        _laneOf.Clear();
+        _barriers.Clear();
+        for (var i = 0; i < _lanes.Count; i++)
+        {
+            foreach (var p in _lanes[i])
+            {
+                _laneOf[p] = i;
+            }
+        }
+
+        foreach (var lane in _lanes)
+        {
+            var open = new HashSet<TilePoint>();
+            foreach (var (end, next) in new[] { (lane[0], lane[Math.Min(1, lane.Count - 1)]), (lane[^1], lane[Math.Max(0, lane.Count - 2)]) })
+            {
+                var (ex, ey) = (end.X - next.X, end.Y - next.Y);
+                for (var side = -1; side <= 1; side++)
+                {
+                    open.Add(new TilePoint(end.X + ex - (ey * side), end.Y + ey + (ex * side)));
+                }
+            }
+
+            foreach (var p in lane)
+            {
+                for (var dy = -1; dy <= 1; dy++)
+                {
+                    for (var dx = -1; dx <= 1; dx++)
+                    {
+                        var q = new TilePoint(p.X + dx, p.Y + dy);
+                        if (!_laneOf.ContainsKey(q) && !open.Contains(q) && TakesLane(q) && StageAt(q) is null && StallAt(q) is null && GateAt(q) is null && !_fence.ContainsKey(q))
+                        {
+                            _barriers.Add(q);
+                        }
+                    }
+                }
+            }
+        }
     }
 
     private void Flood(IEnumerable<TilePoint> from, Side side, HashSet<TilePoint> gateTiles)
@@ -592,4 +930,5 @@ public sealed class SiteLayout
 }
 
 /// <summary>The layout as written to a save file.</summary>
-public sealed record SiteSave(List<PlacedStage>? Stages, List<PlacedGate>? Gates, List<FenceRun>? Fences, List<PlacedStall>? Stalls = null);
+public sealed record SiteSave(List<PlacedStage>? Stages, List<PlacedGate>? Gates, List<FenceRun>? Fences, List<PlacedStall>? Stalls = null,
+    List<List<TilePoint>>? Lanes = null, List<TileRect>? KeepOut = null);

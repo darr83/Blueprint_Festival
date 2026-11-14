@@ -41,9 +41,17 @@ public sealed class PathFinder
     private readonly int[] _searched;
     private int _search;
 
-    public PathFinder(FieldMap map)
+    private readonly bool _staff;
+
+    private bool Walkable(int x, int y) => _staff ? _map.IsWalkableForStaff(x, y) : _map.IsWalkable(x, y);
+
+    private bool Walkable(TilePoint p) => Walkable(p.X, p.Y);
+
+    /// <summary>A route finder for the public, or for staff, who can also cross ground the public are kept off.</summary>
+    public PathFinder(FieldMap map, bool staff = false)
     {
         _map = map;
+        _staff = staff;
         _crowding = new float[map.Width * map.Height];
         _cost = new double[_crowding.Length];
         _cameFrom = new int[_crowding.Length];
@@ -122,7 +130,7 @@ public sealed class PathFinder
         {
             for (var x = 0; x < map.Width; x++)
             {
-                if (map.IsWalkable(x, y))
+                if (Walkable(x, y))
                 {
                     _crowding[(y * map.Width) + x] = Clearance(x, y) switch { 1 => 2.0f, 2 => 0.8f, 3 => 0.3f, _ => 0f };
                 }
@@ -139,7 +147,7 @@ public sealed class PathFinder
             {
                 for (var dx = -r; dx <= r; dx++)
                 {
-                    if (Math.Max(Math.Abs(dx), Math.Abs(dy)) == r && !_map.IsWalkable(x + dx, y + dy))
+                    if (Math.Max(Math.Abs(dx), Math.Abs(dy)) == r && !Walkable(x + dx, y + dy))
                     {
                         return r;
                     }
@@ -157,7 +165,7 @@ public sealed class PathFinder
     /// </summary>
     public List<TilePoint>? FindPath(TilePoint from, TilePoint to, bool keepToPaths = false)
     {
-        if (!_map.IsWalkable(from) || !_map.IsWalkable(to))
+        if (!Walkable(from) || !Walkable(to))
         {
             return null;
         }
@@ -214,7 +222,7 @@ public sealed class PathFinder
         foreach (var p in _pathPoints)
         {
             var score = (OffPath * Estimate(from.X, from.Y, p)) + Estimate(p.X, p.Y, to);
-            if (score < best && _map.IsWalkable(p))
+            if (score < best && Walkable(p))
             {
                 (best, join) = (score, p);
             }
@@ -229,7 +237,7 @@ public sealed class PathFinder
         foreach (var p in _pathPoints)
         {
             var score = Estimate(j.X, j.Y, p) + (OffPath * Estimate(p.X, p.Y, to));
-            if (score < best && _map.IsWalkable(p))
+            if (score < best && Walkable(p))
             {
                 (best, leave) = (score, p);
             }
@@ -307,12 +315,12 @@ public sealed class PathFinder
             {
                 var nx = cx + dx;
                 var ny = cy + dy;
-                if (!_map.IsWalkable(nx, ny))
+                if (!Walkable(nx, ny))
                 {
                     continue;
                 }
 
-                if (dx != 0 && dy != 0 && (!_map.IsWalkable(cx + dx, cy) || !_map.IsWalkable(cx, cy + dy)))
+                if (dx != 0 && dy != 0 && (!Walkable(cx + dx, cy) || !Walkable(cx, cy + dy)))
                 {
                     continue; // no cutting corners
                 }
@@ -377,7 +385,7 @@ public sealed class PathFinder
         {
             // Close to either end the line may brush past something: that is where it is going.
             var nearEnd = Math.Max(Math.Abs(x - from.X), Math.Abs(y - from.Y)) <= EndReach || Math.Max(Math.Abs(x - to.X), Math.Abs(y - to.Y)) <= EndReach;
-            if (!_map.IsWalkable(x, y) || (!nearEnd && _crowding[(y * width) + x] != 0))
+            if (!Walkable(x, y) || (!nearEnd && _crowding[(y * width) + x] != 0))
             {
                 return false;
             }
@@ -390,7 +398,7 @@ public sealed class PathFinder
             var twice = 2 * error;
             var stepX = twice > -dy;
             var stepY = twice < dx;
-            if (stepX && stepY && (!_map.IsWalkable(x + sx, y) || !_map.IsWalkable(x, y + sy)))
+            if (stepX && stepY && (!Walkable(x + sx, y) || !Walkable(x, y + sy)))
             {
                 return false; // no cutting corners
             }

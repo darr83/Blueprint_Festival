@@ -42,6 +42,7 @@ brands or sponsors.
 | 17. Dancing to the beat: each song's beat is worked out once and saved beside it, and the crowd dances in time to it, with a move for each sort of music | Done |
 | 18a. Proper queues: people stand one behind the next at gates and stalls, long queues bend and fold back instead of piling up, each person holds up a ticket at the gate, and a stall has one queue with each server taking the next party | Done |
 | 18b. Toilets: one queue for each set of cabins, each person walks to a free cubicle, the door swings open and shuts behind them, the sign turns red while they are inside and green when they come out, and they wait nearby for the rest of their party | Done |
+| 18c. Queue lanes and staff-only ground: drag a queue along the ground for a gate, a stall or the toilets and the barriers go up either side by themselves, round corners too; and mark ground "no customers", which the public walk round, staff do not, and which only shows while you are marking it | Done |
 
 ## Controls
 
@@ -183,7 +184,7 @@ crowd at the stage that is not being heard dances to that too.
 - `godot --path game -- --people-shots=DIR` writes line-up pictures of the people.
 - `godot --path game -- --sales-shots=DIR` writes pictures of the planning and ticket sales screens.
 - `godot --path game -- --path-shots=DIR` writes pictures of paths and the camping field.
-- `godot --path game -- --queue-shots=DIR` writes pictures of the queues at gates and stalls.
+- `godot --path game -- --queue-shots=DIR` writes pictures of the queues at gates, stalls and toilets, of queue lanes, and of ground marked "no customers".
 
 The tests and the launch test run on every pull request.
 

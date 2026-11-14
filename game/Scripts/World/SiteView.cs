@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using BlueprintFestival.Simulation;
 using BlueprintFestival.Simulation.Site;
 using BlueprintFestival.Simulation.World;
@@ -25,6 +26,9 @@ public partial class SiteView : Node3D
 
     /// <summary>How many stalls are drawn.</summary>
     public int StallCount { get; private set; }
+
+    /// <summary>How many queue lanes have their barriers drawn.</summary>
+    public int LaneCount { get; private set; }
 
     /// <summary>How many straight runs of fence are drawn.</summary>
     public int FenceRunCount { get; private set; }
@@ -97,6 +101,29 @@ public partial class SiteView : Node3D
         SiteProps.AddFence(builder, run.Kind, from, to);
     }
 
+    /// <summary>
+    /// Adds one straight run of queue barrier down the middle of its tiles. Where a run across meets
+    /// a run up and down, the two are joined at the corner instead of crossing or stopping short.
+    /// </summary>
+    public static void AddBarrier(MeshBuilder builder, SiteLayout site, int x, int y, int length, bool vertical)
+    {
+        bool Has(int tx, int ty) => site.IsBarrier(new TilePoint(tx, ty));
+        Vector3 from, to;
+        if (vertical)
+        {
+            from = new Vector3((x + 0.5f) * T, 0, (y - (Has(x, y - 1) ? 0.5f : 0f)) * T);
+            to = new Vector3((x + 0.5f) * T, 0, (y + length + (Has(x, y + length) ? 0.5f : 0f)) * T);
+        }
+        else
+        {
+            bool Corner(int tx) => Has(tx, y - 1) || Has(tx, y + 1);
+            from = new Vector3((x + (Corner(x) ? 0.5f : 0f)) * T, 0, (y + 0.5f) * T);
+            to = new Vector3((x + length - (Corner(x + length - 1) ? 0.5f : 0f)) * T, 0, (y + 0.5f) * T);
+        }
+
+        SiteProps.AddFence(builder, FenceKind.CrowdBarrier, from, to);
+    }
+
     public void Rebuild()
     {
         _stale = false;
@@ -161,6 +188,21 @@ public partial class SiteView : Node3D
 
             AddChild(builder.BuildNode("Fences"));
         }
+
+        // The barriers down both sides of every queue lane.
+        var barriers = site.LaneBarriers;
+        if (barriers.Count > 0)
+        {
+            var builder = new MeshBuilder();
+            foreach (var (x, y, length, vertical) in SiteLayout.RunsOf(barriers))
+            {
+                AddBarrier(builder, site, x, y, length, vertical);
+            }
+
+            AddChild(builder.BuildNode("QueueBarriers"));
+        }
+
+        LaneCount = site.Lanes.Count;
 
         Doors(0, snap: true);
         StageCount = site.Stages.Count;
