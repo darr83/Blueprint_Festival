@@ -153,7 +153,7 @@ public static class Catalogue
     };
 
     /// <summary>The festival's share of what a stall takes, in pounds out of every hundred.</summary>
-    public const int PitchShare = 30;
+    public const int PitchShare = 25;
 
     /// <summary>What one person pays at the gate.</summary>
     public const int TicketPrice = 5;

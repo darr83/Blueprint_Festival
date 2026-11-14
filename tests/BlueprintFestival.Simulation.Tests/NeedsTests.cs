@@ -105,8 +105,8 @@ public class NeedsTests
         // The stallholders keep most of it: the festival's share is 30p in the pound.
         var van = game.Income.Single(l => l.What == "Food van").Amount;
         var bar = game.Income.Single(l => l.What == "Bar tent").Amount;
-        Assert.InRange(van, served[StallKind.FoodVan] * 6 * 0.27, served[StallKind.FoodVan] * 6 * 0.33);
-        Assert.InRange(bar, served[StallKind.Bar] * 4 * 0.27, served[StallKind.Bar] * 4 * 0.33);
+        Assert.InRange(van, served[StallKind.FoodVan] * 6 * 0.22, served[StallKind.FoodVan] * 6 * 0.28);
+        Assert.InRange(bar, served[StallKind.Bar] * 4 * 0.22, served[StallKind.Bar] * 4 * 0.28);
         Assert.DoesNotContain(game.Income, l => l.What is "Toilets" or "Water point");
         Assert.Equal(van + bar, game.TotalIncome);
         Assert.Equal(FestivalGame.StartingMoney - game.TotalSpending + game.TotalIncome, game.Money);

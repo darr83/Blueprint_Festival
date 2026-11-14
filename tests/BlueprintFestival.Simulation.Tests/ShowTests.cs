@@ -174,7 +174,8 @@ public class ShowTests
         Assert.Equal(0, game.Crowd.Watching);
         game.Show.Book(1, game.Show.At(2));
         RunUntil(game, 16.8);
-        Assert.True(game.Crowd.Watching > 10);
+        // With nothing to eat or drink on this bare field some have gone home by now, but those left come back.
+        Assert.True(game.Crowd.Watching > 5);
         Assert.All(game.Crowd.Parties.Where(p => p.State == PartyState.Watching), p => Assert.Equal(1, p.Watch));
     }
 

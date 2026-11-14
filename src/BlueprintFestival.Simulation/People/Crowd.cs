@@ -212,6 +212,18 @@ public sealed class Crowd
     /// <summary>How people feel when they walk in.</summary>
     public const double StartingMood = 0.65;
 
+    /// <summary>Mood gained in an hour of watching an act, by its stars: a five star act is worth about three times a one star act.</summary>
+    public static double Enjoyed(int stars) => 0.004 + (0.006 * Math.Clamp(stars, 1, 5));
+
+    /// <summary>Sets the mood everyone arrives in, before the gates open.</summary>
+    public void ArriveFeeling(double mood)
+    {
+        foreach (var party in _parties)
+        {
+            party.Mood = Math.Clamp(mood, 0, 1);
+        }
+    }
+
     /// <summary>The level at which a need sends someone to look for a stall, and the level at which it shows and starts to spoil their day.</summary>
     public const double Seeking = 0.6;
     public const double Pressing = 0.85;
@@ -1113,7 +1125,7 @@ public sealed class Crowd
         party.Thirst = Math.Min(1.2, party.Thirst + (party.Appetite * Heat * perHour / HoursToThirsty));
         party.Toilet = Math.Min(1.2, party.Toilet + (party.Appetite * perHour / HoursToToilet));
 
-        var change = party.State == PartyState.Watching ? 0.05 * perHour : 0;
+        var change = party.State == PartyState.Watching ? Enjoyed(ShowOf(party.Watch)?.Playing(now)?.Act.Rating ?? 3) * perHour : 0;
         foreach (var need in new[] { party.Hunger, party.Thirst, party.Toilet })
         {
             if (need >= Pressing)
@@ -1328,7 +1340,7 @@ public sealed class Crowd
 
             var paid = info.Price * party.Members.Count;
             party.Spent += paid;
-            party.Mood = Math.Min(1, party.Mood + 0.012);
+            party.Mood = Math.Min(1, party.Mood + 0.006);
             party.State = PartyState.Standing;
             party.RetryAt = default;
             party.WaitUntil = now + TimeSpan.FromMinutes(party.Random.Between(1, 5));

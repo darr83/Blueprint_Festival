@@ -36,6 +36,7 @@ brands or sponsors.
 | 12. Artists and music: 25 made-up artists with a genre, a rating and a following, and a folder each for their songs | Done (songs are added to `game/Music`) |
 | 13. Selling tickets: book every set yourself in January, advertise and sell month by month, then build week with the last tickets sold day by day | Done |
 | 14. Paths and a scattered campsite: mown, bark chip and gravel paths that about half the crowd keeps to (most on a wet day), and tents dotted about a bigger camping field | Done |
+| 15. Balance: dear tickets sell far fewer and put people in a worse mood, the last tickets are the hardest to sell, better acts lift the mood more, the festival keeps a quarter of stall takings, and the council wants £5 a head in the bank before a bigger field | Done |
 
 ## Controls
 
@@ -104,11 +105,14 @@ The volume sliders are in the pause menu (Esc) and on the main menu, and are rem
   off (15 of them, from posters in shop windows to national TV), change the price if you like, and
   run the month. Adverts decide how many people hear about the festival. The line-up and the price
   decide how many of them buy: more stars and more fans sell more, a price above what the line-up
-  is worth sells slowly, and a price below it sells fast. A festival people enjoyed last year sells
+  is worth sells much more slowly, and a price below it sells fast. The keenest people buy first, so
+  the last few hundred tickets take the most selling. A festival people enjoyed last year sells
   more by word of mouth. Sales speed up as July comes.
 - **July, build week.** You lay out the field. Ending each of the seven days sells that day's
   tickets, and the price can still change.
-- **The day.** The crowd is the people who bought a ticket.
+- **The day.** The crowd is the people who bought a ticket. They arrive pleased if the ticket was a bargain
+  and expecting a lot if it was dear, and a five star act lifts the mood about three times as much
+  as a one star act.
 
 The rules are in `src/BlueprintFestival.Simulation/FestivalGame.Sales.cs` and
 `Sales/Adverts.cs`.
