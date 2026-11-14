@@ -142,10 +142,10 @@ public partial class CampView : Node3D
         {
             var (pitch, party) = tents[i];
             var (x, z) = FieldMap.CentreOf(pitch);
-            // Each tent is turned a little and is a little bigger or smaller, the same way every time.
-            // Doors face the path in from the gateway, more or less.
-            var turn = Mathf.Pi / 2 + ((((party * 37) % 50) - 25) * 0.012f);
-            var size = 0.74f + (((party * 13) % 30) * 0.008f);
+            // Each tent faces whichever way its campers liked and is a little bigger or smaller, the
+            // same way every time, so the field looks pitched by hand and not laid out in rows.
+            var turn = (((pitch.X * 7919) + (pitch.Y * 104729) + (party * 37)) % 360) * Mathf.Pi / 180f;
+            var size = 0.7f + (((party * 13) % 25) * 0.008f);
             var basis = new Basis(Vector3.Up, turn).Scaled(new Vector3(size, size, size));
             mesh.SetInstanceTransform(i, new Transform3D(basis, new Vector3((float)x, 0.02f, (float)z)));
             mesh.SetInstanceColor(i, Colours[(party * 7) % Colours.Length].SrgbToLinear());

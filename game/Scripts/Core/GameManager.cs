@@ -78,6 +78,10 @@ public partial class GameManager : Node
             {
                 AddChild(new SoundShots(arg["--sound-shots=".Length..]) { Name = "SoundShots" });
             }
+            else if (arg.StartsWith("--path-shots=", StringComparison.Ordinal))
+            {
+                AddChild(new PathShots(arg["--path-shots=".Length..]) { Name = "PathShots" });
+            }
             else if (arg.StartsWith("--camp-shots=", StringComparison.Ordinal))
             {
                 AddChild(new CampShots(arg["--camp-shots=".Length..]) { Name = "CampShots" });

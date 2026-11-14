@@ -70,7 +70,7 @@ public partial class BuildBar : VBoxContainer
         AddTab(row, BuildMode.Gate, "Gates", "Where tickets are checked");
         AddTab(row, BuildMode.Stall, "Stalls", "Food, drink, toilets and water");
         AddTab(row, BuildMode.Staff, "Staff", "Ticket staff, security and first aid");
-        AddTab(row, BuildMode.Ground, "Ground", "Straw and trackway, to keep feet out of the mud");
+        AddTab(row, BuildMode.Ground, "Ground", "Straw, trackway and paths, to keep feet out of the mud");
         AddTab(row, BuildMode.Remove, "Take down", "Remove something and get the money back");
 
         SetAnchorsAndOffsetsPreset(LayoutPreset.BottomWide, LayoutPresetMode.Minsize, 14);
@@ -154,6 +154,12 @@ public partial class BuildBar : VBoxContainer
                     "Scattered on wet ground it soaks up most of the mud. It can go down on the day, once you see where the mud is.\nA patch is 2 m square.", () => _tool.PickGround(GroundKind.Straw));
                 AddChoice($"ground{GroundKind.Trackway}", "Trackway", $"£{FestivalGame.CostOf(GroundKind.Trackway)} a patch",
                     "Metal panels. No mud at all, and the grass underneath comes to no harm.\nA patch is 2 m square.", () => _tool.PickGround(GroundKind.Trackway));
+                AddChoice($"ground{GroundKind.MownPath}", "Mown path", $"£{FestivalGame.CostOf(GroundKind.MownPath)} per 2 m",
+                    "A strip of grass cut short. Shows people the way, but it is still grass: it wears and goes to mud like any other.\nDrag to lay it, 2 m wide.", () => _tool.PickGround(GroundKind.MownPath));
+                AddChoice($"ground{GroundKind.BarkChip}", "Bark chip path", $"£{FestivalGame.CostOf(GroundKind.BarkChip)} per 2 m",
+                    "Soft underfoot. Soaks up most of the mud and saves the grass.\nDrag to lay it, 2 m wide.", () => _tool.PickGround(GroundKind.BarkChip));
+                AddChoice($"ground{GroundKind.Gravel}", "Gravel path", $"£{FestivalGame.CostOf(GroundKind.Gravel)} per 2 m",
+                    "Rolled gravel. Hardly any mud and hardly any wear.\nDrag to lay it, 2 m wide.", () => _tool.PickGround(GroundKind.Gravel));
                 break;
             case BuildMode.Remove:
                 _tool.PickRemove();

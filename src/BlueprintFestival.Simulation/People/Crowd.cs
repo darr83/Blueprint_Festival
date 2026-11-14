@@ -275,6 +275,26 @@ public sealed class Crowd
     /// <summary>How muddy the ground is at a place in metres, from 0 to 1. Left unset, the ground is firm.</summary>
     public Func<double, double, double>? Mud { get; set; }
 
+    /// <summary>The share of people who keep to the paths on a dry day. The rest cut across the grass.</summary>
+    public const double DryPathShare = 0.55;
+
+    /// <summary>The share of people who keep to the paths just now: more of them do once the grass is wet.</summary>
+    public double PathShare { get; set; } = DryPathShare;
+
+    /// <summary>True once any path has been laid.</summary>
+    public bool HasPaths => _paths.HasPaths;
+
+    /// <summary>Says which tiles have a path on them.</summary>
+    public void SetPaths(IEnumerable<TilePoint> tiles) => _paths.SetPaths(tiles);
+
+    /// <summary>
+    /// Whether a party keeps to the paths. Each party has its own fixed liking for paths, so the same
+    /// people always keep to them, and more join them as the share grows on a wet day.
+    /// </summary>
+    public bool KeepsToPaths(Party party) => (uint)(party.Id * 2246822519u) % 1000 < PathShare * 1000;
+
+    private List<TilePoint>? Route(Party party, TilePoint from, TilePoint to) => _paths.FindPath(from, to, KeepsToPaths(party));
+
     /// <summary>Whether people have dressed for a wet day: wellies, and a rain poncho for about half of them.</summary>
     public bool DressedForRain { get; set; }
 
@@ -789,7 +809,7 @@ public sealed class Crowd
             _queues[best][bestLane].Add(party);
             var (x, y) = QueuePlace(best, bestLane, bestLength);
             party.Target = FieldMap.TileAt(x, y);
-            party.Path = _paths.FindPath(FieldMap.TileAt(party.X, party.Y), party.Target);
+            party.Path = Route(party, FieldMap.TileAt(party.X, party.Y), party.Target);
             party.PathIndex = 0;
             party.Moving = party.Path is not null;
             return;
@@ -798,7 +818,7 @@ public sealed class Crowd
         // No way in at all: wait on the track by the hedge and look again in a couple of minutes.
         var track = _map.Track;
         party.Target = new TilePoint(track.X + 1 + (party.Id * 7 % (track.Width - 2)), track.Y + 2 + (party.Id * 5 % (track.Height - 4)));
-        party.Path = _paths.FindPath(FieldMap.TileAt(party.X, party.Y), party.Target);
+        party.Path = Route(party, FieldMap.TileAt(party.X, party.Y), party.Target);
         party.PathIndex = 0;
         party.ServiceLeft = 120;
         party.Moving = party.Path is not null;
@@ -1180,7 +1200,7 @@ public sealed class Crowd
         }
 
         var place = StallPlace(best, bestLane, _stallQueues[best][bestLane].Count);
-        var path = _paths.FindPath(FieldMap.TileAt(party.X, party.Y), FieldMap.TileAt(place.X, place.Y));
+        var path = Route(party, FieldMap.TileAt(party.X, party.Y), FieldMap.TileAt(place.X, place.Y));
         if (path is null)
         {
             // Cannot get there (fenced off, perhaps): try again in a while.
@@ -1677,7 +1697,7 @@ public sealed class Crowd
         var from = FieldMap.TileAt(party.X, party.Y);
         party.Target = target ?? from;
         if (state == PartyState.Leaving && target is not null && target != party.Pitch && WayOut(party, from) is { } gate
-            && _paths.FindPath(from, gate) is { } toGate && _paths.FindPath(gate, target.Value) is { } onward)
+            && Route(party, from, gate) is { } toGate && Route(party, gate, target.Value) is { } onward)
         {
             // Going home, people use the whole width of every gate instead of all cutting the same corner.
             toGate.AddRange(onward);
@@ -1685,7 +1705,7 @@ public sealed class Crowd
         }
         else
         {
-            party.Path = target is null ? null : _paths.FindPath(from, target.Value);
+            party.Path = target is null ? null : Route(party, from, target.Value);
         }
 
         party.PathIndex = 0;

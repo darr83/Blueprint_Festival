@@ -6,7 +6,7 @@ using Godot;
 namespace BlueprintFestival.World;
 
 /// <summary>
-/// Draws the rain coming down, and the straw and trackway laid on the grass. The mud itself is
+/// Draws the rain coming down, and the straw, trackway and paths laid on the grass. The mud itself is
 /// drawn with the worn grass, by <see cref="LitterView"/>.
 /// </summary>
 public partial class WeatherView : Node3D
@@ -19,6 +19,15 @@ public partial class WeatherView : Node3D
     private static readonly Color StrawDark = new("#C9A94F");
     private static readonly Color Trackway = new("#AEB5BB");
     private static readonly Color TrackwayDark = new("#8C949B");
+    private static readonly Color Mown = new("#8DC673");
+    private static readonly Color MownStripe = new("#7DB866");
+    private static readonly Color Bark = new("#7A5234");
+    private static readonly Color BarkLight = new("#9A6C45");
+    private static readonly Color BarkDark = new("#5C3C25");
+    private static readonly Color Gravel = new("#CFC6B4");
+    private static readonly Color GravelDark = new("#A99F8C");
+    private static readonly Color Edging = new("#8A6A45");
+    private static readonly Color Meadow = new("#4F8A41");
 
     private FestivalGame _game = null!;
     private MultiMeshInstance3D _rain = null!;
@@ -167,7 +176,11 @@ public partial class WeatherView : Node3D
 
                 var x = (f.X * (float)FieldMap.TileMetres) + ((column + 0.5f) * size);
                 var z = (f.Y * (float)FieldMap.TileMetres) + ((row + 0.5f) * size);
-                if (kind == GroundKind.Trackway)
+                if (kind is GroundKind.MownPath or GroundKind.BarkChip or GroundKind.Gravel)
+                {
+                    DrawPath(b, kind, column, row, x, z, size);
+                }
+                else if (kind == GroundKind.Trackway)
                 {
                     // Two metal panels side by side, with ribs across them for grip.
                     b.Box(new Vector3(x, 0.03f, z), new Vector3(size - 0.04f, 0.06f, size - 0.04f), Trackway);
@@ -194,5 +207,76 @@ public partial class WeatherView : Node3D
         _cover = b.BuildNode("GroundCover");
         _cover.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
         AddChild(_cover);
+    }
+
+    /// <summary>True if the patch next door has a path on it too, so the two join up without an edge.</summary>
+    private bool Joins(int column, int row) =>
+        column >= 0 && row >= 0 && column < _game.WearColumns && row < _game.WearRows && _game.GroundAt(column, row) is { } next && next != GroundKind.Straw;
+
+    /// <summary>
+    /// One 2 m patch of path. Patches of the same path run into each other; where a path stops, or
+    /// turns, its side gets an edge: a ragged line of longer grass for a mown path, a low board for
+    /// bark and gravel.
+    /// </summary>
+    private void DrawPath(MeshBuilder b, GroundKind kind, int column, int row, float x, float z, float size)
+    {
+        var (bottom, top) = kind switch
+        {
+            GroundKind.MownPath => (Mown, MownStripe),
+            GroundKind.BarkChip => (Bark, BarkDark),
+            _ => (Gravel, GravelDark),
+        };
+        var height = kind == GroundKind.MownPath ? 0.012f : 0.035f;
+        b.Box(new Vector3(x, height / 2, z), new Vector3(size, height, size), bottom);
+
+        // The look of the surface: mower stripes, chips lying every way, or a sprinkle of darker stones.
+        bool Same(int c) => c >= 0 && c < _game.WearColumns && _game.GroundAt(c, row) == kind;
+        var across = Same(column - 1) || Same(column + 1);
+        if (kind == GroundKind.MownPath)
+        {
+            b.Box(new Vector3(x, height + 0.002f, z), across ? new Vector3(size, 0.004f, size / 2) : new Vector3(size / 2, 0.004f, size), top);
+        }
+        else
+        {
+            var pieces = kind == GroundKind.BarkChip ? 14 : 18;
+            for (var i = 0; i < pieces; i++)
+            {
+                var pick = (column * 73) + (row * 151) + (i * 97);
+                var dx = ((((pick * 37) % 100) / 100f) - 0.5f) * (size - 0.2f);
+                var dz = ((((pick * 61) % 100) / 100f) - 0.5f) * (size - 0.2f);
+                var colour = kind == GroundKind.BarkChip ? (i % 2 == 0 ? BarkDark : BarkLight) : GravelDark;
+                var piece = kind == GroundKind.BarkChip ? new Vector3(0.22f, 0.02f, 0.08f) : new Vector3(0.07f, 0.02f, 0.07f);
+                b.Box(new Vector3(x + dx, height + 0.008f, z + dz), piece, colour, new Vector3(0, pick * 23 % 180, 0));
+            }
+        }
+
+        // The edges where the path stops.
+        var edge = kind == GroundKind.MownPath ? Meadow : Edging;
+        var lip = kind == GroundKind.MownPath ? 0.03f : 0.08f;
+        var thick = kind == GroundKind.MownPath ? 0.12f : 0.06f;
+        void Edge(float ex, float ez, bool alongX)
+        {
+            b.Box(new Vector3(ex, lip / 2, ez), alongX ? new Vector3(size, lip, thick) : new Vector3(thick, lip, size), edge);
+        }
+
+        if (!Joins(column, row - 1))
+        {
+            Edge(x, z - (size / 2), true);
+        }
+
+        if (!Joins(column, row + 1))
+        {
+            Edge(x, z + (size / 2), true);
+        }
+
+        if (!Joins(column - 1, row))
+        {
+            Edge(x - (size / 2), z, false);
+        }
+
+        if (!Joins(column + 1, row))
+        {
+            Edge(x + (size / 2), z, false);
+        }
     }
 }
