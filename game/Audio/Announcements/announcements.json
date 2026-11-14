@@ -1,0 +1,455 @@
+{
+  "about": "Announcements over the PA a few minutes before each act goes on. Two for each artist; made by tools/make_announcements.py.",
+  "announcements": [
+    {
+      "id": "intro_marnie_thrupp_1",
+      "artist": "Marnie Thrupp",
+      "take": 1,
+      "voice": "JBFqnCBsd6RMkjVDRZzb",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Ladies and gentlemen, in just a few minutes, please welcome a country solo artist... Marnie Thrupp!"
+    },
+    {
+      "id": "intro_marnie_thrupp_2",
+      "artist": "Marnie Thrupp",
+      "take": 2,
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Hello, festival! Grab a drink and come on over, because Marnie Thrupp is on in a few minutes. A country solo artist!"
+    },
+    {
+      "id": "intro_odell_ashby_1",
+      "artist": "Odell Ashby",
+      "take": 1,
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Get yourselves down to the front! Coming up shortly, a pop solo artist. It's Odell Ashby!"
+    },
+    {
+      "id": "intro_odell_ashby_2",
+      "artist": "Odell Ashby",
+      "take": 2,
+      "voice": "onwK4e9ZLuTAKqWW03F9",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Are you ready? It's a pop solo artist, on this stage very soon. Give a big welcome to Odell Ashby!"
+    },
+    {
+      "id": "intro_wren_hallows_1",
+      "artist": "Wren Hallows",
+      "take": 1,
+      "voice": "onwK4e9ZLuTAKqWW03F9",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Not long now, everyone. Next on stage, a rock solo artist: Wren Hallows!"
+    },
+    {
+      "id": "intro_wren_hallows_2",
+      "artist": "Wren Hallows",
+      "take": 2,
+      "voice": "JBFqnCBsd6RMkjVDRZzb",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Don't go anywhere! In just a few minutes, a rock solo artist. Here comes Wren Hallows!"
+    },
+    {
+      "id": "intro_tobias_pell_1",
+      "artist": "Tobias Pell",
+      "take": 1,
+      "voice": "JBFqnCBsd6RMkjVDRZzb",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Can I have your attention, please! In a few minutes, give it up for a country solo artist, Tobias Pell!"
+    },
+    {
+      "id": "intro_tobias_pell_2",
+      "artist": "Tobias Pell",
+      "take": 2,
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Right then, folks! Your next act is a country solo artist. Make some noise for Tobias Pell!"
+    },
+    {
+      "id": "intro_salt_and_bramble_1",
+      "artist": "Salt and Bramble",
+      "take": 1,
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Ladies and gentlemen, in just a few minutes, please welcome a pop duo... Salt and Bramble!"
+    },
+    {
+      "id": "intro_salt_and_bramble_2",
+      "artist": "Salt and Bramble",
+      "take": 2,
+      "voice": "onwK4e9ZLuTAKqWW03F9",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Hello, festival! Grab a drink and come on over, because Salt and Bramble are on in a few minutes. A pop duo!"
+    },
+    {
+      "id": "intro_paper_magpies_1",
+      "artist": "Paper Magpies",
+      "take": 1,
+      "voice": "onwK4e9ZLuTAKqWW03F9",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Get yourselves down to the front! Coming up shortly, a pop duo. It's Paper Magpies!"
+    },
+    {
+      "id": "intro_paper_magpies_2",
+      "artist": "Paper Magpies",
+      "take": 2,
+      "voice": "JBFqnCBsd6RMkjVDRZzb",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Are you ready? It's a pop duo, on this stage very soon. Give a big welcome to Paper Magpies!"
+    },
+    {
+      "id": "intro_ida_and_corin_1",
+      "artist": "Ida and Corin",
+      "take": 1,
+      "voice": "JBFqnCBsd6RMkjVDRZzb",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Not long now, everyone. Next on stage, a country duo: Ida and Corin!"
+    },
+    {
+      "id": "intro_ida_and_corin_2",
+      "artist": "Ida and Corin",
+      "take": 2,
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Don't go anywhere! In just a few minutes, a country duo. Here comes Ida and Corin!"
+    },
+    {
+      "id": "intro_crooked_lantern_1",
+      "artist": "Crooked Lantern",
+      "take": 1,
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Can I have your attention, please! In a few minutes, give it up for a hip hop duo, Crooked Lantern!"
+    },
+    {
+      "id": "intro_crooked_lantern_2",
+      "artist": "Crooked Lantern",
+      "take": 2,
+      "voice": "onwK4e9ZLuTAKqWW03F9",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Right then, folks! Your next act is a hip hop duo. Make some noise for Crooked Lantern!"
+    },
+    {
+      "id": "intro_tin_foxgloves_1",
+      "artist": "Tin Foxgloves",
+      "take": 1,
+      "voice": "onwK4e9ZLuTAKqWW03F9",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Ladies and gentlemen, in just a few minutes, please welcome a rock duo... Tin Foxgloves!"
+    },
+    {
+      "id": "intro_tin_foxgloves_2",
+      "artist": "Tin Foxgloves",
+      "take": 2,
+      "voice": "JBFqnCBsd6RMkjVDRZzb",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Hello, festival! Grab a drink and come on over, because Tin Foxgloves are on in a few minutes. A rock duo!"
+    },
+    {
+      "id": "intro_the_muddy_gateposts_1",
+      "artist": "The Muddy Gateposts",
+      "take": 1,
+      "voice": "JBFqnCBsd6RMkjVDRZzb",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Get yourselves down to the front! Coming up shortly, a country folk band. It's The Muddy Gateposts!"
+    },
+    {
+      "id": "intro_the_muddy_gateposts_2",
+      "artist": "The Muddy Gateposts",
+      "take": 2,
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Are you ready? It's a country folk band, on this stage very soon. Give a big welcome to The Muddy Gateposts!"
+    },
+    {
+      "id": "intro_hollow_skylarks_1",
+      "artist": "Hollow Skylarks",
+      "take": 1,
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Not long now, everyone. Next on stage, a country folk band: Hollow Skylarks!"
+    },
+    {
+      "id": "intro_hollow_skylarks_2",
+      "artist": "Hollow Skylarks",
+      "take": 2,
+      "voice": "onwK4e9ZLuTAKqWW03F9",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Don't go anywhere! In just a few minutes, a country folk band. Here comes Hollow Skylarks!"
+    },
+    {
+      "id": "intro_the_wandering_wellies_1",
+      "artist": "The Wandering Wellies",
+      "take": 1,
+      "voice": "onwK4e9ZLuTAKqWW03F9",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Can I have your attention, please! In a few minutes, give it up for a country folk band, The Wandering Wellies!"
+    },
+    {
+      "id": "intro_the_wandering_wellies_2",
+      "artist": "The Wandering Wellies",
+      "take": 2,
+      "voice": "JBFqnCBsd6RMkjVDRZzb",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Right then, folks! Your next act is a country folk band. Make some noise for The Wandering Wellies!"
+    },
+    {
+      "id": "intro_the_copper_turnips_1",
+      "artist": "The Copper Turnips",
+      "take": 1,
+      "voice": "JBFqnCBsd6RMkjVDRZzb",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Ladies and gentlemen, in just a few minutes, please welcome a rock band... The Copper Turnips!"
+    },
+    {
+      "id": "intro_the_copper_turnips_2",
+      "artist": "The Copper Turnips",
+      "take": 2,
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Hello, festival! Grab a drink and come on over, because The Copper Turnips are on in a few minutes. A rock band!"
+    },
+    {
+      "id": "intro_bramble_hammer_1",
+      "artist": "Bramble Hammer",
+      "take": 1,
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Get yourselves down to the front! Coming up shortly, a metal band. It's Bramble Hammer!"
+    },
+    {
+      "id": "intro_bramble_hammer_2",
+      "artist": "Bramble Hammer",
+      "take": 2,
+      "voice": "onwK4e9ZLuTAKqWW03F9",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Are you ready? It's a metal band, on this stage very soon. Give a big welcome to Bramble Hammer!"
+    },
+    {
+      "id": "intro_the_velvet_otters_1",
+      "artist": "The Velvet Otters",
+      "take": 1,
+      "voice": "onwK4e9ZLuTAKqWW03F9",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Not long now, everyone. Next on stage, a pop band: The Velvet Otters!"
+    },
+    {
+      "id": "intro_the_velvet_otters_2",
+      "artist": "The Velvet Otters",
+      "take": 2,
+      "voice": "JBFqnCBsd6RMkjVDRZzb",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Don't go anywhere! In just a few minutes, a pop band. Here comes The Velvet Otters!"
+    },
+    {
+      "id": "intro_little_ferrets_1",
+      "artist": "Little Ferrets",
+      "take": 1,
+      "voice": "JBFqnCBsd6RMkjVDRZzb",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Can I have your attention, please! In a few minutes, give it up for a rock band, Little Ferrets!"
+    },
+    {
+      "id": "intro_little_ferrets_2",
+      "artist": "Little Ferrets",
+      "take": 2,
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Right then, folks! Your next act is a rock band. Make some noise for Little Ferrets!"
+    },
+    {
+      "id": "intro_tin_thunder_1",
+      "artist": "Tin Thunder",
+      "take": 1,
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Ladies and gentlemen, in just a few minutes, please welcome a metal band... Tin Thunder!"
+    },
+    {
+      "id": "intro_tin_thunder_2",
+      "artist": "Tin Thunder",
+      "take": 2,
+      "voice": "onwK4e9ZLuTAKqWW03F9",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Hello, festival! Grab a drink and come on over, because Tin Thunder are on in a few minutes. A metal band!"
+    },
+    {
+      "id": "intro_hedgerow_howl_1",
+      "artist": "Hedgerow Howl",
+      "take": 1,
+      "voice": "onwK4e9ZLuTAKqWW03F9",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Get yourselves down to the front! Coming up shortly, a metal band. It's Hedgerow Howl!"
+    },
+    {
+      "id": "intro_hedgerow_howl_2",
+      "artist": "Hedgerow Howl",
+      "take": 2,
+      "voice": "JBFqnCBsd6RMkjVDRZzb",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Are you ready? It's a metal band, on this stage very soon. Give a big welcome to Hedgerow Howl!"
+    },
+    {
+      "id": "intro_the_lantern_hearts_1",
+      "artist": "The Lantern Hearts",
+      "take": 1,
+      "voice": "JBFqnCBsd6RMkjVDRZzb",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Not long now, everyone. Next on stage, a pop band: The Lantern Hearts!"
+    },
+    {
+      "id": "intro_the_lantern_hearts_2",
+      "artist": "The Lantern Hearts",
+      "take": 2,
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Don't go anywhere! In just a few minutes, a pop band. Here comes The Lantern Hearts!"
+    },
+    {
+      "id": "intro_dj_haybale_1",
+      "artist": "DJ Haybale",
+      "take": 1,
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Can I have your attention, please! In a few minutes, give it up for an electronic DJ, DJ Haybale!"
+    },
+    {
+      "id": "intro_dj_haybale_2",
+      "artist": "DJ Haybale",
+      "take": 2,
+      "voice": "onwK4e9ZLuTAKqWW03F9",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Right then, folks! Your next act is an electronic DJ. Make some noise for DJ Haybale!"
+    },
+    {
+      "id": "intro_dj_weathervane_1",
+      "artist": "DJ Weathervane",
+      "take": 1,
+      "voice": "onwK4e9ZLuTAKqWW03F9",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Ladies and gentlemen, in just a few minutes, please welcome a hip hop DJ... DJ Weathervane!"
+    },
+    {
+      "id": "intro_dj_weathervane_2",
+      "artist": "DJ Weathervane",
+      "take": 2,
+      "voice": "JBFqnCBsd6RMkjVDRZzb",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Hello, festival! Grab a drink and come on over, because DJ Weathervane is on in a few minutes. A hip hop DJ!"
+    },
+    {
+      "id": "intro_dj_tractor_1",
+      "artist": "DJ Tractor",
+      "take": 1,
+      "voice": "JBFqnCBsd6RMkjVDRZzb",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Get yourselves down to the front! Coming up shortly, an electronic DJ. It's DJ Tractor!"
+    },
+    {
+      "id": "intro_dj_tractor_2",
+      "artist": "DJ Tractor",
+      "take": 2,
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Are you ready? It's an electronic DJ, on this stage very soon. Give a big welcome to DJ Tractor!"
+    },
+    {
+      "id": "intro_dj_magpie_1",
+      "artist": "DJ Magpie",
+      "take": 1,
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Not long now, everyone. Next on stage, a hip hop DJ: DJ Magpie!"
+    },
+    {
+      "id": "intro_dj_magpie_2",
+      "artist": "DJ Magpie",
+      "take": 2,
+      "voice": "onwK4e9ZLuTAKqWW03F9",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Don't go anywhere! In just a few minutes, a hip hop DJ. Here comes DJ Magpie!"
+    },
+    {
+      "id": "intro_dj_foxglove_1",
+      "artist": "DJ Foxglove",
+      "take": 1,
+      "voice": "onwK4e9ZLuTAKqWW03F9",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Can I have your attention, please! In a few minutes, give it up for an electronic DJ, DJ Foxglove!"
+    },
+    {
+      "id": "intro_dj_foxglove_2",
+      "artist": "DJ Foxglove",
+      "take": 2,
+      "voice": "JBFqnCBsd6RMkjVDRZzb",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Right then, folks! Your next act is an electronic DJ. Make some noise for DJ Foxglove!"
+    },
+    {
+      "id": "intro_dj_otter_1",
+      "artist": "DJ Otter",
+      "take": 1,
+      "voice": "JBFqnCBsd6RMkjVDRZzb",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Ladies and gentlemen, in just a few minutes, please welcome an electronic DJ... DJ Otter!"
+    },
+    {
+      "id": "intro_dj_otter_2",
+      "artist": "DJ Otter",
+      "take": 2,
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Hello, festival! Grab a drink and come on over, because DJ Otter is on in a few minutes. An electronic DJ!"
+    }
+  ]
+}

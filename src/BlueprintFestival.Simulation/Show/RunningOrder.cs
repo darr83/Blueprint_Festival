@@ -167,11 +167,11 @@ public sealed class RunningOrder
 
     /// <summary>
     /// The set that has just finished, while its act is still on stage taking the applause (for
-    /// <see cref="Performing.BowMinutes"/> after the end), or null. Not after the music was called off.
+    /// <see cref="Performing.BowMinutes"/> after the end), or null. Not after the music was called off, nor after a set that was cancelled.
     /// </summary>
     public Slot? Bowing(DateTime now) =>
         Stage is null || CalledOff is not null ? null
-        : _slots.FirstOrDefault(s => now >= s.End && now < s.End.AddMinutes(Performing.BowMinutes) && Playing(now) is null);
+        : _slots.FirstOrDefault(s => !s.CutShort && now >= s.End && now < s.End.AddMinutes(Performing.BowMinutes) && Playing(now) is null);
 
     /// <summary>True in the gap after a set has finished and before the next one starts.</summary>
     public bool Changeover(DateTime now) => Stage is not null && CalledOff is null && Playing(now) is null && Next(now) is not null && _slots.Any(s => s.End <= now);

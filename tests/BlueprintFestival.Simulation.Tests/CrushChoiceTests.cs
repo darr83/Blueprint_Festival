@@ -164,6 +164,7 @@ public class CrushChoiceTests
         Assert.Equal(slot.Index, cancelled!.Index);
         Assert.Null(game.Show.Playing(game.Now));
         Assert.True(game.Show.Slots.Single(s => s.Index == slot.Index).CutShort);
+        Assert.Null(game.Show.Bowing(game.Now));
         Assert.Equal(1, game.ActsCancelled);
         Assert.True(fansBefore - MoodOf(game, fans) >= FestivalGame.CancelMoodWatching - 0.01, "The act's fans are let down.");
         Assert.True(othersBefore - MoodOf(game, others) >= FestivalGame.CancelMoodEveryone - 0.01, "Everyone else a little.");
