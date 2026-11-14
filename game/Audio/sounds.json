@@ -1,0 +1,464 @@
+{
+  "note": "Every sound effect in the game. The game plays game/Audio/<id>.ogg (or .wav or .mp3) if the file is there and stays silent if it is not. tools/make_sounds.py makes the files from the prompts with ElevenLabs. No act music here: that is added separately.",
+  "sounds": [
+    {
+      "id": "amb_day",
+      "bus": "Ambience",
+      "seconds": 20,
+      "loop": true,
+      "volume": 0.7,
+      "gap": 0.0,
+      "prompt": "Quiet English countryside meadow on a summer day, birdsong, a light breeze in the hedgerows, distant sheep. No people, no music, no traffic."
+    },
+    {
+      "id": "amb_night",
+      "bus": "Ambience",
+      "seconds": 20,
+      "loop": true,
+      "volume": 0.7,
+      "gap": 0.0,
+      "prompt": "A summer night in an English field, crickets, a distant owl, a gentle breeze. No people, no music."
+    },
+    {
+      "id": "amb_rain_light",
+      "bus": "Ambience",
+      "seconds": 15,
+      "loop": true,
+      "volume": 0.8,
+      "gap": 0.0,
+      "prompt": "Light steady rain falling on grass and canvas tents. No thunder, no people, no music."
+    },
+    {
+      "id": "amb_rain_heavy",
+      "bus": "Ambience",
+      "seconds": 15,
+      "loop": true,
+      "volume": 0.9,
+      "gap": 0.0,
+      "prompt": "Heavy rain pouring on a field and on tent roofs, puddles splashing. No thunder, no people, no music."
+    },
+    {
+      "id": "crowd_small",
+      "bus": "Crowd",
+      "seconds": 20,
+      "loop": true,
+      "volume": 0.6,
+      "gap": 0.0,
+      "prompt": "About fifty people chatting and laughing outdoors at a village fete, relaxed and friendly. No music, no announcements."
+    },
+    {
+      "id": "crowd_medium",
+      "bus": "Crowd",
+      "seconds": 20,
+      "loop": true,
+      "volume": 0.7,
+      "gap": 0.0,
+      "prompt": "A few hundred people talking outdoors at a small summer festival, a steady murmur with occasional laughter. No music, no announcements."
+    },
+    {
+      "id": "crowd_large",
+      "bus": "Crowd",
+      "seconds": 20,
+      "loop": true,
+      "volume": 0.8,
+      "gap": 0.0,
+      "prompt": "Several thousand people at a big outdoor festival, a constant loud murmur with distant whoops. No music, no announcements."
+    },
+    {
+      "id": "crowd_queue",
+      "bus": "Crowd",
+      "seconds": 15,
+      "loop": true,
+      "volume": 0.5,
+      "gap": 0.0,
+      "prompt": "A long queue of people waiting outdoors, quiet impatient chatter and shuffling feet. No music."
+    },
+    {
+      "id": "cheer_small",
+      "bus": "Crowd",
+      "seconds": 4,
+      "loop": false,
+      "volume": 0.8,
+      "gap": 20,
+      "prompt": "A small crowd of about fifty people clapping and giving a friendly cheer outdoors. No music."
+    },
+    {
+      "id": "cheer_medium",
+      "bus": "Crowd",
+      "seconds": 5,
+      "loop": false,
+      "volume": 0.9,
+      "gap": 20,
+      "prompt": "A few hundred people cheering and applauding as a band walks on stage outdoors. No music."
+    },
+    {
+      "id": "cheer_big",
+      "bus": "Crowd",
+      "seconds": 6,
+      "loop": false,
+      "volume": 1.0,
+      "gap": 20,
+      "prompt": "Thousands of people roaring, cheering and whistling as a headline act walks on stage at a festival. No music."
+    },
+    {
+      "id": "applause_small",
+      "bus": "Crowd",
+      "seconds": 4,
+      "loop": false,
+      "volume": 0.8,
+      "gap": 20,
+      "prompt": "Polite warm applause from a small outdoor audience at the end of a song. No music."
+    },
+    {
+      "id": "applause_big",
+      "bus": "Crowd",
+      "seconds": 6,
+      "loop": false,
+      "volume": 1.0,
+      "gap": 20,
+      "prompt": "Huge applause and cheering from a festival crowd of thousands at the end of a set. No music."
+    },
+    {
+      "id": "crowd_groan",
+      "bus": "Crowd",
+      "seconds": 3,
+      "loop": false,
+      "volume": 0.8,
+      "gap": 30,
+      "prompt": "A crowd groaning in disappointment with a few boos, outdoors. No music."
+    },
+    {
+      "id": "crowd_alarm",
+      "bus": "Crowd",
+      "seconds": 4,
+      "loop": false,
+      "volume": 0.9,
+      "gap": 30,
+      "prompt": "Alarmed shouting from a tightly packed crowd, people calling out for help and for others to move back. No music."
+    },
+    {
+      "id": "gate_ticket",
+      "bus": "Effects",
+      "seconds": 1,
+      "loop": false,
+      "volume": 0.5,
+      "gap": 1.5,
+      "prompt": "A paper ticket torn in half, then a rubber hand stamp thump."
+    },
+    {
+      "id": "gate_turnstile",
+      "bus": "Effects",
+      "seconds": 1,
+      "loop": false,
+      "volume": 0.5,
+      "gap": 1.0,
+      "prompt": "A metal turnstile rotating with a solid clunk."
+    },
+    {
+      "id": "till",
+      "bus": "Effects",
+      "seconds": 1,
+      "loop": false,
+      "volume": 0.45,
+      "gap": 2.5,
+      "prompt": "An old-fashioned cash register opening with a ka-ching bell."
+    },
+    {
+      "id": "pour_drink",
+      "bus": "Effects",
+      "seconds": 2,
+      "loop": false,
+      "volume": 0.45,
+      "gap": 4,
+      "prompt": "Beer poured from a tap into a plastic cup."
+    },
+    {
+      "id": "fry",
+      "bus": "Effects",
+      "seconds": 2,
+      "loop": false,
+      "volume": 0.45,
+      "gap": 4,
+      "prompt": "Food sizzling on a hot griddle in a food van."
+    },
+    {
+      "id": "tea_cup",
+      "bus": "Effects",
+      "seconds": 1,
+      "loop": false,
+      "volume": 0.45,
+      "gap": 4,
+      "prompt": "A china teacup set down on a saucer with a clink."
+    },
+    {
+      "id": "toilet_door",
+      "bus": "Effects",
+      "seconds": 1.5,
+      "loop": false,
+      "volume": 0.4,
+      "gap": 4,
+      "prompt": "The plastic door of a portable toilet banging shut and the latch sliding across."
+    },
+    {
+      "id": "water_tap",
+      "bus": "Effects",
+      "seconds": 2,
+      "loop": false,
+      "volume": 0.4,
+      "gap": 5,
+      "prompt": "An outdoor standpipe tap filling a plastic bottle for a moment, then turned off."
+    },
+    {
+      "id": "ui_click",
+      "bus": "Interface",
+      "seconds": 0.5,
+      "loop": false,
+      "volume": 0.5,
+      "gap": 0.0,
+      "prompt": "A short soft wooden click, like a small wooden block tapped once."
+    },
+    {
+      "id": "ui_tab",
+      "bus": "Interface",
+      "seconds": 0.5,
+      "loop": false,
+      "volume": 0.5,
+      "gap": 0.0,
+      "prompt": "A single sheet of paper flicked over, short and soft."
+    },
+    {
+      "id": "ui_refuse",
+      "bus": "Interface",
+      "seconds": 0.5,
+      "loop": false,
+      "volume": 0.6,
+      "gap": 0.3,
+      "prompt": "A short low dull thud, a gentle \"no\" sound, not harsh."
+    },
+    {
+      "id": "build_stage",
+      "bus": "Effects",
+      "seconds": 2.5,
+      "loop": false,
+      "volume": 0.8,
+      "gap": 0.0,
+      "prompt": "Scaffolding poles clanking together and a ratchet spanner tightening, a stage going up."
+    },
+    {
+      "id": "build_fence",
+      "bus": "Effects",
+      "seconds": 1.5,
+      "loop": false,
+      "volume": 0.7,
+      "gap": 0.4,
+      "prompt": "A wooden fence post knocked into soft ground with a mallet, two knocks."
+    },
+    {
+      "id": "build_gate",
+      "bus": "Effects",
+      "seconds": 1.5,
+      "loop": false,
+      "volume": 0.8,
+      "gap": 0.0,
+      "prompt": "A metal gate frame bolted together with a clank and a rattle of bolts."
+    },
+    {
+      "id": "build_stall",
+      "bus": "Effects",
+      "seconds": 2,
+      "loop": false,
+      "volume": 0.8,
+      "gap": 0.0,
+      "prompt": "A canvas tent unfurled and tent pegs hammered into the ground."
+    },
+    {
+      "id": "build_ground",
+      "bus": "Effects",
+      "seconds": 1.5,
+      "loop": false,
+      "volume": 0.7,
+      "gap": 0.4,
+      "prompt": "Dry straw shaken out of a bale and scattered on the ground, rustling."
+    },
+    {
+      "id": "take_down",
+      "bus": "Effects",
+      "seconds": 2,
+      "loop": false,
+      "volume": 0.8,
+      "gap": 0.3,
+      "prompt": "Metal poles and wooden boards dismantled and dropped onto a trailer with a clatter."
+    },
+    {
+      "id": "hire_staff",
+      "bus": "Effects",
+      "seconds": 1,
+      "loop": false,
+      "volume": 0.6,
+      "gap": 0.0,
+      "prompt": "A walkie-talkie beep followed by a short burst of radio static."
+    },
+    {
+      "id": "coins",
+      "bus": "Effects",
+      "seconds": 1,
+      "loop": false,
+      "volume": 0.6,
+      "gap": 0.5,
+      "prompt": "A handful of coins dropped into a metal cash tin."
+    },
+    {
+      "id": "ponchos",
+      "bus": "Effects",
+      "seconds": 1.5,
+      "loop": false,
+      "volume": 0.7,
+      "gap": 0.0,
+      "prompt": "A thin plastic rain poncho shaken out and rustling."
+    },
+    {
+      "id": "notebook",
+      "bus": "Interface",
+      "seconds": 1.5,
+      "loop": false,
+      "volume": 0.7,
+      "gap": 0.0,
+      "prompt": "Two pages of a paper notebook turned over."
+    },
+    {
+      "id": "rubber_stamp",
+      "bus": "Interface",
+      "seconds": 2,
+      "loop": false,
+      "volume": 0.8,
+      "gap": 0.0,
+      "prompt": "A rubber stamp pressed firmly onto paper, then a pen scratching a signature."
+    },
+    {
+      "id": "gates_open",
+      "bus": "Effects",
+      "seconds": 3,
+      "loop": false,
+      "volume": 0.9,
+      "gap": 0.0,
+      "prompt": "A brass handbell rung three times outdoors."
+    },
+    {
+      "id": "radio_alert",
+      "bus": "Effects",
+      "seconds": 2,
+      "loop": false,
+      "volume": 0.9,
+      "gap": 20,
+      "prompt": "An urgent two-tone alert beeping on a security radio, three beeps."
+    },
+    {
+      "id": "first_aid",
+      "bus": "Effects",
+      "seconds": 1.5,
+      "loop": false,
+      "volume": 0.6,
+      "gap": 6,
+      "prompt": "A first aid kit bag unzipped and a strip of velcro pulled open."
+    },
+    {
+      "id": "trouble",
+      "bus": "Effects",
+      "seconds": 2.5,
+      "loop": false,
+      "volume": 0.7,
+      "gap": 15,
+      "prompt": "A muffled angry argument between two men in a crowd, shoving, no clear words."
+    },
+    {
+      "id": "all_clear",
+      "bus": "Effects",
+      "seconds": 1,
+      "loop": false,
+      "volume": 0.5,
+      "gap": 6,
+      "prompt": "A friendly double beep on a walkie-talkie."
+    },
+    {
+      "id": "pa_stop",
+      "bus": "Effects",
+      "seconds": 2,
+      "loop": false,
+      "volume": 0.8,
+      "gap": 0.0,
+      "prompt": "A short squeal of microphone feedback, then a public address system clicking off."
+    },
+    {
+      "id": "pa_start",
+      "bus": "Effects",
+      "seconds": 1.5,
+      "loop": false,
+      "volume": 0.7,
+      "gap": 0.0,
+      "prompt": "A public address system clicking on with a soft hum and a tap on a microphone."
+    },
+    {
+      "id": "rain_start",
+      "bus": "Ambience",
+      "seconds": 4,
+      "loop": false,
+      "volume": 0.9,
+      "gap": 120,
+      "prompt": "The first heavy raindrops hitting the ground, then a distant rumble of thunder."
+    },
+    {
+      "id": "mud_squelch",
+      "bus": "Effects",
+      "seconds": 3,
+      "loop": false,
+      "volume": 0.5,
+      "gap": 25,
+      "prompt": "Wellington boots squelching slowly through thick wet mud, four steps."
+    },
+    {
+      "id": "litter_pick",
+      "bus": "Effects",
+      "seconds": 1.5,
+      "loop": false,
+      "volume": 0.6,
+      "gap": 0.4,
+      "prompt": "A litter picker grabber snapping shut and rubbish dropped into a rustling bin bag."
+    },
+    {
+      "id": "day_end",
+      "bus": "Ambience",
+      "seconds": 4,
+      "loop": false,
+      "volume": 0.8,
+      "gap": 0.0,
+      "prompt": "A distant village church bell tolling once at night."
+    },
+    {
+      "id": "results_good",
+      "bus": "Crowd",
+      "seconds": 4,
+      "loop": false,
+      "volume": 0.9,
+      "gap": 0.0,
+      "prompt": "A small group of people cheering, clapping and letting off a party popper. No music."
+    },
+    {
+      "id": "results_bad",
+      "bus": "Crowd",
+      "seconds": 3,
+      "loop": false,
+      "volume": 0.8,
+      "gap": 0.0,
+      "prompt": "A small group of people sighing and murmuring in disappointment. No music."
+    },
+    {
+      "id": "gate_closed",
+      "bus": "Effects",
+      "seconds": 4,
+      "loop": false,
+      "volume": 0.9,
+      "gap": 0.0,
+      "prompt": "A heavy wooden farm gate creaking shut, a chain pulled through it and a padlock clicking."
+    }
+  ]
+}

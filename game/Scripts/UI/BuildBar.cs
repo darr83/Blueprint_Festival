@@ -1,3 +1,5 @@
+using BlueprintFestival.Audio;
+using BlueprintFestival.Simulation.Sound;
 using System.Linq;
 using System.Collections.Generic;
 using BlueprintFestival.Simulation;
@@ -77,7 +79,7 @@ public partial class BuildBar : VBoxContainer
 
     private void AddTab(Container row, BuildMode mode, string text, string tip)
     {
-        var button = UiStyle.SecondaryButton(text, () => Toggle(mode));
+        var button = UiStyle.SecondaryButton(text, () => Toggle(mode), Sounds.Tab);
         button.ToggleMode = true;
         button.TooltipText = tip;
         row.AddChild(button);

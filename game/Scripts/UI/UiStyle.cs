@@ -1,3 +1,5 @@
+using BlueprintFestival.Audio;
+using BlueprintFestival.Simulation.Sound;
 using Godot;
 
 namespace BlueprintFestival.UI;
@@ -131,16 +133,17 @@ public static class UiStyle
         return label;
     }
 
-    public static Button Button(string text, System.Action pressed)
+    public static Button Button(string text, System.Action pressed, string sound = Sounds.Click)
     {
         var button = new Button { Text = text, FocusMode = Control.FocusModeEnum.None };
+        button.Pressed += () => SoundBoard.Cue(sound);
         button.Pressed += pressed;
         return button;
     }
 
-    public static Button SecondaryButton(string text, System.Action pressed)
+    public static Button SecondaryButton(string text, System.Action pressed, string sound = Sounds.Click)
     {
-        var button = Button(text, pressed);
+        var button = Button(text, pressed, sound);
         button.ThemeTypeVariation = Secondary;
         return button;
     }

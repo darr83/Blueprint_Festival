@@ -47,6 +47,9 @@ public partial class MainMenu : Control
         resume.Disabled = !GameManager.Instance.HasSave();
         resume.TooltipText = resume.Disabled ? "No saved festival yet" : "";
         column.AddChild(resume);
+        var sliders = new SoundSliders { Name = "SoundSliders", Visible = false };
+        column.AddChild(UiStyle.SecondaryButton("Sound", () => sliders.Visible = !sliders.Visible));
+        column.AddChild(sliders);
         column.AddChild(UiStyle.SecondaryButton("Quit", () => GetTree().Quit()));
 
         _message = UiStyle.Body("", muted: true, size: 14);
@@ -54,7 +57,7 @@ public partial class MainMenu : Control
         _message.AutowrapMode = TextServer.AutowrapMode.WordSmart;
         column.AddChild(_message);
 
-        var version = UiStyle.Body("Step 6: the festival year", muted: true, size: 13);
+        var version = UiStyle.Body("Step 11: sound", muted: true, size: 13);
         AddChild(version);
         version.SetAnchorsAndOffsetsPreset(LayoutPreset.BottomLeft, LayoutPresetMode.Minsize, 18);
         version.GrowVertical = GrowDirection.Begin;

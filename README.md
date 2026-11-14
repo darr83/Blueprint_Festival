@@ -32,7 +32,8 @@ brands or sponsors.
 | 10a. Growing up: a licence ladder from 200 to 5,000, three fields, a main stage, turnstiles and a toilet block, and crowds of thousands drawn and run at speed | Done |
 | 10b. A second stage with its own line-up, booked at planning, and a medical tent with six beds | Done |
 | 10c. Camping, as an option from 5,000 | Next |
-| 11. Sound and music: each act's own songs, crowd noise, clicks and a menu tune | |
+| 11. Sound effects: the field, the weather, the crowd, stalls, building, the radio and buttons, with volume sliders | Done (files made with `tools/make_sounds.py`) |
+| 12. The acts' music | |
 
 ## Controls
 
@@ -55,11 +56,14 @@ brands or sponsors.
 ```
 game/                               Godot project (open this folder in Godot)
   Scenes/                           Main menu and festival scenes
+  Audio/                            The list of sound effects (sounds.json) and their files
+  Scripts/Audio/                    The sound board and what the festival sounds like
   Scripts/Core/                     Game manager, saves, launch test, screenshot tool
   Scripts/UI/                       Look and feel, menus, top bar, view buttons
   Scripts/World/                    The 3D site, camera, daylight and people
 src/BlueprintFestival.Simulation/   The rules of the game in plain C# (no Godot)
 tests/BlueprintFestival.Simulation.Tests/   Unit tests for the rules
+tools/make_sounds.py                Makes the sound effect files with ElevenLabs
 docs/handoff/                       The original brief and mock-ups
 docs/screenshots/                   Screenshots from each step
 ```
@@ -73,6 +77,20 @@ You need **Godot 4.7.2 .NET** (the "mono" download) and the **.NET 8 SDK**.
 
 1. Start Godot, choose **Import**, and select `game/project.godot`.
 2. Press **Build** (the hammer, top right) once, then **Run Project** (F5).
+
+## Sound
+
+Every sound effect is on one list, `game/Audio/sounds.json`: its name, how long it is, whether it
+plays round and round, how loud it is, and a description of what it should sound like. The game
+plays `game/Audio/<name>.ogg` (or `.wav` or `.mp3`) if the file is there and is silent if it is
+not, so a sound can be swapped by dropping a new file in with the same name.
+
+`python3 tools/make_sounds.py` makes every missing file from its description with ElevenLabs. It
+needs an ElevenLabs key in the `ELEVENLABS_API_KEY` environment variable (never put the key in a
+file in this project). `--list` shows what is there, and `--only till,fry --force` makes chosen
+sounds again. The acts' music is not part of this and comes later.
+
+The volume sliders are in the pause menu (Esc) and on the main menu, and are remembered.
 
 ## Checks
 
