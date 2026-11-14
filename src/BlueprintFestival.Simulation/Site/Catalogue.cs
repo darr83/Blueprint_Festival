@@ -64,7 +64,11 @@ public enum StallKind
     /// <summary>A white tent with a green cross, where people who are unwell can lie down.</summary>
     FirstAidTent,
 
+    /// <summary>Nine toilet cabins in a row.</summary>
     ToiletBlock,
+
+    /// <summary>A big white tent with a green cross and six beds, for a big festival.</summary>
+    MedicalTent,
 }
 
 /// <summary>What a person can need during the day.</summary>
@@ -143,8 +147,9 @@ public static class Catalogue
         new StallInfo(StallKind.Bar, "Bar tent", 12, 8, 200, Need.Drink, 4, 25, 3, "Drinks from a long bar. Serves three at a time."),
         new StallInfo(StallKind.Toilets, "Toilets", 8, 3, 40, Need.Toilet, 0, 75, 3, "Three cabins. People will not wait for ever."),
         new StallInfo(StallKind.WaterPoint, "Water point", 3, 2, 15, Need.Drink, 0, 20, 2, "Two taps. Free, so it earns nothing."),
-        new StallInfo(StallKind.FirstAidTent, "First aid tent", 8, 6, 80, null, 0, 1200, 2, "Two beds under a green cross. First-aiders bring people here to rest."),
+        new StallInfo(StallKind.FirstAidTent, "First aid tent", 8, 6, 80, null, 0, 1200, 2, "Two beds under a green cross. First-aiders bring people to the nearest free bed to rest."),
         new StallInfo(StallKind.ToiletBlock, "Toilet block", 24, 3, 110, Need.Toilet, 0, 75, 9, "Nine cabins in a row, for a bigger crowd."),
+        new StallInfo(StallKind.MedicalTent, "Medical tent", 16, 10, 450, null, 0, 600, 6, "Six beds under a green cross. People are back on their feet in half the time."),
     };
 
     /// <summary>The festival's share of what a stall takes, in pounds out of every hundred.</summary>

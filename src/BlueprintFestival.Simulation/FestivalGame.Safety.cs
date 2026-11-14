@@ -225,7 +225,7 @@ public sealed partial class FestivalGame
     /// </summary>
     public bool PauseAct()
     {
-        if (Phase != Phase.Day || ActPaused || Show.Playing(Now) is null || Show.Stage is not { } stage)
+        if (Phase != Phase.Day || ActPaused || !MusicOn)
         {
             return false;
         }
@@ -233,8 +233,15 @@ public sealed partial class FestivalGame
         _pausedUntil = Now.AddMinutes(PauseMinutes);
         ActsPaused++;
         Crowd.Ease();
-        var (fx, fy, _, _) = RunningOrder.Front(stage);
-        Crowd.Upset(fx, fy, 40, 0.015);
+        foreach (var show in new[] { Show, SecondShow })
+        {
+            if (show.Playing(Now) is not null && show.Stage is { } stage)
+            {
+                var (fx, fy, _, _) = RunningOrder.Front(stage);
+                Crowd.Upset(fx, fy, 40, 0.015);
+            }
+        }
+
         return true;
     }
 
@@ -315,6 +322,7 @@ public sealed partial class FestivalGame
             // Too many people hurt: the music stops and everyone is sent home.
             SeriousIncident = true;
             Show.CallOff(now);
+            SecondShow.CallOff(now);
             Crowd.SendEveryoneHome(now, 0.25);
         }
     }
@@ -323,6 +331,7 @@ public sealed partial class FestivalGame
     {
         RedMinutes = _redMinutes.Count > 0 ? new Dictionary<int, int>(_redMinutes) : null,
         Warned = _wasRed,
+        Places = Crowd.SavePlaces(),
     };
 
     private void RestoreSafety(SafetySave save)
@@ -330,6 +339,7 @@ public sealed partial class FestivalGame
         (CrushInjuries, PulledOut, SeriousIncident, ActsPaused, _pausedUntil) = (save.CrushInjuries, save.PulledOut, save.SeriousIncident, save.ActsPaused, save.PausedUntil);
         _danger = new GameRandom(save.Danger);
         _wasRed = save.Warned;
+        Crowd.RestorePlaces(save.Places);
         _redMinutes.Clear();
         foreach (var (square, minutes) in save.RedMinutes ?? new())
         {
@@ -339,6 +349,7 @@ public sealed partial class FestivalGame
         if (save.CalledOff is { } when)
         {
             Show.CallOff(when);
+            SecondShow.CallOff(when);
         }
     }
 }
@@ -351,4 +362,7 @@ public sealed record SafetySave(int CrushInjuries, int PulledOut, bool SeriousIn
 
     /// <summary>True if the player has already been warned about the crush that is going on.</summary>
     public bool Warned { get; init; }
+
+    /// <summary>The places the audience have picked to watch from.</summary>
+    public WatchingPlaces? Places { get; init; }
 }

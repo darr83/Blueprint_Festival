@@ -48,6 +48,8 @@ public sealed partial class FestivalGame
         Crowd = new Crowd(Field, Site, Seed, Clock.Now);
         Show = new RunningOrder(Site, Seed, Clock.Now);
         Crowd.Show = Show;
+        SecondShow = new RunningOrder(Site, Seed, Clock.Now, Show);
+        Crowd.Second = SecondShow;
         Crowd.TicketsSold += people => Earn("Tickets", people * TicketPrice);
         // The stallholders keep most of what they take; the festival gets its share for the pitch.
         Crowd.Served += (kind, _, paid) => Earn(Catalogue.Of(kind).Name, ((paid * Catalogue.PitchShare) + 50) / 100);
@@ -72,6 +74,12 @@ public sealed partial class FestivalGame
 
     /// <summary>The day's music: who plays when.</summary>
     public RunningOrder Show { get; }
+
+    /// <summary>The second stage's music. It plays only if its acts were booked at planning and a second stage is put up.</summary>
+    public RunningOrder SecondShow { get; }
+
+    /// <summary>True while an act is on, on either stage.</summary>
+    public bool MusicOn => Show.Playing(Now) is not null || SecondShow.Playing(Now) is not null;
 
     /// <summary>What the player has built on the field.</summary>
     public SiteLayout Site { get; }

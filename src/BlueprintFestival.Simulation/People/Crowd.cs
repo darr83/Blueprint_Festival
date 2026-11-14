@@ -109,6 +109,9 @@ public sealed class Party
     /// <summary>The last set they made their mind up about, so they only decide once for each.</summary>
     public int Decided { get; internal set; } = -1;
 
+    /// <summary>The last set on the second stage this party made its mind up about, or -1.</summary>
+    public int DecidedSecond { get; internal set; } = -1;
+
     /// <summary>How hungry they are, from 0 (just eaten) to 1 and a little over (starving).</summary>
     public double Hunger { get; internal set; }
 
@@ -282,6 +285,8 @@ public sealed class Crowd
 
     private int[] _claims = Array.Empty<int>();
     private int _claimSlot = -1;
+    private int[] _claimsSecond = Array.Empty<int>();
+    private int _claimSlotSecond = -1;
     private int _measuredMinute = -1;
 
     public Crowd(FieldMap map, int seed, DateTime festivalDay)
@@ -296,6 +301,7 @@ public sealed class Crowd
         _paths = new PathFinder(map);
         Density = new DensityMap(map);
         _claims = new int[Density.Across * Density.Down];
+        _claimsSecond = new int[_claims.Length];
         Seed = seed;
         _day = festivalDay.Date;
         Plan(_day, null);
@@ -305,6 +311,15 @@ public sealed class Crowd
 
     /// <summary>The day's music, if there is any. People go and watch the acts they fancy.</summary>
     public RunningOrder? Show { get; set; }
+
+    /// <summary>The second stage's line-up, if there is one.</summary>
+    public RunningOrder? Second { get; set; }
+
+    /// <summary>The line-up a set belongs to, by the set's number.</summary>
+    private RunningOrder? ShowOf(int set) => set >= RunningOrder.SecondBase ? Second : Show;
+
+    /// <summary>True while the set a party went to watch is still on.</summary>
+    private bool StillOn(int set, DateTime now) => set >= 0 && ShowOf(set)?.Playing(now)?.Index == set;
 
     /// <summary>How many people are standing watching the act that is on.</summary>
     public int Watching => _parties.Where(p => p.State == PartyState.Watching).Sum(p => p.Members.Count);
@@ -615,7 +630,7 @@ public sealed class Crowd
                     if (party.Watch >= 0)
                     {
                         party.Watch = -1;
-                        party.Decided = -1;
+                        party.Decided = party.DecidedSecond = -1;
                     }
 
                     Send(party, _standableSet.Contains(party.Target) ? party.Target : SomewhereInField(party.Random), party.State);
@@ -626,7 +641,7 @@ public sealed class Crowd
                 case PartyState.Watching:
                     // The stage may have moved or gone: think again.
                     party.Watch = -1;
-                    party.Decided = -1;
+                    party.Decided = party.DecidedSecond = -1;
                     party.State = PartyState.Standing;
                     break;
                 case PartyState.AtStall:
@@ -938,7 +953,7 @@ public sealed class Crowd
                         // Something cannot wait for the end of the set.
                         party.Watch = -1;
                     }
-                    else if (Show?.Playing(now)?.Index != party.Watch)
+                    else if (!StillOn(party.Watch, now))
                     {
                         // The set is over: hang about for a bit, then wander off.
                         party.Watch = -1;
@@ -989,7 +1004,7 @@ public sealed class Crowd
                         {
                             party.State = PartyState.Gone;
                         }
-                        else if (party.Watch >= 0 && Show?.Playing(now) is { } on && on.Index == party.Watch && Show.Stage is { } stage)
+                        else if (StillOn(party.Watch, now) && ShowOf(party.Watch)?.Stage is { } stage)
                         {
                             // Got to the stage: stand and face it.
                             var (fx, fy, _, _) = RunningOrder.Front(stage);
@@ -1255,19 +1270,33 @@ public sealed class Crowd
     /// When a set is on, a party that has not yet made up its mind about it decides whether to go
     /// and watch. True if they set off for the stage.
     /// </summary>
-    private bool GoAndWatch(Party party, DateTime now)
+    private bool GoAndWatch(Party party, DateTime now) => GoAndWatch(party, now, Show, false) || GoAndWatch(party, now, Second, true);
+
+    private bool GoAndWatch(Party party, DateTime now, RunningOrder? show, bool second)
     {
-        if (Show?.Playing(now) is not { } slot || Show.Stage is not { } stage || party.Decided == slot.Index)
+        if (show?.Playing(now) is not { } slot || show.Stage is not { } stage || (second ? party.DecidedSecond : party.Decided) == slot.Index)
         {
             return false;
         }
 
-        party.Decided = slot.Index;
-        if (slot.Index != _claimSlot)
+        if (second)
         {
-            // A new act: everyone who wants to watch finds a place afresh.
-            _claimSlot = slot.Index;
-            Array.Clear(_claims);
+            party.DecidedSecond = slot.Index;
+            if (slot.Index != _claimSlotSecond)
+            {
+                _claimSlotSecond = slot.Index;
+                Array.Clear(_claimsSecond);
+            }
+        }
+        else
+        {
+            party.Decided = slot.Index;
+            if (slot.Index != _claimSlot)
+            {
+                // A new act: everyone who wants to watch finds a place afresh.
+                _claimSlot = slot.Index;
+                Array.Clear(_claims);
+            }
         }
 
         if (party.Random.NextDouble() >= slot.Act.Draw || PlaceToWatch(stage, party.Random, slot.Act.Draw, party.Members.Count) is not { } spot)
@@ -1283,7 +1312,7 @@ public sealed class Crowd
             return false;
         }
 
-        Claim(spot, party.Members.Count);
+        Claim(spot, party.Members.Count, second);
 
         return true;
     }
@@ -1342,14 +1371,55 @@ public sealed class Crowd
     private double Claimed(double x, double y, int joining)
     {
         var (sx, sy) = Density.SquareOf(x, y);
-        return (_claims[(sy * Density.Across) + sx] + joining) / (DensityMap.SquareMetres * DensityMap.SquareMetres);
+        var square = (sy * Density.Across) + sx;
+        return (_claims[square] + _claimsSecond[square] + joining) / (DensityMap.SquareMetres * DensityMap.SquareMetres);
     }
 
-    private void Claim(TilePoint tile, int people)
+    /// <summary>The places people have picked to watch from, as written to a save file.</summary>
+    public WatchingPlaces SavePlaces() => new(_claimSlot, Sparse(_claims), _claimSlotSecond, Sparse(_claimsSecond));
+
+    public void RestorePlaces(WatchingPlaces? places)
+    {
+        Array.Clear(_claims);
+        Array.Clear(_claimsSecond);
+        (_claimSlot, _claimSlotSecond) = (places?.Slot ?? -1, places?.SlotSecond ?? -1);
+        foreach (var (square, people) in places?.Claims ?? new())
+        {
+            if (square >= 0 && square < _claims.Length)
+            {
+                _claims[square] = people;
+            }
+        }
+
+        foreach (var (square, people) in places?.ClaimsSecond ?? new())
+        {
+            if (square >= 0 && square < _claimsSecond.Length)
+            {
+                _claimsSecond[square] = people;
+            }
+        }
+    }
+
+    private static Dictionary<int, int> Sparse(int[] claims)
+    {
+        var kept = new Dictionary<int, int>();
+        for (var i = 0; i < claims.Length; i++)
+        {
+            if (claims[i] != 0)
+            {
+                kept[i] = claims[i];
+            }
+        }
+
+        return kept;
+    }
+
+    /// <summary>Notes that people have picked a place to watch from, for the main stage's act or the second stage's.</summary>
+    private void Claim(TilePoint tile, int people, bool second)
     {
         var (x, y) = FieldMap.CentreOf(tile);
         var (sx, sy) = Density.SquareOf(x, y);
-        _claims[(sy * Density.Across) + sx] += people;
+        (second ? _claimsSecond : _claims)[(sy * Density.Across) + sx] += people;
     }
 
     /// <summary>
@@ -1394,18 +1464,20 @@ public sealed class Crowd
     /// Eases a packed crowd: everyone watching from a busy square moves further back. Returns how
     /// many people moved.
     /// </summary>
-    public int Ease()
+    public int Ease() => Ease(Show, false) + Ease(Second, true);
+
+    private int Ease(RunningOrder? show, bool second)
     {
-        if (Show?.Playing(_now) is not { } slot || Show.Stage is not { } stage)
+        if (show?.Playing(_now) is not { } slot || show.Stage is not { } stage)
         {
             return 0;
         }
 
-        Array.Clear(_claims);
+        Array.Clear(second ? _claimsSecond : _claims);
         var moved = 0;
         foreach (var party in _parties)
         {
-            if (party.State != PartyState.Watching || Density.At(party.X, party.Y) < DensityMap.Busy)
+            if (party.State != PartyState.Watching || party.Watch != slot.Index || Density.At(party.X, party.Y) < DensityMap.Busy)
             {
                 continue;
             }
@@ -1415,7 +1487,7 @@ public sealed class Crowd
                 var watching = party.Watch;
                 Send(party, spot, PartyState.Strolling);
                 party.Watch = party.State == PartyState.Strolling ? watching : -1;
-                Claim(spot, party.Members.Count);
+                Claim(spot, party.Members.Count, second);
                 moved += party.Members.Count;
             }
         }
@@ -1426,7 +1498,7 @@ public sealed class Crowd
     /// <summary>Moves one party out of the crush to somewhere further back, as security do when they lift someone over the barrier.</summary>
     public void MoveBack(Party party)
     {
-        if (Show?.Stage is not { } stage || PlaceToWatch(stage, party.Random, 0.3, party.Members.Count, standBack: true) is not { } spot)
+        if ((ShowOf(party.Watch)?.Stage ?? Show?.Stage) is not { } stage || PlaceToWatch(stage, party.Random, 0.3, party.Members.Count, standBack: true) is not { } spot)
         {
             return;
         }
@@ -1601,7 +1673,7 @@ public sealed class Crowd
             {
                 Hunger = p.Hunger, Thirst = p.Thirst, Toilet = p.Toilet, Mood = p.Mood, Stall = p.Stall, StallLane = p.StallLane,
                 StallPlace = p.Stall >= 0 && p.Stall < _stallQueues.Count ? _stallQueues[p.Stall][p.StallLane].IndexOf(p) : 0,
-                QueuedSince = p.QueuedSince, NeedRetryAt = p.NeedRetryAt, GaveUp = p.GaveUp, Spent = p.Spent, LeftUnhappy = p.LeftUnhappy, Leaves = p.Leaves, LitterAt = p.LitterAt, StayDecided = p.StayDecided,
+                QueuedSince = p.QueuedSince, NeedRetryAt = p.NeedRetryAt, GaveUp = p.GaveUp, Spent = p.Spent, LeftUnhappy = p.LeftUnhappy, Leaves = p.Leaves, LitterAt = p.LitterAt, DecidedSecond = p.DecidedSecond, StayDecided = p.StayDecided,
             })
         .ToList();
 
@@ -1636,6 +1708,7 @@ public sealed class Crowd
             party.Ticketed = s.Ticketed;
             party.Watch = s.Watch;
             party.Decided = s.Decided;
+            party.DecidedSecond = s.DecidedSecond;
             party.Gate = -1;
             party.ServiceLeft = s.ServiceLeft;
             party.Stall = -1;
@@ -1754,5 +1827,14 @@ public sealed record PartySave(int Id, PartyState State, double X, double Y, dou
 
     public bool StayDecided { get; init; }
 
+    /// <summary>The last set on the second stage the party made its mind up about, or -1.</summary>
+    public int DecidedSecond { get; init; } = -1;
+
     public DateTime? Leaves { get; init; }
 }
+
+/// <summary>
+/// How many people have picked each square of the crowd map to watch the act now on from, for
+/// the main stage and the second stage, and which sets those are.
+/// </summary>
+public sealed record WatchingPlaces(int Slot, Dictionary<int, int>? Claims, int SlotSecond, Dictionary<int, int>? ClaimsSecond);
