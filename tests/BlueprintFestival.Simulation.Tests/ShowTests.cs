@@ -31,20 +31,20 @@ public class ShowTests
     [InlineData(1)]
     [InlineData(21)]
     [InlineData(999)]
-    public void The_day_has_four_two_hour_sets_in_order_that_do_not_overlap_and_the_headliner_is_last(int seed)
+    public void The_day_has_four_ninety_minute_sets_in_order_that_do_not_overlap_and_the_headliner_is_last(int seed)
     {
         var show = new FestivalGame(seed: seed).Show;
         Assert.Equal(4, show.Slots.Count);
         Assert.Equal(Day.AddHours(14), show.Slots[0].Start);
-        Assert.All(show.Slots, s => Assert.Equal(TimeSpan.FromHours(2), s.End - s.Start));
+        Assert.All(show.Slots, s => Assert.Equal(TimeSpan.FromMinutes(90), s.End - s.Start));
         for (var i = 1; i < show.Slots.Count; i++)
         {
-            Assert.True(show.Slots[i].Start >= show.Slots[i - 1].End, "One set should end before the next starts.");
+            Assert.Equal(TimeSpan.FromMinutes(30), show.Slots[i].Start - show.Slots[i - 1].End);
         }
 
         Assert.All(show.Slots.Take(3), s => Assert.False(s.Headliner));
         Assert.True(show.Slots[3].Headliner);
-        Assert.Equal(Day.AddHours(22), show.Slots[3].End);
+        Assert.Equal(Day.AddHours(21.5), show.Slots[3].End);
         Assert.True(show.Slots[3].Act.Draw > show.Slots.Take(3).Max(s => s.Act.Draw));
         Assert.Contains(show.Slots[3].Act.Kind, new[] { ActKind.Band, ActKind.Dj });
     }
@@ -80,16 +80,23 @@ public class ShowTests
     }
 
     [Fact]
-    public void A_set_is_on_between_its_start_and_end_and_the_next_follows_straight_on()
+    public void A_set_is_on_between_its_start_and_end_and_the_stage_is_empty_for_half_an_hour_before_the_next()
     {
         var game = WithStage(StageKind.Bandstand);
         Assert.Null(game.Show.Playing(Day.AddHours(13.9)));
         Assert.Equal(0, game.Show.Playing(Day.AddHours(14))!.Index);
-        Assert.Equal(0, game.Show.Playing(Day.AddHours(15.9))!.Index);
+        Assert.Equal(0, game.Show.Playing(Day.AddHours(15.4))!.Index);
+        Assert.Null(game.Show.Playing(Day.AddHours(15.5)));
+        Assert.Null(game.Show.Playing(Day.AddHours(15.9)));
+        Assert.True(game.Show.Changeover(Day.AddHours(15.75)));
+        Assert.False(game.Show.Changeover(Day.AddHours(13)));
+        Assert.False(game.Show.Changeover(Day.AddHours(14.5)));
+        Assert.False(game.Show.Changeover(Day.AddHours(21.75)));
+        Assert.Empty(game.Show.OnStage(Day.AddHours(15.75)));
         Assert.Equal(1, game.Show.Playing(Day.AddHours(16))!.Index);
         Assert.Equal(1, game.Show.Next(Day.AddHours(14.5))!.Index);
         Assert.Null(game.Show.Next(Day.AddHours(21)));
-        Assert.Null(game.Show.Playing(Day.AddHours(22)));
+        Assert.Null(game.Show.Playing(Day.AddHours(21.5)));
 
         // A set left empty is a gap in the day.
         game.Show.Book(1, null);
@@ -168,9 +175,9 @@ public class ShowTests
     {
         var game = WithStage(StageKind.Bandstand);
         game.Show.Book(1, null);
-        RunUntil(game, 15.9);
+        RunUntil(game, 15.4);
         Assert.True(game.Crowd.Watching > 10);
-        RunUntil(game, 16.1);
+        RunUntil(game, 15.6);
         Assert.Equal(0, game.Crowd.Watching);
         game.Show.Book(1, game.Show.At(2));
         RunUntil(game, 16.8);

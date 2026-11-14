@@ -35,6 +35,13 @@ public partial class TopBar : PanelContainer
     private Label _queue = null!;
     private Label _show = null!;
     private Label _mood = null!;
+    private Button _skip = null!;
+
+    /// <summary>
+    /// The button that hurries the day on to the next act. The scene hangs it just below the bar,
+    /// under the line that says who is on.
+    /// </summary>
+    public Button SkipButton => _skip;
 
     /// <summary>How happy people are, as the bar says it.</summary>
     public string MoodText { get; private set; } = "";
@@ -190,6 +197,18 @@ public partial class TopBar : PanelContainer
         nowHolder.AddThemeConstantOverride("margin_top", 8);
         nowHolder.AddChild(now);
         row.AddChild(nowHolder);
+        _skip = UiStyle.SecondaryButton("Skip to next act", () =>
+        {
+            if (_game.SkippingTo is null)
+            {
+                _game.SkipToNextAct();
+            }
+            else
+            {
+                _game.StopSkipping();
+            }
+        });
+        _skip.Theme = UiStyle.Theme;
 
         row.AddChild(new Control { SizeFlagsHorizontal = SizeFlags.ExpandFill, MouseFilter = MouseFilterEnum.Ignore });
 
@@ -255,6 +274,12 @@ public partial class TopBar : PanelContainer
             : music.Playing(now) is { } on ? ("Now", on.Act.Name, $"until {on.End.ToString("HH:mm", British)}")
             : music.Next(now) is { } next ? ("Next", next.Act.Name, $"at {next.Start.ToString("HH:mm", British)}")
             : ("", "The music has finished", "");
+        if (kicker == "Next" && music.Changeover(now))
+        {
+            // The half hour after a set, while people go for a drink and the next act sets up.
+            kicker = "Stage empty. Next";
+        }
+
         ShowText = kicker.Length == 0 ? name : tail.Length == 0 ? $"{kicker}: {name}" : $"{kicker}: {name} {tail}";
         var other = _game.SecondShow;
         if (other.Stage is not null && other.CalledOff is null)
@@ -274,6 +299,15 @@ public partial class TopBar : PanelContainer
         {
             _showPill.TooltipText = "Who is on stage now, or who is on next";
         }
+
+        var upNext = _game.Phase == Phase.Day ? _game.NextAct : null;
+        _skip.Visible = _game.Phase == Phase.Day && music.Stage is not null;
+        _skip.Disabled = upNext is null && _game.SkippingTo is null;
+        _skip.Position = new Vector2(_showPill.GlobalPosition.X + ((_showPill.Size.X - _skip.Size.X) / 2), _showPill.GlobalPosition.Y + _showPill.Size.Y + 8);
+        _skip.Text = _game.SkippingTo is not null ? "Skipping..." : "Skip to next act";
+        _skip.TooltipText = _game.SkippingTo is not null ? "Click to stop skipping"
+            : upNext is null ? "There are no more acts to come today"
+            : $"Hurry the day on to {upNext.Act.Name} at {upNext.Start.ToString("HH:mm", British)} (N)";
 
         _showKicker.Text = kicker == "Now" ? "On now" : kicker;
         _showKicker.Visible = kicker.Length > 0;

@@ -267,6 +267,9 @@ public sealed class Crowd
     public const double Seeking = 0.6;
     public const double Pressing = 0.85;
 
+    /// <summary>The level at which someone who has just watched a set goes to a stall in the break, sooner than they otherwise would.</summary>
+    public const double InTheBreak = 0.35;
+
     /// <summary>How long a need takes to go from nothing to desperate, in hours.</summary>
     private const double HoursToHungry = 7;
     private const double HoursToThirsty = 3.5;
@@ -1475,10 +1478,14 @@ public sealed class Crowd
                     }
                     else if (!StillOn(party.Watch, now))
                     {
-                        // The set is over: hang about for a bit, then wander off.
+                        // The set is over. With the stage empty this is the moment for a drink, some food
+                        // or the toilet, even for those who could have waited; the rest hang about, then wander off.
                         party.Watch = -1;
-                        party.State = PartyState.Standing;
-                        party.WaitUntil = now + TimeSpan.FromMinutes(party.Random.Between(0.5, 4));
+                        if (!SeekStall(party, now, InTheBreak))
+                        {
+                            party.State = PartyState.Standing;
+                            party.WaitUntil = now + TimeSpan.FromMinutes(party.Random.Between(0.5, 4));
+                        }
                     }
 
                     break;
@@ -1591,7 +1598,7 @@ public sealed class Crowd
     /// A party with a need that has grown enough looks for the stall that answers it with the
     /// shortest wait, and joins its queue. True if they set off.
     /// </summary>
-    private bool SeekStall(Party party, DateTime now)
+    private bool SeekStall(Party party, DateTime now, double from = Seeking)
     {
         if (now < party.NeedRetryAt || _site.Stalls.Count == 0)
         {
@@ -1602,7 +1609,7 @@ public sealed class Crowd
         Need? wanted = null;
         foreach (var candidate in new[] { Need.Toilet, Need.Drink, Need.Food })
         {
-            if (party.Level(candidate) >= Seeking && (wanted is null || party.Level(candidate) > party.Level(wanted.Value))
+            if (party.Level(candidate) >= from && (wanted is null || party.Level(candidate) > party.Level(wanted.Value))
                 && _site.Stalls.Any(s => Catalogue.Of(s.Kind).Serves == candidate))
             {
                 wanted = candidate;

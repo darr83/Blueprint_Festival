@@ -312,7 +312,7 @@ public static partial class YearPanels
         bill.AddChild(new Control { CustomMinimumSize = new Vector2(0, 6), SizeFlagsVertical = Control.SizeFlags.ExpandFill });
         bill.AddChild(PriceTicket(view.Price, view.FairPrice, does.Price, "Admit", $"{view.Licence:N0}"));
         var summary = UiStyle.Body($"{view.Acts} acts  ·  fees £{view.Fees:N0}  ·  line-up pull {view.Pull}%", muted: true, size: 13);
-        summary.TooltipText = "Sets are two hours, from 14:00 to 22:00, and any can be left empty. Every act helps sell tickets by its stars and fans, the last act on the main stage most of all. Four kinds of music or more bring a wider crowd.";
+        summary.TooltipText = "Sets are an hour and a half, at 14:00, 16:00, 18:00 and 20:00, with half an hour's break after each, and any can be left empty. Every act helps sell tickets by its stars and fans, the last act on the main stage most of all. Four kinds of music or more bring a wider crowd.";
         summary.MouseFilter = Control.MouseFilterEnum.Stop;
         bill.AddChild(summary);
 

@@ -155,6 +155,7 @@ public partial class FestivalScene : Node3D
         TopBar = new TopBar { Name = "TopBar" };
         _hud.AddChild(TopBar);
         TopBar.Initialise(Game, OpenMenu);
+        _hud.AddChild(TopBar.SkipButton);
         Money = new MoneyPanel { Name = "MoneyPanel" };
         _hud.AddChild(Money);
         Money.Initialise(Game);
@@ -249,6 +250,9 @@ public partial class FestivalScene : Node3D
                 break;
             case Key.Key4:
                 Game.Clock.SetSpeed(GameSpeed.Fastest);
+                break;
+            case Key.N:
+                Game.SkipToNextAct();
                 break;
             case Key.C:
                 _viewFromWarning = false;
