@@ -142,7 +142,7 @@ public partial class YearScreen : Control
 
                 break;
             case Phase.Build:
-                Side(YearPanels.BuildDay(_game.Crowd.Expected, _game.Money, OpenGates, _game.Weather.Summary, WeekOf(_game), NextDay, ChangePrice, TravelOf(_game), ChangeParking, ChangeBuses));
+                Side(YearPanels.BuildDay(_game.Crowd.Expected, _game.Money, StartDay, _game.Weather.Summary, WeekOf(_game), NextDay, ChangePrice, TravelOf(_game), ChangeParking, ChangeBuses));
                 break;
             case Phase.Tidy:
                 Side(YearPanels.Tidy(_game.Litter.Count, _game.LitterAtStart, _game.ScoutsFee, () => PayScouts(), HandBack, _game.LitterPicked, _game.LitterBinned));
@@ -486,9 +486,10 @@ public partial class YearScreen : Control
         }
     }
 
-    public void OpenGates()
+    /// <summary>Ends the build: the day starts at eight with the gates shut and people queuing outside.</summary>
+    public void StartDay()
     {
-        _game.OpenGates();
+        _game.StartDay();
         Rebuild();
     }
 

@@ -48,6 +48,15 @@ public partial class TopBar : PanelContainer
     /// </summary>
     public Button SkipButton => _skip;
 
+    private Button _gates = null!;
+    private PanelContainer _ticket = null!;
+
+    /// <summary>
+    /// The button that opens the gates on the morning of the festival. The scene hangs it just
+    /// below the ticket badge; it shows only while the gates are shut.
+    /// </summary>
+    public Button GateButton => _gates;
+
     /// <summary>How happy people are, as the bar says it.</summary>
     public string MoodText { get; private set; } = "";
 
@@ -70,6 +79,7 @@ public partial class TopBar : PanelContainer
     private Label _year = null!;
     private Label _peopleCaption = null!;
     private Control _queueCell = null!;
+    private Label _queueCaption = null!;
 
     private static VBoxContainer Cell(Label big, Control caption, string tip)
     {
@@ -139,6 +149,10 @@ public partial class TopBar : PanelContainer
         figures.AddThemeConstantOverride("separation", 22);
         cells.AddChild(figures);
         parts.AddChild(cells);
+        _ticket = ticket;
+        _gates = UiStyle.Button("Open the gates", () => _game.OpenGates());
+        _gates.Theme = UiStyle.Theme;
+        _gates.Visible = false;
 
         _time = UiStyle.Heading("", 30);
         _time.CustomMinimumSize = new Vector2(84, 0);
@@ -175,7 +189,8 @@ public partial class TopBar : PanelContainer
         figures.AddChild(Cell(_people, _peopleCaption, "People on the site now, out of everyone expected today"));
 
         _queue = Figure();
-        _queueCell = Cell(_queue, UiStyle.Caps("Queuing", size: 11), "People queuing at the gates, or waiting outside because there is no way in");
+        _queueCaption = UiStyle.Caps("Queuing", size: 11);
+        _queueCell = Cell(_queue, _queueCaption, "People queuing at the gates, or waiting outside because there is no way in");
         figures.AddChild(_queueCell);
 
         row.AddChild(new Control { SizeFlagsHorizontal = SizeFlags.ExpandFill, MouseFilter = MouseFilterEnum.Ignore });
@@ -317,6 +332,7 @@ public partial class TopBar : PanelContainer
         _people.Text = $"{_game.Crowd.OnSite:N0}";
         _peopleCaption.Text = $"of {_game.Crowd.Expected:N0} here";
         QueueText = _game.Crowd.Queuing > 0 ? $"Queuing {_game.Crowd.Queuing}" : "";
+        _queueCaption.Text = _game.Phase == Phase.Day && _game.GatesShut ? "Outside" : "Queuing";
         _queue.Text = $"{_game.Crowd.Queuing:N0}";
         _queueCell.Visible = QueueText.Length > 0;
 
@@ -328,6 +344,17 @@ public partial class TopBar : PanelContainer
         _mood.Text = $"{_game.Crowd.Happiness}%";
         var music = _game.Show;
         ShowLines(OnNow.Lines(_game));
+
+        _gates.Visible = _game.Phase == Phase.Day && _game.GatesShut;
+        if (_gates.Visible)
+        {
+            var waiting = _game.Crowd.Queuing;
+            _gates.TooltipText = waiting > 0
+                ? $"{waiting:N0} {(waiting == 1 ? "person is" : "people are")} queuing outside. Ticket staff start checking tickets once the gates are open (G)"
+                : "Nobody is let in until the gates are open (G)";
+            _gates.Position = new Vector2(_ticket.GlobalPosition.X, _ticket.GlobalPosition.Y + _ticket.Size.Y + 10);
+        }
+
         var upNext = _game.Phase == Phase.Day ? _game.NextAct : null;
         _skip.Visible = _game.Phase == Phase.Day && music.Stage is not null;
         _skip.Disabled = upNext is null && _game.SkippingTo is null;

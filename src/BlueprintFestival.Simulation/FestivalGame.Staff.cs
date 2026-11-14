@@ -214,7 +214,39 @@ public sealed partial class FestivalGame
         if (NeedsStaff)
         {
             Crowd.OpenLanes = OpenLanes;
+            Crowd.Checkers = Checkers;
         }
+    }
+
+    /// <summary>The most ticket staff on one lane of a gate: one at the ticket table and one more beside the lane.</summary>
+    public const int CheckersALane = 2;
+
+    /// <summary>How many ticket staff are posted at a gate.</summary>
+    public int TicketStaffAt(int gate)
+    {
+        if (gate < 0 || gate >= Site.Gates.Count)
+        {
+            return 0;
+        }
+
+        var rect = Site.Gates[gate].Rect;
+        return _staff.Count(s => s.Kind == StaffKind.TicketStaff && rect.Contains(s.Tile));
+    }
+
+    /// <summary>
+    /// How many people are checking tickets on one lane of a gate. Staff fill the lanes one each
+    /// first, then a second on each lane in turn, so each one hired speeds the gate up.
+    /// </summary>
+    public int Checkers(int gate, int lane)
+    {
+        if (gate < 0 || gate >= Site.Gates.Count)
+        {
+            return 0;
+        }
+
+        var lanes = Catalogue.Of(Site.Gates[gate].Kind).Lanes;
+        var staff = TicketStaffAt(gate);
+        return lane < 0 || lane >= lanes ? 0 : Math.Min(CheckersALane, (staff + lanes - 1 - lane) / lanes);
     }
 
     /// <summary>How many lanes of a gate have ticket staff on them.</summary>
@@ -225,8 +257,7 @@ public sealed partial class FestivalGame
             return 0;
         }
 
-        var rect = Site.Gates[gate].Rect;
-        return Math.Min(Catalogue.Of(Site.Gates[gate].Kind).Lanes, _staff.Count(s => s.Kind == StaffKind.TicketStaff && rect.Contains(s.Tile)));
+        return Math.Min(Catalogue.Of(Site.Gates[gate].Kind).Lanes, TicketStaffAt(gate));
     }
 
     /// <summary>Whether someone could be posted on a tile, counting the money.</summary>
@@ -246,9 +277,9 @@ public sealed partial class FestivalGame
                 return new BuildCheck(false, wage, "Ticket staff work at a gate. Click a gate.");
             }
 
-            if (OpenLanes(gate) >= Catalogue.Of(Site.Gates[gate].Kind).Lanes)
+            if (TicketStaffAt(gate) >= Catalogue.Of(Site.Gates[gate].Kind).Lanes * CheckersALane)
             {
-                return new BuildCheck(false, wage, "Every lane of this gate has someone on it.");
+                return new BuildCheck(false, wage, $"Every lane of this gate has {CheckersALane} people checking tickets already.");
             }
         }
         else if (!Field.IsWalkableForStaff(tile) || !Field.Rented(tile))
@@ -276,13 +307,15 @@ public sealed partial class FestivalGame
         var heading = 0.0;
         if (kind == StaffKind.TicketStaff)
         {
-            // They stand just inside their lane, facing the people coming in.
+            // They stand just inside their lane, facing the people coming in. A second person on a
+            // lane stands across from the first, so the lane has a checker on each side.
             var gate = Site.Gates.ToList().FindIndex(g => g.Rect.Contains(tile));
-            var lane = OpenLanes(gate);
+            var info = Catalogue.Of(Site.Gates[gate].Kind);
+            var already = TicketStaffAt(gate);
+            var lane = already % info.Lanes;
             var use = Site.GateUses[gate];
             (x, y) = Site.LaneMouth(gate, lane, -0.8);
-            var info = Catalogue.Of(Site.Gates[gate].Kind);
-            var aside = Math.Min(0.7, info.Width * FieldMap.TileMetres / info.Lanes * 0.3);
+            var aside = Math.Min(0.7, info.Width * FieldMap.TileMetres / info.Lanes * 0.3) * (already < info.Lanes ? 1 : -1);
             (x, y) = (x - (use.OutY * aside), y + (use.OutX * aside));
             heading = Math.Atan2(use.OutX, use.OutY);
         }
