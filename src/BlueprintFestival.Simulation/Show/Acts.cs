@@ -24,32 +24,137 @@ public enum ActKind
     Dj,
 }
 
+/// <summary>The sort of music an act plays.</summary>
+public enum Genre
+{
+    Pop,
+    Rock,
+    Country,
+    Electronic,
+    Metal,
+    HipHop,
+}
+
 /// <summary>
 /// A made-up act. Its members are listed most important first, so a small stage takes the first
 /// few. Draw is the share of the people on site who want to watch, from 0 to 1.
 /// </summary>
 public sealed record Act(string Name, ActKind Kind, IReadOnlyList<BandRole> Members, double Draw, int LookSeed)
 {
-    /// <summary>
-    /// The number the act's music is made from. It comes from the act's name alone, so the same
-    /// act plays the same songs in every festival, every year and after every load.
-    /// </summary>
-    public int SongSeed => ActGenerator.SongSeedFor(Name);
+    /// <summary>The sort of music they play.</summary>
+    public Genre Genre { get; init; }
 
-    /// <summary>The act's own songs, in the order it plays them. Always the same for the same act.</summary>
-    public IReadOnlyList<Song> Songs => ActGenerator.SongsFor(Name, Kind);
+    /// <summary>How good they are, from one star (a local turn) to five (a household name).</summary>
+    public int Rating { get; init; } = 1;
+
+    /// <summary>How many people follow them.</summary>
+    public int Fans { get; init; }
+
+    /// <summary>The name the act was first drawn under, kept so the same festival always books the same acts.</summary>
+    internal string Stem { get; init; } = "";
+
+    /// <summary>The folder under the game's Music folder that holds this act's songs: the act's name.</summary>
+    public string MusicFolder => Name;
 
     /// <summary>The members who fit on a stage with room for so many.</summary>
     public IReadOnlyList<BandRole> On(int room) => Members.Take(Math.Max(1, room)).ToList();
 }
 
-/// <summary>
-/// One of an act's songs. Seed is what the music is made from (tune, key and so on), Tempo is in
-/// beats a minute. File is empty unless a recording is supplied for it later.
-/// </summary>
-public sealed record Song(string Title, int Seed, int Tempo, string File = "");
+/// <summary>One of the 25 artists who play the festival. Headline artists are the ones offered to close the night.</summary>
+public sealed record Artist(string Name, ActKind Kind, Genre Genre, int Rating, int Fans, bool Headline = false);
 
-/// <summary>Makes up acts. Every name is built from two plain words; none is a real artist.</summary>
+/// <summary>
+/// The artists. Every one is made up: none is a real act. Each has a kind (a solo guitarist, a
+/// duo, a full band or a DJ), a genre, a rating out of five and a following. Their songs are
+/// sound files in a folder of the same name under the game's Music folder.
+/// </summary>
+public static class Roster
+{
+    public static readonly IReadOnlyList<Artist> Artists = new[]
+    {
+        // Solo guitarists.
+        new Artist("Marnie Thrupp", ActKind.Solo, Genre.Country, 1, 320),
+        new Artist("Odell Ashby", ActKind.Solo, Genre.Pop, 2, 4200),
+        new Artist("Wren Hallows", ActKind.Solo, Genre.Rock, 2, 6800),
+        new Artist("Tobias Pell", ActKind.Solo, Genre.Country, 3, 38000),
+
+        // Duos.
+        new Artist("Salt and Bramble", ActKind.Duo, Genre.Pop, 1, 540),
+        new Artist("Paper Magpies", ActKind.Duo, Genre.Pop, 2, 5100),
+        new Artist("Ida and Corin", ActKind.Duo, Genre.Country, 2, 2900),
+        new Artist("Crooked Lantern", ActKind.Duo, Genre.HipHop, 3, 52000),
+        new Artist("Tin Foxgloves", ActKind.Duo, Genre.Rock, 3, 27000),
+
+        // Full bands with a fiddle.
+        new Artist("The Muddy Gateposts", ActKind.FolkBand, Genre.Country, 1, 780),
+        new Artist("Hollow Skylarks", ActKind.FolkBand, Genre.Country, 2, 7400),
+        new Artist("The Wandering Wellies", ActKind.FolkBand, Genre.Country, 3, 44000),
+
+        // Full bands.
+        new Artist("The Copper Turnips", ActKind.Band, Genre.Rock, 3, 61000),
+        new Artist("Bramble Hammer", ActKind.Band, Genre.Metal, 4, 240000),
+        new Artist("The Velvet Otters", ActKind.Band, Genre.Pop, 5, 2600000),
+        new Artist("Little Ferrets", ActKind.Band, Genre.Rock, 2, 8900, Headline: true),
+        new Artist("Tin Thunder", ActKind.Band, Genre.Metal, 3, 33000, Headline: true),
+        new Artist("Hedgerow Howl", ActKind.Band, Genre.Metal, 4, 310000, Headline: true),
+        new Artist("The Lantern Hearts", ActKind.Band, Genre.Pop, 5, 1900000, Headline: true),
+
+        // DJs.
+        new Artist("DJ Haybale", ActKind.Dj, Genre.Electronic, 2, 3600),
+        new Artist("DJ Weathervane", ActKind.Dj, Genre.HipHop, 4, 180000),
+        new Artist("DJ Tractor", ActKind.Dj, Genre.Electronic, 2, 9500, Headline: true),
+        new Artist("DJ Magpie", ActKind.Dj, Genre.HipHop, 3, 47000, Headline: true),
+        new Artist("DJ Foxglove", ActKind.Dj, Genre.Electronic, 4, 420000, Headline: true),
+        new Artist("DJ Otter", ActKind.Dj, Genre.Electronic, 5, 3100000, Headline: true),
+    };
+
+    /// <summary>The artist of that name, or null.</summary>
+    public static Artist? Named(string name) => Artists.FirstOrDefault(a => a.Name == name);
+
+    /// <summary>What a genre is called.</summary>
+    public static string NameOf(Genre genre) => genre == Genre.HipHop ? "Hip hop" : genre.ToString();
+
+    /// <summary>A following in a few characters: 780, 7.4k, 2.6m.</summary>
+    public static string FansText(int fans) => fans switch
+    {
+        >= 1000000 => string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{fans / 1000000.0:0.#}m"),
+        >= 10000 => string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{fans / 1000}k"),
+        >= 1000 => string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{fans / 1000.0:0.#}k"),
+        _ => fans.ToString(System.Globalization.CultureInfo.InvariantCulture),
+    };
+}
+
+/// <summary>
+/// A sound file in an artist's music folder. Files are named with a number and the song's
+/// title, such as "01 Long Way Home.mp3"; the number sets the order the songs are played in.
+/// </summary>
+public sealed record SongFile(string File, int Order, string Title)
+{
+    public static readonly IReadOnlyList<string> Endings = new[] { ".mp3", ".ogg", ".wav" };
+
+    /// <summary>Reads a file name. Null if it is not a sound file.</summary>
+    public static SongFile? Read(string file)
+    {
+        ArgumentNullException.ThrowIfNull(file);
+        var ending = Endings.FirstOrDefault(e => file.EndsWith(e, StringComparison.OrdinalIgnoreCase));
+        if (ending is null)
+        {
+            return null;
+        }
+
+        var name = file[..^ending.Length].Trim();
+        var digits = name.TakeWhile(char.IsDigit).Count();
+        var order = digits is > 0 and < 6 ? int.Parse(name[..digits], System.Globalization.CultureInfo.InvariantCulture) : int.MaxValue;
+        var title = name[digits..].TrimStart(' ', '-', '_', '.').Replace('_', ' ').Trim();
+        return new SongFile(file, order, title.Length == 0 ? name : title);
+    }
+
+    /// <summary>The songs among some file names, in the order they are played: by number, then by name.</summary>
+    public static IReadOnlyList<SongFile> InOrder(IEnumerable<string> files) =>
+        files.Select(Read).Where(s => s is not null).Select(s => s!).OrderBy(s => s.Order).ThenBy(s => s.File, StringComparer.OrdinalIgnoreCase).ToList();
+}
+
+/// <summary>Books acts from the roster for a festival, the same ones every time for the same festival.</summary>
 public static class ActGenerator
 {
     private static readonly string[] First =
@@ -76,54 +181,7 @@ public static class ActGenerator
         new[] { BandRole.Dj },
     };
 
-    private static readonly string[] SongStarts =
-    {
-        "Long Way", "Last Bus", "Rain On", "Dancing In", "Meet Me By", "Back To", "Lights Over", "Down By", "Waiting For", "Singing To", "Lost In", "Home From",
-    };
-
-    private static readonly string[] SongEnds =
-    {
-        "The Top Field", "Market Square", "The Old Barn", "Midsummer", "The River", "Harvest Moon", "The Night Train", "Bluebell Wood", "The Seaside", "Your Kitchen", "The Morning", "The Hill",
-    };
-
-    /// <summary>A number worked out from a name, the same on every computer and every run.</summary>
-    public static int SongSeedFor(string name)
-    {
-        var hash = 2166136261u;
-        foreach (var c in name)
-        {
-            hash = (hash ^ c) * 16777619u;
-        }
-
-        return (int)(hash & 0x7FFFFFFF);
-    }
-
-    /// <summary>The six songs an act plays, made from its name so they never change.</summary>
-    public static IReadOnlyList<Song> SongsFor(string name, ActKind kind)
-    {
-        var random = GameRandom.FromSeed(SongSeedFor(name), 11);
-        var (slow, fast) = kind switch
-        {
-            ActKind.Dj => (118, 132),
-            ActKind.Band => (100, 150),
-            ActKind.FolkBand => (90, 140),
-            _ => (70, 115),
-        };
-        var songs = new List<Song>();
-        var titles = new HashSet<string>();
-        while (songs.Count < 6)
-        {
-            var title = $"{SongStarts[random.Next(SongStarts.Length)]} {SongEnds[random.Next(SongEnds.Length)]}";
-            if (titles.Add(title))
-            {
-                songs.Add(new Song(title, random.Next(1000000), slow + random.Next(fast - slow + 1)));
-            }
-        }
-
-        return songs;
-    }
-
-    /// <summary>One act. Headliners are bands or DJs and draw most of the field.</summary>
+    /// <summary>One act from the roster. Headliners are bands or DJs where one is free, and draw most of the field.</summary>
     public static Act Make(GameRandom random, bool headliner, ISet<string> taken)
     {
         var roll = random.NextDouble();
@@ -148,6 +206,80 @@ public static class ActGenerator
         while (!taken.Add(name));
 
         var draw = headliner ? random.Between(0.85, 0.95) : random.Between(0.4, 0.7);
-        return new Act(name, kind, LineUps[(int)kind], draw, random.Next(100000));
+        var look = random.Next(100000);
+
+        // The bigger the pull, the bigger the name: support acts are one to three stars, a headliner four or five.
+        var rating = headliner ? (draw < 0.9 ? 4 : 5) : 1 + Math.Min(2, (int)((draw - 0.4) / 0.1));
+        return From(Pick(kind, rating, headline: false, taken, name), draw, look, name);
+    }
+
+    /// <summary>One of the headline artists with exactly so many stars, to be offered for the last set of the night.</summary>
+    public static Act MakeOffer(GameRandom random, int stars, ISet<string> taken)
+    {
+        ArgumentNullException.ThrowIfNull(taken);
+        var rolled = Make(random, true, new HashSet<string>(taken));
+        taken.Add(rolled.Stem);
+        return From(Pick(rolled.Kind, stars, headline: true, taken, rolled.Stem), rolled.Draw, rolled.LookSeed, rolled.Stem);
+    }
+
+    private static Act From(Artist artist, double draw, int look, string stem) =>
+        new(artist.Name, artist.Kind, artist.Kind == ActKind.Solo ? new[] { BandRole.Guitarist } : LineUps[(int)artist.Kind], draw, look)
+        {
+            Genre = artist.Genre,
+            Rating = artist.Rating,
+            Fans = artist.Fans,
+            Stem = stem,
+        };
+
+    /// <summary>Marks an act as booked, so nobody is booked twice in one festival.</summary>
+    public static void Take(ISet<string> taken, Act act)
+    {
+        ArgumentNullException.ThrowIfNull(taken);
+        ArgumentNullException.ThrowIfNull(act);
+        taken.Add(act.Stem);
+        taken.Add(Booked + act.Name);
+    }
+
+    private const string Booked = "#";
+
+    /// <summary>
+    /// The artist not yet booked who best fits: the right kind if there is one, then the nearest
+    /// rating. Ties are settled by the name first drawn, so the same festival books the same artist.
+    /// </summary>
+    private static Artist Pick(ActKind kind, int rating, bool headline, ISet<string> taken, string stem)
+    {
+        var free = Roster.Artists.Where(a => !taken.Contains(Booked + a.Name)).ToList();
+        var pool = free.Where(a => a.Headline == headline).ToList();
+        if (pool.Count == 0)
+        {
+            pool = free.Count > 0 ? free : Roster.Artists.ToList();
+        }
+
+        // A support act is never a four or five star name, and the night is never closed by less.
+        var fitting = pool.Where(a => headline ? a.Rating == rating : (a.Rating >= 4) == (rating >= 4)).ToList();
+        if (fitting.Count > 0)
+        {
+            pool = fitting;
+        }
+
+        var tie = (uint)Hash(stem);
+        var best = pool
+            .OrderBy(a => a.Kind == kind ? 0 : 1)
+            .ThenBy(a => Math.Abs(a.Rating - rating))
+            .ThenBy(a => (uint)Hash(a.Name) ^ tie)
+            .First();
+        taken.Add(Booked + best.Name);
+        return best;
+    }
+
+    private static int Hash(string name)
+    {
+        var hash = 2166136261u;
+        foreach (var c in name)
+        {
+            hash = (hash ^ c) * 16777619u;
+        }
+
+        return (int)(hash & 0x7FFFFFFF);
     }
 }

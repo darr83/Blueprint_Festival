@@ -33,7 +33,7 @@ brands or sponsors.
 | 10b. A second stage with its own line-up, booked at planning, and a medical tent with six beds | Done |
 | 10c. Camping, as an option at 5,000: a camping field next door, tents, campers who stay the night | Done |
 | 11. Sound effects: the field, the weather, the crowd, stalls, building, the radio and buttons, with volume sliders | Done (files made with `tools/make_sounds.py`) |
-| 12. The acts' music | |
+| 12. Artists and music: 25 made-up artists with a genre, a rating and a following, and a folder each for their songs | Done (songs are added to `game/Music`) |
 
 ## Controls
 
@@ -57,6 +57,7 @@ brands or sponsors.
 game/                               Godot project (open this folder in Godot)
   Scenes/                           Main menu and festival scenes
   Audio/                            The list of sound effects (sounds.json) and their files
+  Music/                            A folder for each artist's songs
   Scripts/Audio/                    The sound board and what the festival sounds like
   Scripts/Core/                     Game manager, saves, launch test, screenshot tool
   Scripts/UI/                       Look and feel, menus, top bar, view buttons
@@ -91,6 +92,18 @@ file in this project). `--list` shows what is there, and `--only till,fry --forc
 sounds again. The acts' music is not part of this and comes later.
 
 The volume sliders are in the pause menu (Esc) and on the main menu, and are remembered.
+
+## Artists and music
+
+There are 25 made-up artists (solo guitarists, duos, full bands and DJs), each with a genre, a
+rating out of five and a following. They are listed in `game/Music/README.txt` and in
+`src/BlueprintFestival.Simulation/Show/Acts.cs`.
+
+Each artist has a folder with their name on it under `game/Music`. Put that artist's songs in it,
+named with a number and the title: `01 Song Title.mp3`, `02 Another Song.mp3`. The number is the
+playing order and the title is what the game shows. `.mp3`, `.ogg` and `.wav` all work. During an
+artist's set their songs play in order and round again; an artist with no songs plays in silence.
+The music has its own volume slider.
 
 ## Checks
 

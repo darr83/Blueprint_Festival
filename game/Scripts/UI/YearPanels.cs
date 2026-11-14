@@ -4,7 +4,7 @@ using Godot;
 namespace BlueprintFestival.UI;
 
 /// <summary>One act on offer as headliner: its name, what it is, its fee and how many of five stars of pull it has.</summary>
-public sealed record ActOffer(string Name, string Kind, int Fee, int Stars);
+public sealed record ActOffer(string Name, string Kind, int Fee, int Stars, string Fans = "");
 
 /// <summary>One choice of ticket price and how many people it is expected to bring.</summary>
 public sealed record TicketChoice(int Price, int Expected);
@@ -125,7 +125,7 @@ public static class YearPanels
                 pull.AddChild(dot);
             }
 
-            pull.AddChild(UiStyle.Body("  pull", muted: true, size: 13));
+            pull.AddChild(UiStyle.Body(offer.Fans.Length > 0 ? $"  {offer.Fans}" : "  pull", muted: true, size: 13));
             inner.AddChild(pull);
             inner.AddChild(UiStyle.Body($"Fee £{offer.Fee:N0}", size: 15));
             tile.AddChild(inner);

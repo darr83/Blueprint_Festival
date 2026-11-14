@@ -1,3 +1,4 @@
+using BlueprintFestival.Simulation.Show;
 using BlueprintFestival.Audio;
 using BlueprintFestival.Simulation.Sound;
 using System;
@@ -207,7 +208,9 @@ public partial class SmokeTest : Node
                     Check(show.Acts.PerformerCount == onStage.Count, $"The act should be drawn on the stage: {show.Acts.PerformerCount} drawn, {onStage.Count} playing.");
                     Check(show.TopBar.ShowText.StartsWith($"Now: {music.Playing(show.Game.Now)!.Act.Name}", StringComparison.Ordinal), $"The top bar should say who is on, not '{show.TopBar.ShowText}'.");
                     Check(show.Game.Crowd.Watching > 0, "Some people should be watching the act.");
-                    Check(music.SongNow(show.Game.Now) is not null, "The act should be playing one of its songs.");
+                    Check(show.Music.Artist == music.Playing(show.Game.Now)!.Act.Name, $"The music player should be on the act that is playing, not '{show.Music.Artist}'.");
+                    Check(show.Music.SongCount == MusicPlayer.SongsOf(show.Music.Artist).Count, "The act's songs should come from its music folder.");
+                    Check(Roster.Named(show.Music.Artist) is not null && DirAccess.DirExistsAbsolute($"{MusicPlayer.Folder}/{show.Music.Artist}"), "The act should be one of the artists, with a music folder.");
                     Check(show.Acts.LightStrength < 0.05f, "The stage lights should be off by day.");
                     Check(show.Game.Income.Count >= 3, $"Tickets, food and drink should all have earned something by now, not {show.Game.Income.Count} lines.");
                     Check(show.TopBar.MoodText == $"Happy {show.Game.Crowd.Happiness}%", $"The top bar should say how happy people are, not '{show.TopBar.MoodText}'.");
@@ -453,6 +456,8 @@ public partial class SmokeTest : Node
                     Check(heard.Asked(Sounds.Notebook) == 2, "Next year's notebook should be heard opening.");
                     Next(Stage.Done);
                     GD.Print($"[smoke] Sound files found: {heard.WithFiles} of {heard.Listed}.");
+                    var (artists, songs) = MusicPlayer.Supplied();
+                    GD.Print($"[smoke] Songs found: {songs}, for {artists} of {Roster.Artists.Count} artists.");
                     GD.Print("[smoke] PASSED.");
                     GetTree().Quit(0);
                 }
