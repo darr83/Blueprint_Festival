@@ -149,8 +149,8 @@ public partial class SoundBoard : Node
     /// <summary>How loud a background sound is being asked to be, from 0 to 1.</summary>
     public float Wanted(string id) => _wanted.GetValueOrDefault(id);
 
-    /// <summary>Plays a one-off sound. Returns false if it was skipped for coming too soon after the last one.</summary>
-    public bool Play(string id)
+    /// <summary>Plays a one-off sound, at a level from 0 to 1. Returns false if it was skipped for coming too soon after the last one.</summary>
+    public bool Play(string id, float level = 1f)
     {
         if (!_sounds.TryGetValue(id, out var sound))
         {
@@ -174,7 +174,7 @@ public partial class SoundBoard : Node
         var voice = _voices.FirstOrDefault(v => !v.Playing) ?? _voices.MinBy(v => v.Stream is null ? 0 : v.Stream.GetLength() - v.GetPlaybackPosition())!;
         voice.Stream = sound.Stream;
         voice.Bus = sound.Bus;
-        voice.VolumeDb = Mathf.LinearToDb(sound.Volume);
+        voice.VolumeDb = Mathf.LinearToDb(sound.Volume * Mathf.Clamp(level, 0.001f, 1f));
         // A touch of difference each time, so a row of tills does not sound like one till.
         voice.PitchScale = sound.Bus == "Effects" ? _random.RandfRange(0.94f, 1.06f) : 1f;
         voice.Play();

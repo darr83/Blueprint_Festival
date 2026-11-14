@@ -56,6 +56,12 @@ public static class Sounds
     public const string ResultsGood = "results_good";
     public const string ResultsBad = "results_bad";
     public const string GateClosed = "gate_closed";
+    public const string Clap1 = "clap_1";
+    public const string Clap2 = "clap_2";
+    public const string Clap3 = "clap_3";
+
+    /// <summary>One clap of the crowd clapping along, each a little different; one plays on each clap of the beat.</summary>
+    public static readonly IReadOnlyList<string> Claps = [Clap1, Clap2, Clap3];
 
     /// <summary>The sounds that play round and round for as long as they are wanted.</summary>
     public static readonly IReadOnlyList<string> Loops =
