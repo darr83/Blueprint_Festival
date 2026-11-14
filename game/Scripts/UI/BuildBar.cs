@@ -65,7 +65,7 @@ public partial class BuildBar : VBoxContainer
         AddTab(row, BuildMode.Fence, "fence", "Fences", "Keep people in, out, or in a line");
         AddTab(row, BuildMode.Gate, "gate", "Gates", "Where tickets are checked");
         AddTab(row, BuildMode.Stall, "stall", "Stalls", "Food, drink, toilets and water");
-        AddTab(row, BuildMode.Staff, "staff", "Staff", "Ticket staff, security and first aid");
+        AddTab(row, BuildMode.Staff, "staff", "Staff", "Ticket staff, security, first aid and cleaners");
         AddTab(row, BuildMode.Ground, "ground", "Ground", "Straw, trackway and paths, to keep feet out of the mud");
         AddTab(row, BuildMode.Remove, "remove", "Take down", "Remove something and get the money back");
 
@@ -144,9 +144,9 @@ public partial class BuildBar : VBoxContainer
 
                 break;
             case BuildMode.Stall:
-                foreach (var s in Catalogue.Stalls.Where(s => s.Serves is not null))
+                foreach (var s in Catalogue.Stalls.Where(s => s.Serves is not null || s.Kind == StallKind.Bin))
                 {
-                    var takes = s.Price > 0 ? $"People pay £{s.Price} each." : "Free to use.";
+                    var takes = s.Kind == StallKind.Bin ? "" : s.Price > 0 ? $"People pay £{s.Price} each." : "Free to use.";
                     AddChoice($"stall{s.Kind}", s.Name, $"£{s.Cost:N0}", $"{s.About}\n{takes} {s.Width / 2f:0.#} m wide, {s.Depth / 2f:0.#} m deep.", () => _tool.PickStall(s.Kind));
                 }
 
@@ -158,7 +158,7 @@ public partial class BuildBar : VBoxContainer
                     AddChoice($"staff{s.Kind}", s.Name, $"£{s.Wage:N0} a day", s.About, () => _tool.PickStaff(s.Kind));
                 }
 
-                foreach (var tent in Catalogue.Stalls.Where(s => FestivalGame.HasBeds(s.Kind)))
+                foreach (var tent in Catalogue.Stalls.Where(s => FestivalGame.HasBeds(s.Kind) || s.Kind == StallKind.Bin))
                 {
                     AddChoice($"stall{tent.Kind}", tent.Name, $"£{tent.Cost:N0}", $"{tent.About}\n{tent.Width / 2f:0.#} m wide, {tent.Depth / 2f:0.#} m deep.", () => _tool.PickStall(tent.Kind));
                 }
@@ -220,6 +220,8 @@ public partial class BuildBar : VBoxContainer
             : k.StartsWith("stallbar") ? ("glass", UiStyle.StagePink)
             : k.StartsWith("stalltea") ? ("cup", UiStyle.StagePink)
             : booth && k.Contains("security") ? ("shield", UiStyle.StagePink)
+            : k == "stallbin" ? ("bin", UiStyle.StagePink)
+            : k == "staffcleaner" ? ("broom", UiStyle.StagePink)
             : booth && k.Contains("ticket") ? ("ticket", UiStyle.StagePink)
             : k.StartsWith("stage") ? ("stage", UiStyle.StagePink)
             : k.StartsWith("fence") ? ("fence", UiStyle.StagePink)

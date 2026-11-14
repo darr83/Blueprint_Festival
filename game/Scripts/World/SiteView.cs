@@ -15,6 +15,7 @@ public partial class SiteView : Node3D
     private const float DoorOpenDegrees = -105f;
 
     private readonly System.Collections.Generic.List<(int Stall, Node3D[] Doors)> _toilets = new();
+    private readonly System.Collections.Generic.List<(PlacedStall Bin, Node3D Rubbish)> _bins = new();
     private FestivalGame _game = null!;
     private bool _stale;
 
@@ -60,6 +61,12 @@ public partial class SiteView : Node3D
     /// </summary>
     public void Doors(float delta, bool snap)
     {
+        foreach (var (bin, rubbish) in _bins)
+        {
+            // A bin that wants emptying has bags heaped over the rim.
+            rubbish.Visible = _game.BinFill(bin) >= FestivalGame.BinWantsEmptying;
+        }
+
         var faster = Mathf.Max(1, (int)_game.Clock.Speed);
         foreach (var (stall, doors) in _toilets)
         {
@@ -133,6 +140,7 @@ public partial class SiteView : Node3D
         }
 
         _toilets.Clear();
+        _bins.Clear();
         var site = _game.Site;
         foreach (var stage in site.Stages)
         {
@@ -157,6 +165,11 @@ public partial class SiteView : Node3D
             }
 
             AddChild(node);
+            if (stall.Kind == StallKind.Bin)
+            {
+                _bins.Add((stall, node.GetNode<Node3D>("Rubbish")));
+            }
+
             if (Catalogue.Of(stall.Kind).Serves == Need.Toilet)
             {
                 var doors = new Node3D[Catalogue.Of(stall.Kind).Servers];

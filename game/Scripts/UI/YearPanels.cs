@@ -325,7 +325,7 @@ public static partial class YearPanels
     }
 
     /// <summary>The small panel shown the morning after, while the field is tidied.</summary>
-    public static Control Tidy(int litterLeft, int litterAtStart, int scoutsFee, System.Action? pay = null, System.Action? done = null)
+    public static Control Tidy(int litterLeft, int litterAtStart, int scoutsFee, System.Action? pay = null, System.Action? done = null, int picked = 0, int binned = 0)
     {
         var panel = Card(360);
         var box = new VBoxContainer();
@@ -337,6 +337,16 @@ public static partial class YearPanels
         words.AutowrapMode = TextServer.AutowrapMode.WordSmart;
         words.CustomMinimumSize = new Vector2(300, 0);
         box.AddChild(words);
+        if (picked > 0)
+        {
+            box.AddChild(MoneyRow("Picked up by cleaners", $"{picked:N0}"));
+        }
+
+        if (binned > 0)
+        {
+            box.AddChild(MoneyRow("Put in the bins", $"{binned:N0}"));
+        }
+
         box.AddChild(MoneyRow("Litter left", $"{litterLeft} of {litterAtStart}"));
         var bar = new ProgressBar { Value = 100.0 * (litterAtStart - litterLeft) / System.Math.Max(1, litterAtStart), ShowPercentage = false, CustomMinimumSize = new Vector2(0, 14) };
         bar.AddThemeStyleboxOverride("fill", UiStyle.Box(UiStyle.FirstAidGreen, 7));

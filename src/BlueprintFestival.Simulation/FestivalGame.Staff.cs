@@ -28,6 +28,18 @@ public enum StaffState
 
     /// <summary>Security standing in a crush the player sent them to, keeping the crowd back.</summary>
     Holding,
+
+    /// <summary>Walking their beat, away from their post, with nothing in particular to deal with.</summary>
+    Patrolling,
+
+    /// <summary>Stopped somewhere on their beat for a look round.</summary>
+    Looking,
+
+    /// <summary>A cleaner on the way to litter, or to a bin that wants emptying.</summary>
+    Cleaning,
+
+    /// <summary>A cleaner picking litter up, or emptying a bin.</summary>
+    Picking,
 }
 
 /// <summary>Something that needs a member of staff.</summary>
@@ -81,7 +93,7 @@ public sealed class StaffMember
     /// <summary>The number of the incident they are dealing with, or -1.</summary>
     public int Incident { get; internal set; } = -1;
 
-    public bool IsWalking => State is StaffState.Going or StaffState.Escorting or StaffState.Returning or StaffState.Sent;
+    public bool IsWalking => State is StaffState.Going or StaffState.Escorting or StaffState.Returning or StaffState.Sent or StaffState.Patrolling or StaffState.Cleaning;
 
     /// <summary>Where the player sent them into a crush, in metres.</summary>
     public double HoldX { get; internal set; }
@@ -91,7 +103,10 @@ public sealed class StaffMember
     /// <summary>Ticks still to stand in the crush once they are there.</summary>
     public int HoldLeft { get; internal set; }
 
-    public bool IsFree => State is StaffState.AtPost or StaffState.Returning;
+    public bool IsFree => State is StaffState.AtPost or StaffState.Returning or StaffState.Patrolling or StaffState.Looking;
+
+    /// <summary>Ticks until they next set off along their beat.</summary>
+    public int Wait { get; internal set; }
 
     internal List<TilePoint>? Path { get; set; }
 
@@ -373,6 +388,7 @@ public sealed partial class FestivalGame
 
         foreach (var member in _staff)
         {
+            Rounds(member);
             Move(member);
         }
     }
@@ -573,6 +589,7 @@ public sealed partial class FestivalGame
                 {
                     member.State = StaffState.AtPost;
                     member.Heading = member.PostHeading;
+                    member.Wait = 20 + (member.Id * 13 % 40);
                 }
 
                 break;
@@ -670,15 +687,15 @@ public sealed partial class FestivalGame
     }
 
     private StaffSave SaveStaff() => new(
-        _staff.Select(s => new StaffMemberSave(s.Id, s.Kind, s.Tile, s.PostX, s.PostY, s.PostHeading, s.X, s.Y, s.Heading, s.State, s.Incident) { Path = s.Path?.Skip(s.PathIndex).ToList(), HoldX = s.HoldX, HoldY = s.HoldY, HoldLeft = s.HoldLeft }).ToList(),
+        _staff.Select(s => new StaffMemberSave(s.Id, s.Kind, s.Tile, s.PostX, s.PostY, s.PostHeading, s.X, s.Y, s.Heading, s.State, s.Incident) { Path = s.Path?.Skip(s.PathIndex).ToList(), HoldX = s.HoldX, HoldY = s.HoldY, HoldLeft = s.HoldLeft, Wait = s.Wait }).ToList(),
         _incidents.Select(i => new IncidentSave(i.Id, i.Kind, i.X, i.Y, i.Party, i.Started, i.Staff, i.Left, i.Resting, i.Crush) { Tent = i.Tent, Bed = i.Bed }).ToList(),
-        _chance.State, _nextStaff, _nextIncident, Treated, Untreated, TroubleSorted, TroubleIgnored);
+        _chance.State, _nextStaff, _nextIncident, Treated, Untreated, TroubleSorted, TroubleIgnored) { Rounds = SaveRounds() };
 
     private void RestoreStaff(StaffSave save)
     {
         foreach (var s in save.Staff ?? new())
         {
-            var member = new StaffMember(s.Id, s.Kind, s.Tile, s.PostX, s.PostY, s.PostHeading) { X = s.X, Y = s.Y, Heading = s.Heading, State = Enum.IsDefined(s.State) ? s.State : StaffState.AtPost, Incident = s.Incident, HoldX = s.HoldX, HoldY = s.HoldY, HoldLeft = s.HoldLeft };
+            var member = new StaffMember(s.Id, s.Kind, s.Tile, s.PostX, s.PostY, s.PostHeading) { X = s.X, Y = s.Y, Heading = s.Heading, State = Enum.IsDefined(s.State) ? s.State : StaffState.AtPost, Incident = s.Incident, HoldX = s.HoldX, HoldY = s.HoldY, HoldLeft = s.HoldLeft, Wait = s.Wait };
             _staff.Add(member);
         }
 
@@ -691,7 +708,7 @@ public sealed partial class FestivalGame
         var ways = (save.Staff ?? new()).Where(s => s.Path is { Count: > 0 }).ToDictionary(s => s.Id, s => s.Path!);
         foreach (var member in _staff)
         {
-            if (ways.TryGetValue(member.Id, out var way) && member.State is StaffState.Going or StaffState.Escorting or StaffState.Returning or StaffState.Sent && way.All(Field.IsWalkable))
+            if (ways.TryGetValue(member.Id, out var way) && member.State is StaffState.Going or StaffState.Escorting or StaffState.Returning or StaffState.Sent or StaffState.Patrolling or StaffState.Cleaning && way.All(Field.IsWalkableForStaff))
             {
                 member.Path = way.ToList();
                 member.PathIndex = 0;
@@ -714,6 +731,9 @@ public sealed partial class FestivalGame
                 case StaffState.Sent:
                     Walk(member, member.HoldX, member.HoldY, StaffState.Sent);
                     break;
+                case StaffState.Patrolling or StaffState.Cleaning:
+                    Walk(member, member.HoldX, member.HoldY, member.State);
+                    break;
             }
         }
 
@@ -721,6 +741,7 @@ public sealed partial class FestivalGame
         _nextStaff = Math.Max(save.NextStaff, _staff.Count == 0 ? 0 : _staff.Max(s => s.Id) + 1);
         _nextIncident = Math.Max(save.NextIncident, _incidents.Count == 0 ? 0 : _incidents.Max(i => i.Id) + 1);
         (Treated, Untreated, TroubleSorted, TroubleIgnored) = (save.Treated, save.Untreated, save.TroubleSorted, save.TroubleIgnored);
+        RestoreRounds(save.Rounds);
     }
 }
 
@@ -736,6 +757,9 @@ public sealed record StaffMemberSave(int Id, StaffKind Kind, TilePoint Tile, dou
     public double HoldY { get; init; }
 
     public int HoldLeft { get; init; }
+
+    /// <summary>Ticks until they next set off along their beat.</summary>
+    public int Wait { get; init; }
 }
 
 /// <summary>One incident as written to a save file.</summary>
@@ -749,4 +773,8 @@ public sealed record IncidentSave(int Id, IncidentKind Kind, double X, double Y,
 }
 
 /// <summary>The staff and what they are dealing with, as written to a save file.</summary>
-public sealed record StaffSave(List<StaffMemberSave>? Staff, List<IncidentSave>? Incidents, ulong Chance, int NextStaff, int NextIncident, int Treated, int Untreated, int TroubleSorted, int TroubleIgnored);
+public sealed record StaffSave(List<StaffMemberSave>? Staff, List<IncidentSave>? Incidents, ulong Chance, int NextStaff, int NextIncident, int Treated, int Untreated, int TroubleSorted, int TroubleIgnored)
+{
+    /// <summary>The beats, the bins and the litter picked up.</summary>
+    public RoundsSave? Rounds { get; init; }
+}
