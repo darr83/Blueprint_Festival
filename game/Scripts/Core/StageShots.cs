@@ -112,7 +112,7 @@ public partial class StageShots : Node
         GameManager.Instance.Open(FestivalGame.StartYear(null, new YearSetup(year, licence, 4000 + (licence * 14), false, 82)));
     }
 
-    private static void RunTo(FestivalGame game, double hour)
+    internal static void RunTo(FestivalGame game, double hour)
     {
         var until = game.Day.AddHours(hour);
         while (game.Phase == Phase.Day && game.Now < until)
@@ -122,7 +122,7 @@ public partial class StageShots : Node
     }
 
     /// <summary>Builds a site with a main stage, a second stage, a medical tent, and stalls along the bottom hedge.</summary>
-    private static void Build(FestivalGame game)
+    internal static void Build(FestivalGame game)
     {
         var licence = game.Licence;
         var gap = game.Field.Gap;

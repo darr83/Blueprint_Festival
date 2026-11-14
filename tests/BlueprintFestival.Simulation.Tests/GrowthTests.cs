@@ -12,11 +12,12 @@ public class GrowthTests
     /// across the way in with staff on every lane, a main stage with a front barrier and pit
     /// crew, and food, drink, toilets and first aid in proportion to the crowd.
     /// </summary>
-    private static FestivalGame Built(int licence, int bank = 60000, bool bigName = false)
+    internal static FestivalGame Built(int licence, int bank = 60000, bool bigName = false, bool camping = false)
     {
         var game = FestivalGame.StartYear("Larkmoor Festival", new YearSetup(4, licence, bank, false, 80));
         var stars = bigName ? game.Headliners.Max(o => o.Stars) : game.Headliners.Min(o => o.Stars);
         game.ChooseHeadliner(game.Headliners.ToList().FindIndex(h => h.Stars == stars));
+        game.BookCamping(camping);
         Assert.True(game.ConfirmPlan());
         var gap = game.Field.Gap;
         var y = gap.Y + 1;

@@ -54,6 +54,8 @@ public partial class FestivalScene : Node3D
 
     public FestivalSounds Sounds { get; private set; } = null!;
 
+    public CampView Camp { get; private set; } = null!;
+
     private ViewButtons _viewButtons = null!;
     private Label _hint = null!;
 
@@ -98,6 +100,10 @@ public partial class FestivalScene : Node3D
         Litter = new LitterView { Name = "Litter" };
         AddChild(Litter);
         Litter.Initialise(Game);
+
+        Camp = new CampView { Name = "Camp" };
+        AddChild(Camp);
+        Camp.Initialise(Game);
 
         Crowd = new CrowdView { Name = "Crowd" };
         AddChild(Crowd);

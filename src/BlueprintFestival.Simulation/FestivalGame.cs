@@ -51,6 +51,7 @@ public sealed partial class FestivalGame
         SecondShow = new RunningOrder(Site, Seed, Clock.Now, Show);
         Crowd.Second = SecondShow;
         Crowd.TicketsSold += people => Earn("Tickets", people * TicketPrice);
+        Crowd.CamperArrived += people => Earn("Camping", people * CampingFee);
         // The stallholders keep most of what they take; the festival gets its share for the pitch.
         Crowd.Served += (kind, _, paid) => Earn(Catalogue.Of(kind).Name, ((paid * Catalogue.PitchShare) + 50) / 100);
         Crowd.Dropped += (x, y) => _litter.Add(new LitterPiece(Math.Round(x, 2), Math.Round(y, 2)));

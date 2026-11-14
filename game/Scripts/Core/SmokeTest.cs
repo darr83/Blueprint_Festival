@@ -314,6 +314,8 @@ public partial class SmokeTest : Node
                     board.SetVolume("Crowd", 0, save: false);
                     Check(SoundBoard.Volume("Crowd") == 0, "A slider all the way down should be silent.");
                     board.SetVolume("Crowd", 1, save: false);
+                    plan.Year.ToggleCamping();
+                    Check(!game.CampingOffered && !game.CampingBooked && !plan.Camp.GateShut && plan.Camp.TentCount == 0, "A village festival should have no camping field to take.");
                     var before = game.ActFees;
                     plan.Year.ToggleSecondStage();
                     Check(game.SecondStageBooked && game.ActFees == before + game.SecondStageFee, "Clicking the second stage should book its acts.");

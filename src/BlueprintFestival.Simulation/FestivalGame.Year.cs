@@ -142,6 +142,31 @@ public sealed partial class FestivalGame
         SecondShow.Booked = book;
     }
 
+    /// <summary>What the farmer charges for the camping field, with its toilets and taps.</summary>
+    public const int CampingCost = 2500;
+
+    /// <summary>What each camper pays for their pitch, on top of their ticket.</summary>
+    public const int CampingFee = 4;
+
+    /// <summary>The smallest licence at which camping is on offer.</summary>
+    public const int CampingFrom = 5000;
+
+    /// <summary>True if this year's field has a camping field next door and the licence is big enough to use it.</summary>
+    public bool CampingOffered => Planned && Licence >= CampingFrom && Field.HasCamp;
+
+    /// <summary>True if the camping field has been taken for this year.</summary>
+    public bool CampingBooked { get; private set; }
+
+    /// <summary>About how many people will camp if camping is booked.</summary>
+    public int CampersExpected => (int)Math.Round(ExpectedAt(TicketPrice) * People.Crowd.CamperShare);
+
+    /// <summary>Takes the camping field for the night, or gives it up. Only while planning, and only when it is on offer.</summary>
+    public void BookCamping(bool book)
+    {
+        Need(Phase.Plan);
+        CampingBooked = book && CampingOffered;
+    }
+
     public bool CanBuild => Phase is Phase.Build or Phase.Day;
 
     public IReadOnlyList<LitterPiece> Litter => _litter;
@@ -241,7 +266,8 @@ public sealed partial class FestivalGame
     {
         Need(Phase.Plan);
         var ponchos = PonchosOrdered ? PonchoCost : 0;
-        if (ActFees + ponchos + FieldRent > Money)
+        var camping = CampingBooked ? CampingCost : 0;
+        if (ActFees + ponchos + FieldRent + camping > Money)
         {
             return false;
         }
@@ -257,6 +283,11 @@ public sealed partial class FestivalGame
             Spend("Rain ponchos", ponchos);
         }
 
+        if (camping > 0)
+        {
+            Spend("Camping field", camping);
+        }
+
         ApplyPlan(Turnout());
         Phase = Phase.Build;
         return true;
@@ -269,6 +300,10 @@ public sealed partial class FestivalGame
     {
         Show.SetHeadliner(_offers[HeadlinerPicked].Act);
         Crowd.Replan(people);
+        if (CampingBooked)
+        {
+            Crowd.PitchCamp();
+        }
     }
 
     /// <summary>The build day is over: the clock starts and people begin to arrive.</summary>
@@ -328,6 +363,18 @@ public sealed partial class FestivalGame
     private void EndDay()
     {
         Phase = Phase.Tidy;
+        foreach (var (pitch, party) in Crowd.Tents)
+        {
+            // Most campers take everything home. Some leave a bag of rubbish, and a few leave the tent.
+            var mess = (uint)(party * 40503u) % 10;
+            var (x, y) = FieldMap.CentreOf(pitch);
+            for (var i = 0; i < (mess < 2 ? 3 : mess < 5 ? 1 : 0); i++)
+            {
+                // Left out in front of the tent, where it can be seen.
+                _litter.Add(new LitterPiece(Math.Round(x + 1.5 + (0.4 * Math.Cos(party + (i * 2.1))), 2), Math.Round(y + (0.5 * Math.Sin(party + (i * 2.1))), 2)));
+            }
+        }
+
         LitterAtStart = _litter.Count;
         _incidents.Clear();
         foreach (var member in _staff)
@@ -439,6 +486,7 @@ public sealed partial class FestivalGame
     {
         FieldRepair = _fieldRepair,
         SecondStage = SecondStageBooked,
+        Camping = CampingBooked,
     };
 
     private void RestoreYear(YearSave year)
@@ -446,6 +494,7 @@ public sealed partial class FestivalGame
         TicketPrice = TicketPrices.Contains(year.TicketPrice) ? year.TicketPrice : Catalogue.TicketPrice;
         HeadlinerPicked = Math.Clamp(year.Headliner, 0, _offers.Count - 1);
         SecondShow.Booked = year.SecondStage;
+        CampingBooked = year.Camping && CampingOffered;
         Phase = Enum.IsDefined(year.Phase) ? year.Phase : Phase.Plan;
         if (Phase != Phase.Plan)
         {
@@ -477,4 +526,7 @@ public sealed record YearSave(int Number, int Licence, Phase Phase, DateTime Day
 
     /// <summary>True if acts were booked for a second stage.</summary>
     public bool SecondStage { get; init; }
+
+    /// <summary>True if the camping field was taken.</summary>
+    public bool Camping { get; init; }
 }

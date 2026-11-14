@@ -12,7 +12,8 @@ public sealed record TicketChoice(int Price, int Expected);
 /// <summary>What the planning screen shows.</summary>
 public sealed record PlanView(int Year, string Festival, string Date, int Licence, int Bank, IReadOnlyList<TicketChoice> Tickets, int TicketPicked,
     IReadOnlyList<ActOffer> Headliners, int HeadlinerPicked, IReadOnlyList<string> Support, int SupportFee,
-    string Forecast = "", bool Ponchos = false, int PonchoCost = 0, string Field = "", int Rent = 0, bool SecondStage = false, int SecondStageFee = 0);
+    string Forecast = "", bool Ponchos = false, int PonchoCost = 0, string Field = "", int Rent = 0, bool SecondStage = false, int SecondStageFee = 0,
+    bool Camping = false, int CampingCost = 0, int Campers = 0, int CampingFee = 0);
 
 /// <summary>What the results screen shows.</summary>
 public sealed record ResultsView(int Year, string Festival, int Came, int Expected, int Happy, int WentHome, IReadOnlyList<(string What, int Amount)> In,
@@ -76,7 +77,7 @@ public static class YearPanels
 
     /// <summary>The planning screen: ticket price, headline act, and what is left to build with.</summary>
     public static Control Plan(PlanView view, System.Action? start = null, System.Action<int>? pickTicket = null, System.Action<int>? pickHeadliner = null,
-        System.Action? togglePonchos = null, System.Action? toggleSecondStage = null)
+        System.Action? togglePonchos = null, System.Action? toggleSecondStage = null, System.Action? toggleCamping = null)
     {
         var panel = Card(820);
         var box = new VBoxContainer();
@@ -177,12 +178,24 @@ public static class YearPanels
             box.AddChild(weather);
             }
 
+        var camping = view.Camping ? view.CampingCost : 0;
+        if (view.CampingCost > 0)
+        {
+            box.AddChild(Section("Camping"));
+            var camp = Tile(view.Camping, 770, toggleCamping);
+            var offer = new VBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
+            offer.AddChild(UiStyle.Heading(view.Camping ? $"Camping field taken: £{view.CampingCost:N0}" : $"Take the camping field next door: £{view.CampingCost:N0}", 18));
+            offer.AddChild(UiStyle.Body($"About {view.Campers:N0} people bring a tent and pay £{view.CampingFee} more each. They stay to the end and walk to their tents, not out of the gate. Some leave a mess.", muted: true, size: 14));
+            camp.AddChild(offer);
+            box.AddChild(camp);
+        }
+
         box.AddChild(Section("Money"));
         var ticket = view.Tickets[view.TicketPicked];
         var secondStage = view.SecondStage ? view.SecondStageFee : 0;
-        var fees = view.Headliners[view.HeadlinerPicked].Fee + (view.Support.Count * view.SupportFee) + secondStage + ponchos + view.Rent;
+        var fees = view.Headliners[view.HeadlinerPicked].Fee + (view.Support.Count * view.SupportFee) + secondStage + ponchos + view.Rent + camping;
         box.AddChild(MoneyRow("In the bank now", $"£{view.Bank:N0}"));
-        box.AddChild(MoneyRow($"Act fees, paid today ({view.Support.Count + 1 + (view.SecondStage ? 6 : 0)} acts)", $"-£{fees - ponchos - view.Rent:N0}"));
+        box.AddChild(MoneyRow($"Act fees, paid today ({view.Support.Count + 1 + (view.SecondStage ? 6 : 0)} acts)", $"-£{fees - ponchos - view.Rent - camping:N0}"));
         if (view.Rent > 0)
         {
             box.AddChild(MoneyRow("Field rent and licence, £1 a head", $"-£{view.Rent:N0}"));
@@ -191,6 +204,11 @@ public static class YearPanels
         if (ponchos > 0)
         {
             box.AddChild(MoneyRow("Rain ponchos", $"-£{ponchos:N0}"));
+        }
+
+        if (camping > 0)
+        {
+            box.AddChild(MoneyRow("Camping field", $"-£{camping:N0}"));
         }
 
         box.AddChild(new HSeparator());

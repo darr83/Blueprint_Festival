@@ -47,6 +47,7 @@ public partial class FieldView : Node3D
 
         BuildGround();
         BuildFieldGrass();
+        BuildCamp();
         BuildLane();
         BuildHedge(random);
         BuildTrees(random);
@@ -136,6 +137,20 @@ public partial class FieldView : Node3D
         }
     }
 
+    private void BuildCamp()
+    {
+        if (!_map.HasCamp)
+        {
+            return;
+        }
+
+        // Rougher grass than the showground, with a worn path in from the gateway.
+        var (x, z, w, d) = Metres(_map.Camp);
+        Flat("Camping field", x, z, w, d, Meadow.Darkened(0.06f), 0.01f);
+        var (gx, gz, gw, gd) = Metres(_map.CampGap);
+        Flat("Camp gateway", gx - 1f, gz, gw + 5f, gd, Dirt, 0.025f);
+    }
+
     private void BuildLane()
     {
         var (lx, lz, lw, ld) = Metres(_map.Lane);
@@ -160,10 +175,24 @@ public partial class FieldView : Node3D
         {
             (rx, rz, rw, thick),                                         // north
             (rx, rz, thick, rd),                                         // west
-            (rx + rw - thick, rz, thick, rd),                            // east
             (rx, rz + rd - thick, gapLeft - rx, thick),                  // south, west of the gap
             (gapRight, rz + rd - thick, rx + rw - gapRight, thick),      // south, east of the gap
         };
+        if (_map.HasCamp)
+        {
+            // The east hedge has a gateway into the camping field, which has a hedge of its own on three sides.
+            var (_, gz, _, gd) = Metres(_map.CampGap);
+            var (cx, cz, cw, cd) = Metres(_map.CampHedge);
+            runs.Add((rx + rw - thick, rz, thick, gz - rz));
+            runs.Add((rx + rw - thick, gz + gd, thick, rz + rd - gz - gd));
+            runs.Add((cx + thick, cz, cw - thick, thick));
+            runs.Add((cx + thick, cz + cd - thick, cw - thick, thick));
+            runs.Add((cx + cw - thick, cz, thick, cd));
+        }
+        else
+        {
+            runs.Add((rx + rw - thick, rz, thick, rd));                  // east
+        }
 
         // Bushy tops: rows of rounded clumps along every run, each a slightly different green.
         var clumps = new List<(Vector3 Position, Vector3 Scale, Color Colour)>();
