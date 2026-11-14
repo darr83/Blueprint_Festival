@@ -95,6 +95,14 @@ public partial class GameManager : Node
             {
                 AddChild(new FieldShots(arg["--field-shots=".Length..]) { Name = "FieldShots" });
             }
+            else if (arg.StartsWith("--dance-shots=", StringComparison.Ordinal))
+            {
+                AddChild(new DanceShots(arg["--dance-shots=".Length..]) { Name = "DanceShots" });
+            }
+            else if (arg == "--work-out-beats")
+            {
+                AddChild(new BeatScan { Name = "BeatScan" });
+            }
             else if (arg.StartsWith("--shots=", StringComparison.Ordinal))
             {
                 AddChild(new Shots(arg["--shots=".Length..]) { Name = "Shots" });

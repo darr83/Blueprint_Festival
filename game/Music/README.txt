@@ -17,6 +17,13 @@ An artist with no songs yet still plays their set, in silence.
 
 After adding files, open the game in Godot once so it can bring them in, then run it.
 
+THE BEAT
+
+The crowd dances in time to each song. The first time the game plays with a new song it works
+out the beat and saves it beside the song, as "01 Song Title.mp3.beat". You can leave these
+alone. If the crowd is ever out of time with a song, delete its .beat file to have it worked out
+again, or change the numbers in it.
+
 THE ARTISTS
 
   Marnie Thrupp           Solo guitarist                    Country     1 stars   320 fans
