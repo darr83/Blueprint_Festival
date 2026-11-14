@@ -110,6 +110,11 @@ sounds again. The acts' music is not part of this and comes later.
 
 The volume sliders are in the pause menu (Esc) and on the main menu, and are remembered.
 
+When the crowd claps along (the sway, mostly to country), one of the three `clap_` sounds plays
+on each clap of the beat of the music being heard, louder the more people are clapping. Those
+sounds have a `keep` length in the list: `make_sounds.py` cuts them to start right on the clap,
+so they are not late.
+
 ## The festival year
 
 - **January, the fields.** The year opens on a map of the Larkmoor estate. You click a field and

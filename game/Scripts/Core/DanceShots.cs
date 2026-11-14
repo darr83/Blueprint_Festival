@@ -1,3 +1,4 @@
+using System;
 using BlueprintFestival.Simulation.Core;
 using BlueprintFestival.Simulation.Show;
 using BlueprintFestival.Simulation.Site;
@@ -82,6 +83,11 @@ public partial class DanceShots : Node
 
         if (_frame == 5 + Filmed)
         {
+            if (GetTree().CurrentScene is FestivalScene filmed)
+            {
+                GD.Print($"[dance] {Scenes[_scene].Name}: {filmed.Crowd.Clappers} clapping along, {filmed.Crowd.ClapsPlayed} claps played");
+            }
+
             NextScene();
         }
     }
@@ -89,6 +95,13 @@ public partial class DanceShots : Node
     private void NextScene()
     {
         _scene++;
+        // SHOTS_ONLY=<part of a name> films just the scenes whose names have it.
+        var only = OS.GetEnvironment("SHOTS_ONLY");
+        while (only.Length > 0 && _scene < Scenes.Length && !Scenes[_scene].Name.Contains(only, StringComparison.Ordinal))
+        {
+            _scene++;
+        }
+
         _ready = false;
         _frame = 0;
         if (_scene >= Scenes.Length)

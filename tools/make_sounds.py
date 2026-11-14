@@ -81,7 +81,19 @@ def level(path):
     return True
 
 
-def save(sound_id, mp3):
+def keep_from_onset(path, seconds):
+    """Cuts a one-hit sound (a clap) so the hit is right at the start and nothing comes after it.
+    The game plays these on the beat, so any quiet lead-in would make them late."""
+    out = path.with_name(path.stem + ".cut" + path.suffix)
+    fade = min(0.12, seconds / 3)
+    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", str(path), "-af",
+                    f"silenceremove=start_periods=1:start_threshold=-30dB:start_silence=0.005,"
+                    f"atrim=0:{seconds},afade=t=out:st={seconds - fade:.3f}:d={fade:.3f}",
+                    "-c:a", "libvorbis", "-q:a", "5", str(out)], check=True)
+    out.replace(path)
+
+
+def save(sound_id, mp3, keep=None):
     for ending in ENDINGS:
         (AUDIO / f"{sound_id}.{ending}").unlink(missing_ok=True)
         (AUDIO / f"{sound_id}.{ending}.import").unlink(missing_ok=True)
@@ -99,6 +111,8 @@ def save(sound_id, mp3):
         ogg.unlink(missing_ok=True)
         return raw
     raw.unlink()
+    if keep:
+        keep_from_onset(ogg, keep)
     return ogg
 
 
@@ -141,7 +155,7 @@ def main():
     failed = []
     for number, sound in enumerate(todo, 1):
         try:
-            path = save(sound["id"], ask(key, sound))
+            path = save(sound["id"], ask(key, sound), sound.get("keep"))
             print(f"[{number}/{len(todo)}] {sound['id']}: {path.name}, {path.stat().st_size // 1024} KB", flush=True)
         except RuntimeError as error:
             failed.append(sound["id"])
