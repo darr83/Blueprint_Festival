@@ -272,9 +272,24 @@ public static partial class SiteProps
             b.Box(new Vector3(x, 0.06f, 0), new Vector3(1.2f, 0.12f, 1.25f), Charcoal);
             b.Box(new Vector3(x, 1.2f, 0), new Vector3(1.14f, 2.16f, 1.18f), Teal);
             b.Box(new Vector3(x, 2.32f, 0), new Vector3(1.2f, 0.1f, 1.24f), Cream, new Vector3(4, 0, 0));
-            b.Box(new Vector3(x, 1.12f, 0.6f), new Vector3(0.8f, 1.86f, 0.03f), Cream);
-            b.Box(new Vector3(x + 0.3f, 1.1f, 0.63f), new Vector3(0.06f, 0.16f, 0.04f), Black);
-            b.Tube(new Vector3(x, 1.75f, 0.625f), new Vector3(0.16f, 0.02f, 0.16f), i % 3 == 1 ? new Color("#D9483B") : new Color("#1E9E52"), new Vector3(90, 0, 0));
+            // The doorway is dark inside. The door is a part of its own, hinged on the left, so it can swing open.
+            b.Box(new Vector3(x, 1.12f, 0.585f), new Vector3(0.8f, 1.86f, 0.02f), new Color("#22302E"));
+            var door = new Node3D { Name = $"Door{i}", Position = new Vector3(x - 0.4f, 0, 0.6f) };
+            var leaf = new MeshBuilder();
+            leaf.Box(new Vector3(0.4f, 1.12f, 0.005f), new Vector3(0.8f, 1.86f, 0.03f), Cream);
+            leaf.Box(new Vector3(0.7f, 1.1f, 0.035f), new Vector3(0.06f, 0.16f, 0.04f), Black);
+            leaf.Tube(new Vector3(0.4f, 1.75f, 0.03f), new Vector3(0.2f, 0.02f, 0.2f), Cream.Darkened(0.25f), new Vector3(90, 0, 0));
+            door.AddChild(leaf.BuildNode("Leaf"));
+            foreach (var (sign, colour) in new[] { ("Vacant", new Color("#1E9E52")), ("Engaged", new Color("#D9483B")) })
+            {
+                var disc = new MeshBuilder();
+                disc.Tube(new Vector3(0.4f, 1.75f, 0.036f), new Vector3(0.16f, 0.02f, 0.16f), colour, new Vector3(90, 0, 0));
+                var node3 = disc.BuildNode(sign);
+                node3.Visible = sign == "Vacant";
+                door.AddChild(node3);
+            }
+
+            node.AddChild(door);
             b.Tube(new Vector3(x - 0.42f, 2.5f, -0.45f), new Vector3(0.09f, 0.5f, 0.09f), Black);
         }
 

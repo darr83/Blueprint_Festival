@@ -172,6 +172,15 @@ public sealed class Party
     /// <summary>How many times they have had to walk on because the back of the queue had moved.</summary>
     internal int Rejoins { get; set; }
 
+    /// <summary>
+    /// At the toilets, where each member has got to: -1 still waiting, the number of the cubicle
+    /// they are using, or -2 once they have been. Null when the party is not at the toilets.
+    /// </summary>
+    internal int[]? Cubicles { get; set; }
+
+    /// <summary>Which row beside the toilets this party gathers in once its members have been.</summary>
+    internal int WaitRow { get; set; }
+
     /// <summary>When they joined the stall queue.</summary>
     public DateTime QueuedSince { get; internal set; }
 
@@ -296,6 +305,7 @@ public sealed class Crowd
     private readonly List<QueueLine[]> _queues = new();
     private readonly List<QueueLine?> _stallQueues = new();
     private readonly List<Party?[]> _serving = new();
+    private readonly List<CubicleUse?[]> _cubicles = new();
     private readonly List<TilePoint> _standable = new();
     private readonly HashSet<TilePoint> _standableSet = new();
     private readonly DateTime _day;
@@ -440,7 +450,16 @@ public sealed class Crowd
     public int StallQueueLength(int stall) => stall < _stallQueues.Count ? _stallQueues[stall]?.People ?? 0 : 0;
 
     /// <summary>How many of a stall's servers are busy with someone.</summary>
-    public int BeingServed(int stall) => stall < _serving.Count ? _serving[stall].Count(p => p is not null) : 0;
+    public int BeingServed(int stall) => stall < _serving.Count ? _serving[stall].Count(p => p is not null) + _cubicles[stall].Count(c => c is not null) : 0;
+
+    /// <summary>How one cubicle of a toilet looks just now: vacant, with its door open as someone goes in or out, or engaged.</summary>
+    public CubicleLook Cubicle(int stall, int cubicle) =>
+        stall < 0 || stall >= _cubicles.Count || cubicle < 0 || cubicle >= _cubicles[stall].Length ? CubicleLook.Vacant : _cubicles[stall][cubicle]?.Phase switch
+        {
+            CubiclePhase.Entering or CubiclePhase.Leaving => CubicleLook.DoorOpen,
+            CubiclePhase.Inside => CubicleLook.Engaged,
+            _ => CubicleLook.Vacant,
+        };
 
     /// <summary>The queue at a stall, or null if it is not the kind of stall people queue at.</summary>
     public QueueLine? StallLine(int stall) => stall >= 0 && stall < _stallQueues.Count ? _stallQueues[stall] : null;
@@ -526,7 +545,26 @@ public sealed class Crowd
                 {
                     var m = party.Members[i];
                     var (x, y, heading) = Place(party, i);
-                    yield return new PersonOnSite(m.Id, m.Look, x, y, heading, party.IsWalking, party.State == PartyState.Watching,
+                    var walking = party.IsWalking;
+                    if (party.Cubicles is { } cubicles && party.State == PartyState.AtStall && party.Stall >= 0 && party.Stall < _cubicles.Count)
+                    {
+                        if (cubicles[i] >= 0 && _cubicles[party.Stall][cubicles[i]] is { } use)
+                        {
+                            if (use.Phase == CubiclePhase.Inside)
+                            {
+                                // Behind a shut door.
+                                continue;
+                            }
+
+                            (x, y, heading, walking) = (use.X, use.Y, use.Heading, true);
+                        }
+                        else if (cubicles[i] == -2)
+                        {
+                            walking = false;
+                        }
+                    }
+
+                    yield return new PersonOnSite(m.Id, m.Look, x, y, heading, walking, party.State == PartyState.Watching,
                         i == 0 && party.State != PartyState.Unwell ? party.Wants : null,
                         party.State == PartyState.Unwell && i == 0)
                     {
@@ -817,6 +855,7 @@ public sealed class Crowd
             party.InLine = false;
             party.Checked = 0;
             party.Server = -1;
+            party.Cubicles = null;
             switch (party.State)
             {
                 case PartyState.Queuing:
@@ -970,14 +1009,23 @@ public sealed class Crowd
         _queues.Clear();
         _stallQueues.Clear();
         _serving.Clear();
+        _cubicles.Clear();
         _taken.Clear();
         foreach (var stall in _site.Stalls)
         {
             var info = Catalogue.Of(stall.Kind);
             for (var k = 0; info.Serves is not null && k < info.Servers; k++)
             {
-                Take(SiteLayout.ServingPlace(stall, k, CounterMetres));
-                Take(SiteLayout.ServingPlace(stall, k, CounterMetres + 0.8));
+                if (info.Serves == Need.Toilet)
+                {
+                    Take(SiteLayout.CubicleDoor(stall, k, DoorMetres));
+                    Take(SiteLayout.CubicleDoor(stall, k, WaitMetres));
+                }
+                else
+                {
+                    Take(SiteLayout.ServingPlace(stall, k, CounterMetres));
+                    Take(SiteLayout.ServingPlace(stall, k, CounterMetres + 0.8));
+                }
             }
         }
 
@@ -1002,7 +1050,8 @@ public sealed class Crowd
         foreach (var stall in _site.Stalls)
         {
             var info = Catalogue.Of(stall.Kind);
-            _serving.Add(new Party?[info.Servers]);
+            _serving.Add(new Party?[info.Serves == Need.Toilet ? 0 : info.Servers]);
+            _cubicles.Add(new CubicleUse?[info.Serves == Need.Toilet ? info.Servers : 0]);
             if (info.Serves is null)
             {
                 _stallQueues.Add(null);
@@ -1243,9 +1292,18 @@ public sealed class Crowd
 
         if (party.State == PartyState.AtStall && party.Stall >= 0 && party.Stall < _site.Stalls.Count)
         {
+            if (party.Cubicles is not null && (i < party.Checked || !party.InLine))
+            {
+                // Those who have been wait in a row, clear of the doors, for the rest of their party.
+                var toilets = _site.Stalls[party.Stall];
+                var (fx, fy, dx, dy) = SiteLayout.Front(toilets.Rect, toilets.Facing);
+                var (wx, wy) = Waiting(party);
+                return (wx + (dy * i * 0.75), wy - (dx * i * 0.75), Math.Atan2(dy, -dx));
+            }
+
             if (party.InLine && _stallQueues[party.Stall] is { } line)
             {
-                return line.At(party.LinePos + i);
+                return line.At(party.LinePos + i - party.Checked);
             }
 
             if (party.Server >= 0)
@@ -1688,13 +1746,210 @@ public sealed class Crowd
             }
         }
 
+        if (party.Cubicles is not null && party.Stall >= 0 && party.Stall < _cubicles.Count)
+        {
+            var cubicles = _cubicles[party.Stall];
+            for (var k = 0; k < cubicles.Length; k++)
+            {
+                if (ReferenceEquals(cubicles[k]?.Party, party))
+                {
+                    cubicles[k] = null;
+                }
+            }
+        }
+
         party.Stall = -1;
         party.Server = -1;
         party.InLine = false;
+        party.Checked = 0;
+        party.Cubicles = null;
         party.Rejoins = 0;
         party.ServiceLeft = -1;
         party.Moving = false;
         party.Path = null;
+    }
+
+    /// <summary>How far out from its door someone stands as it opens, and how far out those who have been wait.</summary>
+    private const double DoorMetres = 0.9;
+    private const double WaitMetres = 1.8;
+
+    /// <summary>How long a cubicle door stands open as someone goes in or comes out, in seconds.</summary>
+    public const int DoorSeconds = 14;
+
+    /// <summary>
+    /// Where the first of a party at the toilets waits once they have been: off to one side and
+    /// well clear of the doors and the queue, each party in a row of its own. The rest of the
+    /// party line up beside them.
+    /// </summary>
+    private (double X, double Y) Waiting(Party party)
+    {
+        var stall = _site.Stalls[party.Stall];
+        var info = Catalogue.Of(stall.Kind);
+        var (fx, fy, dx, dy) = SiteLayout.Front(stall.Rect, stall.Facing);
+        var across = -((info.Width * FieldMap.TileMetres / 2) + 0.6);
+        var metresOut = 2.4 + (party.WaitRow * 1.3);
+        var (x, y) = (fx + (dx * metresOut) - (dy * across), fy + (dy * metresOut) + (dx * across));
+        if (_map.IsWalkable(FieldMap.TileAt(x, y)))
+        {
+            return (x, y);
+        }
+
+        // Something is in the way there: wait in front of the cabins instead.
+        return (fx + (dx * WaitMetres) + (dy * 0.6 * ((party.Members.Count - 1) / 2.0)), fy + (dy * WaitMetres) - (dx * 0.6 * ((party.Members.Count - 1) / 2.0)));
+    }
+
+    /// <summary>The first row beside a toilet that no other party is gathering in.</summary>
+    private int FreeWaitRow(int stall)
+    {
+        for (var row = 0; ; row++)
+        {
+            if (!_parties.Any(p => p.Stall == stall && p.State == PartyState.AtStall && p.Cubicles is not null && p.WaitRow == row))
+            {
+                return row;
+            }
+        }
+    }
+
+    /// <summary>
+    /// At the toilets people go in one at a time. Whoever is first in the queue walks to a free
+    /// cubicle, the door opens, they go in and it shuts behind them; when they come out the door
+    /// opens again and they wait nearby for the rest of their party.
+    /// </summary>
+    private void UseToilets(Party party, PlacedStall stall, StallInfo info, QueueLine line, DateTime now)
+    {
+        var cubicles = _cubicles[party.Stall];
+        if (party.Server < 0)
+        {
+            // People only wait so long once they have joined the queue, unless some of them have already gone in.
+            if (party.InLine && party.Checked == 0 && now - party.QueuedSince > TimeSpan.FromMinutes(PatienceMinutes))
+            {
+                LeaveStall(party);
+                party.GaveUp++;
+                party.Mood = Math.Max(0, party.Mood - 0.08);
+                party.NeedRetryAt = now + TimeSpan.FromMinutes(15);
+                party.State = PartyState.Standing;
+                party.WaitUntil = now;
+                return;
+            }
+
+            if (party.Path is not null)
+            {
+                party.Moving = true;
+                if (!Walk(party))
+                {
+                    return;
+                }
+            }
+
+            if (!party.InLine)
+            {
+                if (!Join(party, line))
+                {
+                    return;
+                }
+
+                party.QueuedSince = now;
+            }
+
+            Shuffle(party, line);
+            var free = party.LineTarget == 0 && party.LinePos < 0.6 ? Array.IndexOf(cubicles, null) : -1;
+            if (free >= 0)
+            {
+                if (party.Cubicles is null)
+                {
+                    party.WaitRow = FreeWaitRow(party.Stall);
+                    party.Cubicles = Enumerable.Repeat(-1, party.Members.Count).ToArray();
+                }
+
+                var (x, y, heading) = line.At(party.LinePos);
+                cubicles[free] = new CubicleUse(party, party.Checked) { X = x, Y = y, Heading = heading };
+                party.Cubicles[party.Checked] = free;
+                party.Checked++;
+                if (party.Checked == party.Members.Count)
+                {
+                    // The last of them has left the queue: the next party is now first.
+                    line.Parties.Remove(party);
+                    party.InLine = false;
+                    party.Server = 0;
+                    party.Moving = false;
+                    (party.X, party.Y) = Waiting(party);
+                }
+            }
+        }
+
+        var busy = false;
+        for (var k = 0; k < cubicles.Length; k++)
+        {
+            if (cubicles[k] is not { } use || !ReferenceEquals(use.Party, party))
+            {
+                continue;
+            }
+
+            if (Step(use, stall, k, info))
+            {
+                cubicles[k] = null;
+                party.Cubicles![use.Member] = -2;
+            }
+            else
+            {
+                busy = true;
+            }
+        }
+
+        if (party.Server >= 0 && !busy)
+        {
+            Finish(party, stall, info, now);
+        }
+    }
+
+    /// <summary>Moves one person on through their visit to a cubicle. True once they are out and the door has shut.</summary>
+    private static bool Step(CubicleUse use, PlacedStall stall, int cubicle, StallInfo info)
+    {
+        var (tx, ty) = SiteLayout.CubicleDoor(stall, cubicle, use.Phase == CubiclePhase.Entering ? -0.6 : DoorMetres);
+        if (use.Phase != CubiclePhase.Inside)
+        {
+            var dx = tx - use.X;
+            var dy = ty - use.Y;
+            var distance = Math.Sqrt((dx * dx) + (dy * dy));
+            if (distance > 0.02)
+            {
+                var step = Math.Min(distance, use.Party.Speed);
+                use.X += dx / distance * step;
+                use.Y += dy / distance * step;
+                use.Heading = Math.Atan2(dx, dy);
+            }
+
+            if (use.Phase == CubiclePhase.Approaching)
+            {
+                if (distance <= 0.02)
+                {
+                    use.Phase = CubiclePhase.Entering;
+                    use.Left = DoorSeconds;
+                }
+
+                return false;
+            }
+        }
+
+        if (--use.Left > 0)
+        {
+            return false;
+        }
+
+        switch (use.Phase)
+        {
+            case CubiclePhase.Entering:
+                // The walk there and the door take time too, so the visit itself is that much shorter.
+                use.Phase = CubiclePhase.Inside;
+                use.Left = Math.Max(10, info.SecondsPerPerson - (2 * DoorSeconds) - 8);
+                return false;
+            case CubiclePhase.Inside:
+                use.Phase = CubiclePhase.Leaving;
+                use.Left = DoorSeconds;
+                return false;
+            default:
+                return true;
+        }
     }
 
     private void QueueAtStall(Party party, DateTime now)
@@ -1708,6 +1963,12 @@ public sealed class Crowd
 
         var stall = _site.Stalls[party.Stall];
         var info = Catalogue.Of(stall.Kind);
+        if (info.Serves == Need.Toilet)
+        {
+            UseToilets(party, stall, info, line, now);
+            return;
+        }
+
         if (party.Server < 0)
         {
             // People only wait so long once they have joined the queue.
@@ -1773,6 +2034,14 @@ public sealed class Crowd
         }
 
         if (--party.ServiceLeft <= 0 && !party.Moving)
+        {
+            Finish(party, stall, info, now);
+        }
+    }
+
+    /// <summary>A party has been served: the need is answered, they pay, and they go back to their day.</summary>
+    private void Finish(Party party, PlacedStall stall, StallInfo info, DateTime now)
+    {
         {
             LeaveStall(party);
             switch (info.Serves)
@@ -2229,6 +2498,11 @@ public sealed class Crowd
                 Hunger = p.Hunger, Thirst = p.Thirst, Toilet = p.Toilet, Mood = p.Mood, Stall = p.Stall,
                 StallPlace = p.Stall >= 0 && p.Stall < _stallQueues.Count ? _stallQueues[p.Stall]?.Parties.IndexOf(p) ?? 0 : 0,
                 Server = p.Server, InLine = p.InLine, LinePos = p.LinePos, Checked = p.Checked,
+                Cubicles = p.Cubicles?.ToList(), WaitRow = p.WaitRow,
+                Visits = p.Cubicles is null || p.Stall < 0 || p.Stall >= _cubicles.Count ? null : _cubicles[p.Stall]
+                    .Where(c => ReferenceEquals(c?.Party, p))
+                    .Select(c => new CubicleSave(c!.Member, (int)c.Phase, c.Left, c.X, c.Y, c.Heading))
+                    .ToList(),
                 QueuedSince = p.QueuedSince, NeedRetryAt = p.NeedRetryAt, GaveUp = p.GaveUp, Spent = p.Spent, LeftUnhappy = p.LeftUnhappy, Leaves = p.Leaves, LitterAt = p.LitterAt, DecidedSecond = p.DecidedSecond, StayDecided = p.StayDecided,
             })
         .ToList();
@@ -2249,6 +2523,11 @@ public sealed class Crowd
         foreach (var serving in _serving)
         {
             Array.Clear(serving);
+        }
+
+        foreach (var cubicles in _cubicles)
+        {
+            Array.Clear(cubicles);
         }
 
         foreach (var s in saved.OrderBy(s => s.QueuePlace).ThenBy(s => s.StallPlace).ThenBy(s => s.Id))
@@ -2276,6 +2555,7 @@ public sealed class Crowd
             party.Server = -1;
             party.InLine = false;
             party.Checked = 0;
+            party.Cubicles = null;
             party.Rejoins = 0;
             party.GaveUp = s.GaveUp;
             party.Spent = s.Spent;
@@ -2303,7 +2583,39 @@ public sealed class Crowd
                 {
                     party.Stall = s.Stall;
                     party.QueuedSince = s.QueuedSince;
-                    if (s.Server >= 0 && s.Server < _serving[s.Stall].Length && _serving[s.Stall][s.Server] is null)
+                    if (_cubicles[s.Stall].Length > 0)
+                    {
+                        // At the toilets: some of the party may be in cubicles, or have been already.
+                        if (s.Cubicles is { } been && been.Count == party.Members.Count)
+                        {
+                            party.Cubicles = been.ToArray();
+                            party.WaitRow = s.WaitRow;
+                            party.Checked = Math.Clamp(s.Checked, 0, party.Members.Count);
+                            foreach (var visit in s.Visits ?? new())
+                            {
+                                var k = visit.Member >= 0 && visit.Member < been.Count ? been[visit.Member] : -1;
+                                if (k >= 0 && k < _cubicles[s.Stall].Length && _cubicles[s.Stall][k] is null)
+                                {
+                                    _cubicles[s.Stall][k] = new CubicleUse(party, visit.Member)
+                                    {
+                                        Phase = (CubiclePhase)visit.Phase, Left = visit.Left, X = visit.X, Y = visit.Y, Heading = visit.Heading,
+                                    };
+                                }
+                            }
+                        }
+
+                        if (party.Checked == party.Members.Count)
+                        {
+                            party.Server = 0;
+                        }
+                        else
+                        {
+                            line.Parties.Add(party);
+                            party.InLine = s.InLine;
+                            party.LinePos = s.LinePos;
+                        }
+                    }
+                    else if (s.Server >= 0 && s.Server < _serving[s.Stall].Length && _serving[s.Stall][s.Server] is null)
                     {
                         party.Server = s.Server;
                         _serving[s.Stall][s.Server] = party;
@@ -2399,8 +2711,17 @@ public sealed record PartySave(int Id, PartyState State, double X, double Y, dou
 
     public double LinePos { get; init; }
 
-    /// <summary>How many of the party have had their tickets checked.</summary>
+    /// <summary>How many of the party have had their tickets checked, or have left the queue for a toilet cubicle.</summary>
     public int Checked { get; init; }
+
+    /// <summary>At the toilets, where each member has got to: -1 waiting, a cubicle's number, or -2 once they have been.</summary>
+    public List<int>? Cubicles { get; init; }
+
+    /// <summary>Which row beside the toilets the party gathers in.</summary>
+    public int WaitRow { get; init; }
+
+    /// <summary>The members who are at or in a cubicle just now.</summary>
+    public List<CubicleSave>? Visits { get; init; }
 
     public int StallPlace { get; init; }
 
@@ -2436,3 +2757,6 @@ public sealed record WatchingPlaces(int Slot, Dictionary<int, int>? Claims, int 
     /// <summary>The minute of the hour the crowd was last counted in.</summary>
     public int MeasuredMinute { get; init; } = -1;
 }
+
+/// <summary>One person's visit to a toilet cubicle as written to a save file.</summary>
+public sealed record CubicleSave(int Member, int Phase, int Left, double X, double Y, double Heading);

@@ -10,6 +10,10 @@ public partial class SiteView : Node3D
 {
     private const float T = (float)FieldMap.TileMetres;
 
+    /// <summary>How far a cubicle door swings open, in degrees.</summary>
+    private const float DoorOpenDegrees = -105f;
+
+    private readonly System.Collections.Generic.List<(int Stall, Node3D[] Doors)> _toilets = new();
     private FestivalGame _game = null!;
     private bool _stale;
 
@@ -41,6 +45,30 @@ public partial class SiteView : Node3D
         if (_stale)
         {
             Rebuild();
+        }
+
+        Doors((float)delta, snap: false);
+    }
+
+    /// <summary>
+    /// Swings each cubicle door open or shut and turns its sign red or green, to match what the
+    /// rules say is happening there. The first cubicle in the rules is the last cabin in the model.
+    /// </summary>
+    public void Doors(float delta, bool snap)
+    {
+        var faster = Mathf.Max(1, (int)_game.Clock.Speed);
+        foreach (var (stall, doors) in _toilets)
+        {
+            for (var i = 0; i < doors.Length; i++)
+            {
+                var look = _game.Crowd.Cubicle(stall, doors.Length - 1 - i);
+                var door = doors[i];
+                var wanted = look == Simulation.People.CubicleLook.DoorOpen ? DoorOpenDegrees : 0f;
+                var now = door.RotationDegrees.Y;
+                door.RotationDegrees = new Vector3(0, snap ? wanted : Mathf.MoveToward(now, wanted, delta * 260f * faster), 0);
+                door.GetNode<Node3D>("Engaged").Visible = look == Simulation.People.CubicleLook.Engaged;
+                door.GetNode<Node3D>("Vacant").Visible = look != Simulation.People.CubicleLook.Engaged;
+            }
         }
     }
 
@@ -77,6 +105,7 @@ public partial class SiteView : Node3D
             child.QueueFree();
         }
 
+        _toilets.Clear();
         var site = _game.Site;
         foreach (var stage in site.Stages)
         {
@@ -101,6 +130,16 @@ public partial class SiteView : Node3D
             }
 
             AddChild(node);
+            if (Catalogue.Of(stall.Kind).Serves == Need.Toilet)
+            {
+                var doors = new Node3D[Catalogue.Of(stall.Kind).Servers];
+                for (var d = 0; d < doors.Length; d++)
+                {
+                    doors[d] = node.GetNode<Node3D>($"Door{d}");
+                }
+
+                _toilets.Add((i, doors));
+            }
         }
 
         for (var i = 0; i < site.Gates.Count; i++)
@@ -123,6 +162,7 @@ public partial class SiteView : Node3D
             AddChild(builder.BuildNode("Fences"));
         }
 
+        Doors(0, snap: true);
         StageCount = site.Stages.Count;
         GateCount = site.Gates.Count;
         StallCount = site.Stalls.Count;

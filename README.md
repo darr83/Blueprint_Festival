@@ -41,6 +41,7 @@ brands or sponsors.
 | 16b. Getting there: villagers walk, car park fields with bays and a parking charge, shuttle buses to the bus stop on the lane, and nobody buys a ticket without a way to get there | Done |
 | 17. Dancing to the beat: each song's beat is worked out once and saved beside it, and the crowd dances in time to it, with a move for each sort of music | Done |
 | 18a. Proper queues: people stand one behind the next at gates and stalls, long queues bend and fold back instead of piling up, each person holds up a ticket at the gate, and a stall has one queue with each server taking the next party | Done |
+| 18b. Toilets: one queue for each set of cabins, each person walks to a free cubicle, the door swings open and shuts behind them, the sign turns red while they are inside and green when they come out, and they wait nearby for the rest of their party | Done |
 
 ## Controls
 
