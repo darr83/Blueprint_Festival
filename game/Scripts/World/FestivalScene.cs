@@ -174,6 +174,7 @@ public partial class FestivalScene : Node3D
         _hud.AddChild(TopBar);
         TopBar.Initialise(Game, OpenMenu);
         _hud.AddChild(TopBar.SkipButton);
+        _hud.AddChild(TopBar.GateButton);
         Money = new MoneyPanel { Name = "MoneyPanel" };
         _hud.AddChild(Money);
         Money.Initialise(Game);
@@ -278,6 +279,9 @@ public partial class FestivalScene : Node3D
                 break;
             case Key.N:
                 Game.SkipToNextAct();
+                break;
+            case Key.G when Game.Phase == Phase.Day && Game.GatesShut:
+                Game.OpenGates();
                 break;
             case Key.C:
                 _viewFromWarning = false;

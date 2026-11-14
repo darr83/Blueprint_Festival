@@ -520,8 +520,29 @@ public partial class SmokeTest : Node
                     Check(sound.Wanted(Sounds.Day) > 0.9f && sound.Wanted(Sounds.CrowdSmall) == 0, "An empty field in the morning should be birdsong and no crowd.");
                     build.BuildBar.Close();
                     Check(game.Staff.Count == 3 && game.Spending.Any(l => l.What == "Staff wages" && l.Amount == 150), "Three staff should be hired for £150.");
-                    build.Year.OpenGates();
-                    Check(game.Phase == Phase.Day, "Opening the gates should start the day.");
+                    build.Year.StartDay();
+                    Check(game.Phase == Phase.Day && game.GatesShut, "Starting the day should leave the gates shut.");
+                    Check(game.Now.TimeOfDay == System.TimeSpan.FromHours(8), $"The day should start at 8am, not {game.Now:HH:mm}.");
+                    build.TopBar._Process(0);
+                    build.Site.Rebuild();
+                    Check(build.TopBar.GateButton.Visible && build.TopBar.GateButton.Text == "Open the gates", "The top bar should offer to open the gates.");
+                    Check(build.Site.GatesLookShut, "Poles should be across the gates while they are shut.");
+                    build.Sounds.Look();
+                    Check(SoundBoard.Instance!.Asked(Sounds.GatesOpen) == 0, "The gates should not be heard opening while they are shut.");
+
+                    // People arrive and queue outside, and nobody gets in.
+                    var waitGuard = 0;
+                    while (game.Now.TimeOfDay < System.TimeSpan.FromHours(8.6) && waitGuard++ < 5000)
+                    {
+                        game.Clock.Step();
+                    }
+
+                    Check(game.Crowd.Queuing > 0 && game.Crowd.ThroughGates == 0, $"People should queue outside the shut gates: {game.Crowd.Queuing} queuing, {game.Crowd.ThroughGates} in.");
+                    build.TopBar.GateButton.EmitSignal(BaseButton.SignalName.Pressed);
+                    Check(!game.GatesShut && game.GatesOpenedAt is not null, "The gate button should open the gates.");
+                    build.TopBar._Process(0);
+                    build.Site.Doors(0, snap: true);
+                    Check(!build.TopBar.GateButton.Visible && !build.Site.GatesLookShut, "The gate button and the poles should go once the gates are open.");
                     build.Sounds.Look();
 
                     // Run to the middle of the afternoon and look at the crowd view.

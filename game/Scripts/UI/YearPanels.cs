@@ -270,7 +270,7 @@ public static partial class YearPanels
         box.AddChild(UiStyle.Caps(week is null ? "Friday" : "Build week", pink: true));
         box.AddChild(UiStyle.Heading(week is null ? "Build day" : week.Day ?? "Ready to open", 28));
         var words = UiStyle.Body(week is null
-            ? "Friday. Nobody is here yet and the clock is stopped. Put up what you need, then open the gates."
+            ? "Friday. Nobody is here yet and the clock is stopped. Put up what you need, then start the day. It starts at 8am with the gates shut: people queue outside until you open them."
             : "Nobody is here yet and the clock is stopped. Put up what you need. Ending each day sells that day's tickets.", muted: true, size: 14);
         words.AutowrapMode = TextServer.AutowrapMode.WordSmart;
         words.CustomMinimumSize = new Vector2(300, 0);
@@ -314,11 +314,11 @@ public static partial class YearPanels
         if (week?.Day is not null)
         {
             box.AddChild(UiStyle.Button($"End {week.Day}", nextDay ?? (() => { }), BlueprintFestival.Simulation.Sound.Sounds.Coins));
-            box.AddChild(UiStyle.SecondaryButton("Skip the rest and open the gates", open ?? (() => { })));
+            box.AddChild(UiStyle.SecondaryButton("Skip the rest and start the day", open ?? (() => { })));
         }
         else
         {
-            box.AddChild(UiStyle.Button("Open the gates", open ?? (() => { })));
+            box.AddChild(UiStyle.Button("Start the day", open ?? (() => { })));
         }
 
         return panel;

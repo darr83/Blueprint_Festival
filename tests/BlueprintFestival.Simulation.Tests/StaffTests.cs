@@ -45,7 +45,7 @@ public class StaffTests
     }
 
     [Fact]
-    public void Ticket_staff_go_on_a_gate_one_to_a_lane_and_are_paid_for_the_day()
+    public void Ticket_staff_go_on_a_gate_up_to_two_a_lane_and_are_paid_for_the_day()
     {
         var game = BuildDay();
         var before = game.Money;
@@ -58,9 +58,13 @@ public class StaffTests
         Assert.Equal(before - 40, game.Money);
         Assert.Contains(game.Spending, l => l.What == "Staff wages" && l.Amount == 40);
 
-        // A village gate has one lane, so there is no room for a second.
+        // A village gate has one lane: a second person checks tickets beside the first, and a third has no room.
+        Assert.True(game.HireStaff(StaffKind.TicketStaff, GateTile(game)).Ok);
+        Assert.Equal(1, game.OpenLanes(0));
+        Assert.Equal(2, game.Checkers(0, 0));
         Assert.False(game.HireStaff(StaffKind.TicketStaff, GateTile(game)).Ok);
-        Assert.Single(game.Staff);
+        Assert.Equal(2, game.Staff.Count);
+        Assert.Equal(40, game.DismissStaff(game.Staff[1]));
 
         // Sent home on the build day, the wage comes back. Once the gates are open it does not.
         Assert.Equal(40, game.DismissStaff(game.Staff[0]));
