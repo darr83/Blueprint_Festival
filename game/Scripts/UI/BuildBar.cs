@@ -46,6 +46,15 @@ public partial class BuildBar : VBoxContainer
     /// <summary>The key of a size of big screen, under Stages.</summary>
     public static string ScreenKey(ScreenKind kind) => $"screen{kind}";
 
+    /// <summary>The key of a size of launch pad, under Fireworks.</summary>
+    public static string PadKey(LaunchPadKind kind) => $"pad{kind}";
+
+    /// <summary>The key of the card that opens the firework mixer, under Fireworks.</summary>
+    public const string MixerKey = "fireworksMixer";
+
+    /// <summary>Opens the firework mixer. Set by the scene.</summary>
+    public System.Action? OpenMixer { get; set; }
+
     /// <summary>The key of a kind of light, under Lights.</summary>
     public static string LightKey(LightKind kind) => $"light{kind}";
 
@@ -55,6 +64,11 @@ public partial class BuildBar : VBoxContainer
     public string StatusText => _status.Text;
 
     public int ChoiceCount => _choiceRow.GetChildCount();
+
+    private HBoxContainer _tabRow = null!;
+
+    /// <summary>Where the row of round build buttons starts on the screen, so the key hints can keep clear of it.</summary>
+    public float TabsLeft => _tabRow.GlobalPosition.X;
 
     public void Initialise(FestivalGame game, BuildTool tool)
     {
@@ -91,7 +105,8 @@ public partial class BuildBar : VBoxContainer
 
         // A row of round buttons, each with its name underneath, straight on the field.
         var row = new HBoxContainer { SizeFlagsHorizontal = SizeFlags.ShrinkCenter, MouseFilter = MouseFilterEnum.Ignore };
-        row.AddThemeConstantOverride("separation", 14);
+        row.AddThemeConstantOverride("separation", 10);
+        _tabRow = row;
         AddChild(row);
 
         AddTab(row, BuildMode.Stage, "stage", "Stages", "Somewhere for the acts to play, and big screens to show them");
@@ -101,6 +116,7 @@ public partial class BuildBar : VBoxContainer
         AddTab(row, BuildMode.Staff, "staff", "Staff", "Ticket staff, security, first aid and cleaners");
         AddTab(row, BuildMode.Ground, "ground", "Ground", "Straw, trackway and paths, to keep feet out of the mud");
         AddTab(row, BuildMode.Light, "light", "Lights", "Path lights, floodlights and fairy lights for after dark");
+        AddTab(row, BuildMode.Fireworks, "firework", "Fireworks", "A launch pad, and firework shows to plan on the mixer");
         AddTab(row, BuildMode.Remove, "remove", "Take down", "Remove something and get the money back");
 
         SetAnchorsAndOffsetsPreset(LayoutPreset.BottomWide, LayoutPresetMode.Minsize, 14);
@@ -219,6 +235,23 @@ public partial class BuildBar : VBoxContainer
                 }
 
                 break;
+            case BuildMode.Fireworks:
+                foreach (var p in LaunchPads.All)
+                {
+                    var side = (p.Size + (2 * p.SafeTiles)) / 2;
+                    AddChoice(PadKey(p.Kind), p.Name, $"£{p.Cost:N0}",
+                        $"{p.About}\nThe safe zone is {side} m square and must be clear of everything. Fence it off from the mixer (£{LaunchPads.FenceCostFor(p.Kind):N0}), or people wander in.",
+                        () => _tool.PickLaunchPad(p.Kind));
+                }
+
+                AddChoice(MixerKey, "Plan the shows", "Mixer",
+                    "Up to four 30-second shows at times you choose. Drag fireworks onto the timeline.\nA good show in the dark cheers everyone up.",
+                    () =>
+                    {
+                        _tool.Stop();
+                        OpenMixer?.Invoke();
+                    });
+                break;
             case BuildMode.Remove:
                 _tool.PickRemove();
                 break;
@@ -324,6 +357,7 @@ public partial class BuildBar : VBoxContainer
             : k.StartsWith("staff") ? ("staff", UiStyle.StagePink)
             : k.StartsWith("light") ? ("light", UiStyle.StagePink)
             : k.StartsWith("screen") ? ("screen", UiStyle.StagePink)
+            : k.StartsWith("pad") || k.StartsWith("fireworks") ? ("firework", UiStyle.StagePink)
             : k.StartsWith("ground") ? ("ground", UiStyle.StagePink)
             : ("stall", UiStyle.StagePink);
     }
@@ -380,6 +414,7 @@ public partial class BuildBar : VBoxContainer
             BuildMode.Ground => $"ground{_tool.Ground}",
             BuildMode.Light or BuildMode.Fairy => LightKey(_tool.Light),
             BuildMode.Screen => ScreenKey(_tool.Screen),
+            BuildMode.LaunchPad => PadKey(_tool.Pad),
             _ => "",
         };
         foreach (var (key, button) in _choices)
