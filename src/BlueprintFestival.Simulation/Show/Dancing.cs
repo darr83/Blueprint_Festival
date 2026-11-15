@@ -23,6 +23,31 @@ public enum DanceMove
 
     /// <summary>Just nodding along, for those who are not big dancers.</summary>
     Tap,
+
+    /// <summary>Both arms up, waving together from side to side over two hits.</summary>
+    Wave,
+
+    /// <summary>Pointing up at the stage on every hit, one hand and then the other.</summary>
+    Point,
+
+    /// <summary>A side step, one way and then the other, turning with it and arms swinging low.</summary>
+    Step,
+
+    /// <summary>Clapping with both hands above the head on every hit.</summary>
+    ClapHigh,
+}
+
+/// <summary>Which beats someone dances on.</summary>
+public enum DanceTiming
+{
+    /// <summary>On the hit, with most of the crowd (every other beat).</summary>
+    OnTheHit,
+
+    /// <summary>On the other beat from most of the crowd: still in time, but the opposite way round.</summary>
+    Offbeat,
+
+    /// <summary>Twice as fast, on every beat.</summary>
+    DoubleTime,
 }
 
 /// <summary>
@@ -45,18 +70,20 @@ public static class Dancing
     };
 
     /// <summary>
-    /// How one person dances to some music: mostly the move that suits it, but one in five does
-    /// something gentler that would suit it too, and one in ten just nods along.
+    /// How one person dances to some music: about two in three do the move that suits it; one in eight
+    /// does something gentler that would suit it too; about one in seven dances a different style of
+    /// their own (see <see cref="OtherStyles"/>), so each stage's crowd does not all look the same; and
+    /// the rest just nod along.
     /// </summary>
     public static DanceMove MoveFor(Genre genre, int person)
     {
         var roll = Roll(person, 1) % 100;
-        if (roll < 10)
+        if (roll < 8)
         {
             return DanceMove.Tap;
         }
 
-        if (roll < 30)
+        if (roll < 20)
         {
             return genre switch
             {
@@ -65,11 +92,67 @@ public static class Dancing
                 Genre.Electronic => DanceMove.Bounce,
                 Genre.HipHop => DanceMove.Bounce,
                 Genre.Pop => DanceMove.Sway,
+                Genre.Country => DanceMove.Step,
                 _ => DanceMove.Tap,
             };
         }
 
+        if (roll < 35)
+        {
+            var styles = OtherStyles(genre);
+            return styles[Roll(person, 4) % styles.Count];
+        }
+
         return MoveFor(genre);
+    }
+
+    /// <summary>
+    /// The different styles someone might dance to some music instead of the crowd's move: each still
+    /// suits the music (nobody head-bangs to country or jumps to hip hop).
+    /// </summary>
+    public static IReadOnlyList<DanceMove> OtherStyles(Genre genre) => genre switch
+    {
+        Genre.Pop => PopStyles,
+        Genre.Rock => RockStyles,
+        Genre.Metal => MetalStyles,
+        Genre.Electronic => ElectronicStyles,
+        Genre.Country => CountryStyles,
+        Genre.HipHop => HipHopStyles,
+        _ => PopStyles,
+    };
+
+    private static readonly DanceMove[] PopStyles = { DanceMove.Wave, DanceMove.ClapHigh, DanceMove.Step, DanceMove.Point };
+    private static readonly DanceMove[] RockStyles = { DanceMove.Jump, DanceMove.Point, DanceMove.Wave, DanceMove.ClapHigh };
+    private static readonly DanceMove[] MetalStyles = { DanceMove.Jump, DanceMove.Point, DanceMove.ClapHigh };
+    private static readonly DanceMove[] ElectronicStyles = { DanceMove.Wave, DanceMove.Point, DanceMove.Step, DanceMove.ClapHigh };
+    private static readonly DanceMove[] CountryStyles = { DanceMove.Step, DanceMove.ClapHigh, DanceMove.Wave };
+    private static readonly DanceMove[] HipHopStyles = { DanceMove.Point, DanceMove.Wave, DanceMove.Step, DanceMove.Bounce };
+
+    /// <summary>
+    /// Which beats someone dances on: most on the hit with everyone else, about one in eight on the
+    /// other beat (still in time, just the opposite way round), and about one in twelve twice as fast,
+    /// on every beat. Those swaying and clapping along always clap on the hit, so the clapping heard
+    /// matches their hands; and nobody jumps twice as fast.
+    /// </summary>
+    public static DanceTiming TimingOf(DanceMove move, int person)
+    {
+        if (move == DanceMove.Sway)
+        {
+            return DanceTiming.OnTheHit;
+        }
+
+        var roll = Roll(person, 5) % 100;
+        if (roll < 12)
+        {
+            return DanceTiming.Offbeat;
+        }
+
+        if (roll < 20 && move is not (DanceMove.Jump or DanceMove.Wave or DanceMove.Step))
+        {
+            return DanceTiming.DoubleTime;
+        }
+
+        return DanceTiming.OnTheHit;
     }
 
     /// <summary>
@@ -83,7 +166,8 @@ public static class Dancing
     /// a sway goes one way and back over two, a jump punches with one fist and then the other, and
     /// a hip hop nod leans one way and then the other.
     /// </summary>
-    public static int BeatsAMove(DanceMove move) => move is DanceMove.Sway or DanceMove.Jump or DanceMove.Nod or DanceMove.Bounce ? 2 : 1;
+    public static int BeatsAMove(DanceMove move) =>
+        move is DanceMove.Sway or DanceMove.Jump or DanceMove.Nod or DanceMove.Bounce or DanceMove.Wave or DanceMove.Point or DanceMove.Step ? 2 : 1;
 
     /// <summary>
     /// How far off the beat someone is, as a part of a beat: nobody is more than a twentieth of a
@@ -101,14 +185,18 @@ public static class Dancing
     public const int BeatsAHit = 2;
 
     /// <summary>
-    /// How far through their move someone is, from 0 to 1, where 0 is the moment it lands, on every
-    /// other beat of the music.
+    /// How far through their move someone is, from 0 to 1, where 0 is the moment it lands: on every
+    /// other beat of the music, or for some on the beats in between or on every beat (see
+    /// <see cref="TimingOf"/>).
     /// </summary>
     /// <param name="beat">How many beats into the song it is (see <see cref="BeatInfo.BeatAt"/>).</param>
     public static double Through(double beat, DanceMove move, int person)
     {
         var length = BeatsAMove(move);
-        var at = (beat - Lateness(person)) / (length * BeatsAHit);
+        var timing = TimingOf(move, person);
+        var hit = timing == DanceTiming.DoubleTime ? 1 : BeatsAHit;
+        var offset = timing == DanceTiming.Offbeat ? 1 : 0;
+        var at = (beat - Lateness(person) - offset) / (length * hit);
         return at - Math.Floor(at);
     }
 

@@ -843,6 +843,38 @@ public partial class PersonView : Node3D
                 return (new Vector3(5, 0, -10), new Vector3(-95 + pump, 0, 18), -0.04f * hit * e, new Vector3(12 * hit * e, 0, 0), second ? -4f : 4f);
             }
 
+            case DanceMove.Wave:
+            {
+                // Both arms up high, waving together from one side to the other over two hits, the
+                // body leaning with them and the knees giving a little on each hit.
+                var side = Mathf.Sin(through * Mathf.Tau) * 38f * e;
+                return (new Vector3(-8, 0, -155 + side), new Vector3(-8, 0, 155 + side), -0.025f * hit * e, new Vector3(0, 0, side * 0.18f), 0);
+            }
+
+            case DanceMove.Point:
+            {
+                // Pointing up at the stage on the hit, one hand and then the other, with a little dip.
+                var reach = 45f * hit * e;
+                var up = new Vector3(-105 - reach, 0, 0);
+                var down = new Vector3(-25, 0, 0);
+                return (second ? new Vector3(up.X, 0, -12) : new Vector3(down.X, 0, -14), second ? new Vector3(down.X, 0, 14) : new Vector3(up.X, 0, 12), -0.03f * hit * e, new Vector3(5 * hit * e, 0, 0), second ? 6f : -6f);
+            }
+
+            case DanceMove.Step:
+            {
+                // A side step: weight onto one foot and then the other, turning with it, the knees
+                // dipping on each hit and the arms swinging low, bent at the elbows.
+                var shift = Mathf.Sin(through * Mathf.Tau);
+                return (new Vector3(-30 + (30 * shift * e), 0, -16), new Vector3(-30 - (30 * shift * e), 0, 16), -0.03f * hit * e, new Vector3(3 * hit * e, 0, 6 * shift * e), 14f * shift * e);
+            }
+
+            case DanceMove.ClapHigh:
+            {
+                // Clapping above the head on each hit: the hands meet just as it lands.
+                var open = 34f * (1 - Clapped(swell));
+                return (new Vector3(-12, 0, -190 + open), new Vector3(-12, 0, 190 - open), (0.04f * e * (1 - wave)) - 0.02f, new Vector3(-3 * hit * e, 0, 0), 0);
+            }
+
             default:
                 // Nodding along on the beat with hands by their sides.
                 return (new Vector3(0, 0, -7), new Vector3(0, 0, 7), -0.012f * hit, new Vector3(8 * hit * e, 0, 0), 0);
