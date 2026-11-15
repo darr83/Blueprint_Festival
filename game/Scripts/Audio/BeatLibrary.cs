@@ -82,6 +82,15 @@ public partial class BeatLibrary : Node
                 Queue(artist.Name, song, first: false);
             }
         }
+
+        foreach (var kind in Busking.Kinds)
+        {
+            var folder = Busking.MusicFolder(kind);
+            foreach (var song in MusicPlayer.SongsOf(folder))
+            {
+                Queue(folder, song, first: false);
+            }
+        }
     }
 
     public override void _Ready() => QueueAll();

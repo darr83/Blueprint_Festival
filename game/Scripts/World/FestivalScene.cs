@@ -57,6 +57,9 @@ public partial class FestivalScene : Node3D
     public MoneyPanel Money { get; private set; } = null!;
     public StallPanel StallMenu { get; private set; } = null!;
 
+    /// <summary>An entertainer's set times, opened by clicking them.</summary>
+    public BuskPanel BuskTimes { get; private set; } = null!;
+
     public SignPanel SignBox { get; private set; } = null!;
 
     public BuildBar BuildBar { get; private set; } = null!;
@@ -167,7 +170,7 @@ public partial class FestivalScene : Node3D
         Acts.Music = Music;
         SecondActs.Music = Music;
 
-        Staff = new StaffView { Name = "Staff" };
+        Staff = new StaffView { Name = "Staff", Buskers = Music.Buskers };
         AddChild(Staff);
         Staff.Initialise(Game);
 
@@ -208,6 +211,9 @@ public partial class FestivalScene : Node3D
         StallMenu = new StallPanel { Name = "StallPanel" };
         _hud.AddChild(StallMenu);
         StallMenu.Initialise(Game, Build);
+        BuskTimes = new BuskPanel { Name = "BuskPanel" };
+        _hud.AddChild(BuskTimes);
+        BuskTimes.Initialise(Game, Build);
         SignBox = new SignPanel { Name = "SignPanel" };
         _hud.AddChild(SignBox);
         SignBox.Initialise(Game, Build);

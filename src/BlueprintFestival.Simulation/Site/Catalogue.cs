@@ -194,6 +194,18 @@ public enum StaffKind
 
     /// <summary>Picks up litter and empties the bins.</summary>
     Cleaner,
+
+    /// <summary>An entertainer: plays an acoustic guitar in a camping or food field at the times the player sets.</summary>
+    Guitarist,
+
+    /// <summary>An entertainer: plays a painted street piano.</summary>
+    Pianist,
+
+    /// <summary>An entertainer: plays a small drum kit.</summary>
+    Drummer,
+
+    /// <summary>An entertainer: plays records from a little DJ booth.</summary>
+    Dj,
 }
 
 /// <summary>One kind of staff: what they are called, what they cost for the day, and what they do.</summary>
@@ -388,6 +400,10 @@ public static class Catalogue
         new StaffInfo(StaffKind.Security, "Security", 60, "Walks a beat and deals with trouble. Behind a front barrier each one holds another 8 m of crowd."),
         new StaffInfo(StaffKind.FirstAider, "First-aider", 50, "Goes to anyone taken ill or hurt and looks after them."),
         new StaffInfo(StaffKind.Cleaner, "Cleaner", 35, "Walks the field picking up litter, and empties the bins when they fill."),
+        new StaffInfo(StaffKind.Guitarist, "Guitarist", 45, "An entertainer with an acoustic guitar. Plays in a camping or food field at the times you set, and people passing stop to listen."),
+        new StaffInfo(StaffKind.Pianist, "Pianist", 60, "An entertainer at a painted street piano. Plays in a camping or food field at the times you set, and people passing stop to listen."),
+        new StaffInfo(StaffKind.Drummer, "Drummer", 50, "An entertainer with a little drum kit. Plays in a camping or food field at the times you set, and people passing stop to listen."),
+        new StaffInfo(StaffKind.Dj, "DJ", 55, "An entertainer with a small DJ booth. Plays in a camping or food field at the times you set, and people passing stop to listen."),
     };
 
     public static StaffInfo Of(StaffKind kind) => Staff[(int)kind];
