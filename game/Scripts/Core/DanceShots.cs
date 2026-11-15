@@ -85,7 +85,7 @@ public partial class DanceShots : Node
         {
             if (GetTree().CurrentScene is FestivalScene filmed)
             {
-                GD.Print($"[dance] {Scenes[_scene].Name}: {filmed.Crowd.Clappers} clapping along, {filmed.Crowd.ClapsPlayed} claps played");
+                GD.Print($"[dance] {Scenes[_scene].Name}: {filmed.Crowd.Clappers} clapping along, {filmed.Crowd.ClapsPlayed} claps played, {filmed.Crowd.Singers} singing at level {filmed.Crowd.SingingLevel:0.00}");
             }
 
             NextScene();

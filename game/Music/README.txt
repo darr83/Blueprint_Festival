@@ -57,4 +57,16 @@ THE ENTERTAINERS
 The guitarist, pianist, drummer and DJ you can hire to play in the camping and food fields have
 their own folders inside "Entertainers". See the README there.
 
+SING-ALONG CHORUSES
+
+The crowd sings along in a song's choruses once they are marked. On the main menu press
+"Mark the choruses", pick a song, press Play, and tap C as each chorus starts and again as it
+ends. The marks are saved beside the song as "<song file>.chorus" (for example
+"01 Long Way Home.mp3.chorus"); delete that file to take the sing-along away. Songs with no
+choruses marked have no sing-along.
+
+If you also have the song's singing on its own (a vocal stem), put it beside the song with
+".vocals" before the ending, such as "01 Long Way Home.vocals.mp3". In the choruses the crowd then
+sings the real words back, quietly and with an echo, as well as the wordless crowd singing.
+
 Every artist is made up. None is a real act.

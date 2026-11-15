@@ -143,12 +143,27 @@ public sealed record SongFile(string File, int Order, string Title)
 {
     public static readonly IReadOnlyList<string> Endings = new[] { ".mp3", ".ogg", ".wav" };
 
-    /// <summary>Reads a file name. Null if it is not a sound file.</summary>
+    /// <summary>
+    /// What goes before the ending of a song's singing on its own (a vocal stem), which the crowd
+    /// sings along with in the choruses: "01 Hay Fever.vocals.mp3" for "01 Hay Fever.mp3".
+    /// It is not a song in itself.
+    /// </summary>
+    public const string VocalsMark = ".vocals";
+
+    /// <summary>The names a song's singing on its own could have, one for each sort of sound file.</summary>
+    public IEnumerable<string> VocalsFiles()
+    {
+        var ending = Endings.First(e => File.EndsWith(e, StringComparison.OrdinalIgnoreCase));
+        var name = File[..^ending.Length];
+        return Endings.Select(e => name + VocalsMark + e);
+    }
+
+    /// <summary>Reads a file name. Null if it is not a sound file, or is only the singing of another song.</summary>
     public static SongFile? Read(string file)
     {
         ArgumentNullException.ThrowIfNull(file);
         var ending = Endings.FirstOrDefault(e => file.EndsWith(e, StringComparison.OrdinalIgnoreCase));
-        if (ending is null)
+        if (ending is null || file[..^ending.Length].EndsWith(VocalsMark, StringComparison.OrdinalIgnoreCase))
         {
             return null;
         }
