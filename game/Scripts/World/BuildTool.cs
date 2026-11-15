@@ -743,6 +743,7 @@ public partial class BuildTool : Node3D
             DecorKind.GiantLetters => Sounds.BuildLetters,
             _ => Sounds.BuildPlanter,
         },
+        BuildMode.Stall when Rides.IsRide(Stall) => Sounds.BuildRide,
         _ => Sounds.BuildStall,
     };
 

@@ -178,6 +178,7 @@ public partial class FestivalScene : Node3D
         Crowd = new CrowdView { Name = "Crowd" };
         AddChild(Crowd);
         Crowd.Initialise(Game);
+        Crowd.RideSeat = Site.RideSeat;
         Crowd.Music = Music;
         Acts.Music = Music;
         SecondActs.Music = Music;

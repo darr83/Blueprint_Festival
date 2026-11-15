@@ -14,6 +14,11 @@ public static partial class SiteProps
     /// <summary>A stall built round its own middle, serving towards the south (+Z).</summary>
     public static Node3D Stall(StallKind kind)
     {
+        if (Rides.IsFair(kind))
+        {
+            return Ride(kind);
+        }
+
         var node = new Node3D { Name = Catalogue.Of(kind).Name };
         var b = new MeshBuilder();
         if (Vip(b, node, kind))
@@ -68,7 +73,7 @@ public static partial class SiteProps
     }
 
     /// <summary>Where the people serving stand, in metres from the stall's middle, the stall facing south.</summary>
-    public static Vector3[] StaffSpots(StallKind kind) => ShopStaff(kind) ?? kind switch
+    public static Vector3[] StaffSpots(StallKind kind) => ShopStaff(kind) ?? RideStaff(kind) ?? kind switch
     {
         StallKind.Bar => new[] { new Vector3(-1.4f, 0, 0.55f), new Vector3(1.3f, 0, 0.55f) },
         StallKind.VipLounge => new[] { new Vector3(-1.1f, 0, -2.35f), new Vector3(1.1f, 0, -2.35f) },

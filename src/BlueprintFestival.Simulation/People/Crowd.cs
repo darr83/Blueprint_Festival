@@ -253,6 +253,9 @@ public sealed class Party
 
     public bool BoughtMerch { get; internal set; }
 
+    /// <summary>How many times they have been on a ride or had a go at hook a duck today.</summary>
+    public int FairGoes { get; internal set; }
+
     /// <summary>True once the party has made up its mind whether to stay on for the headliner.</summary>
     public bool StayDecided { get; internal set; }
 
@@ -319,6 +322,12 @@ public readonly record struct PersonOnSite(int Id, PersonLook Look, double X, do
 
     /// <summary>How high the seat they are sitting on is, in metres (0 on the ground), or null if they are on their feet.</summary>
     public double? Seat { get; init; }
+
+    /// <summary>The ride they are on (its number among the stalls), or -1 if they are not on one.</summary>
+    public int Ride { get; init; } = -1;
+
+    /// <summary>Which seat of the ride they are in.</summary>
+    public int RideSeat { get; init; }
 }
 
 /// <summary>
@@ -770,6 +779,22 @@ public sealed partial class Crowd
     /// <summary>How many of the people on site are inside the hedge.</summary>
     public int InField => _parties.Where(p => p.IsOnSite && _map.InFestival(FieldMap.TileAt(p.X, p.Y))).Sum(p => p.Members.Count);
 
+    /// <summary>True while a party is sat on a ride: they have walked up to it and it has not let them off yet.</summary>
+    public bool OnRide(Party party) =>
+        party.State == PartyState.AtStall && party.Server >= 0 && !party.Moving && party.Stall >= 0 && party.Stall < _site.Stalls.Count && Rides.IsRide(_site.Stalls[party.Stall].Kind);
+
+    /// <summary>How many people are sat on a ride just now.</summary>
+    public int Riding(int stall) => _parties.Where(p => p.Stall == stall && OnRide(p)).Sum(p => p.Members.Count);
+
+    /// <summary>How many big teddies have been won at hook a duck today.</summary>
+    public int TeddiesWon => _parties.Sum(p => p.Members.Count(m => m.Holding == Carried.Teddy));
+
+    /// <summary>Raised when somebody wins a teddy: the hook a duck stall it was won at.</summary>
+    public event Action<PlacedStall>? TeddyWon;
+
+    /// <summary>True for something that is kept in the hand all day, not eaten or drunk.</summary>
+    public static bool Keeps(Carried item) => item is Carried.Bag or Carried.Teddy;
+
     /// <summary>Everyone on site, one entry per person.</summary>
     public IEnumerable<PersonOnSite> People
     {
@@ -811,6 +836,8 @@ public sealed partial class Crowd
                     {
                         Holding = m.Holding,
                         Seat = party.State == PartyState.Sitting ? SeatHeight(party, i) : null,
+                        Ride = OnRide(party) ? party.Stall : -1,
+                        RideSeat = (Math.Max(0, party.Server) * Rides.SeatsEach) + Math.Min(i, Rides.SeatsEach - 1),
                         Ticket = party.State == PartyState.Queuing && party.InLine && party.ServiceLeft >= 0 && i >= party.Checked && i < party.Checked + CheckersOn(party.Gate, party.Lane),
                     };
                 }
@@ -1946,7 +1973,7 @@ public sealed partial class Crowd
                 party.HoldUntil = default;
                 foreach (var member in party.Members)
                 {
-                    if (member.Holding != Carried.Bag)
+                    if (!Keeps(member.Holding))
                     {
                         member.Holding = Carried.None;
                     }
@@ -2428,6 +2455,9 @@ public sealed partial class Crowd
                 return party.Charged ? 0 : hour < 12 ? 0.004 : hour < 16 ? 0.012 : 0.02;
             case StallKind.VipLounge:
                 return !party.Vip || party.Thirst < 0.15 ? 0 : 0.05 * (hour >= 17 ? 1.5 : 1);
+            case StallKind.BigWheel or StallKind.Waltzer or StallKind.Twister or StallKind.Carousel or StallKind.Skylark or StallKind.HookADuck:
+                // The fairground is for people having a good enough day, less so in the rain, and the novelty wears off.
+                return party.Mood < 0.3 ? 0 : Rides.Pull(stall.Kind, party.HasChild) * (wet ? 0.3 : 1) / (1 + (0.7 * party.FairGoes));
             default:
                 return 0;
         }
@@ -2821,8 +2851,11 @@ public sealed partial class Crowd
             // first walking to the very front.
             var free = party.LineTarget == 0 ? Array.IndexOf(_serving[party.Stall], null) : -1;
             Shuffle(party, line);
-            if (free < 0)
+            var ride = Rides.IsRide(stall.Kind);
+            var turn = ride ? Rides.TurnAt(stall, now) : default;
+            if (free < 0 || (ride && !turn.Boarding))
             {
+                // A ride only lets people on while it is standing still.
                 return;
             }
 
@@ -2830,7 +2863,8 @@ public sealed partial class Crowd
             _serving[party.Stall][free] = party;
             party.InLine = false;
             party.Server = free;
-            party.ServiceLeft = info.SecondsPerPerson * party.Members.Count;
+            // Everyone on a ride gets off together when it stops.
+            party.ServiceLeft = ride ? turn.Left : info.SecondsPerPerson * party.Members.Count;
         }
 
         // Walk up to the counter. The serving starts as they set off, so nobody is kept waiting by the walk.
@@ -2883,7 +2917,7 @@ public sealed partial class Crowd
             buyers++;
             filled += item.Fills;
             dearness += stall.Dearness(pick);
-            if (item.Gives != Carried.None && (member.Holding != Carried.Bag || item.Gives == Carried.Bag))
+            if (item.Gives != Carried.None && (!Keeps(member.Holding) || item.Gives == Carried.Bag) && (member.Holding != Carried.Teddy))
             {
                 member.Holding = item.Gives;
                 handful = handful || item.Gives != Carried.Bag;
@@ -2907,6 +2941,23 @@ public sealed partial class Crowd
             case Need.Toilet:
                 party.Toilet = 0;
                 break;
+        }
+
+        if (Rides.IsFair(stall.Kind) && buyers > 0)
+        {
+            party.FairGoes++;
+            party.Mood = Math.Clamp(party.Mood + Rides.Thrill, 0, 1);
+            if (stall.Kind == StallKind.HookADuck && Roll(party.Id, 61, (int)now.TimeOfDay.TotalMinutes) < Rides.TeddyChance)
+            {
+                // The teddy goes to a child if there is one, and to whoever has a hand free.
+                var winner = party.Members.Where(m => !Keeps(m.Holding)).OrderBy(m => m.Look.Age == AgeGroup.Child ? 0 : 1).FirstOrDefault();
+                if (winner is not null)
+                {
+                    winner.Holding = Carried.Teddy;
+                    party.Mood = Math.Clamp(party.Mood + Rides.Thrill, 0, 1);
+                    TeddyWon?.Invoke(stall);
+                }
+            }
         }
 
         switch (stall.Kind)
@@ -3587,7 +3638,7 @@ public sealed partial class Crowd
                 QueuedSince = p.QueuedSince, NeedRetryAt = p.NeedRetryAt, GaveUp = p.GaveUp, Spent = p.Spent, LeftUnhappy = p.LeftUnhappy, Leaves = p.Leaves, LitterAt = p.LitterAt, DecidedSecond = p.DecidedSecond, StayDecided = p.StayDecided,
                 Holding = p.Members.Any(m => m.Holding != Carried.None) ? p.Members.Select(m => (int)m.Holding).ToList() : null,
                 Bought = p.Members.Any(m => m.Bought != 0) ? p.Members.Select(m => m.Bought).ToList() : null,
-                HoldUntil = p.HoldUntil, FancyAt = p.FancyAt, GrumbleAt = p.GrumbleAt, BoughtHats = p.BoughtHats, BoughtMerch = p.BoughtMerch, Fancying = p.Fancying,
+                HoldUntil = p.HoldUntil, FancyAt = p.FancyAt, GrumbleAt = p.GrumbleAt, BoughtHats = p.BoughtHats, BoughtMerch = p.BoughtMerch, FairGoes = p.FairGoes == 0 ? null : p.FairGoes, Fancying = p.Fancying,
                 Charged = p.Charged, OnGround = p.State == PartyState.Sitting && p.OnGround, SitUntil = p.State == PartyState.Sitting ? p.SitUntil : default, RestAfter = p.RestAfter,
                 Seat = p.State == PartyState.Sitting && p.Seat is { } sat ? new TilePoint(sat.X, sat.Y) : null,
                 Seats = p.State == PartyState.Sitting && p.Seat is not null ? p.Seats?.ToList() : null,
@@ -3654,6 +3705,7 @@ public sealed partial class Crowd
             party.GrumbleAt = s.GrumbleAt;
             party.BoughtHats = s.BoughtHats;
             party.BoughtMerch = s.BoughtMerch;
+            party.FairGoes = s.FairGoes ?? 0;
             party.Charged = s.Charged;
             party.Fancying = false;
             RestoreSeat(party, s);
@@ -3878,6 +3930,8 @@ public sealed record PartySave(int Id, PartyState State, double X, double Y, dou
     public bool BoughtHats { get; init; }
 
     public bool BoughtMerch { get; init; }
+
+    public int? FairGoes { get; init; }
 
     public bool Fancying { get; init; }
 }

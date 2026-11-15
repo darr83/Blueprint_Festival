@@ -958,6 +958,51 @@
       "prompt": "A wood fire crackling and popping gently in a metal fire pit outdoors at night. No voices, no music."
     },
     {
+      "id": "amb_fairground",
+      "bus": "Ambience",
+      "seconds": 18,
+      "loop": true,
+      "volume": 0.4,
+      "gap": 0.0,
+      "prompt": "A travelling funfair on a summer afternoon: a fairground organ playing a cheerful waltz, rides whirring round, people laughing and squealing with delight. No announcer."
+    },
+    {
+      "id": "build_ride",
+      "bus": "Effects",
+      "seconds": 2.5,
+      "loop": false,
+      "volume": 0.7,
+      "gap": 0.0,
+      "prompt": "A heavy steel fairground ride being bolted together: ratchets clicking, steel clanking into place, then a generator humming into life."
+    },
+    {
+      "id": "ride_bell",
+      "bus": "Effects",
+      "seconds": 1.5,
+      "loop": false,
+      "volume": 0.4,
+      "gap": 6,
+      "prompt": "A fairground ride coming to a stop: a brass bell rung twice and a hiss of air brakes."
+    },
+    {
+      "id": "hook_a_duck",
+      "bus": "Effects",
+      "seconds": 1.5,
+      "loop": false,
+      "volume": 0.45,
+      "gap": 5,
+      "prompt": "A plastic duck lifted out of water with a splash and a drip, then a rubber duck squeak."
+    },
+    {
+      "id": "teddy_win",
+      "bus": "Effects",
+      "seconds": 2,
+      "loop": false,
+      "volume": 0.55,
+      "gap": 3,
+      "prompt": "A fairground prize win: a bright bell going ding ding ding and a small child cheering happily."
+    },
+    {
       "id": "crowd_sing_whoa",
       "bus": "Crowd",
       "seconds": 20,
