@@ -134,7 +134,7 @@ public partial class YearScreen : Control
                     _game.Plan is null ? null : ChangeFields, ChangeParking, ChangeBuses, MoveSet, ChangeCamping), scroll));
                 break;
             case Phase.Sell:
-                Centre(YearPanels.Sales(SalesOf(_game, Running), RunMonth, ToggleAdvert, ChangePrice, Running, ChangeParking, ChangeBuses, ChangeCamping));
+                Centre(YearPanels.Sales(SalesOf(_game, Running), RunMonth, ToggleAdvert, ChangePrice, Running, ChangeParking, ChangeBuses, ChangeCamping, ChangeVipPrice));
                 if (Running && FindChild("Chart", true, false) is SalesChart chart)
                 {
                     chart.Shown = 0;
@@ -142,7 +142,7 @@ public partial class YearScreen : Control
 
                 break;
             case Phase.Build:
-                Side(YearPanels.BuildDay(_game.Crowd.Expected, _game.Money, StartDay, _game.Weather.Summary, WeekOf(_game), NextDay, ChangePrice, TravelOf(_game), ChangeParking, ChangeBuses, ChangeCamping));
+                Side(YearPanels.BuildDay(_game.Crowd.Expected, _game.Money, StartDay, _game.Weather.Summary, WeekOf(_game), NextDay, ChangePrice, TravelOf(_game), ChangeParking, ChangeBuses, ChangeCamping, ChangeVipPrice));
                 break;
             case Phase.Tidy:
                 Side(YearPanels.Tidy(_game.Litter.Count, _game.LitterAtStart, _game.ScoutsFee, () => PayScouts(), HandBack, _game.LitterPicked, _game.LitterBinned));
@@ -236,12 +236,16 @@ public partial class YearScreen : Control
             game.SalesLog.Sum(l => l.Taken), game.SalesLog.Sum(l => l.AdCost), game.AdvertReach, game.AdvertCost, game.SalesForecast,
             game.TicketPrice, (int)System.Math.Round(game.FairPrice), (int)System.Math.Round(game.LineUpPull * 100),
             Adverts.All.Select(a => new AdvertView(a.Id, a.Name, a.Cost, a.Reach, a.Reaches, game.AdvertOn(a.Id))).ToList(),
-            game.SalesLog.Select(l => (l.When, l.Tickets, l.Price, l.AdCost)).ToList(), after, TravelOf(game));
+            game.SalesLog.Select(l => (l.When, l.Tickets, l.Price, l.AdCost, l.Vips, l.VipPrice)).ToList(), after, TravelOf(game), VipOf(game));
     }
+
+    /// <summary>The VIP tickets for the sales screens, or null in a year paid for at the gate.</summary>
+    public static VipView? VipOf(FestivalGame game) => game.VipOnSale <= 0 ? null
+        : new VipView(game.VipTicketsSold, game.VipOnSale, game.VipTicketPrice, (int)System.Math.Round(game.VipFairPrice), game.VipForecast, game.VipTakings);
 
     /// <summary>What the build panel shows in build week, or null in a year whose tickets are paid for at the gate.</summary>
     public static BuildWeekView? WeekOf(FestivalGame game) => !game.SoldAhead ? null
-        : new BuildWeekView(game.NextSalesTurn, game.TicketsSold, game.OnSale, game.SalesForecast, game.AdvertCost, game.TicketPrice, (int)System.Math.Round(game.FairPrice));
+        : new BuildWeekView(game.NextSalesTurn, game.TicketsSold, game.OnSale, game.SalesForecast, game.AdvertCost, game.TicketPrice, (int)System.Math.Round(game.FairPrice), null, VipOf(game));
 
     public static ResultsView ResultsOf(FestivalGame game)
     {
@@ -351,6 +355,12 @@ public partial class YearScreen : Control
     public void ChangePrice(int pounds)
     {
         _game.SetTicketPrice(_game.TicketPrice + pounds);
+        Rebuild();
+    }
+
+    public void ChangeVipPrice(int pounds)
+    {
+        _game.SetVipTicketPrice(_game.VipTicketPrice + pounds);
         Rebuild();
     }
 

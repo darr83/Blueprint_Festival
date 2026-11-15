@@ -146,11 +146,12 @@ public class TicketSalesTests
         Assert.Equal("January", january.When);
         Assert.InRange(january.Tickets, (int)(guess * 0.9), (int)(guess * 1.1) + 1);
         Assert.Equal(205, january.AdCost);
-        Assert.Equal(bank - 205 + (january.Tickets * game.TicketPrice), game.Money);
-        Assert.Equal(january.Tickets, game.TicketsSold);
+        Assert.Equal(bank - 205 + (january.Tickets * game.TicketPrice) + (january.Vips * game.VipTicketPrice), game.Money);
+        Assert.Equal(january.Tickets + january.Vips, game.TicketsSold);
+        Assert.Equal(january.Vips, game.VipTicketsSold);
         Assert.Equal("February", game.NextSalesTurn);
         Assert.Contains(game.Spending, l => l.What == "Advertising" && l.Amount == 205);
-        Assert.Contains(game.Income, l => l.What == "Tickets" && l.Amount == january.Taken);
+        Assert.Contains(game.Income, l => l.What == "Tickets" && l.Amount == january.Tickets * january.Price);
 
         // The same adverts sell more as July gets nearer.
         for (var month = 1; month < 6; month++)
@@ -234,7 +235,7 @@ public class TicketSalesTests
         Assert.Equal("Sunday", sunday.When);
         Assert.Equal("Monday", game.NextSalesTurn);
         Assert.True(sunday.Tickets > 0 && sunday.Tickets < game.SalesLog[5].Tickets, $"{sunday.Tickets} on Sunday after {june} by June.");
-        Assert.Equal(june + sunday.Tickets, game.TicketsSold);
+        Assert.Equal(june + sunday.Tickets + sunday.Vips, game.TicketsSold);
         Assert.Equal(game.TicketsSold, game.Crowd.Expected);
 
         // The price can still change, and building goes on between days.
@@ -250,11 +251,11 @@ public class TicketSalesTests
         Assert.Equal(FestivalGame.SalesTurns, game.SalesLog.Count);
         Assert.Null(game.RunSales());
         Assert.Equal(game.TicketsSold, game.Crowd.Expected);
-        Assert.Equal(game.SalesLog.Sum(l => l.Tickets), game.TicketsSold);
+        Assert.Equal(game.SalesLog.Sum(l => l.Tickets + l.Vips), game.TicketsSold);
 
         // Tickets were paid for when they were bought, not again at the gate.
         var tickets = game.Income.Single(l => l.What == "Tickets").Amount;
-        Assert.Equal(game.SalesLog.Sum(l => l.Taken), tickets);
+        Assert.Equal(game.SalesLog.Sum(l => l.Tickets * l.Price), tickets);
         while (game.Now.TimeOfDay < TimeSpan.FromHours(12))
         {
             game.Clock.Step();
@@ -347,7 +348,7 @@ public class TicketSalesTests
             game.SetAdvert("localradio", true);
             SellSixMonths(game);
             Assert.True(game.TicketsSold > 0);
-            Assert.Equal(game.TicketsSold * game.TicketPrice, game.TicketTakings);
+            Assert.Equal((game.TicketsSold - game.VipTicketsSold) * game.TicketPrice, game.TicketTakings);
             return game.ArrivalMood;
         }
 

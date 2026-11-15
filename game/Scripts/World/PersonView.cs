@@ -204,6 +204,12 @@ public partial class PersonView : Node3D
             body.Ball(new Vector3(0, headY + 0.03f, -0.035f), new Vector3(headR * 2.24f, headR * 2.2f, headR * 2.2f), cape);
         }
 
+        // ---- the VIP lanyard: a ribbon from behind the neck down to a pass on the chest
+        if (look.Lanyard is { } lanyardColour)
+        {
+            BuildLanyard(body, new Color(lanyardColour), poncho is null ? depth / 2 : 0.29f, shoulder);
+        }
+
         // ---- head and face
         body.Ball(new Vector3(0, headY, 0), headR * 2, skin);
         BuildFace(body, look, headY, headR, hair);
@@ -441,6 +447,28 @@ public partial class PersonView : Node3D
 
             body.Ball(new Vector3(0, 0.95f, front + 0.02f), 0.05f, chain);
         }
+    }
+
+    /// <summary>The VIP pass: a ribbon round the neck in a V down the chest and a white card with a black band.</summary>
+    private static void BuildLanyard(MeshBuilder body, Color ribbon, float front, float shoulder)
+    {
+        var z = front + 0.014f;
+        var neck = shoulder * 0.42f;
+        foreach (var side in new[] { -1f, 1f })
+        {
+            // Over the shoulder, then down and in to meet at the clip.
+            body.Box(new Vector3(side * neck, 1.15f, 0), new Vector3(0.035f, 0.022f, (front * 2) + 0.02f), ribbon);
+            var top = new Vector3(side * neck, 1.15f, z);
+            var bottom = new Vector3(side * 0.012f, 0.92f, z);
+            var mid = (top + bottom) / 2;
+            var tilt = Mathf.RadToDeg(Mathf.Atan2(top.X - bottom.X, top.Y - bottom.Y));
+            body.Box(mid, new Vector3(0.035f, (top - bottom).Length(), 0.012f), ribbon, new Vector3(0, 0, -tilt));
+        }
+
+        body.Box(new Vector3(0, 0.9f, z + 0.004f), new Vector3(0.03f, 0.03f, 0.016f), new Color("#C9CDD2"));
+        body.Box(new Vector3(0, 0.81f, z + 0.008f), new Vector3(0.11f, 0.14f, 0.012f), Colors.White);
+        body.Box(new Vector3(0, 0.845f, z + 0.015f), new Vector3(0.11f, 0.04f, 0.004f), new Color("#1E1E24"));
+        body.Box(new Vector3(0, 0.79f, z + 0.015f), new Vector3(0.06f, 0.02f, 0.004f), ribbon);
     }
 
     private static void BuildHeadphones(MeshBuilder body, PersonLook look, float headY, float headR)

@@ -320,7 +320,7 @@ public partial class CrowdView : Node3D
             var lift = !person.Unwell ? 0f
                 : _game.Site.StallAt(Simulation.World.FieldMap.TileAt(person.X, person.Y)) is { } bed && FestivalGame.HasBeds(bed.Kind) ? 0.62f : 0.14f;
             var tilt = person.Unwell ? -Mathf.Pi / 2 : 0f;
-            var target = new Vector3((float)person.X, lift, (float)person.Y);
+            var target = new Vector3((float)person.X, lift + (float)_game.Site.HeightAt(Simulation.World.FieldMap.TileAt(person.X, person.Y)), (float)person.Y);
             var heading = (float)person.Heading;
             var has = _views.TryGetValue(person.Id, out var view);
             var near = everyone || new Vector2(target.X - focus.X, target.Z - focus.Z).Length() < (has ? reach * 1.15f : reach);

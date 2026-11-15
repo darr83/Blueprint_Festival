@@ -295,6 +295,9 @@ public sealed class Party
 
     public bool HasChild => Members.Any(m => m.Look.Age == AgeGroup.Child);
 
+    /// <summary>True for a party on VIP tickets: they wear lanyards and may use VIP ground, stalls and buildings.</summary>
+    public bool Vip { get; internal set; }
+
     internal GameRandom Random { get; set; }
 
     internal List<TilePoint>? Path { get; set; }
@@ -379,6 +382,7 @@ public sealed partial class Crowd
     private readonly FieldMap _map;
     private readonly SiteLayout _site;
     private readonly PathFinder _paths;
+    private readonly PathFinder _vipPaths;
     private readonly List<Party> _parties = new();
     private readonly List<QueueLine[]> _queues = new();
     private readonly List<QueueLine?> _stallQueues = new();
@@ -482,7 +486,11 @@ public sealed partial class Crowd
     public bool HasPaths => _paths.HasPaths;
 
     /// <summary>Says which tiles have a path on them.</summary>
-    public void SetPaths(IEnumerable<TilePoint> tiles) => _paths.SetPaths(tiles);
+    public void SetPaths(IEnumerable<TilePoint> tiles)
+    {
+        _paths.SetPaths(tiles);
+        _vipPaths.SetPaths(tiles);
+    }
 
     /// <summary>
     /// Whether a party keeps to the paths. Each party has its own fixed liking for paths, so the same
@@ -490,7 +498,29 @@ public sealed partial class Crowd
     /// </summary>
     public bool KeepsToPaths(Party party) => (uint)(party.Id * 2246822519u) % 1000 < PathShare * 1000;
 
-    private List<TilePoint>? Route(Party party, TilePoint from, TilePoint to) => _paths.FindPath(from, to, KeepsToPaths(party));
+    private List<TilePoint>? Route(Party party, TilePoint from, TilePoint to) => PathsFor(party).FindPath(from, to, KeepsToPaths(party));
+
+    private bool _vipPathsStale = true;
+
+    /// <summary>
+    /// The route finder for this party. VIPs only need their own when some ground is kept for
+    /// them; until then they walk where everyone else does, and their finder is not kept up to date.
+    /// </summary>
+    private PathFinder PathsFor(Party party)
+    {
+        if (!party.Vip || !_map.HasVipOnly)
+        {
+            return _paths;
+        }
+
+        if (_vipPathsStale)
+        {
+            _vipPaths.Refresh();
+            _vipPathsStale = false;
+        }
+
+        return _vipPaths;
+    }
 
     /// <summary>Whether people have dressed for a wet day: wellies, and a rain poncho for about half of them.</summary>
     public bool DressedForRain { get; set; }
@@ -555,6 +585,7 @@ public sealed partial class Crowd
         _map = map;
         _site = site;
         _paths = new PathFinder(map);
+        _vipPaths = new PathFinder(map, vip: true);
         Density = new DensityMap(map);
         _claims = new int[Density.Across * Density.Down];
         _claimsSecond = new int[_claims.Length];
@@ -843,6 +874,8 @@ public sealed partial class Crowd
             });
             Expected += size;
         }
+
+        MarkVips();
     }
 
     /// <summary>How often a shuttle bus pulls in at the stop.</summary>
@@ -1021,6 +1054,8 @@ public sealed partial class Crowd
     private void SiteChanged()
     {
         _paths.Refresh();
+        _vipPathsStale = true;
+        RefreshVipPlaces();
 
         // People stand on the festival side of the gates, or anywhere in the field if it is open.
         const int inset = 4;
@@ -1062,7 +1097,7 @@ public sealed partial class Crowd
             }
 
             var at = FieldMap.TileAt(party.X, party.Y);
-            if (!_map.IsWalkable(at))
+            if (!WalkableFor(party, at))
             {
                 at = NearestWalkable(at);
                 (party.X, party.Y) = FieldMap.CentreOf(at);
@@ -1280,8 +1315,9 @@ public sealed partial class Crowd
                 continue;
             }
 
-            var (fx, fy, dx, dy) = SiteLayout.Front(stall.Rect, stall.Facing);
+            var (fx, fy, dx, dy) = SiteLayout.Front(stall.ServeRect, stall.Facing);
             var line = new QueueLine(fx, fy);
+            _layingVip = stall.ForVips;
             if (fenced.TryGetValue((false, _stallQueues.Count, 0), out var built))
             {
                 AlongLane(line, built.Lane, built.FromEnd, StallPlaces, _ => true);
@@ -1292,8 +1328,12 @@ public sealed partial class Crowd
             }
 
             _stallQueues.Add(line);
+            _layingVip = false;
         }
     }
+
+    /// <summary>True while the queue for a stall kept for VIPs is being laid out: it may run over VIP ground.</summary>
+    private bool _layingVip;
 
     /// <summary>How near the end of a queue lane must be to where a queue would start for the queue to use it, in metres.</summary>
     public const double LaneReach = 3.0;
@@ -1342,7 +1382,7 @@ public sealed partial class Crowd
         {
             if (Catalogue.HasQueue(_site.Stalls[i].Kind))
             {
-                var (fx, fy, dx, dy) = SiteLayout.Front(_site.Stalls[i].Rect, _site.Stalls[i].Facing);
+                var (fx, fy, dx, dy) = SiteLayout.Front(_site.Stalls[i].ServeRect, _site.Stalls[i].Facing);
                 Offer((false, i, 0), fx + (dx * LaneFront), fy + (dy * LaneFront));
             }
         }
@@ -1365,7 +1405,7 @@ public sealed partial class Crowd
     private bool FreeFor(double x, double y, Func<TilePoint, bool> allowed)
     {
         var tile = FieldMap.TileAt(x, y);
-        return _map.IsWalkable(tile) && allowed(tile) && !Taken(x, y);
+        return (_layingVip ? _map.IsWalkableForVip(tile) : _map.IsWalkable(tile)) && allowed(tile) && !Taken(x, y);
     }
 
     /// <summary>
@@ -2030,7 +2070,7 @@ public sealed partial class Crowd
                     }
                     else if (now >= party.WaitUntil)
                     {
-                        Send(party, SomewhereInField(party.Random), PartyState.Strolling);
+                        Send(party, Wander(party), PartyState.Strolling);
                     }
 
                     if (party.State == PartyState.Standing && (now >= party.Leaves || closing))
@@ -2139,6 +2179,7 @@ public sealed partial class Crowd
             change -= Mud(party.X, party.Y) * MudPerHour * perHour;
         }
 
+        change += VipFeel(party) * perHour;
         if (Darkness is not null && MindsTheDark(party))
         {
             // Stumbling about an unlit field at night is no fun, and does not feel safe.
@@ -2179,7 +2220,7 @@ public sealed partial class Crowd
             var affordable = false;
             foreach (var s in _site.Stalls)
             {
-                if (Catalogue.Of(s.Kind).Serves == candidate)
+                if (Catalogue.Of(s.Kind).Serves == candidate && MayUse(party, s))
                 {
                     any = true;
                     affordable = affordable || WorthIt(party, s);
@@ -2212,12 +2253,12 @@ public sealed partial class Crowd
         {
             var stall = _site.Stalls[i];
             var info = Catalogue.Of(stall.Kind);
-            if (info.Serves != need || _stallQueues[i] is not { } queue || !WorthIt(party, stall))
+            if (info.Serves != need || _stallQueues[i] is not { } queue || !WorthIt(party, stall) || !MayUse(party, stall))
             {
                 continue;
             }
 
-            var score = WaitAndWalk(party, i, queue, info) + Liking(party, stall, now);
+            var score = WaitAndWalk(party, i, queue, info) + Liking(party, stall, now) - (party.Vip && stall.ForVips ? VipPreference : 0);
             if (score < bestScore)
             {
                 (best, bestScore) = (i, score);
@@ -2357,6 +2398,8 @@ public sealed partial class Crowd
             case StallKind.PhoneCharging:
                 // Batteries run down as the day goes on.
                 return party.Charged ? 0 : hour < 12 ? 0.004 : hour < 16 ? 0.012 : 0.02;
+            case StallKind.VipLounge:
+                return !party.Vip || party.Thirst < 0.15 ? 0 : 0.05 * (hour >= 17 ? 1.5 : 1);
             default:
                 return 0;
         }
@@ -2395,7 +2438,7 @@ public sealed partial class Crowd
         for (var i = 0; i < _site.Stalls.Count; i++)
         {
             var stall = _site.Stalls[i];
-            if (!Catalogue.Sells(stall.Kind) || _stallQueues[i] is not { } queue || queue.People > 8)
+            if (!Catalogue.Sells(stall.Kind) || !MayUse(party, stall) || _stallQueues[i] is not { } queue || queue.People > 8)
             {
                 continue;
             }
@@ -3020,7 +3063,14 @@ public sealed partial class Crowd
             }
         }
 
-        if (party.Random.NextDouble() >= slot.Act.Draw || PlaceToWatch(stage, party.Random, slot.Act.Draw, party.Members.Count) is not { } spot)
+        if (party.Random.NextDouble() >= slot.Act.Draw)
+        {
+            return false;
+        }
+
+        // VIP guests watch from a VIP platform near the stage if there is room on it.
+        var deck = party.Vip ? PlatformSpot(party, stage) : null;
+        if ((deck ?? PlaceToWatch(stage, party.Random, slot.Act.Draw, party.Members.Count)) is not { } spot)
         {
             return false;
         }
@@ -3033,7 +3083,10 @@ public sealed partial class Crowd
             return false;
         }
 
-        Claim(spot, party.Members.Count, second);
+        if (deck is null)
+        {
+            Claim(spot, party.Members.Count, second);
+        }
 
         return true;
     }
@@ -3293,7 +3346,7 @@ public sealed partial class Crowd
             party.RetryAt = default;
             party.WaitUntil = _now + TimeSpan.FromMinutes(2);
             party.Mood = Math.Min(1, party.Mood + 0.04);
-            if (!_map.IsWalkable(FieldMap.TileAt(party.X, party.Y)))
+            if (!WalkableFor(party, FieldMap.TileAt(party.X, party.Y)))
             {
                 (party.X, party.Y) = FieldMap.CentreOf(NearestWalkable(FieldMap.TileAt(party.X, party.Y)));
             }
@@ -3318,7 +3371,7 @@ public sealed partial class Crowd
         party.Watch = -1;
         LeaveQueue(party);
         LeaveStall(party);
-        if (!_map.IsWalkable(FieldMap.TileAt(party.X, party.Y)))
+        if (!WalkableFor(party, FieldMap.TileAt(party.X, party.Y)))
         {
             (party.X, party.Y) = FieldMap.CentreOf(NearestWalkable(FieldMap.TileAt(party.X, party.Y)));
         }
@@ -3617,7 +3670,7 @@ public sealed partial class Crowd
                         party.ServiceLeft = -1;
                     }
 
-                    party.Path = s.Path is { Count: > 0 } && s.Path.All(_map.IsWalkable) ? s.Path.ToList() : null;
+                    party.Path = s.Path is { Count: > 0 } && s.Path.All(t => WalkableFor(party, t)) ? s.Path.ToList() : null;
                     party.PathIndex = 0;
                 }
                 else
@@ -3646,7 +3699,7 @@ public sealed partial class Crowd
                     continue;
                 }
 
-                party.Path = s.Path is { Count: > 0 } && s.Path.All(_map.IsWalkable) ? s.Path.ToList() : null;
+                party.Path = s.Path is { Count: > 0 } && s.Path.All(t => WalkableFor(party, t)) ? s.Path.ToList() : null;
                 party.PathIndex = 0;
                 continue;
             }
@@ -3656,7 +3709,7 @@ public sealed partial class Crowd
                 continue;
             }
 
-            if (s.Path is { Count: > 0 } && s.Path.All(_map.IsWalkable) && _map.IsWalkable(FieldMap.TileAt(s.X, s.Y)))
+            if (s.Path is { Count: > 0 } && s.Path.All(t => WalkableFor(party, t)) && WalkableFor(party, FieldMap.TileAt(s.X, s.Y)))
             {
                 // Carry on along the very route they were on.
                 party.Path = s.Path.ToList();
@@ -3664,7 +3717,7 @@ public sealed partial class Crowd
             }
             else
             {
-                if (!_map.IsWalkable(FieldMap.TileAt(s.X, s.Y)))
+                if (!WalkableFor(party, FieldMap.TileAt(s.X, s.Y)))
                 {
                     (party.X, party.Y) = FieldMap.CentreOf(LaneEnd(party));
                 }

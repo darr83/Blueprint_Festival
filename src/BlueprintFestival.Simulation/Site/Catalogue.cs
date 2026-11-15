@@ -105,6 +105,12 @@ public enum StallKind
 
     /// <summary>A little tent with a wall of lockers, where a phone can be charged for a pound or two.</summary>
     PhoneCharging,
+
+    /// <summary>A white marquee trimmed in gold, with sofas and its own bar. Only VIP guests go in.</summary>
+    VipLounge,
+
+    /// <summary>A raised deck with glass rails and steps at the back, for VIP guests to watch a stage from.</summary>
+    VipPlatform,
 }
 
 /// <summary>Which shelf of the build bar a stall is on.</summary>
@@ -114,6 +120,9 @@ public enum StallGroup
     Drink,
     Other,
     Services,
+
+    /// <summary>The VIP lounge and the VIP viewing platform.</summary>
+    Vip,
 }
 
 /// <summary>What someone has in their hand after buying something.</summary>
@@ -258,6 +267,8 @@ public static class Catalogue
         new StallInfo(StallKind.BucketHats, "Hat stall", 6, 6, 50, null, 0, 30, 1, "Bucket hats. They sell best in hot sun."),
         new StallInfo(StallKind.Merchandise, "Merchandise tent", 10, 8, 150, null, 0, 40, 2, "The festival's own T-shirts, posters and bags. People who are having a good day take something home."),
         new StallInfo(StallKind.PhoneCharging, "Phone charging tent", 6, 6, 120, null, 0, 30, 2, "Lockers to charge a phone in. More people want one as the day goes on."),
+        new StallInfo(StallKind.VipLounge, "VIP lounge", 16, 12, 600, Need.Drink, 0, 30, 2, "A white marquee with sofas and its own bar. Only VIP guests go in, and they expect one."),
+        new StallInfo(StallKind.VipPlatform, "VIP viewing platform", 12, 8, 300, null, 0, 0, 0, "A raised deck with glass rails. VIP guests watch the nearest stage from it, over everyone's heads."),
     };
 
     private static readonly IReadOnlyList<StallItem> NothingToSell = Array.Empty<StallItem>();
@@ -350,6 +361,13 @@ public static class Catalogue
             new StallItem("Poster", 6, Carried.Bag, 0),
             new StallItem("Programme", 4, Carried.Bag, 0),
         },
+        [StallKind.VipLounge] = new[]
+        {
+            new StallItem("Glass of fizz", 9, Carried.Cocktail, AdultsOnly: true),
+            new StallItem("Craft beer", 6, Carried.Pint, AdultsOnly: true),
+            new StallItem("Gin and tonic", 8, Carried.Cocktail, AdultsOnly: true),
+            new StallItem("Mocktail", 5, Carried.Cocktail),
+        },
     };
 
     /// <summary>What a kind of stall sells. Empty for toilets, taps, tents and bins.</summary>
@@ -372,6 +390,7 @@ public static class Catalogue
         StallKind.HotDogs or StallKind.Burgers or StallKind.Fries or StallKind.Pizza or StallKind.Noodles or StallKind.IceCream => StallGroup.Food,
         StallKind.Bar or StallKind.Coffee or StallKind.Slush or StallKind.Cocktails => StallGroup.Drink,
         StallKind.Ponchos or StallKind.BucketHats or StallKind.Merchandise or StallKind.PhoneCharging => StallGroup.Other,
+        StallKind.VipLounge or StallKind.VipPlatform => StallGroup.Vip,
         _ => StallGroup.Services,
     };
 
@@ -384,7 +403,11 @@ public static class Catalogue
         StallKind.Bar, StallKind.Coffee, StallKind.Slush, StallKind.Cocktails,
         StallKind.Ponchos, StallKind.BucketHats, StallKind.Merchandise, StallKind.PhoneCharging,
         StallKind.Toilets, StallKind.ToiletBlock, StallKind.WaterPoint, StallKind.Bin,
+        StallKind.VipLounge, StallKind.VipPlatform,
     };
+
+    /// <summary>True for the things only VIP guests may use, whatever the player sets.</summary>
+    public static bool AlwaysVip(StallKind kind) => kind is StallKind.VipLounge or StallKind.VipPlatform;
 
     /// <summary>The festival's share of what a stall takes, in pounds out of every hundred.</summary>
     public const int PitchShare = 25;

@@ -56,6 +56,9 @@ public enum BuildMode
 
     /// <summary>Dragging a line of bunting from one pole to another.</summary>
     Bunting,
+
+    /// <summary>Marking ground for VIP guests only.</summary>
+    VipGround,
 }
 
 /// <summary>
@@ -79,6 +82,8 @@ public partial class BuildTool : Node3D
     private string _ghostKey = "";
     private bool _held;
     private MeshInstance3D? _keepOut;
+    private MeshInstance3D? _vipMarks;
+    private StandardMaterial3D _vipMaterial = null!;
     private StandardMaterial3D _keepOutMaterial = null!;
 
     public BuildMode Mode { get; private set; }
@@ -144,11 +149,22 @@ public partial class BuildTool : Node3D
             Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
             AlbedoColor = new Color(0.92f, 0.12f, 0.1f, 0.62f),
         };
+        _vipMaterial = new StandardMaterial3D
+        {
+            ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+            Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+            AlbedoColor = new Color(0.89f, 0.69f, 0.24f, 0.62f),
+        };
         game.Site.Changed += DrawKeepOut;
         DrawKeepOut();
     }
 
     public override void _ExitTree() => _game.Site.Changed -= DrawKeepOut;
+
+    public void PickVipGround() => Pick(BuildMode.VipGround, () => { });
+
+    /// <summary>True while the ground marked for VIPs is being shown in gold: only while it is being marked.</summary>
+    public bool VipMarksShown => _vipMarks is { Visible: true };
 
     public void PickStage(StageKind kind) => Pick(BuildMode.Stage, () => Stage = kind);
 
@@ -208,6 +224,19 @@ public partial class BuildTool : Node3D
         }
 
         KeepOutRuns = runs.Count;
+        _vipMarks?.QueueFree();
+        var gold = new MeshBuilder();
+        foreach (var (x, y, length, vertical) in SiteLayout.RunsOf(_game.Site.VipGround))
+        {
+            var rect = vertical ? new TileRect(x, y, 1, length) : new TileRect(x, y, length, 1);
+            gold.Box(SiteView.Middle(rect) + new Vector3(0, 0.05f, 0), new Vector3((rect.Width * T) - 0.08f, 0.02f, (rect.Height * T) - 0.08f), Colors.White);
+        }
+
+        _vipMarks = gold.IsEmpty ? new MeshInstance3D { Name = "VipMarks" } : gold.BuildNode("VipMarks");
+        _vipMarks.MaterialOverride = _vipMaterial;
+        _vipMarks.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
+        _vipMarks.Visible = Mode == BuildMode.VipGround;
+        AddChild(_vipMarks);
         _keepOut = builder.IsEmpty ? new MeshInstance3D { Name = "KeepOut" } : builder.BuildNode("KeepOut");
         _keepOut.MaterialOverride = _keepOutMaterial;
         _keepOut.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
@@ -241,6 +270,7 @@ public partial class BuildTool : Node3D
             BuildMode.Ground => "Click a patch of grass, or hold the mouse button and drag to cover a stretch.",
             BuildMode.Lane => "Hold the mouse button and drag out a queue from the front of a gate, stall or toilets. Drag again from its end to turn a corner.",
             BuildMode.KeepOut => "Hold the mouse button and drag over ground customers must keep off. Start on marked ground to clear it.",
+            BuildMode.VipGround => "Hold the mouse button and drag over ground for VIP guests only. Start on VIP ground to clear it.",
             BuildMode.Light => "Click on the grass to put the light up.",
             BuildMode.LaunchPad => "Click on the grass to put the launch pad down. Its safe zone must be clear. Fence it off from the firework mixer.",
             BuildMode.Screen => "Click on the grass to put the screen up. R turns it. It shows the nearest stage to the people in front of it.",
@@ -252,6 +282,11 @@ public partial class BuildTool : Node3D
         if (_keepOut is not null)
         {
             _keepOut.Visible = mode == BuildMode.KeepOut;
+        }
+
+        if (_vipMarks is not null)
+        {
+            _vipMarks.Visible = mode == BuildMode.VipGround;
         }
     }
 
@@ -287,6 +322,17 @@ public partial class BuildTool : Node3D
         Refused = !result.Ok;
         SoundBoard.Cue(result.Ok ? Sounds.BuildGround : Sounds.Refuse);
         Status = !result.Ok ? result.Problem ?? "That cannot be marked." : mark ? "Customers will keep off that ground." : "Customers can walk there again.";
+        return result;
+    }
+
+    /// <summary>Marks the box between two tiles for VIPs only, or clears it if the drag started on VIP ground.</summary>
+    public BuildCheck DragVipGround(TilePoint from, TilePoint to)
+    {
+        var mark = !_game.Site.IsVipGround(from);
+        var result = _game.VipGround(from, to, mark);
+        Refused = !result.Ok;
+        SoundBoard.Cue(result.Ok ? Sounds.BuildGround : Sounds.Refuse);
+        Status = !result.Ok ? result.Problem ?? "That cannot be marked." : mark ? "Only VIP guests will go there." : "Everyone can walk there again.";
         return result;
     }
 
@@ -848,6 +894,19 @@ public partial class BuildTool : Node3D
                 return;
             }
 
+            case BuildMode.VipGround:
+            {
+                var from = _dragFrom ?? at;
+                var mark = !_game.Site.IsVipGround(from);
+                check = _game.CheckVipGround(from, at, mark);
+                pad = new TileRect(Math.Min(from.X, at.X), Math.Min(from.Y, at.Y), Math.Abs(at.X - from.X) + 1, Math.Abs(at.Y - from.Y) + 1);
+                ClearGhostOnly();
+                ShowPad(pad, check.Ok);
+                Refused = !check.Ok;
+                Status = !check.Ok ? check.Problem ?? "" : mark ? "VIP guests only: free" : "Open this ground to everyone again";
+                return;
+            }
+
             case BuildMode.Ground:
             {
                 var from = _dragFrom ?? at;
@@ -974,7 +1033,7 @@ public partial class BuildTool : Node3D
                 break;
 
             case InputEventMouseButton { ButtonIndex: MouseButton.Left } click when _hovering:
-                if (Mode is BuildMode.Fence or BuildMode.Ground or BuildMode.Lane or BuildMode.KeepOut or BuildMode.Fairy or BuildMode.Bunting)
+                if (Mode is BuildMode.Fence or BuildMode.Ground or BuildMode.Lane or BuildMode.KeepOut or BuildMode.VipGround or BuildMode.Fairy or BuildMode.Bunting)
                 {
                     if (click.Pressed)
                     {
@@ -994,6 +1053,10 @@ public partial class BuildTool : Node3D
                         else if (Mode == BuildMode.KeepOut)
                         {
                             DragKeepOut(from, _hover);
+                        }
+                        else if (Mode == BuildMode.VipGround)
+                        {
+                            DragVipGround(from, _hover);
                         }
                         else if (Mode == BuildMode.Fairy)
                         {

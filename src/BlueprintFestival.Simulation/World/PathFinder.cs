@@ -42,16 +42,18 @@ public sealed class PathFinder
     private int _search;
 
     private readonly bool _staff;
+    private readonly bool _vip;
 
-    private bool Walkable(int x, int y) => _staff ? _map.IsWalkableForStaff(x, y) : _map.IsWalkable(x, y);
+    private bool Walkable(int x, int y) => _staff ? _map.IsWalkableForStaff(x, y) : _vip ? _map.IsWalkableForVip(x, y) : _map.IsWalkable(x, y);
 
     private bool Walkable(TilePoint p) => Walkable(p.X, p.Y);
 
     /// <summary>A route finder for the public, or for staff, who can also cross ground the public are kept off.</summary>
-    public PathFinder(FieldMap map, bool staff = false)
+    public PathFinder(FieldMap map, bool staff = false, bool vip = false)
     {
         _map = map;
         _staff = staff;
+        _vip = vip && !staff;
         _crowding = new float[map.Width * map.Height];
         _cost = new double[_crowding.Length];
         _cameFrom = new int[_crowding.Length];

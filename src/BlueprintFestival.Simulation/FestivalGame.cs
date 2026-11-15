@@ -250,6 +250,19 @@ public sealed partial class FestivalGame
         return check.Ok ? Site.SetKeepOut(from, to, keepOut) : check;
     }
 
+    public BuildCheck CheckVipGround(TilePoint from, TilePoint to, bool vip)
+    {
+        var check = Site.CheckVipGround(from, to, vip);
+        return check.Ok && !CanBuild ? BuildCheck.No("Nothing can be built just now.") : check;
+    }
+
+    /// <summary>Marks ground for VIP guests only (or clears it). It costs nothing; staff still go there.</summary>
+    public BuildCheck VipGround(TilePoint from, TilePoint to, bool vip)
+    {
+        var check = CheckVipGround(from, to, vip);
+        return check.Ok ? Site.SetVipGround(from, to, vip) : check;
+    }
+
     public BuildCheck BuildGate(GateKind kind, int x, int y, bool vertical)
     {
         var check = CheckGate(kind, x, y, vertical);

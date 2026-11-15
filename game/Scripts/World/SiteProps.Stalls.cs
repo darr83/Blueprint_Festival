@@ -16,6 +16,12 @@ public static partial class SiteProps
     {
         var node = new Node3D { Name = Catalogue.Of(kind).Name };
         var b = new MeshBuilder();
+        if (Vip(b, node, kind))
+        {
+            node.AddChild(b.BuildNode("Shapes"));
+            return node;
+        }
+
         if (Shop(b, node, kind))
         {
             node.AddChild(b.BuildNode("Shapes"));
@@ -65,6 +71,7 @@ public static partial class SiteProps
     public static Vector3[] StaffSpots(StallKind kind) => ShopStaff(kind) ?? kind switch
     {
         StallKind.Bar => new[] { new Vector3(-1.4f, 0, 0.55f), new Vector3(1.3f, 0, 0.55f) },
+        StallKind.VipLounge => new[] { new Vector3(-1.1f, 0, -2.35f), new Vector3(1.1f, 0, -2.35f) },
         _ => System.Array.Empty<Vector3>(),
     };
 

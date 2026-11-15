@@ -65,7 +65,7 @@ public partial class StallPanel : PanelContainer
     /// <summary>Opens the menu board of a stall, if it is one that sells things. True if it opened.</summary>
     public bool Open(int stall)
     {
-        if (stall < 0 || stall >= _game.Site.Stalls.Count || !Catalogue.Sells(_game.Site.Stalls[stall].Kind))
+        if (stall < 0 || stall >= _game.Site.Stalls.Count || !HasBoard(_game.Site.Stalls[stall].Kind))
         {
             return false;
         }
@@ -74,6 +74,35 @@ public partial class StallPanel : PanelContainer
         Visible = true;
         _shown = "";
         Refresh();
+        return true;
+    }
+
+    /// <summary>True for a stall that opens a board when clicked: anything that sells, and the toilets and taps, which can be kept for VIPs.</summary>
+    public static bool HasBoard(StallKind kind) => Catalogue.Sells(kind) || Catalogue.HasQueue(kind);
+
+    /// <summary>The "VIP guests only" switch on the board showing, or null.</summary>
+    public CheckButton? VipSwitch { get; private set; }
+
+    /// <summary>Keeps the stall showing for VIP guests only, or opens it to everyone, as the switch on the board does.</summary>
+    public bool SetVipOnly(bool on)
+    {
+        var stall = Stall;
+        if (stall < 0 || !_game.SetVipOnly(stall, on))
+        {
+            SoundBoard.Cue(Sounds.Refuse);
+            if (stall >= 0)
+            {
+                _shown = "";
+                Refresh();
+            }
+
+            return false;
+        }
+
+        SoundBoard.Cue(Sounds.Click);
+
+        // Changing who may use a stall changes the site, which closes the board: open it again.
+        Open(stall);
         return true;
     }
 
@@ -137,7 +166,7 @@ public partial class StallPanel : PanelContainer
         var menu = Catalogue.MenuOf(placed.Kind);
         var sales = _game.SalesOf(Stall);
         var open = _game.CanSetPrices;
-        var key = $"{Stall}|{placed.Kind}|{string.Join(",", Enumerable.Range(0, menu.Count).Select(placed.PriceOf))}|{string.Join(",", sales.Sold)}|{sales.Takings}|{open}|{_game.Phase}";
+        var key = $"{Stall}|{placed.Kind}|{placed.VipOnly}|{string.Join(",", Enumerable.Range(0, menu.Count).Select(placed.PriceOf))}|{string.Join(",", sales.Sold)}|{sales.Takings}|{open}|{_game.Phase}";
         if (key == _shown)
         {
             return;
@@ -156,7 +185,7 @@ public partial class StallPanel : PanelContainer
         var top = new HBoxContainer();
         var titles = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
         titles.AddThemeConstantOverride("separation", 0);
-        titles.AddChild(UiStyle.Caps("Menu board", pink: true));
+        titles.AddChild(UiStyle.Caps(menu.Count > 0 ? "Menu board" : "Stall", pink: true));
         titles.AddChild(UiStyle.Heading(info.Name, 26));
         top.AddChild(titles);
         var close = UiStyle.SecondaryButton("Close", Close);
@@ -164,6 +193,35 @@ public partial class StallPanel : PanelContainer
         top.AddChild(close);
         _box.AddChild(top);
 
+        // Who may use it: everyone, or VIP guests only, with a sign outside saying so.
+        VipSwitch = null;
+        if (Catalogue.AlwaysVip(placed.Kind))
+        {
+            _box.AddChild(UiStyle.Body("Only VIP guests come in here.", size: 14, bold: true));
+        }
+        else
+        {
+            var vip = new CheckButton { Text = "VIP guests only", ButtonPressed = placed.VipOnly, Disabled = !open, FocusMode = FocusModeEnum.None };
+            vip.AddThemeFontSizeOverride("font_size", 16);
+            vip.Toggled += on => Callable.From(() => SetVipOnly(on)).CallDeferred();
+            VipSwitch = vip;
+            _box.AddChild(vip);
+            var why = UiStyle.Body(placed.VipOnly ? "A VIP sign stands outside, and nobody without a lanyard is served."
+                : "Keep it for VIP guests: a VIP sign goes up outside and only people with a lanyard use it.", muted: true, size: 13);
+            why.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+            why.CustomMinimumSize = new Vector2(360, 0);
+            _box.AddChild(why);
+        }
+
+        if (menu.Count == 0)
+        {
+            Rows = 0;
+            Verdict = "";
+            ResetSize();
+            return;
+        }
+
+        _box.AddChild(new HSeparator());
         var hint = UiStyle.Body(open ? "Set the prices before the gates open. Cheaper sells more and pleases people; dearer earns more on each sale but puts people off."
             : _game.Phase == Phase.Day ? "The gates are open, so today's prices are fixed." : "Prices can be set on the build day, and on the morning until the gates open.", muted: true, size: 13);
         hint.AutowrapMode = TextServer.AutowrapMode.WordSmart;

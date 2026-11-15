@@ -51,6 +51,7 @@ brands or sponsors.
 | 25a. Seats, hand washing, shade and floors: straw bales, benches, deckchairs, picnic and parasol tables and a seating marquee on a new Comforts group; people with food look for a seat near where they bought it, others stop for a rest, and a sit down lifts the mood a little. Hand gel posts and hand wash stations by the toilets and food cut tummy bugs. Parasols, a shade sail and the marquee keep rain and hot sun off whoever is under them. A phone charging tent takes money. Five new floors (pallets, sand, rubber mats, artificial grass, boardwalk), with paths on a group of their own that can be dragged 2, 4 or 6 m wide | Done |
 | 25b. Signs with your own words: a sandwich board, a finger post with up to three fingers that each point left or right, a banner to walk under and a site map board that draws the site as built, on a new Signs group. A box opens to type the words and pick a colour when a sign goes up or is clicked. A sandwich board brings stalls within 8 m a quarter more passing trade; people near a finger post or a map board mind a longer walk to a stall less | Done |
 | 25c. Decorations: bunting dragged between poles by the metre, a scarecrow, flower planters, flag poles, a fire pit that glows after dark, giant sunflowers and the festival's name in giant letters, on a Decorations shelf beside Signs on the Decor tab. People near them are a little happier, up to a cap, and a fire pit counts double at night | Done |
+| 26. VIPs: one ticket in ten is a VIP ticket with its own price on the sales screen (it starts at three times the ordinary price). VIP guests wear a gold lanyard. VIP ground (Fences group, free) is ground only VIPs and staff walk on, shown in gold only while it is being marked, and seats put on it are VIP seats. The VIP lounge (£600) is an open-sided marquee with sofas and its own bar; the VIP viewing platform (£300) is a raised deck VIPs watch the nearest stage from. Any stall can be kept for VIPs from its board, and a VIP sign goes up outside. VIPs enjoy VIP things and grumble if they paid extra for nothing | Done |
 
 ## Controls
 
@@ -222,6 +223,7 @@ to three minutes before they drift off to the stalls or home.
 - `godot --path game -- --path-shots=DIR` writes pictures of paths and the camping field.
 - `godot --path game -- --queue-shots=DIR` writes pictures of the queues at gates, stalls and toilets, of queue lanes, and of ground marked "no customers".
 - `godot --path game -- --light-shots=DIR` writes pictures of the lights by day, at dusk and at night.
+- `godot --path game -- --vip-shots=DIR` writes pictures of the lanyards, VIP ground, the lounge, the platform and a stall kept for VIPs.
 
 The tests and the launch test run on every pull request.
 

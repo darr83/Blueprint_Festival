@@ -28,6 +28,18 @@ public sealed record PlacedStall(StallKind Kind, int X, int Y, Facing Facing)
         }
     }
 
+    /// <summary>
+    /// The part of the stall people are served across: the whole stall, except in the VIP lounge,
+    /// where it is the bar across the back and people queue inside the marquee.
+    /// </summary>
+    public TileRect ServeRect => Kind != StallKind.VipLounge ? Rect : Facing switch
+    {
+        Facing.North => new TileRect(Rect.X, Rect.Bottom - SiteLayout.LoungeBarDepth, Rect.Width, SiteLayout.LoungeBarDepth),
+        Facing.East => new TileRect(Rect.X, Rect.Y, SiteLayout.LoungeBarDepth, Rect.Height),
+        Facing.West => new TileRect(Rect.Right - SiteLayout.LoungeBarDepth, Rect.Y, SiteLayout.LoungeBarDepth, Rect.Height),
+        _ => new TileRect(Rect.X, Rect.Y, Rect.Width, SiteLayout.LoungeBarDepth),
+    };
+
     /// <summary>The prices the player has set, one for each thing on the menu. Null while everything is at its usual price.</summary>
     public int[]? Prices { get; init; }
 
@@ -37,6 +49,15 @@ public sealed record PlacedStall(StallKind Kind, int X, int Y, Facing Facing)
         var menu = Catalogue.MenuOf(Kind);
         return item < 0 || item >= menu.Count ? 0 : Prices is { } set && item < set.Length ? set[item] : menu[item].UsualPrice;
     }
+
+    /// <summary>
+    /// True when only VIP guests may use this stall: set by the player on the menu board, and
+    /// always so for the VIP lounge and platform. A sign saying so stands outside.
+    /// </summary>
+    public bool VipOnly { get; init; }
+
+    /// <summary>True when only VIP guests use it, whether the player chose that or it is a VIP building.</summary>
+    public bool ForVips => VipOnly || Catalogue.AlwaysVip(Kind);
 
     /// <summary>How dear something is here against what people usually expect to pay: 1 is the usual price, 2 is double.</summary>
     public double Dearness(int item) => (double)PriceOf(item) / Math.Max(1, Catalogue.MenuOf(Kind)[item].UsualPrice);
@@ -386,6 +407,7 @@ public sealed partial class SiteLayout
                 else if (CanKeepClear(p))
                 {
                     _keepOut.Add(p);
+                    _vipGround.Remove(p);
                 }
             }
 
@@ -454,8 +476,8 @@ public sealed partial class SiteLayout
     public static (double X, double Y) ServingPlace(PlacedStall stall, int lane, double metresOut)
     {
         var info = Catalogue.Of(stall.Kind);
-        var (fx, fy, dx, dy) = Front(stall.Rect, stall.Facing);
-        var across = (((lane + 0.5) / info.Servers) - 0.5) * info.Width * FieldMap.TileMetres * 0.75;
+        var (fx, fy, dx, dy) = Front(stall.ServeRect, stall.Facing);
+        var across = (((lane + 0.5) / info.Servers) - 0.5) * info.Width * FieldMap.TileMetres * (stall.Kind == StallKind.VipLounge ? 0.4 : 0.75);
         return (fx + (dx * metresOut) - (dy * across), fy + (dy * metresOut) + (dx * across));
     }
 
@@ -884,7 +906,7 @@ public sealed partial class SiteLayout
     public SiteSave Save() => new(_stages.ToList(), _gates.ToList(), FenceRuns(), _stalls.ToList(),
         _lanes.Count == 0 ? null : _lanes.Select(l => l.ToList()).ToList(),
         _keepOut.Count == 0 ? null : RunsOf(_keepOut).Select(r => r.Vertical ? new TileRect(r.X, r.Y, 1, r.Length) : new TileRect(r.X, r.Y, r.Length, 1)).ToList(),
-        _lights.Count == 0 ? null : _lights.ToList(), _fairy.Count == 0 ? null : _fairy.ToList(), _screens.Count == 0 ? null : _screens.ToList(), _pad, _comforts.Count == 0 ? null : _comforts.ToList(), _signs.Count == 0 ? null : _signs.ToList(), _decor.Count == 0 ? null : _decor.ToList(), _bunting.Count == 0 ? null : _bunting.ToList());
+        _lights.Count == 0 ? null : _lights.ToList(), _fairy.Count == 0 ? null : _fairy.ToList(), _screens.Count == 0 ? null : _screens.ToList(), _pad, _comforts.Count == 0 ? null : _comforts.ToList(), _signs.Count == 0 ? null : _signs.ToList(), _decor.Count == 0 ? null : _decor.ToList(), _bunting.Count == 0 ? null : _bunting.ToList(), SaveVipGround());
 
     /// <summary>Puts back a saved layout, skipping anything that no longer fits.</summary>
     public void Restore(SiteSave save)
@@ -972,6 +994,7 @@ public sealed partial class SiteLayout
         RestoreComforts(save);
         RestoreSigns(save);
         RestoreDecor(save);
+        RestoreVipGround(save);
         Refresh();
     }
 
@@ -1003,7 +1026,8 @@ public sealed partial class SiteLayout
         _charmStale = true;
         _poles.Clear();
         _keepOut.RemoveWhere(p => _fence.ContainsKey(p) || StageAt(p) is not null || StallAt(p) is not null || GateAt(p) is not null || _laneOf.ContainsKey(p) || _barriers.Contains(p) || ScreenAt(p) is not null || FireworksAt(p) || ComfortAt(p) is not null || SignAt(p) is not null || DecorAt(p) is not null || IsBuntingPole(p));
-        _map.SetBlocked(_stages.SelectMany(s => TilesOf(s.Rect)).Concat(_stalls.SelectMany(s => TilesOf(s.Rect))).Concat(_fence.Keys).Concat(_laneOf.Keys).Concat(_barriers).Concat(LightsInTheWay).Concat(ScreensInTheWay).Concat(PadInTheWay).Concat(ComfortsInTheWay).Concat(SignsInTheWay).Concat(DecorInTheWay).Concat(_pitches));
+        _map.SetBlocked(_stages.SelectMany(s => TilesOf(s.Rect)).Concat(_stalls.SelectMany(BlockedBy)).Concat(_fence.Keys).Concat(_laneOf.Keys).Concat(_barriers).Concat(LightsInTheWay).Concat(ScreensInTheWay).Concat(PadInTheWay).Concat(ComfortsInTheWay).Concat(SignsInTheWay).Concat(DecorInTheWay).Concat(_pitches));
+        RefreshVipGround();
         _map.SetStaffOnly(_keepOut);
 
         var width = _map.Width;
@@ -1088,7 +1112,7 @@ public sealed partial class SiteLayout
         var queue = new Queue<TilePoint>();
         foreach (var p in from)
         {
-            if (_map.IsWalkable(p) && _sides[(p.Y * width) + p.X] == Side.Nowhere && !gateTiles.Contains(p))
+            if (_map.IsWalkableForVip(p.X, p.Y) && _sides[(p.Y * width) + p.X] == Side.Nowhere && !gateTiles.Contains(p))
             {
                 _sides[(p.Y * width) + p.X] = side;
                 queue.Enqueue(p);
@@ -1100,7 +1124,7 @@ public sealed partial class SiteLayout
             foreach (var (dx, dy) in new[] { (1, 0), (-1, 0), (0, 1), (0, -1) })
             {
                 var next = new TilePoint(at.X + dx, at.Y + dy);
-                if (!_map.IsWalkable(next) || gateTiles.Contains(next))
+                if (!_map.IsWalkableForVip(next.X, next.Y) || gateTiles.Contains(next))
                 {
                     continue;
                 }
@@ -1119,4 +1143,4 @@ public sealed partial class SiteLayout
 /// <summary>The layout as written to a save file.</summary>
 public sealed record SiteSave(List<PlacedStage>? Stages, List<PlacedGate>? Gates, List<FenceRun>? Fences, List<PlacedStall>? Stalls = null,
     List<List<TilePoint>>? Lanes = null, List<TileRect>? KeepOut = null,
-    List<PlacedLight>? Lights = null, List<FairyString>? FairyLights = null, List<PlacedScreen>? Screens = null, PlacedLaunchPad? LaunchPad = null, List<PlacedComfort>? Comforts = null, List<PlacedSign>? Signs = null, List<PlacedDecor>? Decor = null, List<BuntingRun>? Bunting = null);
+    List<PlacedLight>? Lights = null, List<FairyString>? FairyLights = null, List<PlacedScreen>? Screens = null, PlacedLaunchPad? LaunchPad = null, List<PlacedComfort>? Comforts = null, List<PlacedSign>? Signs = null, List<PlacedDecor>? Decor = null, List<BuntingRun>? Bunting = null, List<TileRect>? VipGround = null);

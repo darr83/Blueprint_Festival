@@ -133,7 +133,7 @@ public sealed partial class Crowd
         foreach (var comfort in _site.Comforts)
         {
             var info = Comforts.Of(comfort.Kind);
-            if (info.Seats.Length < people || ((wet || roofOnly) && !info.Roofed) || (comfort.Kind == ComfortKind.StrawBale && (wet || Damp)))
+            if (info.Seats.Length < people || ((wet || roofOnly) && !info.Roofed) || (comfort.Kind == ComfortKind.StrawBale && (wet || Damp)) || !MayUse(party, comfort))
             {
                 continue;
             }
@@ -144,7 +144,7 @@ public sealed partial class Crowd
                 continue;
             }
 
-            var score = away + (toEat && !info.Table ? 12 : 0) + (hot && !info.Roofed ? 10 : 0);
+            var score = away + (toEat && !info.Table ? 12 : 0) + (hot && !info.Roofed ? 10 : 0) - (party.Vip && _site.ForVips(comfort) ? 15 : 0);
             if (score >= bestScore)
             {
                 continue;
@@ -175,7 +175,7 @@ public sealed partial class Crowd
                 .ToArray();
             var (sx, sy, _) = best.Place(all[mine[0]]);
             var beside = FieldMap.TileAt(sx, sy);
-            if (!_map.IsWalkable(beside))
+            if (!WalkableFor(party, beside))
             {
                 beside = NearestWalkable(beside);
             }
@@ -310,7 +310,7 @@ public sealed partial class Crowd
         var nearest = ShelterReach;
         foreach (var comfort in _site.Comforts)
         {
-            if (comfort.Kind is ComfortKind.ShadeSail or ComfortKind.SeatingMarquee && Away(party, comfort) is var away && away < nearest)
+            if (comfort.Kind is ComfortKind.ShadeSail or ComfortKind.SeatingMarquee && MayUse(party, comfort) && Away(party, comfort) is var away && away < nearest)
             {
                 (best, nearest) = (comfort, away);
             }
@@ -328,7 +328,7 @@ public sealed partial class Crowd
             var spot = new TilePoint(
                 r.X + 1 + (int)(Roll(party.Id, 67 + attempt, r.X) * Math.Max(1, r.Width - 2)),
                 r.Y + 1 + (int)(Roll(party.Id, 73 + attempt, r.Y) * Math.Max(1, r.Height - 2)));
-            if (_map.IsWalkable(spot))
+            if (WalkableFor(party, spot))
             {
                 Send(party, spot, PartyState.Strolling);
                 return party.State == PartyState.Strolling;
@@ -351,7 +351,7 @@ public sealed partial class Crowd
         foreach (var comfort in _site.Comforts)
         {
             // A sink is worth a few more steps than a squirt of gel.
-            if (Comforts.Of(comfort.Kind).Washes && Away(party, comfort) + (comfort.Kind == ComfortKind.HandGel ? 4 : 0) is var away && away < nearest)
+            if (Comforts.Of(comfort.Kind).Washes && MayUse(party, comfort) && Away(party, comfort) + (comfort.Kind == ComfortKind.HandGel ? 4 : 0) is var away && away < nearest)
             {
                 (best, nearest) = (comfort, away);
             }

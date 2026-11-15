@@ -29,10 +29,11 @@ public static class Adverts
 }
 
 /// <summary>What one month, or one day of build week, sold.</summary>
-public sealed record SalesLine(string When, int Tickets, int Price, int AdCost)
+public sealed record SalesLine(string When, int Tickets, int Price, int AdCost, int Vips = 0, int VipPrice = 0)
 {
-    public int Taken => Tickets * Price;
+    /// <summary>What the ordinary tickets and the VIP tickets took between them.</summary>
+    public int Taken => (Tickets * Price) + (Vips * VipPrice);
 }
 
 /// <summary>Ticket selling as written to a save file.</summary>
-public sealed record SalesSave(int Turn, int Sold, List<string> Adverts, List<SalesLine> Log);
+public sealed record SalesSave(int Turn, int Sold, List<string> Adverts, List<SalesLine> Log, int VipSold = 0, int? VipPrice = null);
