@@ -53,7 +53,7 @@ public class MedicalTests
         }
 
         Assert.True(game.BuildStage(StageKind.HiredStage, f.X + (f.Width / 2) - 6, f.Y + 6, Facing.South).Ok);
-        var kinds = new[] { StallKind.FoodVan, StallKind.Bar, StallKind.ToiletBlock, StallKind.WaterPoint };
+        var kinds = new[] { StallKind.Burgers, StallKind.Bar, StallKind.ToiletBlock, StallKind.WaterPoint };
         for (var i = 0; i < 12; i++)
         {
             var east = i % 2 == 0;

@@ -52,7 +52,7 @@ public class GrowthTests
         }
 
         // A row of stalls down the east hedge and another down the west, facing in.
-        var kinds = new[] { StallKind.FoodVan, StallKind.Bar, StallKind.ToiletBlock, StallKind.WaterPoint };
+        var kinds = new[] { StallKind.Burgers, StallKind.Bar, StallKind.ToiletBlock, StallKind.WaterPoint };
         var wanted = Math.Max(8, licence / 110);
         var perSide = (f.Height - 50) / 30;
         for (var i = 0; i < wanted; i++)

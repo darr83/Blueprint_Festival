@@ -29,13 +29,15 @@ public class NeedsTests
     [Fact]
     public void Every_stall_has_a_name_a_size_a_price_and_a_need_it_answers()
     {
-        Assert.Equal(9, Catalogue.Stalls.Count);
+        Assert.Equal(19, Catalogue.Stalls.Count);
         Assert.All(Enum.GetValues<StallKind>(), k => Assert.Equal(k, Catalogue.Of(k).Kind));
         Assert.All(Catalogue.Stalls.Where(s => s.Kind != StallKind.Bin), s => Assert.True(s.Cost > 0 && s.Width > 0 && s.Depth > 0 && s.Servers >= 1 && s.SecondsPerPerson > 0 && s.Name.Length > 0));
         Assert.All(Enum.GetValues<Need>(), n => Assert.Contains(Catalogue.Stalls, s => s.Serves == n));
         Assert.Equal(0, Catalogue.Of(StallKind.Toilets).Price);
         Assert.Equal(0, Catalogue.Of(StallKind.WaterPoint).Price);
-        Assert.True(Catalogue.Stalls.Sum(s => s.Cost) + Catalogue.Of(StageKind.Bandstand).Cost + Catalogue.Of(GateKind.VillageGate).Cost < FestivalGame.StartingMoney);
+        // A village festival can afford something to eat, something to drink, toilets, a stage and a gate.
+        var village = new[] { StallKind.HotDogs, StallKind.Fries, StallKind.Bar, StallKind.Coffee, StallKind.Toilets, StallKind.WaterPoint, StallKind.Bin };
+        Assert.True(village.Sum(k => Catalogue.Of(k).Cost) + Catalogue.Of(StageKind.Bandstand).Cost + Catalogue.Of(GateKind.VillageGate).Cost < FestivalGame.StartingMoney);
     }
 
     [Fact]
@@ -99,14 +101,19 @@ public class NeedsTests
         }
 
         Assert.True(sawQueue);
-        Assert.True(served[StallKind.FoodVan] > 40, $"{served[StallKind.FoodVan]} fed");
+        Assert.True(served[StallKind.Burgers] > 40, $"{served[StallKind.Burgers]} fed");
         Assert.True(served[StallKind.Bar] + served[StallKind.WaterPoint] > 60);
         Assert.True(served[StallKind.Toilets] > 40);
         // The stallholders keep most of it: the festival's share is 30p in the pound.
-        var van = game.Income.Single(l => l.What == "Food van").Amount;
-        var bar = game.Income.Single(l => l.What == "Bar tent").Amount;
-        Assert.InRange(van, served[StallKind.FoodVan] * 6 * 0.22, served[StallKind.FoodVan] * 6 * 0.28);
-        Assert.InRange(bar, served[StallKind.Bar] * 4 * 0.22, served[StallKind.Bar] * 4 * 0.28);
+        var van = game.Income.Single(l => l.What == "Food stalls").Amount;
+        var bar = game.Income.Single(l => l.What == "Drink stalls").Amount;
+        Assert.Equal(StallKind.Burgers, game.Site.Stalls[0].Kind);
+        Assert.Equal(StallKind.Bar, game.Site.Stalls[1].Kind);
+        Assert.Equal(served[StallKind.Burgers], game.SalesOf(0).Items);
+        Assert.InRange(game.SalesOf(0).Takings, served[StallKind.Burgers] * 6, served[StallKind.Burgers] * 7);
+        Assert.InRange(van, game.SalesOf(0).Takings * 0.22, game.SalesOf(0).Takings * 0.28);
+        Assert.InRange(bar, game.SalesOf(1).Takings * 0.22, game.SalesOf(1).Takings * 0.28);
+        Assert.Equal(game.SalesOf(0).Takings + game.SalesOf(1).Takings, game.StallTakings);
         Assert.DoesNotContain(game.Income, l => l.What is "Toilets" or "Water point");
         Assert.Equal(van + bar, game.TotalIncome);
         Assert.Equal(FestivalGame.StartingMoney - game.TotalSpending + game.TotalIncome, game.Money);
@@ -139,16 +146,20 @@ public class NeedsTests
         Assert.Equal(0, drinker.Thirst, 3);
         Assert.True(drinker.Toilet > toiletBefore + 0.15);
         Assert.Equal(PartyState.Standing, drinker.State);
-        Assert.Equal(4 * drinker.Members.Count, drinker.Spent);
+        Assert.InRange(drinker.Spent, 2 * drinker.Members.Count, 5 * drinker.Members.Count);
+        Assert.Equal(drinker.Spent, game.SalesOf(0).Takings);
+        // Each of them walks away with a drink in their hand.
+        Assert.All(drinker.Members, m => Assert.Contains(m.Holding, new[] { Carried.Pint, Carried.Cup }));
     }
 
     [Fact]
-    public void With_too_little_food_the_queue_grows_and_people_give_up()
+    public void With_too_few_stalls_the_queue_grows_and_people_give_up()
     {
-        // One slow tea table to feed a whole festival.
-        var game = new FestivalGame("One Table", seed: 8);
+        // One little coffee cart for a whole festival on a hot, thirsty day.
+        var game = new FestivalGame("One Cart", seed: 8);
+        game.SetWeather(DayWeather.Of(WeatherKind.Hot, 3));
         var f = game.Field.Field;
-        Assert.True(game.BuildStall(StallKind.TeaAndCake, f.X + 40, f.Y + 20, Facing.South).Ok);
+        Assert.True(game.BuildStall(StallKind.Coffee, f.X + 40, f.Y + 20, Facing.South).Ok);
         var longest = 0;
         var gaveUpAt = DateTime.MaxValue;
         while (game.Now < Day.AddHours(18))
@@ -201,7 +212,7 @@ public class NeedsTests
     {
         var game = new FestivalGame("Take Down", seed: 8);
         var f = game.Field.Field;
-        Assert.True(game.BuildStall(StallKind.TeaAndCake, f.X + 40, f.Y + 20, Facing.South).Ok);
+        Assert.True(game.BuildStall(StallKind.Fries, f.X + 40, f.Y + 20, Facing.South).Ok);
         RunUntil(game, 11);
         while (game.Crowd.AtStalls < 4 && game.Now < Day.AddHours(16))
         {
@@ -209,7 +220,7 @@ public class NeedsTests
         }
 
         Assert.True(game.Crowd.AtStalls >= 4);
-        Assert.Equal(30, game.Remove(new TilePoint(f.X + 41, f.Y + 21)));
+        Assert.Equal(Catalogue.Of(StallKind.Fries).Cost, game.Remove(new TilePoint(f.X + 41, f.Y + 21)));
         Assert.Equal(0, game.Crowd.AtStalls);
         game.Clock.Step();
         Assert.DoesNotContain(game.Crowd.Parties, p => p.State == PartyState.AtStall);

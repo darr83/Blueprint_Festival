@@ -40,7 +40,17 @@ public enum PartyState
 }
 
 /// <summary>One person in a party, and where they stand relative to its middle.</summary>
-public sealed record PartyMember(int Id, PersonLook Look, double OffsetX, double OffsetY);
+public sealed record PartyMember(int Id, PersonLook Look, double OffsetX, double OffsetY)
+{
+    /// <summary>How they look. It changes when they buy a poncho or a hat and put it on.</summary>
+    public PersonLook Look { get; internal set; } = Look;
+
+    /// <summary>What they have in their hand, having bought it at a stall.</summary>
+    public Carried Holding { get; internal set; }
+
+    /// <summary>What they have bought and put on today: 1 for a poncho, 2 for a bucket hat, 3 for both.</summary>
+    public int Bought { get; internal set; }
+}
 
 /// <summary>How a party gets to the festival.</summary>
 public enum Travel
@@ -199,6 +209,30 @@ public sealed class Party
     /// <summary>When they will drop the rubbish they are holding, if they are holding any.</summary>
     public DateTime LitterAt { get; internal set; }
 
+    /// <summary>When they will have finished the food and drink in their hands.</summary>
+    public DateTime HoldUntil { get; internal set; }
+
+    /// <summary>
+    /// How far above the usual price they will go before they refuse to buy: 1 pays the usual
+    /// price and no more, 2.4 pays well over double. Spread evenly, so each step up in price loses
+    /// about the same number of customers.
+    /// </summary>
+    public double Stretch { get; internal set; } = 1.7;
+
+    /// <summary>True while they are at a stall because they fancied something, not because they needed it.</summary>
+    public bool Fancying { get; internal set; }
+
+    /// <summary>They will not think about a treat or the shops again before this time.</summary>
+    public DateTime FancyAt { get; internal set; }
+
+    /// <summary>They will not grumble about prices again before this time.</summary>
+    public DateTime GrumbleAt { get; internal set; }
+
+    /// <summary>True once they have been to the hat stall, and to the merchandise tent.</summary>
+    public bool BoughtHats { get; internal set; }
+
+    public bool BoughtMerch { get; internal set; }
+
     /// <summary>True once the party has made up its mind whether to stay on for the headliner.</summary>
     public bool StayDecided { get; internal set; }
 
@@ -233,6 +267,9 @@ public sealed class Party
 /// <summary>One person as the game draws them: who they are, where they are, which way they face.</summary>
 public readonly record struct PersonOnSite(int Id, PersonLook Look, double X, double Y, double Heading, bool Walking, bool Watching = false, Need? Wants = null, bool Unwell = false)
 {
+    /// <summary>What they have in their hand, having bought it at a stall.</summary>
+    public Carried Holding { get; init; }
+
     /// <summary>True while this person is holding up their ticket for the gate staff.</summary>
     public bool Ticket { get; init; }
 }
@@ -398,6 +435,8 @@ public sealed class Crowd
     /// <summary>The share of people who keep to the paths just now: more of them do once the grass is wet.</summary>
     public double PathShare { get; set; } = DryPathShare;
 
+    private bool _sellers;
+
     /// <summary>True once any path has been laid.</summary>
     public bool HasPaths => _paths.HasPaths;
 
@@ -414,9 +453,6 @@ public sealed class Crowd
 
     /// <summary>Whether people have dressed for a wet day: wellies, and a rain poncho for about half of them.</summary>
     public bool DressedForRain { get; set; }
-
-    /// <summary>Whether the festival hands everyone a rain poncho at the gate on a wet day.</summary>
-    public bool FreePonchos { get; set; }
 
     /// <summary>Mood lost in an hour of pouring rain by someone with no poncho, and by someone with one.</summary>
     public const double SoakedPerHour = 0.07;
@@ -535,6 +571,24 @@ public sealed class Crowd
 
     /// <summary>Raised when a stall serves a party: which kind of stall, how many people, and what they paid.</summary>
     public event Action<StallKind, int, int>? Served;
+
+    /// <summary>Raised each time one person buys one thing: the stall, which thing on its menu, and what they paid.</summary>
+    public event Action<PlacedStall, int, int>? Sold;
+
+    /// <summary>How many people have turned away from a stall today because everything on it cost too much for them.</summary>
+    public int PricedOut { get; internal set; }
+
+    /// <summary>A number from 0 up to 1 that is always the same for the same party, purpose and moment.</summary>
+    private double Roll(int party, int purpose, int moment)
+    {
+        var h = unchecked((uint)((Seed * 73856093) ^ (party * 19349663) ^ (purpose * 83492791) ^ (moment * 40503)));
+        h ^= h >> 15;
+        h = unchecked(h * 2246822519u);
+        h ^= h >> 13;
+        h = unchecked(h * 3266489917u);
+        h ^= h >> 16;
+        return h / 4294967296.0;
+    }
 
     /// <summary>Raised when someone drops a piece of litter: where, in metres.</summary>
     public event Action<double, double>? Dropped;
@@ -670,6 +724,7 @@ public sealed class Crowd
                         i == 0 && party.State != PartyState.Unwell ? party.Wants : null,
                         party.State == PartyState.Unwell && i == 0)
                     {
+                        Holding = m.Holding,
                         Ticket = party.State == PartyState.Queuing && party.InLine && party.ServiceLeft >= 0 && i >= party.Checked && i < party.Checked + CheckersOn(party.Gate, party.Lane),
                     };
                 }
@@ -715,11 +770,6 @@ public sealed class Crowd
                     look = LookGenerator.FestivalGoer(lookSeed, AgeGroup.Adult, DressedForRain);
                 }
 
-                if (DressedForRain && FreePonchos && look.Poncho is null)
-                {
-                    look = look with { Poncho = LookGenerator.PonchoColours[personId % LookGenerator.PonchoColours.Length] };
-                }
-
                 // Members stand in a small ring round the party's middle.
                 var angle = (Math.Tau * i / size) + random.Between(-0.3, 0.3);
                 var radius = size == 1 ? 0 : random.Between(0.34, 0.5);
@@ -744,6 +794,7 @@ public sealed class Crowd
                 Thirst = needs.Between(0.1, 0.4),
                 Toilet = needs.Between(0, 0.3),
                 Appetite = needs.Between(0.8, 1.25),
+                Stretch = 1 + (1.4 * Roll(_parties.Count, 77, 0)),
             });
             Expected += size;
         }
@@ -1112,11 +1163,12 @@ public sealed class Crowd
         _serving.Clear();
         _cubicles.Clear();
         _taken.Clear();
+        _sellers = _site.Stalls.Any(s => Catalogue.Sells(s.Kind));
         var fenced = MatchLanes();
         foreach (var stall in _site.Stalls)
         {
             var info = Catalogue.Of(stall.Kind);
-            for (var k = 0; info.Serves is not null && k < info.Servers; k++)
+            for (var k = 0; Catalogue.HasQueue(stall.Kind) && k < info.Servers; k++)
             {
                 if (info.Serves == Need.Toilet)
                 {
@@ -1156,9 +1208,9 @@ public sealed class Crowd
         foreach (var stall in _site.Stalls)
         {
             var info = Catalogue.Of(stall.Kind);
-            _serving.Add(new Party?[info.Serves == Need.Toilet ? 0 : info.Servers]);
+            _serving.Add(new Party?[info.Serves == Need.Toilet || !Catalogue.HasQueue(stall.Kind) ? 0 : info.Servers]);
             _cubicles.Add(new CubicleUse?[info.Serves == Need.Toilet ? info.Servers : 0]);
-            if (info.Serves is null)
+            if (!Catalogue.HasQueue(stall.Kind))
             {
                 _stallQueues.Add(null);
                 continue;
@@ -1224,7 +1276,7 @@ public sealed class Crowd
 
         for (var i = 0; i < _site.Stalls.Count; i++)
         {
-            if (Catalogue.Of(_site.Stalls[i].Kind).Serves is not null)
+            if (Catalogue.HasQueue(_site.Stalls[i].Kind))
             {
                 var (fx, fy, dx, dy) = SiteLayout.Front(_site.Stalls[i].Rect, _site.Stalls[i].Facing);
                 Offer((false, i, 0), fx + (dx * LaneFront), fy + (dy * LaneFront));
@@ -1753,6 +1805,19 @@ public sealed class Crowd
                 }
             }
 
+            if (party.HoldUntil != default && now >= party.HoldUntil)
+            {
+                // The food is eaten and the drinks are drunk. A bag of merchandise is kept all day.
+                party.HoldUntil = default;
+                foreach (var member in party.Members)
+                {
+                    if (member.Holding != Carried.Bag)
+                    {
+                        member.Holding = Carried.None;
+                    }
+                }
+            }
+
             if (party.LitterAt != default && now >= party.LitterAt && party.IsOnSite)
             {
                 // Anyone already on their way out takes it home with them.
@@ -1879,6 +1944,10 @@ public sealed class Crowd
                     {
                         // Off to the stage.
                     }
+                    else if (Fancy(party, now))
+                    {
+                        // Off for a treat, or to the shops.
+                    }
                     else if (now >= party.WaitUntil)
                     {
                         Send(party, SomewhereInField(party.Random), PartyState.Strolling);
@@ -1981,15 +2050,40 @@ public sealed class Crowd
             return false;
         }
 
-        // The most pressing need that some stall here can answer.
+        // The most pressing need that some stall here can answer at a price they will pay.
         Need? wanted = null;
+        var tooDear = false;
         foreach (var candidate in new[] { Need.Toilet, Need.Drink, Need.Food })
         {
-            if (party.Level(candidate) >= from && (wanted is null || party.Level(candidate) > party.Level(wanted.Value))
-                && _site.Stalls.Any(s => Catalogue.Of(s.Kind).Serves == candidate))
+            if (party.Level(candidate) < from)
+            {
+                continue;
+            }
+
+            var any = false;
+            var affordable = false;
+            foreach (var s in _site.Stalls)
+            {
+                if (Catalogue.Of(s.Kind).Serves == candidate)
+                {
+                    any = true;
+                    affordable = affordable || WorthIt(party, s);
+                }
+            }
+
+            tooDear = tooDear || (any && !affordable);
+            if (affordable && (wanted is null || party.Level(candidate) > party.Level(wanted.Value)))
             {
                 wanted = candidate;
             }
+        }
+
+        if (tooDear && now >= party.GrumbleAt && party.Ticketed is not null)
+        {
+            // There is food or drink here, but not at a price they will pay. They go without, and they mind.
+            party.GrumbleAt = now + TimeSpan.FromMinutes(30);
+            party.Mood = Math.Max(0, party.Mood - 0.03);
+            PricedOut += party.Members.Count;
         }
 
         if (wanted is not { } need)
@@ -2003,34 +2097,221 @@ public sealed class Crowd
         {
             var stall = _site.Stalls[i];
             var info = Catalogue.Of(stall.Kind);
-            if (info.Serves != need || _stallQueues[i] is not { } queue)
+            if (info.Serves != need || _stallQueues[i] is not { } queue || !WorthIt(party, stall))
             {
                 continue;
             }
 
+            var score = WaitAndWalk(party, i, queue, info) + Liking(party, stall, now);
+            if (score < bestScore)
             {
-                var (x, y, _) = queue.At(Entry(queue, queue.People));
-                var walk = Math.Abs(x - party.X) + Math.Abs(y - party.Y);
-                var score = ((queue.People + (_serving[i].Count(p => p is not null) * 2.2)) * info.SecondsPerPerson / info.Servers) + (walk / party.Speed);
-                if (score < bestScore)
-                {
-                    (best, bestScore) = (i, score);
-                }
+                (best, bestScore) = (i, score);
             }
         }
 
-        if (best < 0)
+        return best >= 0 && JoinStall(party, best, now, fancy: false);
+    }
+
+    /// <summary>How long a stall would take a party, in seconds: the queue, the people being served and the walk there.</summary>
+    private double WaitAndWalk(Party party, int stall, QueueLine queue, StallInfo info)
+    {
+        var (x, y, _) = queue.At(Entry(queue, queue.People));
+        var walk = Math.Abs(x - party.X) + Math.Abs(y - party.Y);
+        return ((queue.People + (_serving[stall].Count(p => p is not null) * 2.2)) * info.SecondsPerPerson / Math.Max(1, info.Servers)) + (walk / party.Speed);
+    }
+
+    /// <summary>
+    /// How much less a party likes one stall than another, counted as seconds of extra wait they
+    /// would put up with to go elsewhere: dear prices, their own tastes, and whether it suits the
+    /// weather and the time of day.
+    /// </summary>
+    private double Liking(Party party, PlacedStall stall, DateTime now)
+    {
+        if (!Catalogue.Sells(stall.Kind))
+        {
+            // The tap is free, but some people would always rather have a proper drink. The toilets are just the toilets.
+            return stall.Kind == StallKind.WaterPoint ? 60 + (150 * Roll(party.Id, 31, (int)stall.Kind)) : 0;
+        }
+
+        // Someone properly hungry or thirsty wants a meal or a long drink: a snack is a poor second.
+        var menu = Catalogue.MenuOf(stall.Kind);
+        var snack = 1 - Math.Min(1, menu.Max(m => m.Fills));
+        var score = (Cheapest(party, stall) * 60) + (300 * Roll(party.Id, 31, (int)stall.Kind)) + (snack * 300);
+        var hot = Heat >= 1.5;
+        var wet = Rain > 0.05;
+        var hour = now.TimeOfDay.TotalHours;
+        score += stall.Kind switch
+        {
+            StallKind.IceCream or StallKind.Slush => (hot ? -80 : 0) + (wet ? 200 : 0) + (stall.Kind == StallKind.Slush ? (party.HasChild ? -40 : 60) : 0),
+            StallKind.Coffee => (hour < 12 ? -120 : 0) + (wet ? -120 : 0) + (hot ? 150 : 0),
+            StallKind.Cocktails => (party.HasChild ? 200 : 0) + (hour >= 17 ? -100 : 0),
+            StallKind.Bar => party.HasChild ? 60 : 0,
+            _ => 0,
+        };
+        return score;
+    }
+
+    private static bool GrownUp(PartyMember member) => member.Look.Age is AgeGroup.Adult or AgeGroup.Older;
+
+    /// <summary>Whether one person may buy one thing: no beer for children, and children's sizes only for children.</summary>
+    private static bool MayBuy(PartyMember member, StallItem item) =>
+        (!item.AdultsOnly || GrownUp(member)) && (!item.ForChildren || member.Look.Age == AgeGroup.Child);
+
+    /// <summary>Whether one person has any use for something that is worn: nobody buys a second poncho or hat.</summary>
+    private static bool HasUseFor(PartyMember member, StallItem item) => item.Wears switch
+    {
+        Worn.Poncho => member.Look.Poncho is null,
+        Worn.BucketHat => member.Look.Hat == Hat.None && member.Look.Poncho is null,
+        _ => true,
+    };
+
+    /// <summary>
+    /// How dear the best-priced thing on a stall is for a party, against its usual price: 1 is the
+    /// usual price. Only things somebody in the party could buy count.
+    /// </summary>
+    public double Cheapest(Party party, PlacedStall stall)
+    {
+        var menu = Catalogue.MenuOf(stall.Kind);
+        var best = double.MaxValue;
+        for (var i = 0; i < menu.Count; i++)
+        {
+            var dear = stall.Dearness(i);
+            if (dear < best && Wanted(party, menu[i]))
+            {
+                best = dear;
+            }
+        }
+
+        return best;
+    }
+
+    private static bool Wanted(Party party, StallItem item)
+    {
+        foreach (var member in party.Members)
+        {
+            if (MayBuy(member, item) && HasUseFor(member, item))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>Whether a stall has anything a party would pay for. The toilets and the taps always do.</summary>
+    public bool WorthIt(Party party, PlacedStall stall) => !Catalogue.Sells(stall.Kind) || Cheapest(party, stall) <= party.Stretch;
+
+    /// <summary>How many more (or fewer) people fancy a treat as its price goes down (or up): 1 at the usual price.</summary>
+    public static double Tempted(double dearness) => Math.Clamp(1 + ((1 - dearness) * 1.2), 0.2, 1.8);
+
+    /// <summary>How often a party with nothing pressing thinks about a treat or the shops, in minutes.</summary>
+    public const double FancyEveryMinutes = 15;
+
+    /// <summary>
+    /// The chance that a party, thinking about it, fancies what a stall sells just now. Ponchos go
+    /// when it rains, hats in hot sun, merchandise to people having a good day, and treats (ice
+    /// cream, slush, coffee, cocktails) when the weather and the hour suit them.
+    /// </summary>
+    public double Appeal(Party party, PlacedStall stall, DateTime now)
+    {
+        var hot = Heat >= 1.5;
+        var wet = Rain > 0.05;
+        var hour = now.TimeOfDay.TotalHours;
+        switch (stall.Kind)
+        {
+            case StallKind.Ponchos:
+                return wet ? 0.7 : DressedForRain ? 0.04 : 0;
+            case StallKind.BucketHats:
+                return party.BoughtHats || wet ? 0 : hot ? 0.035 : 0.01;
+            case StallKind.Merchandise:
+                return party.BoughtMerch || party.Mood < 0.6 ? 0 : 0.012 + (party.Decided >= 0 || party.DecidedSecond >= 0 ? 0.018 : 0);
+            case StallKind.IceCream:
+                return party.Hunger < 0.2 ? 0 : 0.03 * (hot ? 2.5 : 1) * (wet ? 0.2 : 1) * (party.HasChild ? 1.5 : 1);
+            case StallKind.Slush:
+                return party.Thirst < 0.25 ? 0 : 0.02 * (hot ? 2.5 : 1) * (wet ? 0.2 : 1) * (party.HasChild ? 2 : 1);
+            case StallKind.Coffee:
+                return party.Thirst < 0.25 ? 0 : 0.02 * (hour < 12 ? 2 : 1) * (wet ? 2 : 1) * (hot ? 0.3 : 1);
+            case StallKind.Cocktails:
+                return party.Thirst < 0.25 || !party.Members.Any(GrownUp) ? 0 : 0.015 * (hour >= 17 ? 2.5 : 1) * (party.HasChild ? 0.3 : 1);
+            default:
+                return 0;
+        }
+    }
+
+    /// <summary>
+    /// The extra pull of a bargain: food or drink well under its usual price tempts people who are
+    /// only a little hungry or thirsty and would otherwise have waited.
+    /// </summary>
+    public double Bargain(Party party, PlacedStall stall)
+    {
+        if (Catalogue.Of(stall.Kind).Serves is not { } need || !Catalogue.Sells(stall.Kind))
+        {
+            return 0;
+        }
+
+        var wanting = need == Need.Food ? party.Hunger : party.Thirst;
+        return wanting < 0.3 ? 0 : Math.Max(0, 0.9 - Cheapest(party, stall)) * 0.15;
+    }
+
+    /// <summary>
+    /// Now and then a party with nothing pressing fancies a treat or a look round the shops. The
+    /// cheaper a stall, the more people it tempts. True if they set off for one.
+    /// </summary>
+    private bool Fancy(Party party, DateTime now)
+    {
+        if (now < party.FancyAt || now < party.NeedRetryAt || party.Ticketed is null || !_sellers)
         {
             return false;
         }
 
+        var moment = (int)(now.TimeOfDay.TotalMinutes / FancyEveryMinutes);
+        party.FancyAt = now + TimeSpan.FromMinutes(FancyEveryMinutes * (0.7 + (0.6 * Roll(party.Id, 41, moment))));
+        var best = -1;
+        var bestScore = double.MaxValue;
+        for (var i = 0; i < _site.Stalls.Count; i++)
+        {
+            var stall = _site.Stalls[i];
+            if (!Catalogue.Sells(stall.Kind) || _stallQueues[i] is not { } queue || queue.People > 8)
+            {
+                continue;
+            }
+
+            var appeal = Appeal(party, stall, now) + Bargain(party, stall);
+            if (appeal <= 0 || !WorthIt(party, stall))
+            {
+                continue;
+            }
+
+            // One throw of the dice for each kind of stall, so two ice cream vans do not double the urge.
+            if (Roll(party.Id, 43 + (int)stall.Kind, moment) >= appeal * Tempted(Cheapest(party, stall)))
+            {
+                continue;
+            }
+
+            var score = WaitAndWalk(party, i, queue, Catalogue.Of(stall.Kind));
+            if (score < bestScore)
+            {
+                (best, bestScore) = (i, score);
+            }
+        }
+
+        return best >= 0 && JoinStall(party, best, now, fancy: true);
+    }
+
+    /// <summary>Sends a party to the back of a stall's queue. False if they cannot get there.</summary>
+    private bool JoinStall(Party party, int best, DateTime now, bool fancy)
+    {
         var line = _stallQueues[best]!;
         var door = Approach(line, Entry(line, line.People));
         var path = Route(party, FieldMap.TileAt(party.X, party.Y), door);
         if (path is null)
         {
             // Cannot get there (fenced off, perhaps): try again in a while.
-            party.NeedRetryAt = now + TimeSpan.FromMinutes(10);
+            if (!fancy)
+            {
+                party.NeedRetryAt = now + TimeSpan.FromMinutes(10);
+            }
+
             return false;
         }
 
@@ -2045,6 +2326,7 @@ public sealed class Crowd
         party.Path = path;
         party.PathIndex = 0;
         party.Moving = true;
+        party.Fancying = fancy;
         party.State = PartyState.AtStall;
         return true;
     }
@@ -2089,6 +2371,7 @@ public sealed class Crowd
         party.Rejoins = 0;
         party.ServiceLeft = -1;
         party.Moving = false;
+        party.Fancying = false;
         party.Path = null;
     }
 
@@ -2297,10 +2580,17 @@ public sealed class Crowd
             // People only wait so long once they have joined the queue.
             if (party.InLine && now - party.QueuedSince > TimeSpan.FromMinutes(PatienceMinutes))
             {
+                // Someone who only fancied a treat, and is not by now properly hungry or thirsty, just shrugs.
+                var fancied = party.Fancying && !(info.Serves is { } served && party.Level(served) >= Seeking);
                 LeaveStall(party);
-                party.GaveUp++;
-                party.Mood = Math.Max(0, party.Mood - 0.08);
-                party.NeedRetryAt = now + TimeSpan.FromMinutes(15);
+                if (!fancied)
+                {
+                    // Giving up on a treat is a shrug. Giving up on a meal spoils the day.
+                    party.GaveUp++;
+                    party.Mood = Math.Max(0, party.Mood - 0.08);
+                    party.NeedRetryAt = now + TimeSpan.FromMinutes(15);
+                }
+
                 party.State = PartyState.Standing;
                 party.WaitUntil = now;
                 return;
@@ -2362,40 +2652,190 @@ public sealed class Crowd
         }
     }
 
-    /// <summary>A party has been served: the need is answered, they pay, and they go back to their day.</summary>
+    /// <summary>
+    /// A party has been served. At a stall with a menu each of them picks something they will pay
+    /// for, pays for it and walks off with it in their hand (or on their head). The need is
+    /// answered, and how fair the prices were shows in their mood.
+    /// </summary>
     private void Finish(Party party, PlacedStall stall, StallInfo info, DateTime now)
     {
+        var fancied = party.Fancying;
+        LeaveStall(party);
+        var menu = Catalogue.MenuOf(stall.Kind);
+        var paid = 0;
+        var buyers = 0;
+        var filled = 0.0;
+        var dearness = 0.0;
+        var handful = false;
+        for (var m = 0; m < party.Members.Count && menu.Count > 0; m++)
         {
-            LeaveStall(party);
-            switch (info.Serves)
+            var member = party.Members[m];
+            var pick = Pick(party, member, stall, menu, now);
+            if (pick < 0)
             {
-                case Need.Food:
-                    // A slice of cake is not a meal.
-                    party.Hunger = stall.Kind == StallKind.TeaAndCake ? Math.Max(0, party.Hunger - 0.55) : 0;
-                    break;
-                case Need.Drink:
-                    party.Thirst = 0;
-                    party.Toilet = Math.Min(1.2, party.Toilet + 0.2);
-                    break;
-                default:
-                    party.Toilet = 0;
-                    break;
+                continue;
             }
 
-            var paid = info.Price * party.Members.Count;
-            party.Spent += paid;
-            party.Mood = Math.Min(1, party.Mood + 0.006);
-            party.State = PartyState.Standing;
-            party.RetryAt = default;
-            party.WaitUntil = now + TimeSpan.FromMinutes(party.Random.Between(1, 5));
-            if (info.Price > 0 && info.Serves != Need.Toilet && Untidy(party))
+            var item = menu[pick];
+            var price = stall.PriceOf(pick);
+            paid += price;
+            buyers++;
+            filled += item.Fills;
+            dearness += stall.Dearness(pick);
+            if (item.Gives != Carried.None && (member.Holding != Carried.Bag || item.Gives == Carried.Bag))
             {
-                // The wrapper or the cup lasts a few minutes, then some people just let go of it.
-                party.LitterAt = now + TimeSpan.FromMinutes(4 + ((party.Id + party.Spent) % 14));
+                member.Holding = item.Gives;
+                handful = handful || item.Gives != Carried.Bag;
             }
 
-            Served?.Invoke(stall.Kind, party.Members.Count, paid);
+            PutOn(member, item, pick);
+            Sold?.Invoke(stall, pick, price);
         }
+
+        var share = buyers == 0 ? 1 : filled / buyers;
+        switch (info.Serves)
+        {
+            case Need.Food when menu.Count == 0 || buyers > 0:
+                // Fries or an ice cream are not a meal.
+                party.Hunger = Math.Max(0, party.Hunger - (menu.Count == 0 ? 1.2 : share * 1.2));
+                break;
+            case Need.Drink when menu.Count == 0 || buyers > 0:
+                party.Thirst = Math.Max(0, party.Thirst - (menu.Count == 0 ? 1.2 : share * 1.2));
+                party.Toilet = Math.Min(1.2, party.Toilet + (0.2 * (menu.Count == 0 ? 1 : share)));
+                break;
+            case Need.Toilet:
+                party.Toilet = 0;
+                break;
+        }
+
+        switch (stall.Kind)
+        {
+            case StallKind.BucketHats:
+                party.BoughtHats = true;
+                break;
+            case StallKind.Merchandise:
+                party.BoughtMerch = true;
+                break;
+        }
+
+        party.Spent += paid;
+        if (buyers > 0 || menu.Count == 0)
+        {
+            // Being served is a small pleasure; a bargain is a bigger one, and being overcharged takes it away again.
+            var value = buyers == 0 ? 0 : Math.Clamp((1 - (dearness / buyers)) * 0.04, -0.04, 0.02);
+            var treat = fancied || stall.Kind == StallKind.Merchandise ? 0.008 : 0;
+            party.Mood = Math.Clamp(party.Mood + 0.006 + value + treat, 0, 1);
+        }
+
+        party.State = PartyState.Standing;
+        party.RetryAt = default;
+        party.WaitUntil = now + TimeSpan.FromMinutes(party.Random.Between(1, 5));
+        if (handful)
+        {
+            // It takes a few minutes to eat or drink. Then the wrapper or the cup is rubbish, and some people just let go of it.
+            party.HoldUntil = now + TimeSpan.FromMinutes(4 + ((party.Id + party.Spent) % 14));
+            if (Untidy(party))
+            {
+                party.LitterAt = party.HoldUntil;
+            }
+        }
+
+        Served?.Invoke(stall.Kind, party.Members.Count, paid);
+    }
+
+    /// <summary>
+    /// What one person picks from a stall's menu: something they are allowed, have a use for and
+    /// will pay the price of, leaning towards whatever is the best value. -1 if nothing suits.
+    /// </summary>
+    private int Pick(Party party, PartyMember member, PlacedStall stall, IReadOnlyList<StallItem> menu, DateTime now)
+    {
+        Span<double> weights = stackalloc double[menu.Count];
+        var total = 0.0;
+        for (var i = 0; i < menu.Count; i++)
+        {
+            var dear = stall.Dearness(i);
+            if (!MayBuy(member, menu[i]) || !HasUseFor(member, menu[i]) || dear > party.Stretch)
+            {
+                continue;
+            }
+
+            if (menu[i].Gives == Carried.Bag && member.Look.Age == AgeGroup.Child)
+            {
+                // The grown-ups carry the shopping.
+                continue;
+            }
+
+            weights[i] = (menu[i].ForChildren ? 4 : 1) / Math.Max(0.05, dear * dear);
+            total += weights[i];
+        }
+
+        if (total <= 0)
+        {
+            return -1;
+        }
+
+        if (stall.Kind == StallKind.Merchandise && member != party.Members[0] && Roll(member.Id, 53, party.Id) > 0.5)
+        {
+            // Not everyone in a party buys a souvenir.
+            return -1;
+        }
+
+        var roll = Roll(member.Id, 47 + (int)stall.Kind, (int)now.TimeOfDay.TotalMinutes) * total;
+        for (var i = 0; i < menu.Count; i++)
+        {
+            roll -= weights[i];
+            if (weights[i] > 0 && roll <= 0)
+            {
+                return i;
+            }
+        }
+
+        for (var i = 0; i < menu.Count; i++)
+        {
+            if (weights[i] > 0)
+            {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
+    /// <summary>The colours bucket hats come in at the hat stall.</summary>
+    public static readonly string[] HatStallColours = { "#F6B93B", "#E94F7B", "#2FB7A8", "#F6F0E2", "#6FC3E8", "#C59BE0", "#FF7A45", "#7FD6B8" };
+
+    /// <summary>Puts a poncho or a bucket hat on someone who has just bought one.</summary>
+    private static void PutOn(PartyMember member, StallItem item, int pick)
+    {
+        switch (item.Wears)
+        {
+            case Worn.Poncho:
+                member.Look = member.Look with { Poncho = LookGenerator.PonchoColours[member.Id % LookGenerator.PonchoColours.Length] };
+                member.Bought |= 1;
+                break;
+            case Worn.BucketHat:
+                member.Look = member.Look with { Hat = Hat.Bucket, HatColour = HatStallColours[member.Id % HatStallColours.Length] };
+                member.Bought |= 2;
+                break;
+        }
+
+        _ = pick;
+    }
+
+    /// <summary>Puts back what someone had bought and put on, after loading a save.</summary>
+    private static void PutBackOn(PartyMember member, int bought)
+    {
+        if ((bought & 2) != 0 && (member.Bought & 2) == 0)
+        {
+            member.Look = member.Look with { Hat = Hat.Bucket, HatColour = HatStallColours[member.Id % HatStallColours.Length] };
+        }
+
+        if ((bought & 1) != 0 && member.Look.Poncho is null)
+        {
+            member.Look = member.Look with { Poncho = LookGenerator.PonchoColours[member.Id % LookGenerator.PonchoColours.Length] };
+        }
+
+        member.Bought |= bought;
     }
 
     /// <summary>
@@ -2830,6 +3270,9 @@ public sealed class Crowd
                     .Select(c => new CubicleSave(c!.Member, (int)c.Phase, c.Left, c.X, c.Y, c.Heading))
                     .ToList(),
                 QueuedSince = p.QueuedSince, NeedRetryAt = p.NeedRetryAt, GaveUp = p.GaveUp, Spent = p.Spent, LeftUnhappy = p.LeftUnhappy, Leaves = p.Leaves, LitterAt = p.LitterAt, DecidedSecond = p.DecidedSecond, StayDecided = p.StayDecided,
+                Holding = p.Members.Any(m => m.Holding != Carried.None) ? p.Members.Select(m => (int)m.Holding).ToList() : null,
+                Bought = p.Members.Any(m => m.Bought != 0) ? p.Members.Select(m => m.Bought).ToList() : null,
+                HoldUntil = p.HoldUntil, FancyAt = p.FancyAt, GrumbleAt = p.GrumbleAt, BoughtHats = p.BoughtHats, BoughtMerch = p.BoughtMerch, Fancying = p.Fancying,
             })
         .ToList();
 
@@ -2887,6 +3330,21 @@ public sealed class Crowd
             party.Spent = s.Spent;
             party.LeftUnhappy = s.LeftUnhappy;
             party.LitterAt = s.LitterAt;
+            party.HoldUntil = s.HoldUntil;
+            party.FancyAt = s.FancyAt;
+            party.GrumbleAt = s.GrumbleAt;
+            party.BoughtHats = s.BoughtHats;
+            party.BoughtMerch = s.BoughtMerch;
+            party.Fancying = false;
+            for (var m = 0; m < party.Members.Count; m++)
+            {
+                party.Members[m].Holding = s.Holding is { } held && m < held.Count ? (Carried)held[m] : Carried.None;
+                if (s.Bought is { } bought && m < bought.Count)
+                {
+                    PutBackOn(party.Members[m], bought[m]);
+                }
+            }
+
             party.StayDecided = s.StayDecided;
             party.NeedRetryAt = s.NeedRetryAt;
             if (s.Mood is { } mood)
@@ -2908,6 +3366,7 @@ public sealed class Crowd
                 if (s.Stall >= 0 && s.Stall < _stallQueues.Count && _stallQueues[s.Stall] is { } line)
                 {
                     party.Stall = s.Stall;
+                    party.Fancying = s.Fancying;
                     party.QueuedSince = s.QueuedSince;
                     if (_cubicles[s.Stall].Length > 0)
                     {
@@ -3069,6 +3528,23 @@ public sealed record PartySave(int Id, PartyState State, double X, double Y, dou
     public int DecidedSecond { get; init; } = -1;
 
     public DateTime? Leaves { get; init; }
+
+    /// <summary>What each member has in their hand, and what each has bought and put on (1 poncho, 2 hat).</summary>
+    public List<int>? Holding { get; init; }
+
+    public List<int>? Bought { get; init; }
+
+    public DateTime HoldUntil { get; init; }
+
+    public DateTime FancyAt { get; init; }
+
+    public DateTime GrumbleAt { get; init; }
+
+    public bool BoughtHats { get; init; }
+
+    public bool BoughtMerch { get; init; }
+
+    public bool Fancying { get; init; }
 }
 
 /// <summary>

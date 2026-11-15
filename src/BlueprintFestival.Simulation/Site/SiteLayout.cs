@@ -27,6 +27,19 @@ public sealed record PlacedStall(StallKind Kind, int X, int Y, Facing Facing)
             return Facing is Facing.South or Facing.North ? new TileRect(X, Y, info.Width, info.Depth) : new TileRect(X, Y, info.Depth, info.Width);
         }
     }
+
+    /// <summary>The prices the player has set, one for each thing on the menu. Null while everything is at its usual price.</summary>
+    public int[]? Prices { get; init; }
+
+    /// <summary>What this stall charges for one thing on its menu.</summary>
+    public int PriceOf(int item)
+    {
+        var menu = Catalogue.MenuOf(Kind);
+        return item < 0 || item >= menu.Count ? 0 : Prices is { } set && item < set.Length ? set[item] : menu[item].UsualPrice;
+    }
+
+    /// <summary>How dear something is here against what people usually expect to pay: 1 is the usual price, 2 is double.</summary>
+    public double Dearness(int item) => (double)PriceOf(item) / Math.Max(1, Catalogue.MenuOf(Kind)[item].UsualPrice);
 }
 
 /// <summary>A gate that has been put up: a line of tiles one tile thick that people walk through.</summary>
@@ -487,6 +500,39 @@ public sealed partial class SiteLayout
         }
 
         return check;
+    }
+
+    /// <summary>Raised when the price of something on a stall's menu changes.</summary>
+    public event Action? PricesChanged;
+
+    /// <summary>
+    /// Sets what a stall charges for one thing on its menu, kept between £1 and three times the
+    /// usual price. Returns the price it ended up at, or null if there is no such stall or thing.
+    /// </summary>
+    public int? SetPrice(int stall, int item, int price)
+    {
+        if (stall < 0 || stall >= _stalls.Count)
+        {
+            return null;
+        }
+
+        var placed = _stalls[stall];
+        var menu = Catalogue.MenuOf(placed.Kind);
+        if (item < 0 || item >= menu.Count)
+        {
+            return null;
+        }
+
+        var prices = new int[menu.Count];
+        for (var i = 0; i < prices.Length; i++)
+        {
+            prices[i] = placed.PriceOf(i);
+        }
+
+        prices[item] = Math.Clamp(price, Catalogue.LowestPrice(menu[item]), Catalogue.HighestPrice(menu[item]));
+        _stalls[stall] = placed with { Prices = prices };
+        PricesChanged?.Invoke();
+        return prices[item];
     }
 
     private bool IsBuildable(TilePoint p) => _map[p] == Ground.Grass;

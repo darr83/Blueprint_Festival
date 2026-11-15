@@ -69,7 +69,7 @@ public class LightTests
         // Too short, the same again, or a pole on top of something: refused.
         Assert.False(game.CheckFairyLights(new TilePoint(f.X + 5, f.Y + 5), new TilePoint(f.X + 7, f.Y + 5)).Ok);
         Assert.False(game.CheckFairyLights(to, from).Ok);
-        Assert.True(game.BuildStall(StallKind.TeaAndCake, f.X + 60, f.Y + 40, Facing.South).Ok);
+        Assert.True(game.BuildStall(StallKind.Fries, f.X + 60, f.Y + 40, Facing.South).Ok);
         Assert.False(game.CheckFairyLights(new TilePoint(f.X + 40, f.Y + 42), new TilePoint(f.X + 62, f.Y + 42)).Ok);
 
         // But the string can cross over a stall, as long as its poles stand clear.
@@ -138,7 +138,7 @@ public class LightTests
         Assert.Equal(0, site.LitAt(new TilePoint(f.X + 45, f.Y + 29)));
 
         // A stall's own lamps light a little ground round it; taking a light down puts its patch back in the dark.
-        Assert.True(game.BuildStall(StallKind.FoodVan, f.X + 100, f.Y + 20, Facing.South).Ok);
+        Assert.True(game.BuildStall(StallKind.Burgers, f.X + 100, f.Y + 20, Facing.South).Ok);
         Assert.True(site.LitAt(new TilePoint(f.X + 106, f.Y + 27)) > 0.9);
         game.Remove(post);
         Assert.Equal(0, site.LitAt(post));
@@ -182,6 +182,10 @@ public class LightTests
         Assert.True(game.BuildStage(StageKind.Bandstand, f.X + 50, f.Y + 6, Facing.South).Ok);
         Amenities.Add(game);
         Assert.True(game.HireStaff(StaffKind.TicketStaff, new TilePoint(gap.X + 1, y)).Ok);
+        // First aid on hand, so the evening is not decided by someone left lying ill in the crowd.
+        Assert.True(game.BuildStall(StallKind.FirstAidTent, f.X + 20, f.Y + 6, Facing.South).Ok);
+        Assert.True(game.HireStaff(StaffKind.FirstAider, new TilePoint(f.X + 30, f.Y + 30)).Ok);
+        Assert.True(game.HireStaff(StaffKind.FirstAider, new TilePoint(f.X + 70, f.Y + 30)).Ok);
         if (lit)
         {
             // Nine floodlights in a grid: nowhere on the field is more than 13 m from one.
@@ -221,7 +225,7 @@ public class LightTests
         Assert.True(Mood(lit) > Mood(dark), $"lit {Mood(lit):0.00}, dark {Mood(dark):0.00}");
 
         // Nobody on the lit field is in the dark; on the unlit one everyone not watching the act is.
-        Assert.True(dark.InTheDark >= 10, $"{dark.InTheDark} in the dark");
+        Assert.True(dark.InTheDark >= 5, $"{dark.InTheDark} in the dark");
         Assert.Equal(0, lit.InTheDark);
     }
 

@@ -16,14 +16,26 @@ public static partial class SiteProps
     {
         var node = new Node3D { Name = Catalogue.Of(kind).Name };
         var b = new MeshBuilder();
+        if (Shop(b, node, kind))
+        {
+            node.AddChild(b.BuildNode("Shapes"));
+            if (kind == StallKind.Burgers)
+            {
+                // The cab sticks out at one end: slide the van along so the whole of it sits on its ground.
+                foreach (var child in node.GetChildren())
+                {
+                    if (child is Node3D part)
+                    {
+                        part.Position += new Vector3(-0.55f, 0, -0.15f);
+                    }
+                }
+            }
+
+            return node;
+        }
+
         switch (kind)
         {
-            case StallKind.TeaAndCake:
-                TeaAndCake(b, node);
-                break;
-            case StallKind.FoodVan:
-                FoodVan(b, node);
-                break;
             case StallKind.Bar:
                 BarTent(b, node);
                 break;
@@ -46,26 +58,12 @@ public static partial class SiteProps
         }
 
         node.AddChild(b.BuildNode("Shapes"));
-        if (kind == StallKind.FoodVan)
-        {
-            // The cab sticks out at one end: slide the van along so the whole of it sits on its ground.
-            foreach (var child in node.GetChildren())
-            {
-                if (child is Node3D part)
-                {
-                    part.Position += new Vector3(-0.55f, 0, -0.15f);
-                }
-            }
-        }
-
         return node;
     }
 
     /// <summary>Where the people serving stand, in metres from the stall's middle, the stall facing south.</summary>
-    public static Vector3[] StaffSpots(StallKind kind) => kind switch
+    public static Vector3[] StaffSpots(StallKind kind) => ShopStaff(kind) ?? kind switch
     {
-        StallKind.TeaAndCake => new[] { new Vector3(0.3f, 0, 0) },
-        StallKind.FoodVan => new[] { new Vector3(-1.45f, 0.55f, 0.4f), new Vector3(-0.15f, 0.55f, 0.4f) },
         StallKind.Bar => new[] { new Vector3(-1.4f, 0, 0.55f), new Vector3(1.3f, 0, 0.55f) },
         _ => System.Array.Empty<Vector3>(),
     };
@@ -122,51 +120,7 @@ public static partial class SiteProps
         return node;
     }
 
-    private static void TeaAndCake(MeshBuilder b, Node3D node)
-    {
-        // A garden gazebo over a trestle table with a gingham cloth.
-        const float w = 3f, d = 3f, eaves = 2.1f;
-        foreach (var x in new[] { -w / 2, w / 2 })
-        {
-            foreach (var z in new[] { -d / 2, d / 2 })
-            {
-                b.Tube(new Vector3(x, eaves / 2, z), new Vector3(0.07f, eaves, 0.07f), Canvas);
-            }
-        }
-
-        b.Cone(new Vector3(0, eaves + 0.45f, 0), new Vector3(w * 1.42f, 0.9f, d * 1.42f), Sunflower, new Vector3(0, 45, 0));
-        b.Box(new Vector3(0, eaves - 0.12f, d / 2), new Vector3(w, 0.26f, 0.04f), Cream);
-        Painted(node, "Tea & Cake", new Vector3(0, eaves - 0.12f, (d / 2) + 0.03f), w - 0.3f, 0.2f, PinkDark);
-        Bunting(b, new Vector3(-w / 2, eaves - 0.3f, (d / 2) + 0.02f), new Vector3(w / 2, eaves - 0.3f, (d / 2) + 0.02f), 0.14f);
-
-        b.Box(new Vector3(0, 0.74f, 0.7f), new Vector3(2.4f, 0.05f, 0.8f), Canvas);
-        b.Box(new Vector3(0, 0.45f, 1.11f), new Vector3(2.44f, 0.6f, 0.02f), Pink);
-        for (var i = 0; i < 6; i++)
-        {
-            b.Box(new Vector3(-1.0f + (i * 0.4f), 0.45f, 1.125f), new Vector3(0.2f, 0.6f, 0.01f), Canvas);
-        }
-
-        foreach (var x in new[] { -1.05f, 1.05f })
-        {
-            b.Box(new Vector3(x, 0.36f, 0.7f), new Vector3(0.05f, 0.72f, 0.7f), WoodDark);
-        }
-
-        // An urn, a stack of cups and three cakes on stands.
-        b.Tube(new Vector3(-0.9f, 1.0f, 0.65f), new Vector3(0.32f, 0.46f, 0.32f), Steel);
-        b.Tube(new Vector3(-0.9f, 1.25f, 0.65f), new Vector3(0.2f, 0.06f, 0.2f), Black);
-        b.Tube(new Vector3(-0.5f, 0.86f, 0.8f), new Vector3(0.1f, 0.2f, 0.1f), Cream);
-        var cakes = new[] { new Color("#F29BBB"), new Color("#7A4A2A"), new Color("#F6D84A") };
-        for (var i = 0; i < 3; i++)
-        {
-            var x = 0.0f + (i * 0.45f);
-            b.Tube(new Vector3(x, 0.82f, 0.7f), new Vector3(0.06f, 0.1f, 0.06f), Canvas);
-            b.Tube(new Vector3(x, 0.88f, 0.7f), new Vector3(0.32f, 0.02f, 0.32f), Canvas);
-            b.Tube(new Vector3(x, 0.95f, 0.7f), new Vector3(0.26f, 0.12f, 0.26f), cakes[i]);
-            b.Ball(new Vector3(x, 1.03f, 0.7f), 0.06f, new Color("#D9483B"));
-        }
-    }
-
-    private static void FoodVan(MeshBuilder b, Node3D node)
+    private static void FoodVan(MeshBuilder b, Node3D node, string sign)
     {
         // A boxy catering van, side on, with the hatch open under a striped awning.
         const float w = 4.6f, d = 2.1f, floor = 0.55f, high = 2.2f;
@@ -204,7 +158,7 @@ public static partial class SiteProps
         b.Cone(new Vector3(-1.7f, floor + high + 0.72f, -0.4f), new Vector3(0.36f, 0.16f, 0.36f), SteelDark);
         b.Box(new Vector3(-2.9f, 0.6f, front + 0.9f), new Vector3(0.7f, 1.1f, 0.05f), Black, new Vector3(-12, 20, 0));
         b.Box(new Vector3(1.75f, floor + 1.25f, front + 0.01f), new Vector3(0.9f, 0.9f, 0.03f), Black);
-        Painted(node, "Hot Food", new Vector3(-0.3f, floor + 0.3f, front + 0.03f), 2.6f, 0.34f, Cream);
+        Painted(node, sign, new Vector3(-0.3f, floor + 0.3f, front + 0.03f), 2.6f, 0.34f, Cream);
         Painted(node, "Menu", new Vector3(1.75f, floor + 1.55f, front + 0.04f), 0.7f, 0.16f, Sunflower);
     }
 

@@ -37,7 +37,7 @@ public class SecondStageTests
         Assert.True(game.BuildFence(FenceKind.CrowdBarrier, new TilePoint(main.X - 2, main.Bottom + 4), new TilePoint(main.Right + 1, main.Bottom + 4)).Ok);
         Assert.True(game.HireStaff(StaffKind.Security, new TilePoint(main.X + 10, main.Bottom + 2)).Ok);
         Assert.True(game.HireStaff(StaffKind.Security, new TilePoint(main.Right - 10, main.Bottom + 2)).Ok);
-        var kinds = new[] { StallKind.FoodVan, StallKind.Bar, StallKind.ToiletBlock, StallKind.WaterPoint };
+        var kinds = new[] { StallKind.Burgers, StallKind.Bar, StallKind.ToiletBlock, StallKind.WaterPoint };
         for (var i = 0; i < 12; i++)
         {
             var east = i % 2 == 0;

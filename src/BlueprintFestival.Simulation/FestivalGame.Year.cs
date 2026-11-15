@@ -445,7 +445,7 @@ public sealed partial class FestivalGame
     }
 
     /// <summary>What has to be paid on the day the plan is agreed: the acts, the field, and anything ordered.</summary>
-    public int PlanCost => ActFees + (PonchosOrdered ? PonchoCost : 0) + FieldRent + (CampingBooked && Plan is null ? CampingCost : 0);
+    public int PlanCost => ActFees + FieldRent + (CampingBooked && Plan is null ? CampingCost : 0);
 
     private bool PayForPlan()
     {
@@ -454,16 +454,10 @@ public sealed partial class FestivalGame
             return false;
         }
 
-        var ponchos = PonchosOrdered ? PonchoCost : 0;
         Spend("Act fees", ActFees);
         if (FieldRent > 0)
         {
             Spend("Field rent and licence", FieldRent);
-        }
-
-        if (ponchos > 0)
-        {
-            Spend("Rain ponchos", ponchos);
         }
 
         if (CampingBooked && Plan is null)

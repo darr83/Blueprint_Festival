@@ -138,7 +138,7 @@ public partial class LightingShots : Node
         var x = f.X + ((f.Width - info.Width) / 2) + 8;
         game.BuildStage(StageKind.HiredStage, x, f.Y + 12, Facing.South);
         _stage = SiteView.Middle(new TileRect(x, f.Y + 12, info.Width, info.Depth));
-        game.BuildStall(StallKind.FoodVan, f.X + 7, f.Y + 30, Facing.East);
+        game.BuildStall(StallKind.Burgers, f.X + 7, f.Y + 30, Facing.East);
         game.BuildStall(StallKind.Bar, f.X + 7, f.Y + 48, Facing.East);
         game.BuildStall(StallKind.Toilets, f.X + 26, f.Y + 5, Facing.South);
         game.BuildStall(StallKind.Toilets, f.X + 36, f.Y + 5, Facing.South);

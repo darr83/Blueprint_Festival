@@ -20,12 +20,12 @@ public sealed record ArtistView(string Name, string Detail, int Stars, int Fee, 
 /// <summary>What the planning screen shows in January.</summary>
 public sealed record PlanView(int Year, string Festival, string Date, int Licence, int Bank, IReadOnlyList<SlotView> Main, IReadOnlyList<SlotView>? Second,
     int Picked, string PickedName, IReadOnlyList<ArtistView> Artists, int Price, int FairPrice, int Pull, int Fees, int Acts, int ToPay,
-    string Forecast = "", bool Ponchos = false, int PonchoCost = 0, string Field = "", int Rent = 0,
+    string Forecast = "", string Field = "", int Rent = 0,
     bool Camping = false, int CampingCost = 0, int Campers = 0, int CampingFee = 0, TravelView? Travel = null);
 
 /// <summary>What the planning screen can do.</summary>
 public sealed record PlanActions(System.Action? Book = null, System.Action<int>? PickSlot = null, System.Action<string?>? PickArtist = null,
-    System.Action? ToggleSecond = null, System.Action<int>? Price = null, System.Action? Ponchos = null, System.Action? Camping = null, System.Action? Fields = null,
+    System.Action? ToggleSecond = null, System.Action<int>? Price = null, System.Action? Camping = null, System.Action? Fields = null,
     System.Action<int>? Parking = null, System.Action<int>? Buses = null, System.Action<int, int>? MoveSet = null);
 
 /// <summary>One way of advertising, and whether it is switched on.</summary>
@@ -416,7 +416,9 @@ public static partial class YearPanels
             roster.AddChild(row);
             if (view.Forecast.Length > 0)
             {
-                row.AddChild(Extra(view.Ponchos, view.Ponchos ? $"Rain ponchos ordered: £{view.PonchoCost:N0}" : $"Order rain ponchos: £{view.PonchoCost:N0}", $"{view.Forecast}. A guess this far ahead.", does.Ponchos));
+                var forecast = UiStyle.Body($"{view.Forecast}. A guess this far ahead. If it rains, a poncho stall will do good business.", muted: true, size: 13);
+                forecast.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
+                row.AddChild(forecast);
             }
 
             if (view.CampingCost > 0)
@@ -433,7 +435,7 @@ public static partial class YearPanels
         var rent = view.Rent > 0 ? $"  ·  field rent £{view.Rent:N0}" : "";
         var short_ = view.ToPay > view.Bank;
         sums.AddChild(UiStyle.Body(short_ ? "There is not the money for all this."
-            : $"To pay today: acts £{view.Fees:N0}{rent}{(view.Ponchos ? "  ·  ponchos" : "")}{(view.Camping ? "  ·  camping field" : "")}", muted: true, size: 13));
+            : $"To pay today: acts £{view.Fees:N0}{rent}{(view.Camping ? "  ·  camping field" : "")}", muted: true, size: 13));
         sums.AddChild(UiStyle.Heading($"£{view.Bank - view.ToPay:N0} left", 26));
         foot.AddChild(sums);
         var go = UiStyle.Button("Print the tickets", does.Book ?? (() => { }));

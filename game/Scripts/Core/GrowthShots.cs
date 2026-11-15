@@ -160,7 +160,7 @@ public partial class GrowthShots : Node
             game.HireStaff(StaffKind.Security, new TilePoint(f.X + 50 + (i * 61 % (f.Width - 100)), f.Y + 70 + (i * 47 % (f.Height - 110))));
         }
 
-        var kinds = new[] { StallKind.FoodVan, StallKind.Bar, StallKind.ToiletBlock, StallKind.WaterPoint };
+        var kinds = new[] { StallKind.Burgers, StallKind.Bar, StallKind.ToiletBlock, StallKind.WaterPoint };
         var wanted = Math.Max(8, licence / 110);
         var perSide = (f.Height - 50) / 30;
         for (var i = 0; i < wanted; i++)

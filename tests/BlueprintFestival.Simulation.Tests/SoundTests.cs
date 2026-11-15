@@ -33,7 +33,7 @@ public class SoundTests
         Assert.True(game.HireStaff(StaffKind.TicketStaff, new TilePoint(gap.X + 1, y)).Ok);
         Assert.True(game.BuildStage(StageKind.FarmTrailer, f.X + 50, f.Y + 6, Facing.South).Ok);
         Amenities.Add(game);
-        Assert.True(game.BuildStall(StallKind.TeaAndCake, f.X + 8, f.Y + 40, Facing.East).Ok);
+        Assert.True(game.BuildStall(StallKind.Coffee, f.X + 8, f.Y + 40, Facing.East).Ok);
         Assert.True(game.BuildStall(StallKind.FirstAidTent, f.X + 30, f.Y + 6, Facing.South).Ok);
         Assert.True(game.HireStaff(StaffKind.FirstAider, new TilePoint(f.X + 34, f.Y + 14)).Ok);
         Assert.True(game.HireStaff(StaffKind.Security, new TilePoint(f.X + 60, f.Y + 30)).Ok);

@@ -116,7 +116,7 @@ public partial class FieldShots : Node
         game.BuildFence(FenceKind.CrowdBarrier, new TilePoint(stage.X - 2, stage.Bottom + 4), new TilePoint(stage.Right + 1, stage.Bottom + 4));
         game.HireStaff(StaffKind.Security, new TilePoint(stage.X + 6, stage.Bottom + 2));
         game.HireStaff(StaffKind.Security, new TilePoint(stage.Right - 6, stage.Bottom + 2));
-        var kinds = new[] { StallKind.FoodVan, StallKind.Bar, StallKind.ToiletBlock, StallKind.WaterPoint };
+        var kinds = new[] { StallKind.Burgers, StallKind.Bar, StallKind.ToiletBlock, StallKind.WaterPoint };
         var perSide = (food.Height - 20) / 30;
         for (var i = 0; i < 14; i++)
         {

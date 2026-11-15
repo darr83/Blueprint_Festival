@@ -15,7 +15,7 @@ public class QueueLaneTests
     {
         var game = new FestivalGame(name, seed: seed);
         var f = game.Field.Field;
-        Assert.True(game.BuildStall(StallKind.TeaAndCake, f.X + 40, f.Y + 20, Facing.South).Ok);
+        Assert.True(game.BuildStall(StallKind.Fries, f.X + 40, f.Y + 20, Facing.South).Ok);
         var front = new TilePoint(f.X + 43, f.Y + 28);
         var back = new TilePoint(f.X + 43, f.Y + 43);
         Assert.True(game.BuildLane(front, back).Ok);
@@ -167,7 +167,7 @@ public class QueueLaneTests
     {
         var game = new FestivalGame(seed: 8);
         var f = game.Field.Field;
-        Assert.True(game.BuildStall(StallKind.TeaAndCake, f.X + 40, f.Y + 20, Facing.South).Ok);
+        Assert.True(game.BuildStall(StallKind.Fries, f.X + 40, f.Y + 20, Facing.South).Ok);
         Assert.True(game.BuildLane(new TilePoint(f.X + 70, f.Y + 50), new TilePoint(f.X + 84, f.Y + 50)).Ok);
         var line = game.Crowd.StallLine(0)!;
         Assert.Equal(0, line.Fenced);

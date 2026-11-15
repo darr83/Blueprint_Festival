@@ -130,7 +130,7 @@ public partial class YearScreen : Control
                     break;
                 }
 
-                Centre(YearPanels.Plan(PlanOf(_game, _slot), new PlanActions(BookEvent, PickSlot, PickArtist, ToggleStage, ChangePrice, TogglePonchos, ToggleCamping,
+                Centre(YearPanels.Plan(PlanOf(_game, _slot), new PlanActions(BookEvent, PickSlot, PickArtist, ToggleStage, ChangePrice, ToggleCamping,
                     _game.Plan is null ? null : ChangeFields, ChangeParking, ChangeBuses, MoveSet), scroll));
                 break;
             case Phase.Sell:
@@ -217,7 +217,7 @@ public partial class YearScreen : Control
                 at is { } set && set != picked ? $"Booked for the {StageName(set)} at {TimeOf(game, set)}" : "", at == picked);
         }).ToList(),
         game.TicketPrice, (int)System.Math.Round(game.FairPrice), (int)System.Math.Round(game.LineUpPull * 100), game.ActFees, game.LineUp.Count(), game.PlanCost,
-        game.EarlyForecast, game.PonchosOrdered, game.PonchoCost,
+        game.EarlyForecast,
         game.Plan is { } fields ? string.Join(" and ", fields.Festival.Select(f => f.Name)) : game.Ground.Name, game.FieldRent,
         game.CampingBooked, game.CampingOffered ? FestivalGame.CampingCost : 0, game.CampersExpected, FestivalGame.CampingFee, TravelOf(game));
 
@@ -457,13 +457,6 @@ public partial class YearScreen : Control
     {
         _game.BookCamping(!_game.CampingBooked);
         SoundBoard.Cue(Sounds.Click);
-        Rebuild();
-    }
-
-    public void TogglePonchos()
-    {
-        _game.OrderPonchos(!_game.PonchosOrdered);
-        SoundBoard.Cue(_game.PonchosOrdered ? Sounds.Ponchos : Sounds.Click);
         Rebuild();
     }
 

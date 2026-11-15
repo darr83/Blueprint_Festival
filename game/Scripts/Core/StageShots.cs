@@ -150,7 +150,7 @@ public partial class StageShots : Node
         }
 
         // Rows of stalls along the bottom of the field, facing up it, leaving the way in clear.
-        var kinds = new[] { StallKind.FoodVan, StallKind.Bar, StallKind.ToiletBlock, StallKind.WaterPoint };
+        var kinds = new[] { StallKind.Burgers, StallKind.Bar, StallKind.ToiletBlock, StallKind.WaterPoint };
         var wanted = Math.Max(8, licence / 110);
         var built = 0;
         for (var back = 0; built < wanted && back < 4; back++)

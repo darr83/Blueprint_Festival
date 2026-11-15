@@ -43,14 +43,14 @@ public enum GateKind
     TurnstileRow,
 }
 
-/// <summary>The stalls and services people use.</summary>
+/// <summary>The stalls and services people use. New kinds go on the end, so old saves still load.</summary>
 public enum StallKind
 {
-    /// <summary>A trestle table under a garden gazebo, run by the village hall committee.</summary>
-    TeaAndCake,
+    /// <summary>A little wooden hut with a fryer: fries in a cone.</summary>
+    Fries,
 
-    /// <summary>A catering van with a hatch: hot food.</summary>
-    FoodVan,
+    /// <summary>A catering van with a hatch: burgers.</summary>
+    Burgers,
 
     /// <summary>A striped marquee with a wooden bar across the front.</summary>
     Bar,
@@ -72,7 +72,81 @@ public enum StallKind
 
     /// <summary>A litter bin. People passing with rubbish in their hands mostly use it.</summary>
     Bin,
+
+    /// <summary>A cart under a big umbrella with a giant hot dog on top.</summary>
+    HotDogs,
+
+    /// <summary>A gazebo with a domed brick oven.</summary>
+    Pizza,
+
+    /// <summary>A long counter under a red roof hung with paper lanterns.</summary>
+    Noodles,
+
+    /// <summary>A pastel van with a giant cone on the roof.</summary>
+    IceCream,
+
+    /// <summary>A little cart with a coffee machine and a big cup on its roof.</summary>
+    Coffee,
+
+    /// <summary>A bright stand with two churning slush tanks.</summary>
+    Slush,
+
+    /// <summary>A thatched beach bar.</summary>
+    Cocktails,
+
+    /// <summary>A small stall hung with rain ponchos.</summary>
+    Ponchos,
+
+    /// <summary>A stall with bucket hats on pegs.</summary>
+    BucketHats,
+
+    /// <summary>A tent selling the festival's own T-shirts, posters and bags.</summary>
+    Merchandise,
 }
+
+/// <summary>Which shelf of the build bar a stall is on.</summary>
+public enum StallGroup
+{
+    Food,
+    Drink,
+    Other,
+    Services,
+}
+
+/// <summary>What someone has in their hand after buying something.</summary>
+public enum Carried
+{
+    None,
+    HotDog,
+    Burger,
+    Fries,
+    Pizza,
+    Noodles,
+    IceCream,
+    Pint,
+    Cup,
+    Coffee,
+    Slush,
+    Cocktail,
+
+    /// <summary>A carrier bag of merchandise. It is kept all day.</summary>
+    Bag,
+}
+
+/// <summary>What buying something puts on the buyer, if anything.</summary>
+public enum Worn
+{
+    None,
+    Poncho,
+    BucketHat,
+}
+
+/// <summary>
+/// One thing on a stall's menu: its name, what people usually expect to pay for it, what the buyer
+/// then carries or wears, how much of a hunger or thirst it answers (1 is a whole meal or a long
+/// drink), and who it is for.
+/// </summary>
+public sealed record StallItem(string Name, int UsualPrice, Carried Gives, double Fills = 1, Worn Wears = Worn.None, bool AdultsOnly = false, bool ForChildren = false);
 
 /// <summary>What a person can need during the day.</summary>
 public enum Need
@@ -102,7 +176,8 @@ public sealed record GateInfo(GateKind Kind, string Name, int Width, int Lanes, 
 
 /// <summary>
 /// What there is to know about a kind of stall: its size in tiles, what it costs to hire, the need
-/// it answers, what each person pays, how long each takes to serve and how many are served at once.
+/// it answers, how long each person takes to serve and how many are served at once. Price is no
+/// longer used: what a stall charges is on its menu.
 /// </summary>
 public sealed record StallInfo(StallKind Kind, string Name, int Width, int Depth, int Cost, Need? Serves, int Price, int SecondsPerPerson, int Servers, string About);
 
@@ -148,15 +223,145 @@ public static class Catalogue
 
     public static readonly IReadOnlyList<StallInfo> Stalls = new[]
     {
-        new StallInfo(StallKind.TeaAndCake, "Tea and cake table", 6, 6, 30, Need.Food, 3, 60, 1, "Run by the village hall committee. Cheap, slow, one queue."),
-        new StallInfo(StallKind.FoodVan, "Food van", 12, 5, 120, Need.Food, 6, 45, 2, "Hot food from a hatch. Serves two at a time."),
-        new StallInfo(StallKind.Bar, "Bar tent", 12, 8, 200, Need.Drink, 4, 25, 3, "Drinks from a long bar. Serves three at a time."),
+        new StallInfo(StallKind.Fries, "Fries hut", 6, 6, 70, Need.Food, 0, 35, 1, "Fries in a cone from a little wooden hut. A snack, not a meal."),
+        new StallInfo(StallKind.Burgers, "Burger van", 12, 5, 120, Need.Food, 0, 45, 2, "Burgers from a hatch. Serves two at a time."),
+        new StallInfo(StallKind.Bar, "Bar tent", 12, 8, 200, Need.Drink, 0, 25, 3, "Beer, cider, wine and soft drinks from a long bar. Serves three at a time."),
         new StallInfo(StallKind.Toilets, "Toilets", 8, 3, 40, Need.Toilet, 0, 75, 3, "Three cabins. People will not wait for ever."),
         new StallInfo(StallKind.WaterPoint, "Water point", 3, 2, 15, Need.Drink, 0, 20, 2, "Two taps. Free, so it earns nothing."),
         new StallInfo(StallKind.FirstAidTent, "First aid tent", 8, 6, 80, null, 0, 1200, 2, "Two beds under a green cross. First-aiders bring people to the nearest free bed to rest."),
         new StallInfo(StallKind.ToiletBlock, "Toilet block", 24, 3, 110, Need.Toilet, 0, 75, 9, "Nine cabins in a row, for a bigger crowd."),
         new StallInfo(StallKind.MedicalTent, "Medical tent", 16, 10, 450, null, 0, 600, 6, "Six beds under a green cross. People are back on their feet in half the time."),
         new StallInfo(StallKind.Bin, "Litter bin", 2, 2, 10, null, 0, 0, 0, "Most people with rubbish in their hands use a bin if one is within a dozen steps. It holds 40 pieces, then a cleaner has to empty it."),
+        new StallInfo(StallKind.HotDogs, "Hot dog cart", 6, 5, 60, Need.Food, 0, 35, 1, "Hot dogs from a cart under a big umbrella. Quick and cheap."),
+        new StallInfo(StallKind.Pizza, "Pizza oven", 8, 8, 140, Need.Food, 0, 50, 2, "Slices straight from a wood-fired oven. Serves two at a time."),
+        new StallInfo(StallKind.Noodles, "Noodle bar", 10, 6, 130, Need.Food, 0, 45, 2, "Boxes of noodles under paper lanterns. Serves two at a time."),
+        new StallInfo(StallKind.IceCream, "Ice cream van", 10, 5, 90, Need.Food, 0, 25, 1, "Cones and lollies. A treat rather than a meal, and busiest on a hot day."),
+        new StallInfo(StallKind.Coffee, "Coffee cart", 6, 5, 70, Need.Drink, 0, 40, 1, "Coffee, tea and hot chocolate. Busiest in the morning and in the rain."),
+        new StallInfo(StallKind.Slush, "Slush stand", 6, 5, 60, Need.Drink, 0, 20, 1, "Iced slush and lemonade. Children love it, and so does everyone on a hot day."),
+        new StallInfo(StallKind.Cocktails, "Cocktail bar", 10, 7, 180, Need.Drink, 0, 40, 2, "A thatched beach bar. Grown-ups' drinks, and a fruit punch for everyone else."),
+        new StallInfo(StallKind.Ponchos, "Poncho stall", 6, 5, 40, null, 0, 12, 1, "Rain ponchos. Nobody looks until it rains, then everybody wants one."),
+        new StallInfo(StallKind.BucketHats, "Hat stall", 6, 6, 50, null, 0, 30, 1, "Bucket hats. They sell best in hot sun."),
+        new StallInfo(StallKind.Merchandise, "Merchandise tent", 10, 8, 150, null, 0, 40, 2, "The festival's own T-shirts, posters and bags. People who are having a good day take something home."),
+    };
+
+    private static readonly IReadOnlyList<StallItem> NothingToSell = Array.Empty<StallItem>();
+
+    private static readonly Dictionary<StallKind, IReadOnlyList<StallItem>> Menus = new()
+    {
+        [StallKind.HotDogs] = new[]
+        {
+            new StallItem("Hot dog", 4, Carried.HotDog),
+            new StallItem("Chilli dog", 5, Carried.HotDog),
+            new StallItem("Veggie dog", 4, Carried.HotDog),
+        },
+        [StallKind.Burgers] = new[]
+        {
+            new StallItem("Burger", 6, Carried.Burger),
+            new StallItem("Cheeseburger", 7, Carried.Burger),
+            new StallItem("Veggie burger", 6, Carried.Burger),
+        },
+        [StallKind.Fries] = new[]
+        {
+            new StallItem("Fries", 3, Carried.Fries, 0.55),
+            new StallItem("Cheesy fries", 4, Carried.Fries, 0.65),
+            new StallItem("Loaded fries", 5, Carried.Fries, 0.8),
+        },
+        [StallKind.Pizza] = new[]
+        {
+            new StallItem("Margherita slice", 4, Carried.Pizza, 0.9),
+            new StallItem("Pepperoni slice", 5, Carried.Pizza, 0.9),
+            new StallItem("Veggie slice", 4, Carried.Pizza, 0.9),
+        },
+        [StallKind.Noodles] = new[]
+        {
+            new StallItem("Vegetable noodles", 6, Carried.Noodles),
+            new StallItem("Chicken noodles", 7, Carried.Noodles),
+            new StallItem("Spicy noodles", 7, Carried.Noodles),
+        },
+        [StallKind.IceCream] = new[]
+        {
+            new StallItem("Ice cream cone", 3, Carried.IceCream, 0.3),
+            new StallItem("Double cone", 4, Carried.IceCream, 0.4),
+            new StallItem("Ice lolly", 2, Carried.IceCream, 0.2),
+        },
+        [StallKind.Bar] = new[]
+        {
+            new StallItem("Pint of beer", 4, Carried.Pint, AdultsOnly: true),
+            new StallItem("Pint of cider", 4, Carried.Pint, AdultsOnly: true),
+            new StallItem("Glass of wine", 5, Carried.Cup, AdultsOnly: true),
+            new StallItem("Soft drink", 2, Carried.Cup),
+        },
+        [StallKind.Coffee] = new[]
+        {
+            new StallItem("Coffee", 3, Carried.Coffee, 0.8),
+            new StallItem("Tea", 2, Carried.Coffee, 0.8),
+            new StallItem("Hot chocolate", 3, Carried.Coffee, 0.8),
+        },
+        [StallKind.Slush] = new[]
+        {
+            new StallItem("Small slush", 2, Carried.Slush, 0.7),
+            new StallItem("Large slush", 3, Carried.Slush),
+            new StallItem("Lemonade", 2, Carried.Cup),
+        },
+        [StallKind.Cocktails] = new[]
+        {
+            new StallItem("Sunset spritz", 7, Carried.Cocktail, AdultsOnly: true),
+            new StallItem("Minty cooler", 7, Carried.Cocktail, AdultsOnly: true),
+            new StallItem("Fruit punch", 4, Carried.Cocktail),
+        },
+        [StallKind.Ponchos] = new[]
+        {
+            new StallItem("Rain poncho", 3, Carried.None, 0, Worn.Poncho),
+            new StallItem("Heavy-duty poncho", 5, Carried.None, 0, Worn.Poncho),
+            new StallItem("Child's poncho", 2, Carried.None, 0, Worn.Poncho, ForChildren: true),
+        },
+        [StallKind.BucketHats] = new[]
+        {
+            new StallItem("Bucket hat", 6, Carried.None, 0, Worn.BucketHat),
+            new StallItem("Patterned bucket hat", 8, Carried.None, 0, Worn.BucketHat),
+            new StallItem("Child's bucket hat", 4, Carried.None, 0, Worn.BucketHat, ForChildren: true),
+        },
+        [StallKind.Merchandise] = new[]
+        {
+            new StallItem("Festival T-shirt", 15, Carried.Bag, 0),
+            new StallItem("Tote bag", 8, Carried.Bag, 0),
+            new StallItem("Poster", 6, Carried.Bag, 0),
+            new StallItem("Programme", 4, Carried.Bag, 0),
+        },
+    };
+
+    /// <summary>What a kind of stall sells. Empty for toilets, taps, tents and bins.</summary>
+    public static IReadOnlyList<StallItem> MenuOf(StallKind kind) => Menus.TryGetValue(kind, out var menu) ? menu : NothingToSell;
+
+    /// <summary>True for a stall that sells things and so has prices to set.</summary>
+    public static bool Sells(StallKind kind) => Menus.ContainsKey(kind);
+
+    /// <summary>True for a stall people queue at: anything that sells, the toilets and the taps.</summary>
+    public static bool HasQueue(StallKind kind) => Of(kind).Serves is not null || Sells(kind);
+
+    /// <summary>The lowest and the highest price the player can put on something, from its usual price.</summary>
+    public static int LowestPrice(StallItem item) => 1;
+
+    public static int HighestPrice(StallItem item) => item.UsualPrice * 3;
+
+    /// <summary>Which shelf of the build bar a stall is on.</summary>
+    public static StallGroup GroupOf(StallKind kind) => kind switch
+    {
+        StallKind.HotDogs or StallKind.Burgers or StallKind.Fries or StallKind.Pizza or StallKind.Noodles or StallKind.IceCream => StallGroup.Food,
+        StallKind.Bar or StallKind.Coffee or StallKind.Slush or StallKind.Cocktails => StallGroup.Drink,
+        StallKind.Ponchos or StallKind.BucketHats or StallKind.Merchandise => StallGroup.Other,
+        _ => StallGroup.Services,
+    };
+
+    /// <summary>The stalls on one shelf, in the order they are offered.</summary>
+    public static IEnumerable<StallInfo> StallsIn(StallGroup group) => ShelfOrder.Where(k => GroupOf(k) == group).Select(Of);
+
+    private static readonly StallKind[] ShelfOrder =
+    {
+        StallKind.HotDogs, StallKind.Burgers, StallKind.Fries, StallKind.Pizza, StallKind.Noodles, StallKind.IceCream,
+        StallKind.Bar, StallKind.Coffee, StallKind.Slush, StallKind.Cocktails,
+        StallKind.Ponchos, StallKind.BucketHats, StallKind.Merchandise,
+        StallKind.Toilets, StallKind.ToiletBlock, StallKind.WaterPoint, StallKind.Bin,
     };
 
     /// <summary>The festival's share of what a stall takes, in pounds out of every hundred.</summary>

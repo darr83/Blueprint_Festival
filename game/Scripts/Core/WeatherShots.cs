@@ -120,15 +120,9 @@ public partial class WeatherShots : Node
         game.SetWeather(DayWeather.Of(hot ? WeatherKind.Hot : WeatherKind.Rain, 3));
         festival.Camera.ShowWholeField();
         festival.Year.PickHeadliner(game.Headliners.ToList().FindIndex(h => h.Stars == game.Headliners.Min(o => o.Stars)));
-        var ponchos = name is "1_planning_with_a_wet_forecast" or "5_straw_and_trackway_hold_up";
-        if (ponchos)
-        {
-            festival.Year.TogglePonchos();
-        }
-
         if (name == "1_planning_with_a_wet_forecast")
         {
-            GD.Print($"[weather] {name}: '{game.EarlyForecast}', expected {game.Crowd.Expected}, ponchos £{game.PonchoCost}");
+            GD.Print($"[weather] {name}: '{game.EarlyForecast}', expected {game.Crowd.Expected}");
             return;
         }
 
@@ -136,7 +130,7 @@ public partial class WeatherShots : Node
         game.BuildStage(StageKind.Bandstand, f.X + 70, f.Y + 10, Facing.South);
         game.BuildFence(FenceKind.Paling, new TilePoint(gap.X, gap.Y + 1), new TilePoint(gap.Right - 1, gap.Y + 1));
         game.BuildGate(GateKind.VillageGate, gap.X + 2, gap.Y + 1, false);
-        game.BuildStall(StallKind.FoodVan, f.X + 7, f.Y + 30, Facing.East);
+        game.BuildStall(StallKind.Burgers, f.X + 7, f.Y + 30, Facing.East);
         game.BuildStall(StallKind.Bar, f.X + 7, f.Y + 48, Facing.East);
         game.BuildStall(StallKind.Toilets, f.X + 26, f.Y + 5, Facing.South);
         game.BuildStall(StallKind.Toilets, f.X + 36, f.Y + 5, Facing.South);

@@ -139,7 +139,7 @@ public class QueueTests
         // One food van for the whole festival: both hatches are busy and a queue forms.
         var game = new FestivalGame("One Van", seed: 8);
         var f = game.Field.Field;
-        Assert.True(game.BuildStall(StallKind.FoodVan, f.X + 40, f.Y + 20, Facing.South).Ok);
+        Assert.True(game.BuildStall(StallKind.Burgers, f.X + 40, f.Y + 20, Facing.South).Ok);
         var allBusy = false;
         var longest = 0;
         var closest = double.MaxValue;
@@ -174,7 +174,7 @@ public class QueueTests
     {
         var game = new FestivalGame(seed: 3);
         var f = game.Field.Field;
-        Assert.True(game.BuildStall(StallKind.TeaAndCake, f.X + 40, f.Y + 20, Facing.South).Ok);
+        Assert.True(game.BuildStall(StallKind.Fries, f.X + 40, f.Y + 20, Facing.South).Ok);
         var stall = game.Site.Stalls[0];
         var line = game.Crowd.StallLine(0)!;
         Assert.True(line.Places.Count >= 60);
@@ -186,7 +186,7 @@ public class QueueTests
         Assert.Contains(Enumerable.Range(1, line.Places.Count - 1), i => line.Places[i].Y < line.Places[i - 1].Y);
 
         // No two places are within an arm's length, in this queue or the next stall's.
-        Assert.True(game.BuildStall(StallKind.FoodVan, f.X + 52, f.Y + 20, Facing.South).Ok);
+        Assert.True(game.BuildStall(StallKind.Burgers, f.X + 52, f.Y + 20, Facing.South).Ok);
         var all = game.Crowd.StallLine(0)!.Places.Concat(game.Crowd.StallLine(1)!.Places).ToList();
         for (var i = 0; i < all.Count; i++)
         {
@@ -215,7 +215,7 @@ public class QueueTests
     {
         var game = new FestivalGame("Saved", seed: 8);
         var f = game.Field.Field;
-        Assert.True(game.BuildStall(StallKind.TeaAndCake, f.X + 40, f.Y + 20, Facing.South).Ok);
+        Assert.True(game.BuildStall(StallKind.Fries, f.X + 40, f.Y + 20, Facing.South).Ok);
         while (game.Now < Day.AddHours(17) && (game.Crowd.StallLine(0)!.Standing < 6 || game.Crowd.BeingServed(0) == 0))
         {
             game.Clock.Step();

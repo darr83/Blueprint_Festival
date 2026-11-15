@@ -41,6 +41,10 @@ public partial class CrowdView : Node3D
     private Color[] _skinColours = System.Array.Empty<Color>();
     private Color[] _hairColours = System.Array.Empty<Color>();
     private float[] _heights = System.Array.Empty<float>();
+    private Simulation.People.PersonLook?[] _looks = System.Array.Empty<Simulation.People.PersonLook?>();
+
+    /// <summary>How many of the people drawn in full have something in their hand that they bought.</summary>
+    public int Carrying { get; private set; }
     private int _stamp;
     private readonly Dictionary<int, (Need Need, MeshInstance3D Node)> _bubbles = new();
     private readonly HashSet<int> _seen = new();
@@ -147,6 +151,7 @@ public partial class CrowdView : Node3D
             System.Array.Resize(ref _skinColours, size);
             System.Array.Resize(ref _hairColours, size);
             System.Array.Resize(ref _heights, size);
+            System.Array.Resize(ref _looks, size);
         }
 
         if (_heights[id] == 0)
@@ -155,6 +160,7 @@ public partial class CrowdView : Node3D
             _skinColours[id] = new Color(look.Skin).SrgbToLinear();
             _hairColours[id] = new Color(look.Hat == Simulation.People.Hat.None ? look.HairColour : look.HatColour).SrgbToLinear();
             _heights[id] = (float)look.Height;
+            _looks[id] = look;
         }
     }
 
@@ -300,6 +306,7 @@ public partial class CrowdView : Node3D
 
         _seen.Clear();
         var dancers = 0;
+        var carrying = 0;
         var heard = HeardStage();
         _clappers = 0;
         _applauding = 0;
@@ -324,10 +331,32 @@ public partial class CrowdView : Node3D
                 has = true;
             }
 
+            if (near && has && !ReferenceEquals(view!.Look, person.Look))
+            {
+                // They have put on a poncho or a hat they just bought: draw them again as they look now.
+                var again = PersonView.Build(person.Look);
+                again.Position = view.Position;
+                again.Rotation = view.Rotation;
+                if (_bubbles.Remove(person.Id, out var old))
+                {
+                    old.Node.QueueFree();
+                }
+
+                view.QueueFree();
+                view = again;
+                _views[person.Id] = view;
+                AddChild(view);
+                if (person.Id < _heights.Length)
+                {
+                    _heights[person.Id] = 0;
+                }
+            }
+
             if (near && has)
             {
                 _seen.Add(person.Id);
-                view!.Position = view.Position.Lerp(target, glide);
+                view!.Hold(person.Holding);
+                view.Position = view.Position.Lerp(target, glide);
                 view.Rotation = new Vector3(tilt, Mathf.LerpAngle(view.Rotation.Y, heading, glide), 0);
 
                 // People watching the stage put their arms up now and then, each in their own time;
@@ -346,6 +375,7 @@ public partial class CrowdView : Node3D
                 view.Pose = person.Ticket ? Pose.ShowingTicket : person.Walking && speed > 0 ? Pose.Walking : dance is not null ? Pose.Dancing
                     : applause is not null ? Applause(person.Id, applause) : cheering ? Pose.Cheering : Pose.Standing;
                 dancers += view.Pose == Pose.Dancing ? 1 : 0;
+                carrying += view.Holding != Simulation.Site.Carried.None ? 1 : 0;
                 Bubble(person.Id, view, person.Wants, cameraYaw);
                 if (snap)
                 {
@@ -367,6 +397,11 @@ public partial class CrowdView : Node3D
             }
 
             // A simple figure: a body in the colour of their top or poncho, a head, and hair or a hat.
+            if (person.Id < _looks.Length && _looks[person.Id] is { } known && !ReferenceEquals(known, person.Look))
+            {
+                _heights[person.Id] = 0;
+            }
+
             Remember(person.Id, person.Look);
             var at = _shownStamp[person.Id] == _stamp - 1 ? _shown[person.Id].Lerp(target, glide) : target;
             _shown[person.Id] = at;
@@ -387,6 +422,7 @@ public partial class CrowdView : Node3D
         }
 
         Simple = simple;
+        Carrying = carrying;
         Dancers = dancers;
         Clappers = _clappers;
         // The clapping is as near or far as the stage's music.

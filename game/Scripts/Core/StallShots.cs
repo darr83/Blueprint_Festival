@@ -107,8 +107,8 @@ public partial class StallShots : Node
         var loos = new TilePoint(f.X + 26, f.Y + 5);
         if (scene.Layout == 0)
         {
-            game.BuildStall(StallKind.TeaAndCake, tea.X, tea.Y, Facing.East);
-            game.BuildStall(StallKind.FoodVan, van.X, van.Y, Facing.East);
+            game.BuildStall(StallKind.Fries, tea.X, tea.Y, Facing.East);
+            game.BuildStall(StallKind.Burgers, van.X, van.Y, Facing.East);
             game.BuildStall(StallKind.Bar, bar.X, bar.Y, Facing.East);
             game.BuildStall(StallKind.Toilets, loos.X, loos.Y, Facing.South);
             game.BuildStall(StallKind.Toilets, loos.X + 10, loos.Y, Facing.South);
@@ -116,7 +116,7 @@ public partial class StallShots : Node
         }
         else if (scene.Layout == 1)
         {
-            game.BuildStall(StallKind.TeaAndCake, tea.X, tea.Y, Facing.East);
+            game.BuildStall(StallKind.Fries, tea.X, tea.Y, Facing.East);
             game.BuildStall(StallKind.Toilets, loos.X, loos.Y, Facing.South);
         }
 
