@@ -117,6 +117,12 @@ public partial class CameraRig : Node3D
         var diff = Mathf.Wrap(TargetYaw - _yaw, -180f, 180f);
         _yaw = Mathf.Abs(diff) < 0.05f ? TargetYaw : _yaw + (diff * Mathf.Min(1f, step * 9f));
         _shownSize = Mathf.Lerp(_shownSize, _size, Mathf.Min(1f, step * 12f));
+        // Settle exactly, or the view (and the shadows fitted to it) keeps creeping for seconds after a zoom.
+        if (Mathf.Abs(_shownSize - _size) < 0.01f)
+        {
+            _shownSize = _size;
+        }
+
         Place();
     }
 
