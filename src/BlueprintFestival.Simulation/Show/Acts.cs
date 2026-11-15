@@ -50,6 +50,13 @@ public sealed record Act(string Name, ActKind Kind, IReadOnlyList<BandRole> Memb
     /// <summary>How many people follow them.</summary>
     public int Fans { get; init; }
 
+    /// <summary>Whether each member is a woman ('f') or a man ('m'), in the order of <see cref="Members"/>.</summary>
+    public string Who { get; init; } = "";
+
+    /// <summary>Whether a member is a woman. A member not listed in <see cref="Who"/> is settled by the act's look.</summary>
+    public bool IsFemale(int member) =>
+        member >= 0 && member < Who.Length ? Who[member] == 'f' : ((LookSeed / 7) + (member * 5)) % 2 == 0;
+
     /// <summary>The name the act was first drawn under, kept so the same festival always books the same acts.</summary>
     internal string Stem { get; init; } = "";
 
@@ -61,7 +68,11 @@ public sealed record Act(string Name, ActKind Kind, IReadOnlyList<BandRole> Memb
 }
 
 /// <summary>One of the 25 artists who play the festival. Headline artists are the ones offered to close the night.</summary>
-public sealed record Artist(string Name, ActKind Kind, Genre Genre, int Rating, int Fans, bool Headline = false);
+/// <remarks>
+/// Who says whether each member is a woman ('f') or a man ('m'), in the order the members are
+/// listed: singer first, then guitarist and so on (see the line-ups in <see cref="ActGenerator"/>).
+/// </remarks>
+public sealed record Artist(string Name, ActKind Kind, Genre Genre, int Rating, int Fans, bool Headline = false, string Who = "");
 
 /// <summary>
 /// The artists. Every one is made up: none is a real act. Each has a kind (a solo guitarist, a
@@ -73,39 +84,39 @@ public static class Roster
     public static readonly IReadOnlyList<Artist> Artists = new[]
     {
         // Solo guitarists.
-        new Artist("Marnie Thrupp", ActKind.Solo, Genre.Country, 1, 320),
-        new Artist("Odell Ashby", ActKind.Solo, Genre.Pop, 2, 4200),
-        new Artist("Wren Hallows", ActKind.Solo, Genre.Rock, 2, 6800),
-        new Artist("Tobias Pell", ActKind.Solo, Genre.Country, 3, 38000),
+        new Artist("Marnie Thrupp", ActKind.Solo, Genre.Country, 1, 320, Who: "f"),
+        new Artist("Odell Ashby", ActKind.Solo, Genre.Pop, 2, 4200, Who: "m"),
+        new Artist("Wren Hallows", ActKind.Solo, Genre.Rock, 2, 6800, Who: "f"),
+        new Artist("Tobias Pell", ActKind.Solo, Genre.Country, 3, 38000, Who: "m"),
 
         // Duos.
-        new Artist("Salt and Bramble", ActKind.Duo, Genre.Pop, 1, 540),
-        new Artist("Paper Magpies", ActKind.Duo, Genre.Pop, 2, 5100),
-        new Artist("Ida and Corin", ActKind.Duo, Genre.Country, 2, 2900),
-        new Artist("Crooked Lantern", ActKind.Duo, Genre.HipHop, 3, 52000),
-        new Artist("Tin Foxgloves", ActKind.Duo, Genre.Rock, 3, 27000),
+        new Artist("Salt and Bramble", ActKind.Duo, Genre.Pop, 1, 540, Who: "fm"),
+        new Artist("Paper Magpies", ActKind.Duo, Genre.Pop, 2, 5100, Who: "ff"),
+        new Artist("Ida and Corin", ActKind.Duo, Genre.Country, 2, 2900, Who: "fm"),
+        new Artist("Crooked Lantern", ActKind.Duo, Genre.HipHop, 3, 52000, Who: "mm"),
+        new Artist("Tin Foxgloves", ActKind.Duo, Genre.Rock, 3, 27000, Who: "fm"),
 
         // Full bands with a fiddle.
-        new Artist("The Muddy Gateposts", ActKind.FolkBand, Genre.Country, 1, 780),
-        new Artist("Hollow Skylarks", ActKind.FolkBand, Genre.Country, 2, 7400),
-        new Artist("The Wandering Wellies", ActKind.FolkBand, Genre.Country, 3, 44000),
+        new Artist("The Muddy Gateposts", ActKind.FolkBand, Genre.Country, 1, 780, Who: "mfmm"),
+        new Artist("Hollow Skylarks", ActKind.FolkBand, Genre.Country, 2, 7400, Who: "fffm"),
+        new Artist("The Wandering Wellies", ActKind.FolkBand, Genre.Country, 3, 44000, Who: "fmmf"),
 
         // Full bands.
-        new Artist("The Copper Turnips", ActKind.Band, Genre.Rock, 3, 61000),
-        new Artist("Bramble Hammer", ActKind.Band, Genre.Metal, 4, 240000),
-        new Artist("The Velvet Otters", ActKind.Band, Genre.Pop, 5, 2600000),
-        new Artist("Little Ferrets", ActKind.Band, Genre.Rock, 2, 8900, Headline: true),
-        new Artist("Tin Thunder", ActKind.Band, Genre.Metal, 3, 33000, Headline: true),
-        new Artist("Hedgerow Howl", ActKind.Band, Genre.Metal, 4, 310000, Headline: true),
-        new Artist("The Lantern Hearts", ActKind.Band, Genre.Pop, 5, 1900000, Headline: true),
+        new Artist("The Copper Turnips", ActKind.Band, Genre.Rock, 3, 61000, Who: "mmfmm"),
+        new Artist("Bramble Hammer", ActKind.Band, Genre.Metal, 4, 240000, Who: "mmmmm"),
+        new Artist("The Velvet Otters", ActKind.Band, Genre.Pop, 5, 2600000, Who: "fmfmf"),
+        new Artist("Little Ferrets", ActKind.Band, Genre.Rock, 2, 8900, Headline: true, Who: "fmmmf"),
+        new Artist("Tin Thunder", ActKind.Band, Genre.Metal, 3, 33000, Headline: true, Who: "mmmfm"),
+        new Artist("Hedgerow Howl", ActKind.Band, Genre.Metal, 4, 310000, Headline: true, Who: "fmmmm"),
+        new Artist("The Lantern Hearts", ActKind.Band, Genre.Pop, 5, 1900000, Headline: true, Who: "mfmff"),
 
         // DJs.
-        new Artist("DJ Haybale", ActKind.Dj, Genre.Electronic, 2, 3600),
-        new Artist("DJ Weathervane", ActKind.Dj, Genre.HipHop, 4, 180000),
-        new Artist("DJ Tractor", ActKind.Dj, Genre.Electronic, 2, 9500, Headline: true),
-        new Artist("DJ Magpie", ActKind.Dj, Genre.HipHop, 3, 47000, Headline: true),
-        new Artist("DJ Foxglove", ActKind.Dj, Genre.Electronic, 4, 420000, Headline: true),
-        new Artist("DJ Otter", ActKind.Dj, Genre.Electronic, 5, 3100000, Headline: true),
+        new Artist("DJ Haybale", ActKind.Dj, Genre.Electronic, 2, 3600, Who: "f"),
+        new Artist("DJ Weathervane", ActKind.Dj, Genre.HipHop, 4, 180000, Who: "m"),
+        new Artist("DJ Tractor", ActKind.Dj, Genre.Electronic, 2, 9500, Headline: true, Who: "m"),
+        new Artist("DJ Magpie", ActKind.Dj, Genre.HipHop, 3, 47000, Headline: true, Who: "f"),
+        new Artist("DJ Foxglove", ActKind.Dj, Genre.Electronic, 4, 420000, Headline: true, Who: "f"),
+        new Artist("DJ Otter", ActKind.Dj, Genre.Electronic, 5, 3100000, Headline: true, Who: "m"),
     };
 
     /// <summary>The artist of that name, or null.</summary>
@@ -228,6 +239,7 @@ public static class ActGenerator
             Genre = artist.Genre,
             Rating = artist.Rating,
             Fans = artist.Fans,
+            Who = artist.Who,
             Stem = stem,
         };
 

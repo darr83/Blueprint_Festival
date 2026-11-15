@@ -209,7 +209,7 @@ public partial class ShowView : Node3D
         var spots = Spots(stage.Kind, roles);
         for (var i = 0; i < roles.Count; i++)
         {
-            var performer = Performers.Build(roles[i], slot.Act.LookSeed + (i * 13));
+            var performer = Performers.Build(roles[i], StarLooks.For(slot.Act, i), slot.Act.LookSeed + (i * 13));
             performer.Position = spots[i];
             _acts.AddChild(performer);
             _band.Add(new BandMember(performer, roles[i], spots[i], i));
