@@ -193,7 +193,7 @@ public class CrushChoiceTests
         Assert.False(game.CrushHandled);
         Assert.Equal(1, game.TimesLeftAlone);
         Assert.False(game.LeaveIt(), "It is already being left alone.");
-        Assert.True(game.MusicOn);
+        Assert.True(game.MusicOn || game.CrowdWaiting);
 
         RunToTheEnd(game);
         Assert.True(game.CrushInjuries > 0);

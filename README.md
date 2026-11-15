@@ -173,6 +173,15 @@ playing order and the title is what the game shows. `.mp3`, `.ogg` and `.wav` al
 artist's set their songs play in order and round again; an artist with no songs plays in silence.
 The music has its own volume slider.
 
+An artist with 20,000 fans or more draws a crowd before they come on: people start filling the
+front of the stage 20 game minutes before the set (`RunningOrder.FillingUp`). A crush can build
+while they wait, and the crush choices work then too (the announcement asks them to step back, and
+cancelling calls the set off before it starts).
+
+From the stage cameras there is a sky (`game/Scripts/World/Sky.Dome.cs`): blue with a few clouds by
+day, gold and pink at sunset, stars and the moon at night, grey under rain. It follows the same
+clock and weather as the lighting. The view of the site looks down on the field and never shows it.
+
 ### Dancing to the beat
 
 The crowd dances in time to the music. The first time the game runs with a new song, it listens to

@@ -609,8 +609,8 @@ public sealed partial class Crowd
     /// <summary>The line-up a set belongs to, by the set's number.</summary>
     private RunningOrder? ShowOf(int set) => set >= RunningOrder.SecondBase ? Second : Show;
 
-    /// <summary>True while the set a party went to watch is still on.</summary>
-    private bool StillOn(int set, DateTime now) => set >= 0 && ShowOf(set)?.Playing(now)?.Index == set;
+    /// <summary>True while the set a party went to watch is still on, or is a big act's they are waiting at the front for.</summary>
+    private bool StillOn(int set, DateTime now) => set >= 0 && ShowOf(set)?.Drawing(now)?.Index == set;
 
     /// <summary>How long a party stays clapping and cheering after a set they watched to the end.</summary>
     private static TimeSpan ApplauseFor(Party party) => TimeSpan.FromMinutes(Performing.ApplauseMinutes(party.Id));
@@ -2144,7 +2144,9 @@ public sealed partial class Crowd
         party.Thirst = Math.Min(1.2, party.Thirst + (party.Appetite * (sheltered ? Math.Min(Heat, 1) : Heat) * perHour / HoursToThirsty));
         party.Toilet = Math.Min(1.2, party.Toilet + (party.Appetite * perHour / HoursToToilet));
 
-        var change = party.State == PartyState.Watching ? Enjoyed(ShowOf(party.Watch)?.Playing(now)?.Act.Rating ?? 3) * ShareOfTheAct(party) * perHour : 0;
+        // Waiting at the front for a big act to come on is not watching one yet.
+        var waiting = party.State == PartyState.Watching && ShowOf(party.Watch)?.FillingUp(now)?.Index == party.Watch;
+        var change = party.State == PartyState.Watching && !waiting ? Enjoyed(ShowOf(party.Watch)?.Playing(now)?.Act.Rating ?? 3) * ShareOfTheAct(party) * perHour : 0;
         foreach (var need in new[] { party.Hunger, party.Thirst, party.Toilet })
         {
             if (need >= Pressing)
@@ -3042,7 +3044,8 @@ public sealed partial class Crowd
 
     private bool GoAndWatch(Party party, DateTime now, RunningOrder? show, bool second)
     {
-        if (show?.Playing(now) is not { } slot || show.Stage is not { } stage || (second ? party.DecidedSecond : party.Decided) == slot.Index)
+        // For an act with a big following people start making their way to the front before the set.
+        if (show?.Drawing(now) is not { } slot || show.Stage is not { } stage || (second ? party.DecidedSecond : party.Decided) == slot.Index)
         {
             return false;
         }
@@ -3260,7 +3263,7 @@ public sealed partial class Crowd
 
     private int Ease(RunningOrder? show, bool second, double share)
     {
-        if (show?.Playing(_now) is not { } slot || show.Stage is not { } stage)
+        if (show?.Drawing(_now) is not { } slot || show.Stage is not { } stage)
         {
             return 0;
         }

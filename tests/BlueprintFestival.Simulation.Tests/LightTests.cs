@@ -167,6 +167,17 @@ public class LightTests
         Assert.Equal(0, game.DarknessAt(litX, litY), 3);
     }
 
+    private static Dictionary<int, double> Moods(FestivalGame game) =>
+        game.Crowd.Parties.Where(p => p.IsOnSite).ToDictionary(p => p.Id, p => p.Mood);
+
+    private static void RunOn(FestivalGame game, double hour)
+    {
+        while (game.Phase == Phase.Day && game.Now.TimeOfDay < TimeSpan.FromHours(hour))
+        {
+            game.Clock.Step();
+        }
+    }
+
     /// <summary>The same village festival day run up to a time in the evening, with or without floodlights all over the field.</summary>
     private static FestivalGame Evening(bool lit, double untilHour)
     {
@@ -217,12 +228,21 @@ public class LightTests
     [Fact]
     public void After_dark_people_are_happier_where_it_is_lit()
     {
-        var dark = Evening(false, 22.5);
-        var lit = Evening(true, 22.5);
+        // The same people are followed from before dusk until late, so how the afternoon happened to
+        // go (who watched which act) does not decide it.
+        var dark = Evening(false, 20.75);
+        var lit = Evening(true, 20.75);
+        var darkBefore = Moods(dark);
+        var litBefore = Moods(lit);
+        RunOn(dark, 22.5);
+        RunOn(lit, 22.5);
 
         // In the unlit field the dark has been getting people down since dusk.
-        double Mood(FestivalGame g) => g.Crowd.Parties.Where(p => p.State != PartyState.Expected).Sum(p => p.Mood * p.Members.Count);
-        Assert.True(Mood(lit) > Mood(dark), $"lit {Mood(lit):0.00}, dark {Mood(dark):0.00}");
+        double Change(FestivalGame g, Dictionary<int, double> before) =>
+            g.Crowd.Parties.Where(p => before.ContainsKey(p.Id)).Sum(p => (p.Mood - before[p.Id]) * p.Members.Count);
+        var litChange = Change(lit, litBefore);
+        var darkChange = Change(dark, darkBefore);
+        Assert.True(litChange > darkChange, $"lit {litChange:0.00}, dark {darkChange:0.00}");
 
         // Nobody on the lit field is in the dark; on the unlit one everyone not watching the act is.
         Assert.True(dark.InTheDark >= 5, $"{dark.InTheDark} in the dark");

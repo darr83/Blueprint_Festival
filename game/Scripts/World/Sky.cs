@@ -106,6 +106,7 @@ public partial class Sky : Node3D
             },
         };
         AddChild(_environment);
+        MakeDome();
         RenderingServer.DirectionalSoftShadowFilterSetQuality(RenderingServer.ShadowQuality.SoftHigh);
         RenderingServer.PositionalSoftShadowFilterSetQuality(RenderingServer.ShadowQuality.SoftMedium);
         RenderingServer.DirectionalShadowAtlasSetSize(4096, true);
@@ -185,6 +186,7 @@ public partial class Sky : Node3D
             _sun.LightEnergy *= 1 + (0.1f * day);
         }
 
+        PaintDome(game, day, warmth, golden, env.BackgroundColor);
         Frame();
     }
 

@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using BlueprintFestival.Simulation;
 using BlueprintFestival.Simulation.Core;
 using BlueprintFestival.Simulation.Show;
 using BlueprintFestival.Simulation.Site;
@@ -19,6 +20,7 @@ public partial class CamShots : Node
     {
         "1_the_two_stage_cam_buttons", "2_front_cam_on_the_bandstand", "3_back_cam_on_the_bandstand",
         "4_front_cam_on_the_hired_stage_at_night", "5_back_cam_on_the_hired_stage_at_night",
+        "6_back_cam_sky_in_the_morning", "7_back_cam_sky_at_sunset", "8_front_cam_sky_in_the_rain", "9_front_cam_sky_at_dusk",
     };
 
     private readonly string _directory;
@@ -131,8 +133,14 @@ public partial class CamShots : Node
         game.BuildStall(StallKind.Toilets, f.X + 36, f.Y + 5, Facing.South);
         game.BuildStall(StallKind.WaterPoint, f.X + 46, f.Y + 5, Facing.South);
         game.HireStaff(StaffKind.TicketStaff, new TilePoint(gap.X + 4, gap.Y + 1));
+        if (name.Contains("rain", StringComparison.Ordinal))
+        {
+            game.SetWeather(DayWeather.Of(WeatherKind.Rain, 3));
+        }
+
         game.OpenGates();
-        WeatherShots.RunTo(game, night ? 21.3 : 14.6);
+        WeatherShots.RunTo(game, night ? 21.3 : name.Contains("morning", StringComparison.Ordinal) ? 10.5
+            : name.Contains("sunset", StringComparison.Ordinal) ? 20.8 : name.Contains("dusk", StringComparison.Ordinal) ? 21.45 : 14.6);
         if (name.Contains("front", StringComparison.Ordinal))
         {
             festival.ViewButtons.FrontCamButton!.ButtonPressed = true;

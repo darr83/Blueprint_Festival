@@ -259,8 +259,9 @@ public partial class CrowdPanel : Control
     private void UpdateChoices()
     {
         var heard = _game.AnnouncementHeard;
-        _announce.Disabled = !_game.MusicOn;
-        _announceNote.Text = !_game.MusicOn ? "No music is on to stop." :
+        var canAnnounce = _game.MusicOn || _game.CrowdWaiting;
+        _announce.Disabled = !canAnnounce;
+        _announceNote.Text = !canAnnounce ? "No music is on to stop." :
             heard >= 1 ? "Free. The crowd gets a little bored." :
             $"Free. Only about {heard * 100:0}% will listen this time.";
 
@@ -271,7 +272,7 @@ public partial class CrowdPanel : Control
 
         var act = _game.ActAtCrush;
         _cancel.Disabled = act is null;
-        _cancelNote.Text = act is null ? "No act is on." : $"{act.Act.Name} walk off. Fans upset, fee lost.";
+        _cancelNote.Text = act is null ? "No act is on." : act.Start > _game.Now ? $"Call off {act.Act.Name}. Fans upset, fee lost." : $"{act.Act.Name} walk off. Fans upset, fee lost.";
 
         _leave.Disabled = false;
         _leaveNote.Text = "Free, but anyone hurt counts against the licence.";
