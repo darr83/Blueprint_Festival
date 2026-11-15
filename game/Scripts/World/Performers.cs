@@ -28,9 +28,10 @@ public static class Performers
 
     /// <summary>
     /// One performer facing south, dressed for their music (see <see cref="StarLooks"/>), with
-    /// whatever they play. The same seed always gives the same instrument.
+    /// whatever they play. The same seed always gives the same instrument. One of the entertainers
+    /// in the fields (busking) plays an acoustic guitar, and a painted street piano for keys.
     /// </summary>
-    public static Node3D Build(BandRole role, PersonLook look, int seed)
+    public static Node3D Build(BandRole role, PersonLook look, int seed, bool busking = false)
     {
         var node = new Node3D { Name = Name(role) };
         seed = System.Math.Abs(seed % 100000);
@@ -54,7 +55,7 @@ public static class Performers
             case BandRole.Guitarist:
             case BandRole.Bassist:
             {
-                var colour = new Color(Guitars[(seed + (int)role) % Guitars.Length]);
+                var colour = busking ? Wood : new Color(Guitars[(seed + (int)role) % Guitars.Length]);
                 var body = new Vector3(0.1f, 0.9f * h, 0.2f);
                 b.Ball(body, new Vector3(0.36f, 0.42f, 0.1f), colour, new Vector3(0, 0, -35));
                 b.Ball(body + new Vector3(-0.12f, 0.12f, 0), new Vector3(0.26f, 0.3f, 0.1f), colour, new Vector3(0, 0, -35));
@@ -75,6 +76,10 @@ public static class Performers
 
             case BandRole.Drummer:
                 BuildKit(node);
+                break;
+
+            case BandRole.Keys when busking:
+                StreetPiano(b);
                 break;
 
             case BandRole.Keys:
@@ -103,6 +108,44 @@ public static class Performers
         }
 
         return node;
+    }
+
+    /// <summary>
+    /// An upright street piano for the pianist to stand at, facing south (+Z) with its back to the
+    /// people listening: painted festival pink with sunflowers on the back, low enough to see the pianist over, the keys at the height
+    /// the keyboard player's hands go to.
+    /// </summary>
+    private static void StreetPiano(MeshBuilder b)
+    {
+        var pink = new Color("#E94F7B");
+        var deep = new Color("#B83A60");
+        var sunflower = new Color("#F6B93B");
+        b.Box(new Vector3(0, 0.6f, 0.82f), new Vector3(1.45f, 1.08f, 0.5f), pink);
+        b.Box(new Vector3(0, 1.16f, 0.8f), new Vector3(1.52f, 0.05f, 0.58f), deep);
+        b.Box(new Vector3(0, 0.93f, 0.49f), new Vector3(1.42f, 0.08f, 0.2f), pink);
+        b.Box(new Vector3(0, 0.98f, 0.47f), new Vector3(1.28f, 0.03f, 0.16f), Cream);
+        for (var i = 0; i < 18; i++)
+        {
+            if (i % 7 is 2 or 6)
+            {
+                continue;
+            }
+
+            b.Box(new Vector3(-0.6f + (i * 0.07f), 1.0f, 0.43f), new Vector3(0.03f, 0.025f, 0.08f), Black);
+        }
+
+        b.Box(new Vector3(0, 1.06f, 0.58f), new Vector3(1.3f, 0.12f, 0.03f), deep);
+        foreach (var x in new[] { -0.64f, 0.64f })
+        {
+            b.Box(new Vector3(x, 0.32f, 0.5f), new Vector3(0.08f, 0.64f, 0.18f), deep);
+        }
+
+        // Sunflowers painted on the back, for the people listening.
+        foreach (var (x, y, size) in new[] { (-0.42f, 0.7f, 0.32f), (0.14f, 0.88f, 0.24f), (0.46f, 0.5f, 0.28f), (-0.05f, 0.36f, 0.18f) })
+        {
+            b.Ball(new Vector3(x, y, 1.08f), new Vector3(size, size, 0.02f), sunflower);
+            b.Ball(new Vector3(x, y, 1.09f), new Vector3(size * 0.38f, size * 0.38f, 0.02f), WoodDark);
+        }
     }
 
     /// <summary>How far below standing the drummer sits on the stool, in metres.</summary>

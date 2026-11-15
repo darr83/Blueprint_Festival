@@ -575,36 +575,117 @@
       "bus": "Effects",
       "seconds": 1.5,
       "loop": false,
-      "volume": 0.7,
+      "volume": 0.6,
       "gap": 0.08,
-      "prompt": "A single firework rocket launching from a mortar tube with a thud and a rising whistle into the night sky. No explosion, no people."
+      "keep": 1.4,
+      "influence": 0.7,
+      "prompt": "Close up, a single firework mortar tube firing: one sharp hollow thump, then a short airy whoosh as the shell climbs away. Outdoors in an open field at night. No explosion, no whistle, no people."
+    },
+    {
+      "id": "firework_whistle",
+      "bus": "Effects",
+      "seconds": 2.0,
+      "loop": false,
+      "volume": 0.55,
+      "gap": 0.2,
+      "keep": 1.9,
+      "influence": 0.7,
+      "prompt": "A single firework rocket shooting upward with a bright rising screaming whistle that climbs in pitch, then stops dead. Outdoors at night. No explosion, no people."
     },
     {
       "id": "firework_burst",
       "bus": "Effects",
-      "seconds": 2.0,
+      "seconds": 3.0,
+      "loop": false,
+      "volume": 0.9,
+      "gap": 0.15,
+      "keep": 2.9,
+      "influence": 0.7,
+      "prompt": "A single big aerial firework shell bursting high overhead: an enormous deep chest-thumping boom with a sharp crack at the start, echoing and rolling back off distant hills like thunder. Outdoors at night, open countryside. No people."
+    },
+    {
+      "id": "firework_burst_2",
+      "bus": "Effects",
+      "seconds": 3.0,
       "loop": false,
       "volume": 0.85,
-      "gap": 0.12,
-      "prompt": "One big firework shell exploding high in the sky, a deep boom echoing across an open field, then a soft sizzle of falling stars. No people."
+      "gap": 0.15,
+      "keep": 2.9,
+      "influence": 0.7,
+      "prompt": "Firework explosion in the night sky: one loud bang, then bright crackling glitter sparkling and fizzing as it fades. No whistle, no people."
+    },
+    {
+      "id": "firework_burst_3",
+      "bus": "Effects",
+      "seconds": 4.0,
+      "loop": false,
+      "volume": 0.8,
+      "gap": 0.3,
+      "keep": 3.9,
+      "influence": 0.7,
+      "prompt": "A distant firework boom followed by a long soft hissing sizzle of falling sparks, like gentle rain on leaves, slowly fading out. No people."
     },
     {
       "id": "firework_crackle",
       "bus": "Effects",
-      "seconds": 2.5,
+      "seconds": 3.0,
       "loop": false,
-      "volume": 0.6,
-      "gap": 0.3,
-      "prompt": "Rapid crackling and popping of firework crackle stars and a fountain of sparks hissing, outdoors at night. No people, no music."
+      "volume": 0.55,
+      "gap": 0.4,
+      "influence": 0.7,
+      "prompt": "Dense crackling firework stars high in the air: hundreds of tiny sharp snaps, pops and crackles all at once, like a giant pan of popping corn, fading at the end. Outdoors at night. No booms, no people."
+    },
+    {
+      "id": "firework_fountain",
+      "bus": "Effects",
+      "seconds": 6.0,
+      "loop": false,
+      "volume": 0.5,
+      "gap": 1.0,
+      "influence": 0.7,
+      "prompt": "A ground firework fountain spraying sparks: a steady roaring hiss with fizzing, spitting and little crackles, constant for the whole time, then sputtering out at the very end. Outdoors at night, no people."
+    },
+    {
+      "id": "firework_candle",
+      "bus": "Effects",
+      "seconds": 1.0,
+      "loop": false,
+      "volume": 0.55,
+      "gap": 0.1,
+      "keep": 0.6,
+      "influence": 0.7,
+      "prompt": "Roman candle firework, one single soft thump shot, a hollow pop. Just one."
+    },
+    {
+      "id": "firework_mine",
+      "bus": "Effects",
+      "seconds": 1.5,
+      "loop": false,
+      "volume": 0.75,
+      "gap": 0.2,
+      "keep": 1.4,
+      "influence": 0.7,
+      "prompt": "A ground mine firework going off: one loud punchy bang from the ground with a big whoosh of stars thrown into the air, then a quick crackle. Outdoors at night. One shot only, no people."
     },
     {
       "id": "firework_ooh",
       "bus": "Crowd",
-      "seconds": 3.0,
+      "seconds": 3.5,
       "loop": false,
       "volume": 0.7,
       "gap": 2.0,
-      "prompt": "A crowd of a few hundred people outdoors at night going ooh and aah at fireworks, then a short cheer and some clapping. No music."
+      "influence": 0.6,
+      "prompt": "A big outdoor crowd at night watching fireworks, all together going a long rising warm oooooh into an aaaah, with a couple of happy whoops. Only voices, no fireworks, no music."
+    },
+    {
+      "id": "firework_cheer",
+      "bus": "Crowd",
+      "seconds": 5.0,
+      "loop": false,
+      "volume": 0.7,
+      "gap": 3.0,
+      "influence": 0.6,
+      "prompt": "A big outdoor crowd at night cheering, whooping and clapping loudly at the end of a fireworks display, then the applause dies down. Only people, no fireworks, no music."
     }
   ]
 }

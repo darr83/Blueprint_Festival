@@ -209,7 +209,7 @@ public sealed partial class SiteLayout
 
     public PlacedStall? StallAt(TilePoint p) => _stalls.FirstOrDefault(s => s.Rect.Contains(p));
 
-    public bool IsEmpty(TilePoint p) => !_fence.ContainsKey(p) && StageAt(p) is null && GateAt(p) is null && StallAt(p) is null && !_laneOf.ContainsKey(p) && !_barriers.Contains(p) && !HasLight(p) && ScreenAt(p) is null && !FireworksAt(p) && ComfortAt(p) is null && SignAt(p) is null && DecorAt(p) is null && !IsBuntingPole(p);
+    public bool IsEmpty(TilePoint p) => !_fence.ContainsKey(p) && StageAt(p) is null && GateAt(p) is null && StallAt(p) is null && !_laneOf.ContainsKey(p) && !_barriers.Contains(p) && !HasLight(p) && ScreenAt(p) is null && !FireworksAt(p) && ComfortAt(p) is null && SignAt(p) is null && DecorAt(p) is null && !IsBuntingPole(p) && !_pitches.Contains(p);
 
     /// <summary>The queue lanes the player has laid: each is the tiles people stand along, in order from one end to the other.</summary>
     public IReadOnlyList<IReadOnlyList<TilePoint>> Lanes => _lanes;
@@ -998,6 +998,25 @@ public sealed partial class SiteLayout
         Refresh();
     }
 
+    private readonly HashSet<TilePoint> _pitches = new();
+
+    /// <summary>The ground the entertainers and their instruments stand on, which people walk round.</summary>
+    public IReadOnlyCollection<TilePoint> Pitches => _pitches;
+
+    /// <summary>Says where the entertainers stand. People walk round them like anything else built.</summary>
+    public void SetPitches(IEnumerable<TilePoint> tiles)
+    {
+        var wanted = new HashSet<TilePoint>(tiles);
+        if (wanted.SetEquals(_pitches))
+        {
+            return;
+        }
+
+        _pitches.Clear();
+        _pitches.UnionWith(wanted);
+        Refresh();
+    }
+
     /// <summary>Works out again what is blocked and which ground is inside the gates.</summary>
     private void Refresh()
     {
@@ -1007,7 +1026,7 @@ public sealed partial class SiteLayout
         _charmStale = true;
         _poles.Clear();
         _keepOut.RemoveWhere(p => _fence.ContainsKey(p) || StageAt(p) is not null || StallAt(p) is not null || GateAt(p) is not null || _laneOf.ContainsKey(p) || _barriers.Contains(p) || ScreenAt(p) is not null || FireworksAt(p) || ComfortAt(p) is not null || SignAt(p) is not null || DecorAt(p) is not null || IsBuntingPole(p));
-        _map.SetBlocked(_stages.SelectMany(s => TilesOf(s.Rect)).Concat(_stalls.SelectMany(BlockedBy)).Concat(_fence.Keys).Concat(_laneOf.Keys).Concat(_barriers).Concat(LightsInTheWay).Concat(ScreensInTheWay).Concat(PadInTheWay).Concat(ComfortsInTheWay).Concat(SignsInTheWay).Concat(DecorInTheWay));
+        _map.SetBlocked(_stages.SelectMany(s => TilesOf(s.Rect)).Concat(_stalls.SelectMany(BlockedBy)).Concat(_fence.Keys).Concat(_laneOf.Keys).Concat(_barriers).Concat(LightsInTheWay).Concat(ScreensInTheWay).Concat(PadInTheWay).Concat(ComfortsInTheWay).Concat(SignsInTheWay).Concat(DecorInTheWay).Concat(_pitches));
         RefreshVipGround();
         _map.SetStaffOnly(_keepOut);
 

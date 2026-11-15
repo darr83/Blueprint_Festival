@@ -1,5 +1,6 @@
 using BlueprintFestival.Simulation.Core;
 using BlueprintFestival.Simulation.People;
+using BlueprintFestival.Simulation.Show;
 using BlueprintFestival.Simulation.Site;
 using BlueprintFestival.Simulation.World;
 
@@ -147,8 +148,9 @@ public sealed partial class FestivalGame
     /// <summary>What someone with nothing to deal with does: waits a little, walks their beat, and (a cleaner) goes after litter.</summary>
     private void Rounds(StaffMember member)
     {
-        if (member.Kind == StaffKind.TicketStaff)
+        if (member.Kind == StaffKind.TicketStaff || Busking.IsEntertainer(member.Kind))
         {
+            // Ticket staff stay on their gate, and entertainers on their pitch.
             return;
         }
 

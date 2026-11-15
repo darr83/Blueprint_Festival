@@ -31,6 +31,9 @@ public partial class MusicPlayer : Node
     private StageCam? _cam;
     private StageMusic? _heard;
 
+    /// <summary>The entertainers' music, out in the fields.</summary>
+    public BuskerMusic Buskers { get; private set; } = null!;
+
     /// <summary>Each stage's music: the main stage first, then the second stage.</summary>
     public IReadOnlyList<StageMusic> Stages => _stages;
 
@@ -104,6 +107,9 @@ public partial class MusicPlayer : Node
         AddChild(_beats);
         AddStage(() => _game.Show, "Music 1");
         AddStage(() => _game.SecondShow, "Music 2");
+        Buskers = new BuskerMusic { Name = "Buskers" };
+        AddChild(Buskers);
+        Buskers.Initialise(game, _beats);
     }
 
     /// <summary>Tells the music where the player is looking from: the site view, and the stage cameras.</summary>
@@ -111,6 +117,7 @@ public partial class MusicPlayer : Node
     {
         _rig = rig;
         _cam = cam;
+        Buskers.Follow(rig, cam);
     }
 
     private void AddStage(System.Func<RunningOrder> show, string bus)

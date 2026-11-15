@@ -26,7 +26,7 @@ public sealed record PlanView(int Year, string Festival, string Date, int Licenc
 /// <summary>What the planning screen can do.</summary>
 public sealed record PlanActions(System.Action? Book = null, System.Action<int>? PickSlot = null, System.Action<string?>? PickArtist = null,
     System.Action? ToggleSecond = null, System.Action<int>? Price = null, System.Action? Camping = null, System.Action? Fields = null,
-    System.Action<int>? Parking = null, System.Action<int>? Buses = null, System.Action<int, int>? MoveSet = null);
+    System.Action<int>? Parking = null, System.Action<int>? Buses = null, System.Action<int, int>? MoveSet = null, System.Action<int>? Pitch = null);
 
 /// <summary>One way of advertising, and whether it is switched on.</summary>
 public sealed record AdvertView(string Id, string Name, int Cost, int Reach, string Reaches, bool On);
@@ -363,7 +363,7 @@ public static partial class YearPanels
         asking.AddChild(empty);
         roster.AddChild(asking);
         var extras = view.Forecast.Length > 0 || view.CampingCost > 0;
-        var room = 438 - (view.Travel is null ? 0 : 150) - (extras ? 62 : 0);
+        var room = 438 - (view.Travel is null ? 0 : view.Travel.Pitch is null ? 150 : 170) - (extras ? 62 : 0);
         var scroller = new ScrollContainer { CustomMinimumSize = new Vector2(590, room), HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled, Name = "Artists" };
         roster.AddChild(scroller);
         var list = new GridContainer { Columns = 2, SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
@@ -409,7 +409,7 @@ public static partial class YearPanels
 
         if (view.Travel is not null)
         {
-            roster.AddChild(Travel(view.Travel, does.Parking, does.Buses));
+            roster.AddChild(Travel(view.Travel, does.Parking, does.Buses, camping: does.Pitch));
         }
 
         if (extras)
@@ -426,7 +426,15 @@ public static partial class YearPanels
 
             if (view.CampingCost > 0)
             {
-                row.AddChild(Extra(view.Camping, view.Camping ? $"Camping field taken: £{view.CampingCost:N0}" : $"Take the camping field: £{view.CampingCost:N0}", $"About a third bring a tent, £{view.CampingFee} more each.", does.Camping));
+                row.AddChild(Extra(view.Camping, view.Camping ? $"Camping field taken: £{view.CampingCost:N0}" : $"Take the camping field: £{view.CampingCost:N0}",
+                    view.Camping ? $"About {view.Campers:N0} bring a tent at £{view.CampingFee} a pitch." : $"Pitches £{view.CampingFee} each, on top of the ticket.", does.Camping));
+                if (view.Camping)
+                {
+                    var pitch = Stepper("Pitch", $"£{view.CampingFee}", does.Pitch);
+                    pitch.TooltipText = "What a pitch costs. Cheap pitches fill the field, up to half the crowd; dear ones leave it emptier.";
+                    pitch.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
+                    row.AddChild(pitch);
+                }
             }
         }
 
@@ -456,7 +464,7 @@ public static partial class YearPanels
     /// the sales line, the adverts to switch on and off, the price on a ticket, and a button that runs the month.
     /// </summary>
     public static Control Sales(SalesView view, System.Action? run = null, System.Action<string>? toggleAdvert = null, System.Action<int>? price = null, bool busy = false,
-        System.Action<int>? parking = null, System.Action<int>? buses = null, System.Action<int>? vipPrice = null)
+        System.Action<int>? parking = null, System.Action<int>? buses = null, System.Action<int>? camping = null, System.Action<int>? vipPrice = null)
     {
         var panel = Card(1220);
         var box = new VBoxContainer();
@@ -549,7 +557,7 @@ public static partial class YearPanels
         }
         if (view.Travel is not null)
         {
-            right.AddChild(Travel(view.Travel, busy ? null : parking, busy ? null : buses));
+            right.AddChild(Travel(view.Travel, busy ? null : parking, busy ? null : buses, camping: busy ? null : camping));
         }
 
         right.AddChild(new Control { SizeFlagsVertical = Control.SizeFlags.ExpandFill });

@@ -298,8 +298,34 @@ public sealed partial class FestivalGame
     /// <summary>What the farmer charges for the camping field, with its toilets and taps.</summary>
     public const int CampingCost = 2500;
 
-    /// <summary>What each camper pays for their pitch, on top of their ticket.</summary>
+    /// <summary>What a pitch costs at the start, before the player changes it.</summary>
     public const int CampingFee = 4;
+
+    /// <summary>The dearest a pitch can be.</summary>
+    public const int DearestPitch = 30;
+
+    /// <summary>What each camper pays for their pitch, on top of their ticket. The player sets it, any time before the gates open.</summary>
+    public int CampingPrice { get; private set; } = CampingFee;
+
+    /// <summary>The share of the crowd that brings a tent at this pitch price: half when it is free, fewer as it gets dearer.</summary>
+    public double CamperShare => People.Crowd.CamperShareAt(CampingPrice);
+
+    /// <summary>Sets what a pitch costs, any time before the gates open. Cheap pitches fill the camping field; dear ones leave it emptier.</summary>
+    public void SetCampingPrice(int pounds)
+    {
+        if (Phase is not (Phase.Plan or Phase.Sell or Phase.Build))
+        {
+            throw new InvalidOperationException("The pitch price is set before the gates open.");
+        }
+
+        CampingPrice = Math.Clamp(pounds, 0, DearestPitch);
+        Crowd.CamperShare = CamperShare;
+        if (CampingBooked && Phase == Phase.Build && Plan is null)
+        {
+            // On the old single field the tents were pitched when the plan was confirmed: pitch them again.
+            Crowd.PitchCamp();
+        }
+    }
 
     /// <summary>The smallest licence at which camping is on offer.</summary>
     public const int CampingFrom = 5000;
@@ -311,7 +337,7 @@ public sealed partial class FestivalGame
     public bool CampingBooked { get; private set; }
 
     /// <summary>About how many people will camp if camping is booked.</summary>
-    public int CampersExpected => (int)Math.Round(ExpectedAt(TicketPrice) * People.Crowd.CamperShare);
+    public int CampersExpected => (int)Math.Round(ExpectedAt(TicketPrice) * CamperShare);
 
     /// <summary>Takes the camping field for the night, or gives it up. Only while planning, and only when it is on offer.</summary>
     public void BookCamping(bool book)
@@ -563,6 +589,7 @@ public sealed partial class FestivalGame
     {
         Crowd.Tick(clock.Now);
         TickStaff(clock.Now);
+        TickBusking(clock.Now);
         TickSafety(clock.Now);
         TickFireworks(clock.Now);
         TickWeather(clock.Now);
@@ -753,6 +780,7 @@ public sealed partial class FestivalGame
         Buses = BusesHired,
         SecondStage = SecondStageBooked,
         Camping = CampingBooked,
+        CampingPrice = CampingPrice,
         LineUp = Enumerable.Range(0, RunningOrder.SetsAStage).Select(i => Show.At(i)?.Name)
             .Concat(Enumerable.Range(0, RunningOrder.SetsAStage).Select(i => SecondShow.At(RunningOrder.SecondBase + i)?.Name)).ToList(),
         Sales = SaveSales(),
@@ -794,6 +822,8 @@ public sealed partial class FestivalGame
         ParkingCharge = Math.Clamp(year.Parking ?? ParkingCharge, 0, DearestParking);
         BusesHired = Math.Clamp(year.Buses, 0, MostBuses);
         RestoreSales(year.Sales);
+        CampingPrice = Math.Clamp(year.CampingPrice ?? CampingPrice, 0, DearestPitch);
+        Crowd.CamperShare = CamperShare;
         CampingBooked = Plan is null ? year.Camping && CampingOffered : CampingBooked;
         Phase = Enum.IsDefined(year.Phase) ? year.Phase : Phase.Plan;
         if (Phase != Phase.Plan)
@@ -846,6 +876,9 @@ public sealed record YearSave(int Number, int Licence, Phase Phase, DateTime Day
 
     /// <summary>True if the camping field was taken.</summary>
     public bool Camping { get; init; }
+
+    /// <summary>What a pitch cost, or null in an older save (four pounds).</summary>
+    public int? CampingPrice { get; init; }
 
     /// <summary>Who is booked for each set: the main stage's four, then the second stage's four. Null is an empty set.</summary>
     public List<string?>? LineUp { get; init; }

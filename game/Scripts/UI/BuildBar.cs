@@ -198,7 +198,7 @@ public partial class BuildBar : VBoxContainer
         AddTab(row, BuildMode.Fence, "fence", "Fences", "Keep people in, out, or in a line");
         AddTab(row, BuildMode.Gate, "gate", "Gates", "Where tickets are checked");
         AddTab(row, BuildMode.Stall, "stall", "Stalls", "Food, drink, ponchos, hats and merchandise, toilets and water, and the VIP lounge and platform");
-        AddTab(row, BuildMode.Staff, "staff", "Staff", "Ticket staff, security, first aid and cleaners");
+        AddTab(row, BuildMode.Staff, "staff", "Staff", "Ticket staff, security, first aid, cleaners and entertainers");
         AddTab(row, BuildMode.Ground, "ground", "Ground", "Straw, trackway, pallets, mats, sand and artificial grass");
         AddTab(row, BuildMode.Path, "path", "Paths", "Mown, bark, gravel and boardwalk paths, up to 6 m wide");
         AddTab(row, BuildMode.Comfort, "bench", "Comforts", "Seats, tables, hand washing and shade");
@@ -481,6 +481,10 @@ public partial class BuildBar : VBoxContainer
             : booth && k.Contains("security") ? ("shield", UiStyle.StagePink)
             : k == "stallbin" ? ("bin", UiStyle.StagePink)
             : k == "staffcleaner" ? ("broom", UiStyle.StagePink)
+            : k == "staffguitarist" ? ("guitar", UiStyle.StagePink)
+            : k == "staffpianist" ? ("piano", UiStyle.StagePink)
+            : k == "staffdrummer" ? ("drum", UiStyle.StagePink)
+            : k == "staffdj" ? ("decks", UiStyle.StagePink)
             : booth && k.Contains("ticket") ? ("ticket", UiStyle.StagePink)
             : k.StartsWith("stage") ? ("stage", UiStyle.StagePink)
             : k.StartsWith("fence") ? ("fence", UiStyle.StagePink)

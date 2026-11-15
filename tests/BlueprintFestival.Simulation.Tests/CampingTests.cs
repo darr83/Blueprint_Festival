@@ -87,7 +87,7 @@ public class CampingTests
         var crowd = game.Crowd;
 
         Assert.True(crowd.CampersIn > 1000, $"Only {crowd.CampersIn} campers came.");
-        Assert.Equal(crowd.CampersIn * FestivalGame.CampingFee, game.Income.Where(l => l.What == "Camping").Sum(l => l.Amount));
+        Assert.Equal(crowd.CampersIn * game.CampingPrice, game.Income.Where(l => l.What == "Camping").Sum(l => l.Amount));
         Assert.True(crowd.InTents >= crowd.CampersIn * 0.97, $"{crowd.InTents} of {crowd.CampersIn} campers got to their tents.");
         Assert.Equal(0, game.CrushInjuries);
         Assert.True(crowd.Happiness >= 70, $"Only {crowd.Happiness}% happy.");
@@ -164,7 +164,7 @@ public class CampingTests
         var game = FestivalGame.StartYear("Larkmoor Festival", new YearSetup(6, 5000, 90000));
         game.BookCamping(true);
         Assert.True(game.ConfirmPlan());
-        var wanted = game.Crowd.Parties.Count(p => (uint)(p.Id * 2654435761u) % 100 < Crowd.CamperShare * 100);
+        var wanted = game.Crowd.Parties.Count(p => (uint)(p.Id * 2654435761u) % 100 < game.Crowd.CamperShare * 100);
         Assert.Equal(wanted, game.Crowd.Parties.Count(p => p.Pitch is not null));
         Assert.True(game.Field.Pitches().Count >= wanted);
     }
