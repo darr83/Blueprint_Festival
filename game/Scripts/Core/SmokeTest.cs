@@ -97,6 +97,7 @@ public partial class SmokeTest : Node
                 if (Menu is { } menu)
                 {
                     Check(menu.NameBox.PlaceholderText == "Larkmoor Festival", "The menu should offer Larkmoor Festival as the default name.");
+                    CheckScreenMode(menu);
                     manager.StartNewGame(FestivalName);
                     Next(Stage.Opening);
                 }
@@ -643,6 +644,23 @@ public partial class SmokeTest : Node
 
                 break;
         }
+    }
+
+    /// <summary>F11 and Alt+Enter swap full screen and window, and the menu's button follows along.</summary>
+    private static void CheckScreenMode(MainMenu menu)
+    {
+        var screen = ScreenMode.Instance;
+        Check(screen is not null, "The full screen switch should always be loaded.");
+        var button = menu.FindChild("ScreenButton", true, false) as Button;
+        Check(button is not null, "The main menu should have a full screen button.");
+        var before = ScreenMode.FullScreen;
+        screen!._Input(new InputEventKey { Keycode = Key.F11, Pressed = true });
+        Check(ScreenMode.FullScreen != before, "F11 should swap full screen and window.");
+        Check(button!.Text == BlueprintFestival.Simulation.Core.ScreenSettings.ButtonText(ScreenMode.FullScreen), "The button should change its words when the screen mode changes.");
+        screen._Input(new InputEventKey { Keycode = Key.Enter, AltPressed = true, Pressed = true });
+        Check(ScreenMode.FullScreen == before, "Alt+Enter should swap it back.");
+        screen._Input(new InputEventKey { Keycode = Key.Enter, Pressed = true });
+        Check(ScreenMode.FullScreen == before, "Enter on its own should not swap the screen mode.");
     }
 
     private static void Check(bool condition, string message)
