@@ -147,6 +147,10 @@ public partial class GameManager : Node
             {
                 AddChild(new SignShots(arg["--sign-shots=".Length..]) { Name = "SignShots" });
             }
+            else if (arg.StartsWith("--decor-shots=", StringComparison.Ordinal))
+            {
+                AddChild(new DecorShots(arg["--decor-shots=".Length..]) { Name = "DecorShots" });
+            }
             else if (arg.StartsWith("--shots=", StringComparison.Ordinal))
             {
                 AddChild(new Shots(arg["--shots=".Length..]) { Name = "Shots" });

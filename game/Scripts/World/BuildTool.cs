@@ -48,8 +48,14 @@ public enum BuildMode
     /// <summary>The Paths group on the build bar. The tool itself lays a path as <see cref="Ground"/>.</summary>
     Path,
 
-    /// <summary>Putting up a sign to write on. Also the Signs group on the build bar.</summary>
+    /// <summary>Putting up a sign to write on. Also the Decor group on the build bar.</summary>
     Sign,
+
+    /// <summary>Putting out a decoration.</summary>
+    Decor,
+
+    /// <summary>Dragging a line of bunting from one pole to another.</summary>
+    Bunting,
 }
 
 /// <summary>
@@ -98,6 +104,8 @@ public partial class BuildTool : Node3D
     public ComfortKind Comfort { get; private set; }
 
     public SignKind Sign { get; private set; }
+
+    public DecorKind Decor { get; private set; }
 
     /// <summary>Raised when a sign has just gone up, with a tile it stands on, so its words can be written.</summary>
     public event Action<TilePoint>? SignPlaced;
@@ -164,6 +172,18 @@ public partial class BuildTool : Node3D
 
     public void PickSign(SignKind kind) => Pick(BuildMode.Sign, () => Sign = kind);
 
+    public void PickDecor(DecorKind kind) => Pick(BuildMode.Decor, () => Decor = kind);
+
+    public void PickBunting() => Pick(BuildMode.Bunting, () => { });
+
+    /// <summary>Strings bunting between two tiles, a pole at each end.</summary>
+    public BuildCheck DragBunting(TilePoint from, TilePoint to)
+    {
+        var result = _game.BuildBunting(from, to);
+        Said(result, "Bunting up");
+        return result;
+    }
+
     public void PickRemove() => Pick(BuildMode.Remove, () => { });
 
     public void PickLane() => Pick(BuildMode.Lane, () => { });
@@ -212,6 +232,8 @@ public partial class BuildTool : Node3D
             BuildMode.Stall => "Click on the grass to put it up. R turns it. People queue at the front.",
             BuildMode.Staff => Hire == StaffKind.TicketStaff ? "Click a gate to put them on it. One for each lane." : "Click on the grass to post them there.",
             BuildMode.Ground when IsPathLine => $"Hold the mouse button and drag to lay a path, {PathWidth * 2} m wide. Some people keep to paths; others cut across.",
+            BuildMode.Decor => Decor == DecorKind.GiantLetters ? $"Click on the grass to stand {_game.LettersWord} up in giant letters. R turns it." : "Click on the grass to put it out. R turns it. Decorations cheer up the people near them, up to a point.",
+            BuildMode.Bunting => "Hold the mouse button and drag to string bunting, up to 16 m. Start on a pole to carry on from it.",
             BuildMode.Sign => "Click on the grass to put it up, then write your own words on it. R turns it. Click a sign later to change it.",
             BuildMode.Comfort => Comforts.Of(Comfort).Seats.Length > 0 ? "Click on the grass to put it out. R turns it. People with food look for a seat near where they bought it."
                 : Comforts.Of(Comfort).Washes ? "Click on the grass to put it out. R turns it. It counts for toilets and food stalls within 14 m."
@@ -223,7 +245,7 @@ public partial class BuildTool : Node3D
             BuildMode.LaunchPad => "Click on the grass to put the launch pad down. Its safe zone must be clear. Fence it off from the firework mixer.",
             BuildMode.Screen => "Click on the grass to put the screen up. R turns it. It shows the nearest stage to the people in front of it.",
             BuildMode.Fairy => "Hold the mouse button and drag to string fairy lights. The poles go in by themselves. Start on a pole to carry on from it.",
-            BuildMode.Remove => "Click a stage, a screen, the launch pad, a stall, a seat, a sign, a gate, a light or a stretch of fence to take it down. You get the money back. Click staff to send them home.",
+            BuildMode.Remove => "Click a stage, a screen, the launch pad, a stall, a seat, a sign, a decoration, a bunting pole, a gate, a light or a stretch of fence to take it down. You get the money back. Click staff to send them home.",
             _ => "",
         };
         ClearGhost();
@@ -301,6 +323,12 @@ public partial class BuildTool : Node3D
     {
         var size = LaunchPads.Of(Pad).Size;
         return (at.X - (size / 2), at.Y - (size / 2));
+    }
+
+    private (int X, int Y) DecorCorner(TilePoint at)
+    {
+        var rect = new PlacedDecor(Decor, 0, 0, Facing, _game.LettersWord).Rect;
+        return (at.X - (rect.Width / 2), at.Y - (rect.Height / 2));
     }
 
     private (int X, int Y) SignCorner(TilePoint at)
@@ -382,6 +410,13 @@ public partial class BuildTool : Node3D
             {
                 var (x, y) = ComfortCorner(at);
                 result = _game.BuildComfort(Comfort, x, y, Facing);
+                break;
+            }
+
+            case BuildMode.Decor:
+            {
+                var (x, y) = DecorCorner(at);
+                result = _game.BuildDecor(Decor, x, y, Facing);
                 break;
             }
 
@@ -688,6 +723,41 @@ public partial class BuildTool : Node3D
                 break;
             }
 
+            case BuildMode.Decor:
+            {
+                var (x, y) = DecorCorner(at);
+                check = _game.CheckDecor(Decor, x, y, Facing);
+                var decor = new PlacedDecor(Decor, x, y, Facing, _game.LettersWord);
+                pad = decor.Rect;
+                Ghost($"decor{Decor}", () => SiteProps.Decoration(decor));
+                break;
+            }
+
+            case BuildMode.Bunting:
+            {
+                var from = _dragFrom ?? at;
+                pad = new TileRect(at.X, at.Y, 1, 1);
+                if (_dragFrom is null || from == at)
+                {
+                    // Not dragging yet: show where the first pole would stand.
+                    ClearGhostOnly();
+                    ShowPad(pad, true);
+                    Refused = false;
+                    Status = _game.Site.IsBuntingPole(at) ? "Drag from this pole to carry the bunting on." : "Hold the mouse button and drag to string bunting.";
+                    return;
+                }
+
+                check = _game.CheckBunting(from, at);
+                var run = new BuntingRun(from, at);
+                Ghost($"bunting{run}", () => SiteProps.BuntingBetween(run));
+                _ghost!.Position = Vector3.Zero;
+                _ghost.RotationDegrees = Vector3.Zero;
+                ShowPad(pad, check.Ok);
+                Refused = !check.Ok;
+                Status = check.Ok ? $"Bunting, {run.Metres:0} m: £{check.Cost:N0}" : check.Problem ?? "";
+                return;
+            }
+
             case BuildMode.Sign:
             {
                 var (x, y) = SignCorner(at);
@@ -844,6 +914,8 @@ public partial class BuildTool : Node3D
         BuildMode.LaunchPad => LaunchPads.Of(Pad).Name,
         BuildMode.Comfort => Comforts.Of(Comfort).Name,
         BuildMode.Sign => Signs.Of(Sign).Name,
+        BuildMode.Decor => Simulation.Site.Decor.Of(Decor).Name,
+        BuildMode.Bunting => "Bunting",
         BuildMode.Stage => Catalogue.Of(Stage).Name,
         BuildMode.Gate => Catalogue.Of(Gate).Name,
         BuildMode.Stall => Catalogue.Of(Stall).Name,
@@ -902,7 +974,7 @@ public partial class BuildTool : Node3D
                 break;
 
             case InputEventMouseButton { ButtonIndex: MouseButton.Left } click when _hovering:
-                if (Mode is BuildMode.Fence or BuildMode.Ground or BuildMode.Lane or BuildMode.KeepOut or BuildMode.Fairy)
+                if (Mode is BuildMode.Fence or BuildMode.Ground or BuildMode.Lane or BuildMode.KeepOut or BuildMode.Fairy or BuildMode.Bunting)
                 {
                     if (click.Pressed)
                     {
@@ -926,6 +998,10 @@ public partial class BuildTool : Node3D
                         else if (Mode == BuildMode.Fairy)
                         {
                             DragFairyLights(from, _hover);
+                        }
+                        else if (Mode == BuildMode.Bunting)
+                        {
+                            DragBunting(from, _hover);
                         }
                         else
                         {

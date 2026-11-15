@@ -344,6 +344,20 @@ public partial class SmokeTest : Node
                     Check(written.Line(1) == "Tea tent" && written.PointsRight(1) && written.Colour == 2, $"The post should say what was typed, not '{written.Line(1)}'.");
                     opened.SignBox.Close();
                     Check(!opened.SignBox.Visible && opened.Game.Remove(post) == 10 && opened.Game.Site.Signs.Count == 0, "Taking the post down should give its £10 back.");
+                    // Decorations: the Decor tab's other shelf, a scarecrow and a line of bunting, and both come down for their money.
+                    opened.BuildBar.ShowDecorShelf(true);
+                    Check(opened.BuildBar.ChoiceCount == 7 && opened.BuildBar.Choose(UI.BuildBar.DecorKey(DecorKind.Scarecrow)) && opened.Build.Mode == BuildMode.Decor, $"The Decorations shelf should offer seven things, not {opened.BuildBar.ChoiceCount}.");
+                    var beforeDecor = opened.Game.Money;
+                    var crow = new TilePoint(grass.X + 41, grass.Y + 56);
+                    var crowUp = opened.Build.ClickAt(crow).Ok;
+                    Check(opened.BuildBar.Choose(UI.BuildBar.BuntingKey) && opened.Build.Mode == BuildMode.Bunting, "Bunting should be on the Decorations shelf.");
+                    var pole = new TilePoint(grass.X + 41, grass.Y + 60);
+                    var strung = opened.Build.DragBunting(pole, new TilePoint(pole.X + 12, pole.Y)).Ok;
+                    opened.Site.Rebuild();
+                    Check(crowUp && strung && opened.Site.DecorCount == 2 && opened.Game.Money == beforeDecor - 22, $"A scarecrow and 6 m of bunting should go up for £22, not £{beforeDecor - opened.Game.Money}.");
+                    Check(opened.Game.Remove(crow) == 10 && opened.Game.Remove(pole) == 12 && opened.Game.Money == beforeDecor, "Taking the scarecrow and the bunting down should give their money back.");
+                    opened.BuildBar.ShowDecorShelf(false);
+                    Check(opened.BuildBar.ChoiceCount == 4, "The Signs shelf should come back with its four signs.");
                     Check(opened.Weather.StreaksShown == 0 && opened.Sky.Overcast < 0.01f, "A fine day should have no rain and no cloud.");
                     Check(opened.TopBar.WeatherText.StartsWith("Fine", StringComparison.Ordinal), $"The top bar should say the day is fine, not '{opened.TopBar.WeatherText}'.");
                     opened.BuildBar.Close();
