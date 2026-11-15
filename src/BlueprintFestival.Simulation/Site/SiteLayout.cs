@@ -147,6 +147,93 @@ public sealed partial class SiteLayout
     /// <summary>True when people can walk from the lane onto the field without passing a gate.</summary>
     public bool OpenWayIn { get; private set; }
 
+    /// <summary>
+    /// Where people can get onto the festival without going through a gate, once some fence or a
+    /// gate is up: the end of a fence that stops short of the hedge, say, or a gap left open. Null
+    /// when the gates are the only way in, or nothing has been put up yet.
+    /// </summary>
+    public TilePoint? GapInTheFence { get; private set; }
+
+    private bool _gatesShut;
+
+    /// <summary>
+    /// True while the gates are shut on the day. The public cannot walk through a shut gate, so
+    /// nobody slips in before the gates are opened; ticket staff still can.
+    /// </summary>
+    public bool GatesShut
+    {
+        get => _gatesShut;
+        set
+        {
+            if (_gatesShut != value)
+            {
+                _gatesShut = value;
+                Refresh();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Finds a gap to show the player. Best is a hole beside a fence or gate: ground anyone can
+    /// walk on, with fence or hedge on either side of it. Failing that, where the festival grass
+    /// opens straight onto the lane or the track with nothing across it.
+    /// </summary>
+    private TilePoint? FindGap()
+    {
+        bool Walkable(TilePoint p) => _map.InBounds(p.X, p.Y) && _map.IsWalkableForVip(p.X, p.Y);
+        bool Built(TilePoint p) => _fence.ContainsKey(p) || GateAt(p) is not null;
+        bool Shut(TilePoint p) => !Walkable(p) || Built(p);
+        var outside = new List<TilePoint>();
+        for (var y = 0; y < _map.Height; y++)
+        {
+            for (var x = 0; x < _map.Width; x++)
+            {
+                var p = new TilePoint(x, y);
+                if (SideOf(p) == Side.Outside)
+                {
+                    outside.Add(p);
+                }
+            }
+        }
+
+        foreach (var p in outside)
+        {
+            var left = new TilePoint(p.X - 1, p.Y);
+            var right = new TilePoint(p.X + 1, p.Y);
+            var up = new TilePoint(p.X, p.Y - 1);
+            var down = new TilePoint(p.X, p.Y + 1);
+            var acrossX = Shut(left) && Shut(right) && (Built(left) || Built(right));
+            var acrossY = Shut(up) && Shut(down) && (Built(up) || Built(down));
+            if (acrossX || acrossY)
+            {
+                return p;
+            }
+        }
+
+        var field = _map.Field;
+        var openings = outside
+            .Where(p => field.Contains(p) && new[] { (1, 0), (-1, 0), (0, 1), (0, -1) }.Any(d =>
+            {
+                var n = new TilePoint(p.X + d.Item1, p.Y + d.Item2);
+                return Walkable(n) && !field.Contains(n);
+            }))
+            .ToList();
+        if (openings.Count > 0)
+        {
+            return openings[openings.Count / 2];
+        }
+
+        foreach (var p in outside)
+        {
+            if (field.Contains(p))
+            {
+                return p;
+            }
+        }
+
+        return null;
+    }
+
     public Side SideOf(TilePoint p) => _map.InBounds(p.X, p.Y) ? _sides[(p.Y * _map.Width) + p.X] : Side.Nowhere;
 
     /// <summary>
@@ -1028,7 +1115,8 @@ public sealed partial class SiteLayout
         _keepOut.RemoveWhere(p => _fence.ContainsKey(p) || StageAt(p) is not null || StallAt(p) is not null || GateAt(p) is not null || _laneOf.ContainsKey(p) || _barriers.Contains(p) || ScreenAt(p) is not null || FireworksAt(p) || ComfortAt(p) is not null || SignAt(p) is not null || DecorAt(p) is not null || IsBuntingPole(p));
         _map.SetBlocked(_stages.SelectMany(s => TilesOf(s.Rect)).Concat(_stalls.SelectMany(BlockedBy)).Concat(_fence.Keys).Concat(_laneOf.Keys).Concat(_barriers).Concat(LightsInTheWay).Concat(ScreensInTheWay).Concat(PadInTheWay).Concat(ComfortsInTheWay).Concat(SignsInTheWay).Concat(DecorInTheWay).Concat(_pitches));
         RefreshVipGround();
-        _map.SetStaffOnly(_keepOut);
+        // Shut gates are closed to the public: nobody walks through one until the gates are opened.
+        _map.SetStaffOnly(_gatesShut ? _keepOut.Concat(_gates.SelectMany(g => TilesOf(g.Rect))) : _keepOut);
 
         var width = _map.Width;
         _sides = new Side[width * _map.Height];
@@ -1058,6 +1146,7 @@ public sealed partial class SiteLayout
         Flood(innerTiles, Side.Inside, gateTiles);
         HasWorkingGate = _gateUses.Any(u => u.InUse);
         OpenWayIn = !HasWorkingGate && TilesOf(_map.Field).Any(p => SideOf(p) == Side.Outside);
+        GapInTheFence = OpenWayIn && (_gates.Count > 0 || _fence.Count > 0) ? FindGap() : null;
         Changed?.Invoke();
     }
 

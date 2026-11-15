@@ -194,7 +194,8 @@ public class GrowthTests
             Assert.True(++guard < 70000, "The day never ended.");
         }
 
-        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(60), $"A day of 1,500 took {watch.Elapsed.TotalSeconds:0} seconds.");
+        // About 30 s on a quiet machine; GitHub's shared runners have taken over 60 s, so the limit leaves room for them.
+        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(120), $"A day of 1,500 took {watch.Elapsed.TotalSeconds:0} seconds.");
         Assert.True(game.Crowd.Arrived >= game.Crowd.Expected * 95 / 100, $"{game.Crowd.Arrived} of {game.Crowd.Expected} arrived.");
         Assert.True(mostOnSite >= game.Crowd.Expected * 8 / 10, $"Most on site {mostOnSite}.");
         Assert.Equal(0, game.Crowd.WalkedInFree);

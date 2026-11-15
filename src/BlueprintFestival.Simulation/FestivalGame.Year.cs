@@ -630,6 +630,9 @@ public sealed partial class FestivalGame
     private void EndDay()
     {
         Phase = Phase.Tidy;
+
+        // A day that ended with the gates never opened leaves nothing shut for the tidy-up or next year.
+        Crowd.GatesShut = false;
         foreach (var (pitch, party) in Crowd.Tents)
         {
             // Most campers take everything home. Some leave a bag of rubbish, and a few leave the tent.

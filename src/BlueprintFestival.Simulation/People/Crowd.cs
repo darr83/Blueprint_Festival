@@ -409,7 +409,11 @@ public sealed partial class Crowd
     /// True while the gates are shut: people who arrive queue outside, and nobody's ticket is
     /// checked until the gates are opened.
     /// </summary>
-    public bool GatesShut { get; set; }
+    public bool GatesShut
+    {
+        get => _site.GatesShut;
+        set => _site.GatesShut = value;
+    }
 
     /// <summary>How long people will wait outside shut gates before they start to mind, in minutes.</summary>
     public const double ShutGraceMinutes = 30;
