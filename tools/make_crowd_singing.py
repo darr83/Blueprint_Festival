@@ -5,7 +5,7 @@ For every song in game/Music that has a ".chorus" file beside it (made with "Mar
 the game's main menu) and no crowd file yet, this:
 
   1. pulls the singer's voice out of the song with Demucs (a free vocal separator), then
-  2. turns that one voice into a field of people singing it: sixteen voices, half of them men an
+  2. turns that one voice into a field of people singing it: sixteen voices, two in three of them men an
      octave lower, each a little different and out of time, spread from left to right, with an
      outdoor echo and the festival crowd's noise underneath,
 
@@ -31,12 +31,12 @@ from pathlib import Path
 MUSIC = Path(__file__).resolve().parent.parent / "game" / "Music"
 ENDINGS = (".mp3", ".ogg", ".wav")
 
-# The crowd: how many voices (every other one a man singing an octave lower with a deeper voice),
+# The crowd: how many voices (two in three of them men singing an octave lower with a deeper voice),
 # how far out of time (ms) each can be, how loud the finished crowd is, and how much of the
 # festival crowd's own noise goes under it.
 VOICES = 16
 MOST_LATE_MS = 160
-LOUDNESS = -16
+LOUDNESS = -14
 CROWD_NOISE = Path(__file__).resolve().parent.parent / "game" / "Audio" / "crowd_large.ogg"
 NOISE_LEVEL = 0.08
 
@@ -63,13 +63,13 @@ def separate(song, work):
 def crowd_filter(seed, noise):
     """
     The ffmpeg filter that turns one voice into a crowd, the same every time for the same song:
-    half the voices men (an octave down, deeper), half women, each a little different in tone,
+    two in three voices men (an octave down, deeper), the rest women, each a little different in tone,
     out of time and spread from left to right, with the festival crowd's noise underneath.
     """
     rng = random.Random(seed)
     parts = [f"[0:a]aformat=sample_rates=44100:channel_layouts=mono,asplit={VOICES}" + "".join(f"[v{i}]" for i in range(VOICES))]
     for i in range(VOICES):
-        man = i % 2 == 0
+        man = i % 3 != 0
         semitones = (-12 if man else 0) + rng.uniform(-0.3, 0.3)
         formant = rng.uniform(0.78, 0.9) if man else rng.uniform(0.95, 1.12)
         late = rng.uniform(10, MOST_LATE_MS)
@@ -84,7 +84,7 @@ def crowd_filter(seed, noise):
             f"pan=stereo|c0={left:.3f}*c0|c1={right:.3f}*c0[c{i}]")
     parts.append("".join(f"[c{i}]" for i in range(VOICES)) + f"amix=inputs={VOICES}:normalize=0,"
                  "highpass=f=150,lowpass=f=5000,"
-                 "aecho=0.8:0.6:90|180|290:0.22|0.14|0.08,"
+                 "aecho=0.8:0.7:90|180|290|420:0.34|0.24|0.16|0.1,"
                  "acompressor=threshold=-24dB:ratio=4:attack=30:release=300[sung]")
     if noise:
         parts.append(f"[1:a]aformat=sample_rates=44100:channel_layouts=stereo,volume={NOISE_LEVEL}[noise]")

@@ -40,7 +40,7 @@ public partial class StageMusic : Node
     private float _singLevel;
 
     /// <summary>How loud the crowd singing is under the song at its loudest, against the song itself.</summary>
-    public const float CrowdLevel = 0.85f;
+    public const float CrowdLevel = 1f;
 
     /// <summary>The bus the crowd's singing of the song's own words plays on, with an echo, feeding the Music bus.</summary>
     public const string SingingBus = "Singing";
