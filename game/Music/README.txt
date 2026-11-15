@@ -59,14 +59,16 @@ their own folders inside "Entertainers". See the README there.
 
 SING-ALONG CHORUSES
 
-The crowd sings along in a song's choruses once they are marked. On the main menu press
-"Mark the choruses", pick a song, press Play, and tap C as each chorus starts and again as it
-ends. The marks are saved beside the song as "<song file>.chorus" (for example
-"01 Long Way Home.mp3.chorus"); delete that file to take the sing-along away. Songs with no
-choruses marked have no sing-along.
+The crowd sings along in a song's choruses once they are marked and the song's crowd is made.
+On the main menu press "Mark the choruses", pick a song, press Play, and tap C as each chorus
+starts and again as it ends. The marks are saved beside the song as "<song file>.chorus" (for
+example "01 Long Way Home.mp3.chorus"); delete that file to take the sing-along away.
 
-If you also have the song's singing on its own (a vocal stem), put it beside the song with
-".vocals" before the ending, such as "01 Long Way Home.vocals.mp3". In the choruses the crowd then
-sings the real words back, quietly and with an echo, as well as the wordless crowd singing.
+The crowd itself is made from the song's own singing by tools/make_crowd_singing.py (or ask
+Claude to make it): it pulls the voice out of the song and turns it into a field of people
+singing, saved beside the song as "01 Long Way Home.crowd.ogg". The game plays it quietly under
+the song in the marked choruses, louder the more people sing. Moving choruses later needs
+nothing made again. A song's singing on its own, saved as "01 Long Way Home.vocals.mp3", is
+used instead when there is no crowd file.
 
 Every artist is made up. None is a real act.

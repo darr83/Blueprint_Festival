@@ -68,24 +68,6 @@ public static class SingAlong
     /// <summary>How loud the crowd singing is, from 0 to 1, for this many people singing.</summary>
     public static double Loudness(int singers) => singers <= 0 ? 0 : Math.Clamp(Math.Sqrt(singers / 350.0), 0.2, 1);
 
-    /// <summary>Which of the crowd's singing sounds a song gets, the same one every time for the same song.</summary>
-    public static int SoundFor(string song, int sounds)
-    {
-        ArgumentNullException.ThrowIfNull(song);
-        if (sounds <= 1)
-        {
-            return 0;
-        }
-
-        var hash = 17;
-        foreach (var c in song)
-        {
-            hash = unchecked((hash * 31) + c);
-        }
-
-        return (int)((uint)hash % (uint)sounds);
-    }
-
     private static int Roll(int person, int question)
     {
         unchecked

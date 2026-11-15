@@ -956,24 +956,6 @@
       "volume": 0.35,
       "gap": 0.0,
       "prompt": "A wood fire crackling and popping gently in a metal fire pit outdoors at night. No voices, no music."
-    },
-    {
-      "id": "crowd_sing_whoa",
-      "bus": "Crowd",
-      "seconds": 20,
-      "loop": true,
-      "volume": 0.8,
-      "gap": 0,
-      "prompt": "A huge outdoor festival crowd singing along together in the open air, thousands of voices in unison holding a long wordless 'whoa-oh-oh, whoa-oh' melody, warm and joyful, heard from the field. Voices only, no instruments, no music."
-    },
-    {
-      "id": "crowd_sing_la",
-      "bus": "Crowd",
-      "seconds": 20,
-      "loop": true,
-      "volume": 0.8,
-      "gap": 0,
-      "prompt": "A big outdoor festival crowd singing a chorus together, thousands of voices in unison singing a wordless 'na na na, la la la' melody, slightly out of tune, happy, echoing across a field. Voices only, no instruments, no music."
     }
   ]
 }

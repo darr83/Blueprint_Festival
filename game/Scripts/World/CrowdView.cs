@@ -532,9 +532,8 @@ public partial class CrowdView : Node3D
 public partial class CrowdView
 {
     /// <summary>
-    /// The sound of the crowd singing along in a chorus: a wordless crowd singing under the music of
-    /// the stage being heard, louder the more people are singing, as near or far as the stage's music.
-    /// If the song has its singing on its own beside it, that is sung back too, with an echo.
+    /// How loud the crowd sings along in a chorus: each stage's song has its crowd file (the song's own
+    /// singing made into a crowd) played quietly under it, louder the more people are singing there.
     /// </summary>
     private void Sing(StageBeat? heard, bool held)
     {
@@ -554,19 +553,8 @@ public partial class CrowdView
 
         var singers = heard == _secondBeat ? _singersSecond : heard == _mainBeat ? _singersMain : 0;
         var stage = heard is null ? null : Music?.For(heard == _secondBeat ? _game.SecondShow : _game.Show);
-        var level = held || heard is null ? 0f : (float)(SingAlong.Loudness(singers) * heard.Chorus) * Mathf.Clamp((stage?.Place ?? 1f) * 1.4f, 0f, 1f);
-        if (stage?.HasVocals == true)
-        {
-            // The words are sung back from the song itself; the wordless crowd is kept low under them.
-            level *= 0.45f;
-        }
-
-        SingingLevel = level;
-        var pick = heard is null ? -1 : SingAlong.SoundFor(heard.SongFile, Sounds.Singing.Count);
-        for (var i = 0; i < Sounds.Singing.Count; i++)
-        {
-            SoundBoard.Instance?.SetLoop(Sounds.Singing[i], i == pick ? level : 0);
-        }
+        SingingLevel = held || heard is null || stage?.HasVocals != true ? 0f
+            : (float)(SingAlong.Loudness(singers) * heard.Chorus) * Mathf.Clamp(stage.Place * 1.4f, 0f, 1f);
     }
 }
 

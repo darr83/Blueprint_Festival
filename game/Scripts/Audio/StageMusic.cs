@@ -39,6 +39,9 @@ public partial class StageMusic : Node
     private Choruses _marks = Choruses.None;
     private float _singLevel;
 
+    /// <summary>How loud the crowd singing is under the song at its loudest, against the song itself.</summary>
+    public const float CrowdLevel = 0.5f;
+
     /// <summary>The bus the crowd's singing of the song's own words plays on, with an echo, feeding the Music bus.</summary>
     public const string SingingBus = "Singing";
 
@@ -183,8 +186,9 @@ public partial class StageMusic : Node
         index = AudioServer.BusCount - 1;
         AudioServer.SetBusName(index, SingingBus);
         AudioServer.SetBusSend(index, MusicPlayer.Bus);
-        AudioServer.AddBusEffect(index, new AudioEffectLowPassFilter { CutoffHz = 3800 });
-        AudioServer.AddBusEffect(index, new AudioEffectReverb { RoomSize = 0.85f, Damping = 0.6f, Spread = 1f, Wet = 0.55f, Dry = 0.5f, PredelayMsec = 60 });
+        // The crowd file already sounds like a field singing; this only sits it a little further back.
+        AudioServer.AddBusEffect(index, new AudioEffectLowPassFilter { CutoffHz = 5000 });
+        AudioServer.AddBusEffect(index, new AudioEffectReverb { RoomSize = 0.7f, Damping = 0.6f, Spread = 1f, Wet = 0.2f, Dry = 0.9f, PredelayMsec = 40 });
         return index;
     }
 
@@ -254,7 +258,7 @@ public partial class StageMusic : Node
         _level = Mathf.MoveToward(_level, _slot >= 0 && !held ? 1 : 0, FadePerSecond * (float)delta);
         _player.VolumeDb = Mathf.LinearToDb(Mathf.Max(_level * _fade * Place, 0.0001f));
         // The song's own singing, sung back by the crowd: only in the choruses, and as loud as the crowd is singing.
-        _vocals.VolumeDb = Mathf.LinearToDb(Mathf.Max(_level * _fade * Place * (float)Chorus * _singLevel * 0.55f, 0.0001f));
+        _vocals.VolumeDb = Mathf.LinearToDb(Mathf.Max(_level * _fade * Place * (float)Chorus * _singLevel * CrowdLevel, 0.0001f));
         if (_vocals.Playing && !_player.Playing)
         {
             _vocals.Stop();
