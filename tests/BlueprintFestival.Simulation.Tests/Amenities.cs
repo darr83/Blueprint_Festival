@@ -9,7 +9,7 @@ internal static class Amenities
     {
         var f = game.Field.Field;
         var x = f.Right - 16;
-        Assert.True(game.BuildStall(StallKind.FoodVan, x, f.Y + 8, Facing.West).Ok);
+        Assert.True(game.BuildStall(StallKind.Burgers, x, f.Y + 8, Facing.West).Ok);
         Assert.True(game.BuildStall(StallKind.Bar, x, f.Y + 24, Facing.West).Ok);
         Assert.True(game.BuildStall(StallKind.Toilets, x, f.Y + 40, Facing.West).Ok);
         Assert.True(game.BuildStall(StallKind.Toilets, x, f.Y + 50, Facing.West).Ok);

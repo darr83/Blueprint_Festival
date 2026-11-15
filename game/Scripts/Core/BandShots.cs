@@ -210,7 +210,7 @@ public partial class BandShots : Node
         var x = f.X + ((f.Width - info.Width) / 2) + 8;
         game.BuildStage(StageKind.HiredStage, x, f.Y + 12, Facing.South);
         game.Show.Book(1, ActGenerator.Of(Roster.Named(_act)!));
-        game.BuildStall(StallKind.FoodVan, f.X + 7, f.Y + 30, Facing.East);
+        game.BuildStall(StallKind.Burgers, f.X + 7, f.Y + 30, Facing.East);
         game.BuildStall(StallKind.Bar, f.X + 7, f.Y + 48, Facing.East);
         game.BuildStall(StallKind.Toilets, f.X + 26, f.Y + 5, Facing.South);
         game.BuildStall(StallKind.Toilets, f.X + 36, f.Y + 5, Facing.South);

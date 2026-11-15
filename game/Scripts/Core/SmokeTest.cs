@@ -516,7 +516,7 @@ public partial class SmokeTest : Node
                     Check(game.BuildStage(StageKind.Bandstand, grass.X + 74, grass.Y + 10, Facing.South).Ok, "A bandstand should go up on the build day.");
                     Check(game.BuildFence(FenceKind.Paling, new TilePoint(gap.X, gap.Y + 1), new TilePoint(gap.Right - 1, gap.Y + 1)).Ok, "A fence should close the gap.");
                     Check(game.BuildGate(GateKind.VillageGate, gap.X + 2, gap.Y + 1, false).Ok, "A gate should go in the fence.");
-                    Check(game.BuildStall(StallKind.FoodVan, grass.X + 7, grass.Y + 34, Facing.East).Ok, "A food van should go up.");
+                    Check(game.BuildStall(StallKind.Burgers, grass.X + 7, grass.Y + 34, Facing.East).Ok, "A food van should go up.");
                     Check(game.BuildStall(StallKind.Bar, grass.X + 7, grass.Y + 52, Facing.East).Ok, "A bar should go up.");
                     Check(game.BuildStall(StallKind.Toilets, grass.X + 26, grass.Y + 5, Facing.South).Ok, "Toilets should go up.");
                     Check(game.BuildStall(StallKind.Toilets, grass.X + 36, grass.Y + 5, Facing.South).Ok, "More toilets should go up.");

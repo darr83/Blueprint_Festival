@@ -165,9 +165,10 @@ public sealed class SoundScript : IDisposable
     /// <summary>The sound of someone being served at a stall of this kind.</summary>
     public static string ServedAt(StallKind kind) => kind switch
     {
-        StallKind.TeaAndCake => Sounds.TeaCup,
-        StallKind.FoodVan => Sounds.Fry,
-        StallKind.Bar => Sounds.PourDrink,
+        StallKind.Coffee => Sounds.TeaCup,
+        StallKind.HotDogs or StallKind.Burgers or StallKind.Fries or StallKind.Pizza or StallKind.Noodles => Sounds.Fry,
+        StallKind.Bar or StallKind.Slush or StallKind.Cocktails => Sounds.PourDrink,
+        StallKind.IceCream or StallKind.Ponchos or StallKind.BucketHats or StallKind.Merchandise => Sounds.Till,
         StallKind.WaterPoint => Sounds.WaterTap,
         _ => Sounds.ToiletDoor,
     };
@@ -372,7 +373,7 @@ public sealed class SoundScript : IDisposable
     private void OnServed(StallKind kind, int people, int paid)
     {
         Cue?.Invoke(ServedAt(kind));
-        if (paid > 0)
+        if (paid > 0 && ServedAt(kind) != Sounds.Till)
         {
             Cue?.Invoke(Sounds.Till);
         }

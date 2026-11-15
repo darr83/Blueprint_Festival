@@ -18,10 +18,10 @@ public static partial class SiteProps
         var b = new MeshBuilder();
         switch (kind)
         {
-            case StallKind.TeaAndCake:
+            case StallKind.Fries:
                 TeaAndCake(b, node);
                 break;
-            case StallKind.FoodVan:
+            case StallKind.Burgers:
                 FoodVan(b, node);
                 break;
             case StallKind.Bar:
@@ -46,7 +46,7 @@ public static partial class SiteProps
         }
 
         node.AddChild(b.BuildNode("Shapes"));
-        if (kind == StallKind.FoodVan)
+        if (kind == StallKind.Burgers)
         {
             // The cab sticks out at one end: slide the van along so the whole of it sits on its ground.
             foreach (var child in node.GetChildren())
@@ -64,8 +64,8 @@ public static partial class SiteProps
     /// <summary>Where the people serving stand, in metres from the stall's middle, the stall facing south.</summary>
     public static Vector3[] StaffSpots(StallKind kind) => kind switch
     {
-        StallKind.TeaAndCake => new[] { new Vector3(0.3f, 0, 0) },
-        StallKind.FoodVan => new[] { new Vector3(-1.45f, 0.55f, 0.4f), new Vector3(-0.15f, 0.55f, 0.4f) },
+        StallKind.Fries => new[] { new Vector3(0.3f, 0, 0) },
+        StallKind.Burgers => new[] { new Vector3(-1.45f, 0.55f, 0.4f), new Vector3(-0.15f, 0.55f, 0.4f) },
         StallKind.Bar => new[] { new Vector3(-1.4f, 0, 0.55f), new Vector3(1.3f, 0, 0.55f) },
         _ => System.Array.Empty<Vector3>(),
     };

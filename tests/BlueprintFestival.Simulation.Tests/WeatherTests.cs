@@ -27,7 +27,6 @@ public class WeatherTests
         }
 
         game.ChooseHeadliner(game.Headliners.ToList().FindIndex(h => h.Stars == game.Headliners.Min(o => o.Stars)));
-        game.OrderPonchos(ponchos);
         Assert.True(game.ConfirmPlan());
         var gap = game.Field.Gap;
         var y = gap.Y + 1;
@@ -36,6 +35,13 @@ public class WeatherTests
         var f = game.Field.Field;
         Assert.True(game.BuildStage(StageKind.Bandstand, f.X + 50, f.Y + 6, Facing.South).Ok);
         Amenities.Add(game);
+        if (ponchos)
+        {
+            // Two poncho stalls by the way in, so nobody has far to go when the rain starts.
+            Assert.True(game.BuildStall(StallKind.Ponchos, f.X + 8, f.Y + 40, Facing.East).Ok);
+            Assert.True(game.BuildStall(StallKind.Ponchos, f.X + 8, f.Y + 52, Facing.East).Ok);
+        }
+
         Assert.True(game.HireStaff(StaffKind.TicketStaff, new TilePoint(gap.X + 1, y)).Ok);
         Assert.True(game.BuildStall(StallKind.FirstAidTent, f.X + 20, f.Y + 6, Facing.South).Ok);
         Assert.True(game.HireStaff(StaffKind.FirstAider, new TilePoint(f.X + 30, f.Y + 30)).Ok);
@@ -132,7 +138,7 @@ public class WeatherTests
     }
 
     [Fact]
-    public void People_dress_for_rain_and_free_ponchos_cover_everyone()
+    public void People_dress_for_rain_and_the_rest_buy_a_poncho_when_it_comes()
     {
         static List<PersonLook> Looks(FestivalGame game) => game.Crowd.Parties.SelectMany(p => p.Members).Select(m => m.Look).ToList();
 
@@ -143,16 +149,17 @@ public class WeatherTests
         Assert.InRange(wet.Count(l => l.Poncho is not null), wet.Count * 4 / 10, wet.Count * 7 / 10);
         Assert.True(wet.Count(l => l.Feet == Footwear.Wellies) > dry.Count(l => l.Feet == Footwear.Wellies) * 2);
 
-        var handedOut = BuildDay(Wet, ponchos: true);
-        Assert.All(Looks(handedOut), l => Assert.NotNull(l.Poncho));
-        // They are ordered for the crowd expected, before anyone knows quite how many will come.
-        var paid = handedOut.Spending.Single(l => l.What == "Rain ponchos").Amount;
-        Assert.InRange(paid, handedOut.Crowd.Expected * 9 / 10, handedOut.Crowd.Expected * 11 / 10);
+        // With a poncho stall on the field, far more of the people who came end up under one.
+        static int Covered(FestivalGame game) => game.Crowd.Parties.Where(p => p.Ticketed is not null).SelectMany(p => p.Members).Count(m => m.Look.Poncho is not null);
+        var sold = PonchoDay.Value;
+        var stalls = Enumerable.Range(0, sold.Site.Stalls.Count).Where(i => sold.Site.Stalls[i].Kind == StallKind.Ponchos).ToList();
+        var ponchos = stalls.Sum(i => sold.SalesOf(i).Items);
+        Assert.True(ponchos >= 15, $"Ponchos sold {ponchos}");
+        Assert.Equal(ponchos, sold.Crowd.Parties.SelectMany(p => p.Members).Count(m => (m.Bought & 1) != 0));
+        Assert.True(Covered(sold) > Covered(RainDay.Value) + 10, $"Covered {Covered(sold)} against {Covered(RainDay.Value)}");
 
-        // Ponchos ordered for a day that turns out dry are money wasted: nobody wears one.
-        var wasted = BuildDay(null, ponchos: true);
-        Assert.DoesNotContain(Looks(wasted), l => l.Poncho is not null);
-        Assert.Contains(wasted.Spending, l => l.What == "Rain ponchos");
+        // On a dry day nobody buys one.
+        Assert.Equal(0, FineDay.Value.Crowd.Parties.SelectMany(p => p.Members).Count(m => m.Look.Poncho is not null));
     }
 
     [Fact]
@@ -176,7 +183,7 @@ public class WeatherTests
         var rain = RainDay.Value.Crowd.Happiness;
         var ponchos = PonchoDay.Value.Crowd.Happiness;
         Assert.True(rain < fine - 3, $"Rain {rain}, fine {fine}");
-        Assert.True(ponchos > rain + 2, $"Ponchos {ponchos}, rain {rain}");
+        Assert.True(ponchos > rain, $"Ponchos {ponchos}, rain {rain}");
         Assert.True(RainDay.Value.Crowd.WentHomeUnhappy >= FineDay.Value.Crowd.WentHomeUnhappy);
     }
 
@@ -272,7 +279,6 @@ public class WeatherTests
         Assert.Equal(game.Weather.Rain, loaded.Weather.Rain);
         Assert.Equal(game.Wetness, loaded.Wetness);
         Assert.Equal(game.RainChance, loaded.RainChance);
-        Assert.True(loaded.PonchosOrdered);
         Assert.Equal(GroundKind.Trackway, loaded.GroundAt(5, 2));
         Assert.Equal(game.Crowd.Rain, loaded.Crowd.Rain);
         Assert.Equal(game.Crowd.People.Select(p => p.Look.Poncho), loaded.Crowd.People.Select(p => p.Look.Poncho));

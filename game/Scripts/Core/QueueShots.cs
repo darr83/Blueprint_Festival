@@ -178,8 +178,8 @@ public partial class QueueShots : Node
         else
         {
             game.BuildStall(StallKind.Bar, f.X + 7, f.Y + 30, Facing.East);
-            game.BuildStall(StallKind.FoodVan, f.X + 7, f.Y + 50, Facing.East);
-            game.BuildStall(StallKind.TeaAndCake, f.X + 7, f.Y + 14, Facing.East);
+            game.BuildStall(StallKind.Burgers, f.X + 7, f.Y + 50, Facing.East);
+            game.BuildStall(StallKind.Fries, f.X + 7, f.Y + 14, Facing.East);
         }
 
         var cabins = game.Site.Stalls[0].Rect;
@@ -223,7 +223,7 @@ public partial class QueueShots : Node
             case "3_the_queue_at_the_bar":
             {
                 game.BuildStall(StallKind.Bar, f.X + 7, f.Y + 30, Facing.East);
-                game.BuildStall(StallKind.FoodVan, f.X + 7, f.Y + 50, Facing.East);
+                game.BuildStall(StallKind.Burgers, f.X + 7, f.Y + 50, Facing.East);
                 game.OpenGates();
                 RunUntil(game, () => game.Crowd.StallLine(2)!.Standing >= 7 && game.Crowd.BeingServed(2) == 3, 20);
                 var bar = game.Site.Stalls[2].Rect;
@@ -234,7 +234,7 @@ public partial class QueueShots : Node
             case "4_the_queue_at_the_food_van":
             {
                 game.BuildStall(StallKind.Bar, f.X + 7, f.Y + 30, Facing.East);
-                game.BuildStall(StallKind.FoodVan, f.X + 7, f.Y + 50, Facing.East);
+                game.BuildStall(StallKind.Burgers, f.X + 7, f.Y + 50, Facing.East);
                 game.OpenGates();
                 RunUntil(game, () => game.Crowd.StallLine(3)!.Standing >= 7 && game.Crowd.BeingServed(3) == 2, 20);
                 var van = game.Site.Stalls[3].Rect;
@@ -244,7 +244,7 @@ public partial class QueueShots : Node
 
             default:
             {
-                game.BuildStall(StallKind.TeaAndCake, f.X + 50, f.Y + 30, Facing.South);
+                game.BuildStall(StallKind.Fries, f.X + 50, f.Y + 30, Facing.South);
                 game.BuildStall(StallKind.WaterPoint, f.X + 70, f.Y + 5, Facing.South);
                 game.OpenGates();
                 RunUntil(game, () => game.Crowd.StallLine(2)!.Standing >= 22, 20);
@@ -265,12 +265,12 @@ public partial class QueueShots : Node
         var gap = game.Field.Gap;
         const float t = 0.5f;
         game.BuildStall(StallKind.Toilets, f.X + 30, f.Y + 5, Facing.South);
-        game.BuildStall(StallKind.TeaAndCake, f.X + 50, f.Y + 30, Facing.South);
+        game.BuildStall(StallKind.Fries, f.X + 50, f.Y + 30, Facing.South);
         game.BuildStall(StallKind.Bar, f.X + 7, f.Y + 30, Facing.East);
         if (name[1] != '0')
         {
             // (In the picture of the lane in use the tea table is the only food, so its queue is a long one.)
-            game.BuildStall(StallKind.FoodVan, f.X + 7, f.Y + 50, Facing.East);
+            game.BuildStall(StallKind.Burgers, f.X + 7, f.Y + 50, Facing.East);
         }
 
         var table = game.Site.Stalls[1].Rect;

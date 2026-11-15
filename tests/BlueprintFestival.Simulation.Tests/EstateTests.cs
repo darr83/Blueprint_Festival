@@ -153,8 +153,8 @@ public class EstateTests
         Assert.False(planned.Site.CheckStage(StageKind.HiredStage, grass["ten"].X + 20, grass["ten"].Y + 20, Facing.South).Ok);
         Assert.Contains("music field", planned.Site.CheckStage(StageKind.HiredStage, grass["ten"].X + 20, grass["ten"].Y + 20, Facing.South).Problem);
         Assert.True(planned.Site.CheckStage(StageKind.HiredStage, grass["home"].X + 60, grass["home"].Y + 10, Facing.South).Ok);
-        Assert.True(planned.Site.CheckStall(StallKind.FoodVan, grass["ten"].X + 20, grass["ten"].Y + 20, Facing.South).Ok);
-        Assert.True(planned.Site.CheckStall(StallKind.FoodVan, grass["home"].X + 20, grass["home"].Y + 60, Facing.South).Ok);
+        Assert.True(planned.Site.CheckStall(StallKind.Burgers, grass["ten"].X + 20, grass["ten"].Y + 20, Facing.South).Ok);
+        Assert.True(planned.Site.CheckStall(StallKind.Burgers, grass["home"].X + 20, grass["home"].Y + 60, Facing.South).Ok);
 
         var loaded = FestivalGame.Load(planned.Save());
         Assert.Equal(planned.Plan!.Save(), loaded.Plan!.Save());
@@ -191,7 +191,7 @@ public class EstateTests
         Assert.True(game.HireStaff(StaffKind.Security, new TilePoint(stage.Right - 6, stage.Bottom + 2)).Ok);
 
         // Every stall is in the food field, down its west and east hedges.
-        var kinds = new[] { StallKind.FoodVan, StallKind.Bar, StallKind.ToiletBlock, StallKind.WaterPoint };
+        var kinds = new[] { StallKind.Burgers, StallKind.Bar, StallKind.ToiletBlock, StallKind.WaterPoint };
         var perSide = (food.Height - 20) / 30;
         for (var i = 0; i < 14; i++)
         {

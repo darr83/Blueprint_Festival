@@ -145,9 +145,6 @@ public sealed record DayWeather(WeatherKind Kind, int High, double[] Rain)
 
 public sealed partial class FestivalGame
 {
-    /// <summary>What a rain poncho costs the festival, per person expected.</summary>
-    public const int PonchoPrice = 1;
-
     /// <summary>What a worn-out patch of grass costs to put right when the field is handed back.</summary>
     public const int RepairPerPatch = 5;
 
@@ -167,12 +164,6 @@ public sealed partial class FestivalGame
 
     /// <summary>How wet the ground is, from 0 (dry) to 1 (sodden).</summary>
     public double Wetness { get; private set; }
-
-    /// <summary>Whether rain ponchos have been ordered to hand out at the gate.</summary>
-    public bool PonchosOrdered { get; private set; }
-
-    /// <summary>What the ponchos would cost for the crowd expected.</summary>
-    public int PonchoCost => ExpectedAt(TicketPrice) * PonchoPrice;
 
     /// <summary>How hard it is raining right now, from 0 to 1.</summary>
     public double RainNow => Phase == Phase.Day ? Weather.RainAt(Clock.Now) : 0;
@@ -246,7 +237,6 @@ public sealed partial class FestivalGame
     private void Dress()
     {
         Crowd.DressedForRain = Weather.Wet;
-        Crowd.FreePonchos = PonchosOrdered;
         Crowd.Heat = Weather.Kind switch { WeatherKind.Hot => 1.6, WeatherKind.Showers => 0.9, WeatherKind.Rain => 0.85, _ => 1.0 };
     }
 
@@ -264,15 +254,6 @@ public sealed partial class FestivalGame
         {
             Crowd.Replan(Planned && Phase == Phase.Plan ? ExpectedAt(TicketPrice) : Crowd.Expected);
         }
-    }
-
-    /// <summary>Orders rain ponchos to hand out at the gate, or cancels them. They are paid for with the acts.</summary>
-    public void OrderPonchos(bool order)
-    {
-        Need(Phase.Plan);
-        PonchosOrdered = order;
-        Dress();
-        Crowd.Replan(ExpectedAt(TicketPrice));
     }
 
     /// <summary>Which patch of ground a tile is on, or null outside the field.</summary>
@@ -478,7 +459,7 @@ public sealed partial class FestivalGame
         Crowd.SetPaths(tiles);
     }
 
-    private WeatherSave SaveWeather() => new(Weather, RainChance, Wetness, PonchosOrdered, _ground.Any(g => g != 0) ? _ground.ToArray() : null)
+    private WeatherSave SaveWeather() => new(Weather, RainChance, Wetness, false, _ground.Any(g => g != 0) ? _ground.ToArray() : null)
     {
         Falling = Crowd.Rain,
     };
@@ -494,7 +475,6 @@ public sealed partial class FestivalGame
         RainChance = Math.Clamp(save.RainChance, 0, 100);
         Wetness = Math.Clamp(save.Wetness, 0, 1);
         SharePaths();
-        PonchosOrdered = save.Ponchos;
         if (save.Ground is { } ground && ground.Length == _ground.Length)
         {
             _ground = ground.ToArray();
@@ -506,7 +486,7 @@ public sealed partial class FestivalGame
     }
 }
 
-/// <summary>The weather and the ground as written to a save file.</summary>
+/// <summary>The weather and the ground as written to a save file. Ponchos is only in old saves: ponchos are sold from a stall now.</summary>
 public sealed record WeatherSave(DayWeather? Weather, int RainChance, double Wetness, bool Ponchos, byte[]? Ground)
 {
     /// <summary>How hard it was raining on the crowd when the game was saved.</summary>

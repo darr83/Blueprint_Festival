@@ -125,7 +125,7 @@ public partial class CamShots : Node
 
         game.BuildFence(FenceKind.Paling, new TilePoint(gap.X, gap.Y + 1), new TilePoint(gap.Right - 1, gap.Y + 1));
         game.BuildGate(GateKind.VillageGate, gap.X + 2, gap.Y + 1, false);
-        game.BuildStall(StallKind.FoodVan, f.X + 7, f.Y + 30, Facing.East);
+        game.BuildStall(StallKind.Burgers, f.X + 7, f.Y + 30, Facing.East);
         game.BuildStall(StallKind.Bar, f.X + 7, f.Y + 48, Facing.East);
         game.BuildStall(StallKind.Toilets, f.X + 26, f.Y + 5, Facing.South);
         game.BuildStall(StallKind.Toilets, f.X + 36, f.Y + 5, Facing.South);
