@@ -35,6 +35,10 @@ public partial class GameManager : Node
             {
                 AddChild(new PeopleShots(arg["--people-shots=".Length..]) { Name = "PeopleShots" });
             }
+            else if (arg.StartsWith("--ride-shots=", StringComparison.Ordinal))
+            {
+                AddChild(new RideShots(arg["--ride-shots=".Length..]) { Name = "RideShots" });
+            }
             else if (arg.StartsWith("--star-shots=", StringComparison.Ordinal))
             {
                 AddChild(new StarShots(arg["--star-shots=".Length..]) { Name = "StarShots" });

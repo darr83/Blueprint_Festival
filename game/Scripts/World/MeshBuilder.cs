@@ -39,6 +39,7 @@ public sealed class MeshBuilder
         {
             "ball" => new SphereMesh { Radius = 0.5f, Height = 1f, RadialSegments = 14, Rings = 7 },
             "tube" => new CylinderMesh { TopRadius = 0.5f, BottomRadius = 0.5f, Height = 1f, RadialSegments = 10, Rings = 0 },
+            "drum" => new CylinderMesh { TopRadius = 0.5f, BottomRadius = 0.5f, Height = 1f, RadialSegments = 48, Rings = 0 },
             "cone" => new CylinderMesh { TopRadius = 0.3f, BottomRadius = 0.5f, Height = 1f, RadialSegments = 12, Rings = 0 },
             "pill" => new CapsuleMesh { Radius = 0.5f, Height = 1.6f, RadialSegments = 12, Rings = 4 },
             _ => new BoxMesh { Size = Vector3.One },
@@ -84,6 +85,9 @@ public sealed class MeshBuilder
     /// <summary>An upright tube: width, height, depth.</summary>
     public void Tube(Vector3 centre, Vector3 size, Color colour, Vector3 turnDegrees = default) => Add("tube", Place(centre, size, turnDegrees), colour);
 
+    /// <summary>An upright tube with many more sides, for big round things such as a ride's platform.</summary>
+    public void Drum(Vector3 centre, Vector3 size, Color colour, Vector3 turnDegrees = default) => Add("drum", Place(centre, size, turnDegrees), colour);
+
     /// <summary>A tube that is narrower at the top (60% of the bottom).</summary>
     public void Cone(Vector3 centre, Vector3 size, Color colour, Vector3 turnDegrees = default) => Add("cone", Place(centre, size, turnDegrees), colour);
 
@@ -92,6 +96,25 @@ public sealed class MeshBuilder
         Add("pill", Place(centre, new Vector3(size.X, size.Y / 1.6f, size.Z), turnDegrees), colour);
 
     public void Box(Vector3 centre, Vector3 size, Color colour, Vector3 turnDegrees = default) => Add("box", Place(centre, size, turnDegrees), colour);
+
+    /// <summary>A flat three-cornered sheet, seen from both sides (a roof panel, a flag, a painted floor).</summary>
+    public void Triangle(Vector3 a, Vector3 b, Vector3 c, Color colour)
+    {
+        var normal = (c - a).Cross(b - a).Normalized();
+        foreach (var (first, second, third, n) in new[] { (a, b, c, normal), (a, c, b, -normal) })
+        {
+            var start = _vertices.Count;
+            _vertices.Add(first);
+            _vertices.Add(second);
+            _vertices.Add(third);
+            for (var i = 0; i < 3; i++)
+            {
+                _normals.Add(n);
+                _colours.Add(colour);
+                _indices.Add(start + i);
+            }
+        }
+    }
 
     public ArrayMesh Build()
     {
