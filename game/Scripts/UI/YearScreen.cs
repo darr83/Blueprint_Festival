@@ -131,10 +131,10 @@ public partial class YearScreen : Control
                 }
 
                 Centre(YearPanels.Plan(PlanOf(_game, _slot), new PlanActions(BookEvent, PickSlot, PickArtist, ToggleStage, ChangePrice, ToggleCamping,
-                    _game.Plan is null ? null : ChangeFields, ChangeParking, ChangeBuses, MoveSet), scroll));
+                    _game.Plan is null ? null : ChangeFields, ChangeParking, ChangeBuses, MoveSet, ChangeCamping), scroll));
                 break;
             case Phase.Sell:
-                Centre(YearPanels.Sales(SalesOf(_game, Running), RunMonth, ToggleAdvert, ChangePrice, Running, ChangeParking, ChangeBuses));
+                Centre(YearPanels.Sales(SalesOf(_game, Running), RunMonth, ToggleAdvert, ChangePrice, Running, ChangeParking, ChangeBuses, ChangeCamping));
                 if (Running && FindChild("Chart", true, false) is SalesChart chart)
                 {
                     chart.Shown = 0;
@@ -142,7 +142,7 @@ public partial class YearScreen : Control
 
                 break;
             case Phase.Build:
-                Side(YearPanels.BuildDay(_game.Crowd.Expected, _game.Money, StartDay, _game.Weather.Summary, WeekOf(_game), NextDay, ChangePrice, TravelOf(_game), ChangeParking, ChangeBuses));
+                Side(YearPanels.BuildDay(_game.Crowd.Expected, _game.Money, StartDay, _game.Weather.Summary, WeekOf(_game), NextDay, ChangePrice, TravelOf(_game), ChangeParking, ChangeBuses, ChangeCamping));
                 break;
             case Phase.Tidy:
                 Side(YearPanels.Tidy(_game.Litter.Count, _game.LitterAtStart, _game.ScoutsFee, () => PayScouts(), HandBack, _game.LitterPicked, _game.LitterBinned));
@@ -219,7 +219,7 @@ public partial class YearScreen : Control
         game.TicketPrice, (int)System.Math.Round(game.FairPrice), (int)System.Math.Round(game.LineUpPull * 100), game.ActFees, game.LineUp.Count(), game.PlanCost,
         game.EarlyForecast,
         game.Plan is { } fields ? string.Join(" and ", fields.Festival.Select(f => f.Name)) : game.Ground.Name, game.FieldRent,
-        game.CampingBooked, game.CampingOffered ? FestivalGame.CampingCost : 0, game.CampersExpected, FestivalGame.CampingFee, TravelOf(game));
+        game.CampingBooked, game.CampingOffered ? FestivalGame.CampingCost : 0, game.CampersExpected, game.CampingPrice, TravelOf(game));
 
     /// <summary>What the ticket sales screen shows.</summary>
     public static SalesView SalesOf(FestivalGame game, bool running = false)
@@ -317,12 +317,26 @@ public partial class YearScreen : Control
         var sold = game.SoldAhead ? game.TicketsSold : 0;
         var split = game.TravelFor(sold);
         return new TravelView(FestivalGame.Walkers, plan.ParkingSpaces, game.CanDrive, game.ParkingCharge, FestivalGame.FairParking, game.BusesHired,
-            FestivalGame.BusSeats, FestivalGame.BusCost, game.CanGetHere, plan.MusicRoom, game.Licence, sold, split.OnFoot, split.ByCar, split.ByBus);
+            FestivalGame.BusSeats, FestivalGame.BusCost, game.CanGetHere, plan.MusicRoom, game.Licence, sold, split.OnFoot, split.ByCar, split.ByBus)
+        {
+            Pitch = game.CampingBooked ? game.CampingPrice : null,
+            Camping = (int)System.Math.Round(game.CamperShare * 100),
+            Campers = game.CampersExpected,
+            Pitches = plan.CampingRoom,
+        };
     }
 
     public void ChangeParking(int pounds)
     {
         _game.SetParkingCharge(_game.ParkingCharge + pounds);
+        SoundBoard.Cue(Sounds.Click);
+        Rebuild();
+    }
+
+    /// <summary>Puts the price of a camping pitch up or down by a pound.</summary>
+    public void ChangeCamping(int pounds)
+    {
+        _game.SetCampingPrice(_game.CampingPrice + pounds);
         SoundBoard.Cue(Sounds.Click);
         Rebuild();
     }

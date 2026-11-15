@@ -517,6 +517,19 @@ public partial class SmokeTest : Node
                     var rows = BlueprintFestival.UI.YearPanels.Travel(travel!);
                     Check(rows.FindChild("Buses", true, false) is not null && rows.FindChild("Parking", true, false) is not null, "The getting there rows should have the bus and parking buttons.");
                     rows.Free();
+                    var camped = FestivalGame.StartYear(null, new YearSetup(6, 5000, 90000, false, 82, new[]
+                    {
+                        new BlueprintFestival.Simulation.World.FieldChoice("home", BlueprintFestival.Simulation.World.FieldUse.Music),
+                        new BlueprintFestival.Simulation.World.FieldChoice("ten", BlueprintFestival.Simulation.World.FieldUse.Food),
+                        new BlueprintFestival.Simulation.World.FieldChoice("show", BlueprintFestival.Simulation.World.FieldUse.Camping),
+                    }));
+                    var pitchPrice = 0;
+                    var campRows = BlueprintFestival.UI.YearPanels.Travel(BlueprintFestival.UI.YearScreen.TravelOf(camped)!, camping: p => pitchPrice = p);
+                    var pitchButtons = campRows.FindChild("Pitch", true, false);
+                    Check(camped.CampingBooked && pitchButtons is not null, "A year with a camping field should show the pitch price buttons.");
+                    (pitchButtons?.FindChild("More", true, false) as BaseButton)?.EmitSignal(BaseButton.SignalName.Pressed);
+                    Check(pitchPrice == 1, "The pitch price up button should ask for a pound more.");
+                    campRows.Free();
                     Check(plan.Parking.CarCount == 0 && !plan.Parking.BusInSight, "No cars or buses should be drawn for a village festival.");
                     Check(!plan.BuildBar.Visible, "Nothing should be built while planning.");
                     Check(game.Headliners.Count == 3, "Three headliners should be on offer.");
