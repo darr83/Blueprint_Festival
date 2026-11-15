@@ -30,6 +30,25 @@ public partial class DayPanel : Paper
     /// <summary>How far above the bottom of the screen the panel stops, to leave the view buttons clear.</summary>
     private const int BottomClear = 96;
 
+    /// <summary>
+    /// Where the build bar starts, counted down from the top of the screen, while it shows; the panel
+    /// stops short of it so no tab or choice on the bar is ever hidden behind the panel.
+    /// </summary>
+    public float? BuildBarTop
+    {
+        get => _buildBarTop;
+        set
+        {
+            if (_buildBarTop != value)
+            {
+                _buildBarTop = value;
+                Place();
+            }
+        }
+    }
+
+    private float? _buildBarTop;
+
     private static readonly Color Amber = new("#E08A1E");
     private static readonly Color Bad = new("#D9483B");
     private static readonly Color AmberTint = new("#FDEBD3");
@@ -113,9 +132,20 @@ public partial class DayPanel : Paper
     /// <summary>Down the right of the screen, under the speed buttons, and clear of the view buttons.</summary>
     private void Place()
     {
+        if (!IsInsideTree())
+        {
+            return;
+        }
+
         var screen = GetViewportRect().Size;
+        var bottom = screen.Y - BottomClear;
+        if (_buildBarTop is { } bar)
+        {
+            bottom = Mathf.Min(bottom, bar - 10);
+        }
+
         Position = new Vector2(screen.X - 22 - PanelWidth, UiStyle.TopClear);
-        Size = new Vector2(PanelWidth, Mathf.Max(320, screen.Y - UiStyle.TopClear - BottomClear));
+        Size = new Vector2(PanelWidth, Mathf.Max(200, bottom - UiStyle.TopClear));
     }
 
     /// <summary>Opens the panel on a tab, or moves to that tab if it is open.</summary>

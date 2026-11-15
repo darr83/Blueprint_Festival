@@ -130,6 +130,12 @@ public partial class BuildBar : VBoxContainer
     /// <summary>Where the row of round build buttons starts on the screen, so the key hints can keep clear of it.</summary>
     public float TabsLeft => _tabRow.GlobalPosition.X;
 
+    /// <summary>
+    /// The top edge of the bar on screen, with whatever tray is open. Worked out from what the bar
+    /// needs as well as where it is, so it is right on the same frame a tray opens.
+    /// </summary>
+    public float Top => Mathf.Min(GlobalPosition.Y, GetViewportRect().Size.Y - 14 - GetCombinedMinimumSize().Y);
+
     public void Initialise(FestivalGame game, BuildTool tool)
     {
         _game = game;

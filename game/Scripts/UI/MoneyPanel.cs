@@ -12,6 +12,16 @@ public partial class MoneyPanel : PanelContainer
 {
     private FestivalGame _game = null!;
     private VBoxContainer _box = null!;
+    private ScrollContainer _scroll = null!;
+
+    /// <summary>How far above the bottom of the screen the panel stops when the build bar is not showing.</summary>
+    private const int BottomClear = 96;
+
+    /// <summary>
+    /// Where the build bar starts, counted down from the top of the screen, while it shows. A long
+    /// list scrolls inside the panel rather than running down over the bar.
+    /// </summary>
+    public float? BuildBarTop { get; set; }
     private double _sinceRefresh = 1;
     private string _shown = "";
 
@@ -24,9 +34,11 @@ public partial class MoneyPanel : PanelContainer
         Theme = UiStyle.Theme;
         CustomMinimumSize = new Vector2(330, 0);
         AddThemeStyleboxOverride("panel", UiStyle.Card(margin: 20, radius: 12));
-        _box = new VBoxContainer();
+        _box = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
         _box.AddThemeConstantOverride("separation", 6);
-        AddChild(_box);
+        _scroll = new ScrollContainer { HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled };
+        _scroll.AddChild(_box);
+        AddChild(_scroll);
         Visible = false;
         SetAnchorsAndOffsetsPreset(LayoutPreset.TopRight, LayoutPresetMode.Minsize, 22);
         GrowHorizontal = GrowDirection.Begin;
@@ -36,10 +48,35 @@ public partial class MoneyPanel : PanelContainer
 
     public override void _Process(double delta)
     {
+        if (Visible)
+        {
+            Fit();
+        }
+
         _sinceRefresh += delta;
         if (Visible && _sinceRefresh > 0.4)
         {
             Refresh();
+        }
+    }
+
+    /// <summary>Makes the panel as tall as its lines, but no lower than the build bar or the view buttons.</summary>
+    public void Fit()
+    {
+        var screen = GetViewportRect().Size;
+        var bottom = screen.Y - BottomClear;
+        if (BuildBarTop is { } bar)
+        {
+            bottom = Mathf.Min(bottom, bar - 10);
+        }
+
+        var frame = GetThemeStylebox("panel");
+        var room = bottom - Position.Y - (frame?.GetMinimumSize().Y ?? 0);
+        var want = Mathf.Clamp(_box.GetCombinedMinimumSize().Y, 0, Mathf.Max(160, room));
+        if (!Mathf.IsEqualApprox(_scroll.CustomMinimumSize.Y, want))
+        {
+            _scroll.CustomMinimumSize = new Vector2(0, want);
+            Size = new Vector2(Size.X, 0);
         }
     }
 

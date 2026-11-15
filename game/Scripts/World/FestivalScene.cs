@@ -271,12 +271,27 @@ public partial class FestivalScene : Node3D
         Sky.Apply(Game, StageCam.Yaw);
     }
 
+    /// <summary>
+    /// The day so far button sits under the festival name, or, while the gates are shut and the
+    /// "Open the gates" button is there, just to the right of that, so neither covers the other.
+    /// </summary>
+    private void PlaceDayButton()
+    {
+        var gates = TopBar.GateButton;
+        DayButton.Position = gates.Visible
+            ? new Vector2(gates.Position.X + gates.Size.X + 10, gates.Position.Y + ((gates.Size.Y - DayButton.Size.Y) / 2))
+            : new Vector2(22, UiStyle.TopClear - 2);
+    }
+
     public override void _Process(double delta)
     {
         Game.Advance(delta);
         Sky.Apply(Game, StageCam.Yaw);
         CrowdSafety.RightInset = Money.Visible ? Money.Size.X + 14 : DayBoard.Visible ? DayBoard.Size.X + 14 : 0;
         DayButton.Visible = Game.Phase is Phase.Day or Phase.Tidy && !Year.HasCentrePanel;
+        PlaceDayButton();
+        DayBoard.BuildBarTop = BuildBar.Visible ? BuildBar.Top : null;
+        Money.BuildBarTop = DayBoard.BuildBarTop;
         if (!DayButton.Visible && DayBoard.Visible)
         {
             DayBoard.Visible = false;

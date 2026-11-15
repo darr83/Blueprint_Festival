@@ -427,6 +427,12 @@ public partial class SmokeTest : Node
                     Check(!show.Money.Visible, "The money panel should start shut.");
                     show.ToggleMoney();
                     Check(show.Money.Visible && show.Money.LineCount >= 5, $"The money panel should list the day's takings and spending, not {show.Money.LineCount} lines.");
+                    show.BuildBar.Toggle(BuildMode.Stall);
+                    show._Process(0);
+                    show.Money.BuildBarTop = 520;
+                    show.Money.Fit();
+                    Check(show.Money.GetGlobalRect().End.Y <= 510.5f, $"On a small screen the money panel should stop above the build bar, not run down to {show.Money.GetGlobalRect().End.Y}.");
+                    show.BuildBar.Close();
                     show.ToggleMoney();
                     CheckDayBoard(show);
                     CheckStageCams(show);
@@ -667,6 +673,8 @@ public partial class SmokeTest : Node
                     build.TopBar._Process(0);
                     build.Site.Rebuild();
                     Check(build.TopBar.GateButton.Visible && build.TopBar.GateButton.Text == "Open the gates", "The top bar should offer to open the gates.");
+                    build._Process(0);
+                    Check(!build.DayButton.GetGlobalRect().Intersects(build.TopBar.GateButton.GetGlobalRect()), "The day so far button should not cover the Open the gates button.");
                     Check(build.Site.GatesLookShut, "Poles should be across the gates while they are shut.");
                     build.Sounds.Look();
                     Check(SoundBoard.Instance!.Asked(Sounds.GatesOpen) == 0, "The gates should not be heard opening while they are shut.");
@@ -813,6 +821,15 @@ public partial class SmokeTest : Node
         Check(show.DayButton.Visible && !show.DayBoard.Visible, "The day so far button should show on the day, with its panel shut.");
         show.ToggleDayBoard();
         Check(show.DayBoard.Visible && !show.Money.Visible, "The day so far panel should open, and the money panel stay shut.");
+        foreach (var tab in new[] { BuildMode.Stage, BuildMode.Stall, BuildMode.Staff })
+        {
+            // Whatever tray is open on the build bar, the panel stops above it.
+            show.BuildBar.Toggle(tab);
+            show._Process(0);
+            Check(show.BuildBar.Visible && show.DayBoard.Position.Y + show.DayBoard.Size.Y <= show.BuildBar.Top, $"The day so far panel should stop above the build bar with the {tab} tray open.");
+        }
+
+        show.BuildBar.Close();
         Check(show.DayBoard.Report is { Stages.Count: > 0 } report && report.Stages[0].Sets.Any(s => s.State == Simulation.Show.SetState.OnNow), "The day so far should show the act on now.");
         show.DayBoard.Show(DayPanel.Tab.Acts);
         Check(show.DayBoard.RowCount == show.Game.Show.Slots.Count, $"The acts tab should list every set, not {show.DayBoard.RowCount}.");
