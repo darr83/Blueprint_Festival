@@ -200,7 +200,7 @@ public partial class SmokeTest : Node
                     {
                         // Every stall can be drawn, with someone behind the counter of each one that sells.
                         var drawn = BlueprintFestival.World.SiteProps.Stall(kind);
-                        Check(drawn.GetChildCount() > 0 && (!Catalogue.Sells(kind) || BlueprintFestival.World.SiteProps.StaffSpots(kind).Length == Math.Min(2, Catalogue.Of(kind).Servers)), $"The {Catalogue.Of(kind).Name} should be drawn and staffed.");
+                        Check(drawn.GetChildCount() > 0 && (!Catalogue.Sells(kind) || BlueprintFestival.World.SiteProps.StaffSpots(kind).Length == (Rides.IsFair(kind) ? 1 : Math.Min(2, Catalogue.Of(kind).Servers))), $"The {Catalogue.Of(kind).Name} should be drawn and staffed.");
                         drawn.Free();
                     }
 
@@ -579,7 +579,7 @@ public partial class SmokeTest : Node
                     Check(game.TicketPrice == 8 && game.HeadlinerPicked == 0, "Clicking a ticket price and a headliner should choose them.");
                     Check(BlueprintFestival.UI.YearScreen.PlanOf(game).Forecast.Contains("chance of rain", StringComparison.Ordinal), "The planning screen should carry the long-range forecast.");
                     var board = SoundBoard.Instance;
-                    Check(board is { Listed: 103 }, "The sound board should be loaded with all 103 sounds on its list.");
+                    Check(board is { Listed: 108 }, "The sound board should be loaded with all 108 sounds on its list.");
                     Check(Sounds.Loops.All(board!.Knows) && board.Knows(Sounds.Till), "The sound board should know the background sounds and the till.");
                     Check(board.Announcements == (50, 50), $"All 50 announcements introducing the acts should be loaded with their files, not {board.Announcements}.");
                     Check(board.Asked(Sounds.Notebook) == 1, "The planning notebook should be heard opening.");

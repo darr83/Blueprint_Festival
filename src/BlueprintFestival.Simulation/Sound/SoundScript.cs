@@ -247,6 +247,8 @@ public sealed class SoundScript : IDisposable
         StallKind.WaterPoint => Sounds.WaterTap,
         StallKind.Bin => Sounds.BinDrop,
         StallKind.Toilets or StallKind.ToiletBlock => Sounds.ToiletDoor,
+        StallKind.HookADuck => Sounds.HookADuck,
+        StallKind.BigWheel or StallKind.Waltzer or StallKind.Twister or StallKind.Carousel or StallKind.Skylark => Sounds.RideBell,
         // The first aid and medical tents are heard through the radio instead.
         _ => null,
     };
