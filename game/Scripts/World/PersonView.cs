@@ -21,6 +21,9 @@ public enum Pose
 
     /// <summary>Playing an instrument or singing: the arms reach where they are told (see <see cref="PersonView.Perform"/>).</summary>
     Performing,
+
+    /// <summary>Sitting down, legs out in front, on a seat as high as <see cref="PersonView.SeatHeight"/>.</summary>
+    Sitting,
 }
 
 /// <summary>
@@ -54,6 +57,7 @@ public partial class PersonView : Node3D
     private float _show;
     private float _clap;
     private float _perform;
+    private float _sit;
     private Vector3 _performLeft;
     private Vector3 _performRight;
     private float _performLift;
@@ -99,6 +103,9 @@ public partial class PersonView : Node3D
     public PersonLook Look { get; private set; } = null!;
 
     public Pose Pose { get; set; } = Pose.Standing;
+
+    /// <summary>How high off the ground the seat is while the pose is <see cref="Pose.Sitting"/>, in metres.</summary>
+    public float SeatHeight { get; set; } = 0.45f;
 
     /// <summary>How tall this person stands, in metres.</summary>
     public float StandingHeight => (float)(1.6 * Look.Height);
@@ -542,6 +549,7 @@ public partial class PersonView : Node3D
         _show = Mathf.MoveToward(_show, Pose == Pose.ShowingTicket ? 1f : 0f, step * 5f);
         _clap = Mathf.MoveToward(_clap, Pose == Pose.Clapping ? 1f : 0f, step * 5f);
         _perform = Mathf.MoveToward(_perform, Pose == Pose.Performing ? 1f : 0f, step * 6f);
+        _sit = Mathf.MoveToward(_sit, Pose == Pose.Sitting ? 1f : 0f, step * 4f);
         _hold = Mathf.MoveToward(_hold, HeldUp ? 1f : 0f, step * 5f);
         ApplyPose();
     }
@@ -633,6 +641,7 @@ public partial class PersonView : Node3D
         _show = pose == Pose.ShowingTicket ? 1 : 0;
         _clap = pose == Pose.Clapping ? 1 : 0;
         _perform = pose == Pose.Performing ? 1 : 0;
+        _sit = pose == Pose.Sitting ? 1 : 0;
         _hold = HeldUp ? 1 : 0;
         ApplyPose();
     }
@@ -715,6 +724,14 @@ public partial class PersonView : Node3D
         if (_ticket is not null)
         {
             _ticket.Visible = _show > 0.05f;
+        }
+
+        if (_sit > 0)
+        {
+            // Sitting: the legs swing out in front and the body comes down until the hips are on the seat.
+            _legLeft.RotationDegrees = new Vector3(Mathf.Lerp(legSwing, -72f, _sit), 0, -3f * _sit);
+            _legRight.RotationDegrees = new Vector3(Mathf.Lerp(-legSwing, -72f, _sit), 0, 3f * _sit);
+            lift = Mathf.Lerp(lift, SeatHeight + 0.07f - (HipY * (float)Look.Height), _sit);
         }
 
         _upper.RotationDegrees = lean;

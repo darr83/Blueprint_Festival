@@ -139,6 +139,10 @@ public partial class GameManager : Node
             {
                 AddChild(new BeatScan { Name = "BeatScan" });
             }
+            else if (arg.StartsWith("--comfort-shots=", StringComparison.Ordinal))
+            {
+                AddChild(new ComfortShots(arg["--comfort-shots=".Length..]) { Name = "ComfortShots" });
+            }
             else if (arg.StartsWith("--shots=", StringComparison.Ordinal))
             {
                 AddChild(new Shots(arg["--shots=".Length..]) { Name = "Shots" });
