@@ -30,6 +30,9 @@ public partial class BuildBar : VBoxContainer
     /// <summary>The key of the "no customers" choice, under Fences.</summary>
     public const string KeepOutKey = "fenceNoCustomers";
 
+    /// <summary>The key of a size of big screen, under Stages.</summary>
+    public static string ScreenKey(ScreenKind kind) => $"screen{kind}";
+
     /// <summary>The key of a kind of light, under Lights.</summary>
     public static string LightKey(LightKind kind) => $"light{kind}";
 
@@ -64,7 +67,7 @@ public partial class BuildBar : VBoxContainer
         row.AddThemeConstantOverride("separation", 14);
         AddChild(row);
 
-        AddTab(row, BuildMode.Stage, "stage", "Stages", "Somewhere for the acts to play");
+        AddTab(row, BuildMode.Stage, "stage", "Stages", "Somewhere for the acts to play, and big screens to show them");
         AddTab(row, BuildMode.Fence, "fence", "Fences", "Keep people in, out, or in a line");
         AddTab(row, BuildMode.Gate, "gate", "Gates", "Where tickets are checked");
         AddTab(row, BuildMode.Stall, "stall", "Stalls", "Food, drink, toilets and water");
@@ -125,6 +128,13 @@ public partial class BuildBar : VBoxContainer
                 foreach (var s in Catalogue.Stages)
                 {
                     AddChoice($"stage{s.Kind}", s.Name, $"£{s.Cost:N0}", $"{s.About}\n{s.Width / 2f:0.#} m wide, {s.Depth / 2f:0.#} m deep.", () => _tool.PickStage(s.Kind));
+                }
+
+                foreach (var b in BigScreens.All)
+                {
+                    AddChoice(ScreenKey(b.Kind), b.Name, $"£{b.Cost:N0}",
+                        $"{b.About}\nShows the nearest stage live. People up to {b.Reach:0} m in front of it get the whole act, however far back from the stage they are.\nWithout one, people more than {BigScreens.ClearMetres:0} m from a stage enjoy the act less and less.\nR turns it.",
+                        () => _tool.PickScreen(b.Kind));
                 }
 
                 break;
@@ -242,6 +252,7 @@ public partial class BuildBar : VBoxContainer
             : k.StartsWith("gate") ? ("gate", UiStyle.StagePink)
             : k.StartsWith("staff") ? ("staff", UiStyle.StagePink)
             : k.StartsWith("light") ? ("light", UiStyle.StagePink)
+            : k.StartsWith("screen") ? ("screen", UiStyle.StagePink)
             : k.StartsWith("ground") ? ("ground", UiStyle.StagePink)
             : ("stall", UiStyle.StagePink);
     }
@@ -297,6 +308,7 @@ public partial class BuildBar : VBoxContainer
             BuildMode.Stall => $"stall{_tool.Stall}",
             BuildMode.Ground => $"ground{_tool.Ground}",
             BuildMode.Light or BuildMode.Fairy => LightKey(_tool.Light),
+            BuildMode.Screen => ScreenKey(_tool.Screen),
             _ => "",
         };
         foreach (var (key, button) in _choices)

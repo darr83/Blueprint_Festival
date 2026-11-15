@@ -226,6 +226,7 @@ public sealed partial class FestivalGame
 
         Crowd.Mud = MudAtPlace;
         Crowd.Darkness = DarknessAt;
+        Crowd.OnScreen = Site.OnScreen;
         Crowd.PathShare = People.Crowd.DryPathShare;
         Crowd.SetPaths(Array.Empty<TilePoint>());
         Dress();

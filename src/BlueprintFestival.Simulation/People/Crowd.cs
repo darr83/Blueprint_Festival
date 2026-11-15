@@ -429,6 +429,30 @@ public sealed class Crowd
     /// <summary>How dark a place is right now, from 0 to 1, if the game knows: night with no light near is 1.</summary>
     public Func<double, double, double>? Darkness { get; set; }
 
+    /// <summary>True if a place, in metres, can see and hear a big screen well, if the game knows.</summary>
+    public Func<double, double, bool>? OnScreen { get; set; }
+
+    /// <summary>How far someone watching an act is from the front of its stage, in metres, or null if they are not watching one.</summary>
+    public double? FromTheStage(Party party)
+    {
+        if (party.State != PartyState.Watching || ShowOf(party.Watch)?.Stage is not { } stage)
+        {
+            return null;
+        }
+
+        var (fx, fy, _, _) = RunningOrder.Front(stage);
+        return Math.Sqrt(((party.X - fx) * (party.X - fx)) + ((party.Y - fy) * (party.Y - fy)));
+    }
+
+    /// <summary>
+    /// How much of an act a party watching it gets: all of it near the stage, less and less further
+    /// back, unless they are in front of a big screen.
+    /// </summary>
+    public double ShareOfTheAct(Party party) =>
+        FromTheStage(party) is not { } metres || metres <= BigScreens.ClearMetres || (OnScreen?.Invoke(party.X, party.Y) ?? false)
+            ? 1
+            : BigScreens.Enjoyment(metres);
+
     /// <summary>Mood lost in an hour of being somewhere pitch dark. Nobody minds the dark while watching an act.</summary>
     public const double DarkPerHour = 0.05;
 
@@ -1910,7 +1934,7 @@ public sealed class Crowd
         party.Thirst = Math.Min(1.2, party.Thirst + (party.Appetite * Heat * perHour / HoursToThirsty));
         party.Toilet = Math.Min(1.2, party.Toilet + (party.Appetite * perHour / HoursToToilet));
 
-        var change = party.State == PartyState.Watching ? Enjoyed(ShowOf(party.Watch)?.Playing(now)?.Act.Rating ?? 3) * perHour : 0;
+        var change = party.State == PartyState.Watching ? Enjoyed(ShowOf(party.Watch)?.Playing(now)?.Act.Rating ?? 3) * ShareOfTheAct(party) * perHour : 0;
         foreach (var need in new[] { party.Hunger, party.Thirst, party.Toilet })
         {
             if (need >= Pressing)
