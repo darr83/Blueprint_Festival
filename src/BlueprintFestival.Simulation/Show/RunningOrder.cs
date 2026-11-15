@@ -257,6 +257,23 @@ public sealed class RunningOrder
         Stage is null || CalledOff is not null ? null
         : _slots.FirstOrDefault(s => !s.CutShort && now >= s.End && now < s.End.AddMinutes(Performing.BowMinutes) && Playing(now) is null);
 
+    /// <summary>How many fans an act needs before people go and wait at the front ahead of the set.</summary>
+    public const int BigFollowing = 20000;
+
+    /// <summary>How many game minutes before a big act's set people start filling the front of the stage.</summary>
+    public const int EarlyMinutes = 20;
+
+    /// <summary>
+    /// The next set, while the stage is empty and it starts within <see cref="EarlyMinutes"/>, if its act has
+    /// <see cref="BigFollowing"/> fans or more: people are already making their way to the front for it. Otherwise null.
+    /// </summary>
+    public Slot? FillingUp(DateTime now) =>
+        Stage is null || CalledOff is not null || Playing(now) is not null ? null
+        : Next(now) is { } next && next.Act.Fans >= BigFollowing && next.Start - now <= TimeSpan.FromMinutes(EarlyMinutes) ? next : null;
+
+    /// <summary>The set people are watching or waiting for: the one on now, or a big act's that is about to start.</summary>
+    public Slot? Drawing(DateTime now) => Playing(now) ?? FillingUp(now);
+
     /// <summary>True in the gap after a set has finished and before the next one starts.</summary>
     public bool Changeover(DateTime now) => Stage is not null && CalledOff is null && Playing(now) is null && Next(now) is not null && _slots.Any(s => s.End <= now);
 
@@ -266,13 +283,29 @@ public sealed class RunningOrder
     /// <summary>Calls off the rest of the day's music from a moment on.</summary>
     public void CallOff(DateTime from) => CalledOff = from;
 
-    /// <summary>Ends a set early, from a moment on: the act walks off and the stage stands empty until the next set. False if the set is not on then.</summary>
+    /// <summary>
+    /// Ends a set early, from a moment on: the act walks off and the stage stands empty until the next
+    /// set. A big act's set can also be called off while the crowd waits for it, before it starts.
+    /// False if the set is not on then, nor about to start.
+    /// </summary>
     public bool CutShort(int index, DateTime at)
     {
         var place = _slots.FindIndex(s => s.Index == index);
-        if (place < 0 || at < _slots[place].Start || at >= _slots[place].End)
+        if (place < 0 || at >= _slots[place].End)
         {
             return false;
+        }
+
+        if (at < _slots[place].Start)
+        {
+            if (FillingUp(at)?.Index != index)
+            {
+                return false;
+            }
+
+            // Called off before it began: the set never happens.
+            _slots[place] = _slots[place] with { End = _slots[place].Start, CutShort = true };
+            return true;
         }
 
         _slots[place] = _slots[place] with { End = at, CutShort = true };
@@ -280,7 +313,7 @@ public sealed class RunningOrder
     }
 
     /// <summary>The next set still to start, or null once the last has begun.</summary>
-    public Slot? Next(DateTime now) => CalledOff is not null ? null : _slots.FirstOrDefault(s => s.Start > now);
+    public Slot? Next(DateTime now) => CalledOff is not null ? null : _slots.FirstOrDefault(s => s.Start > now && !s.CutShort);
 
     /// <summary>Who is on stage right now: the act's members who fit on the stage.</summary>
     public IReadOnlyList<BandRole> OnStage(DateTime now) =>

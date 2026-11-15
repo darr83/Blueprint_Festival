@@ -166,7 +166,8 @@ public class DayPanelTests
         Assert.Contains("the stage", crush.What);
         Assert.Contains(DayReport.Of(game).WorthALook, w => w.StartsWith("Crush risk") || w.StartsWith("Getting packed"));
 
-        var act = game.Show.Playing(game.Now)!;
+        // The crush may build while the crowd waits for the big name, or once they are on.
+        var act = game.ActAtCrush!;
         Assert.True(game.Choose(CrushChoice.CancelAct));
         Assert.Equal($"You cancelled {act.Act.Name}", crush.Outcome);
         var stage = Assert.Single(DayReport.Of(game).Stages);

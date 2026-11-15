@@ -48,6 +48,8 @@ public partial class CameraRig : Node3D
             Far = 900f,
             KeepAspect = Camera3D.KeepAspectEnum.Height,
             Current = true,
+            // Looking down on the field, the sky is never in view.
+            CullMask = 0xFFFFF & ~Sky.SkyLayer,
         };
         AddChild(_camera);
         ShowWholeField();

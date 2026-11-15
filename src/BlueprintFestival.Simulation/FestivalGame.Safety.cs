@@ -139,7 +139,7 @@ public sealed partial class FestivalGame
     public int SecurityFree => Math.Min(SecurityCallOut, _staff.Count(s => s.Kind == StaffKind.Security && s.IsFree));
 
     /// <summary>The act on at the stage nearest the crush, if one is on.</summary>
-    public Slot? ActAtCrush => ShowAtCrush()?.Playing(Now);
+    public Slot? ActAtCrush => ShowAtCrush()?.Drawing(Now);
 
     /// <summary>Raised when the player stops the music for an announcement, with which announcement it is (counting from 0).</summary>
     public event Action<int>? Announced;
@@ -311,7 +311,8 @@ public sealed partial class FestivalGame
     /// </summary>
     public bool PauseAct()
     {
-        if (Phase != Phase.Day || ActPaused || !MusicOn)
+        // With a crowd packing in early for a big act, the PA can ask them to step back before the set too.
+        if (Phase != Phase.Day || ActPaused || !(MusicOn || CrowdWaiting))
         {
             return false;
         }
@@ -321,7 +322,7 @@ public sealed partial class FestivalGame
         Crowd.Ease(heard);
         foreach (var show in new[] { Show, SecondShow })
         {
-            if (show.Playing(Now) is not null && show.Stage is { } stage)
+            if (show.Drawing(Now) is not null && show.Stage is { } stage)
             {
                 var (fx, fy, _, _) = RunningOrder.Front(stage);
                 Crowd.Upset(fx, fy, 40, AnnounceMood);
@@ -371,12 +372,12 @@ public sealed partial class FestivalGame
         }
     }
 
-    /// <summary>The line-up of the stage with an act on whose front is nearest the crush, or null if no act is on.</summary>
+    /// <summary>The line-up of the stage with an act on (or a big act about to come on) whose front is nearest the crush, or null if there is none.</summary>
     private RunningOrder? ShowAtCrush()
     {
         var (x, y) = CrushSpot;
         return new[] { Show, SecondShow }
-            .Where(show => show.Playing(Now) is not null && show.Stage is not null)
+            .Where(show => show.Drawing(Now) is not null && show.Stage is not null)
             .OrderBy(show =>
             {
                 var (fx, fy, _, _) = RunningOrder.Front(show.Stage!);
@@ -432,7 +433,7 @@ public sealed partial class FestivalGame
     /// </summary>
     public bool CancelAct()
     {
-        if (Phase != Phase.Day || ShowAtCrush() is not { } show || show.Playing(Now) is not { } slot || show.Stage is null)
+        if (Phase != Phase.Day || ShowAtCrush() is not { } show || show.Drawing(Now) is not { } slot || show.Stage is null)
         {
             return false;
         }

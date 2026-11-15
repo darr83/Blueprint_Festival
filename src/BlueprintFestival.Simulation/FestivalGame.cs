@@ -115,6 +115,9 @@ public sealed partial class FestivalGame
     /// <summary>True while an act is on, on either stage.</summary>
     public bool MusicOn => Show.Playing(Now) is not null || SecondShow.Playing(Now) is not null;
 
+    /// <summary>True while a crowd is gathering at the front for a big act that has not come on yet.</summary>
+    public bool CrowdWaiting => Show.FillingUp(Now) is not null || SecondShow.FillingUp(Now) is not null;
+
     /// <summary>What the player has built on the field.</summary>
     public SiteLayout Site { get; }
 
