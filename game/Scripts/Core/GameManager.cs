@@ -35,6 +35,10 @@ public partial class GameManager : Node
             {
                 AddChild(new PeopleShots(arg["--people-shots=".Length..]) { Name = "PeopleShots" });
             }
+            else if (arg.StartsWith("--star-shots=", StringComparison.Ordinal))
+            {
+                AddChild(new StarShots(arg["--star-shots=".Length..]) { Name = "StarShots" });
+            }
             else if (arg.StartsWith("--build-shots=", StringComparison.Ordinal))
             {
                 AddChild(new BuildShots(arg["--build-shots=".Length..]) { Name = "BuildShots" });
@@ -98,6 +102,10 @@ public partial class GameManager : Node
             else if (arg.StartsWith("--path-shots=", StringComparison.Ordinal))
             {
                 AddChild(new PathShots(arg["--path-shots=".Length..]) { Name = "PathShots" });
+            }
+            else if (arg.StartsWith("--lighting-shots=", StringComparison.Ordinal))
+            {
+                AddChild(new LightingShots(arg["--lighting-shots=".Length..]) { Name = "LightingShots" });
             }
             else if (arg.StartsWith("--light-shots=", StringComparison.Ordinal))
             {

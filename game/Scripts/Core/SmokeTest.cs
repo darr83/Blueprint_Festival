@@ -115,6 +115,14 @@ public partial class SmokeTest : Node
                     Check(opened.Field.TreeCount >= 8, "There should be trees round the field.");
                     Check(opened.Camera.Camera.Projection == Camera3D.ProjectionType.Orthogonal, "The camera should have no perspective.");
                     Check(opened.Sky.Night < 0.01f, "Eight in the morning should be full daylight.");
+                    Check(opened.Sky.LightBearing is > 60 and < 135 && opened.Sky.SunEnergy > 0.8f, $"At eight the sun should be up in the east, not at {opened.Sky.LightBearing}.");
+                    Check(opened.Sky.ShadowReach < 700f, "Shadows should be drawn only for the ground on screen, to keep them sharp.");
+                    var shadows = Graphics.Shadows;
+                    Check(opened.Sky.ShadowsOn == shadows, "The sun should cast shadows only when the setting is on.");
+                    Graphics.Shadows = !shadows;
+                    Check(opened.Sky.ShadowsOn == !shadows, "Changing the shadows setting should change the sun's shadows straight away.");
+                    Graphics.Shadows = shadows;
+                    Check(opened.Sky.ShadowsOn == shadows, "Changing the shadows setting back should put the shadows back.");
                     Check(opened.Game.Crowd.OnSite == 0 && opened.Crowd.Count == 0, "Nobody should be there before the gates open.");
                     Check(opened.Game.Crowd.Expected is >= 100 and <= 200, "A village festival should expect 100 to 200 people.");
                     Check(opened.TopBar.PeopleText == $"On site 0 of {opened.Game.Crowd.Expected}", $"The top bar should count people, not say '{opened.TopBar.PeopleText}'.");

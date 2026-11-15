@@ -46,6 +46,7 @@ brands or sponsors.
 | 19. The band plays to the music: the drummer's sticks come down on each drum on the beat and the drums shake, guitars are strummed on the beat, the singer's mouth moves with the singing; a few seconds between songs while the crowd claps and cheers; the last song fades at the end of a set, the crowd cheers louder and most stay to clap the act off before they go | Done |
 | 21. Lights: path lights and floodlights are clicked down, fairy lights are dragged from one place to another and their poles go in by themselves (start on a pole to carry on from it, at any angle). They come on as it gets dark and light the ground round them; after dark people about on unlit ground slowly lose heart | Done |
 | 22. Big screens: small, medium and large screens on scaffold towers with speakers, on the Stages group, showing the nearest stage live from the front camera. People more than 20 m from a stage enjoy an act less the further back they are, unless they are in front of a screen (25, 40 or 60 m) | Done |
+| 23. Lighting: the sun crosses the sky, so shadows are long in the morning, short at midday and long and golden in the evening, and everyone casts one; dusk and night are darker and bluer; lamps, fairy lights and stage beams glow, floodlights throw shadows and stalls have a lamp of their own. Shadows can be turned off from the pause menu or the main menu on a slower computer | Done |
 
 ## Controls
 

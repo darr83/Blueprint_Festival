@@ -152,6 +152,6 @@ public partial class CameraRig : Node3D
         var pitch = Mathf.DegToRad(PitchDegrees);
         var back = new Vector3(Mathf.Sin(yaw) * Mathf.Cos(pitch), Mathf.Sin(pitch), Mathf.Cos(yaw) * Mathf.Cos(pitch));
         _camera.Size = _shownSize;
-        _camera.Transform = new Transform3D(Basis.Identity, _target + (back * 300f)).LookingAt(_target, Vector3.Up);
+        _camera.Transform = new Transform3D(Basis.Identity, _target + (back * Sky.CameraDistance)).LookingAt(_target, Vector3.Up);
     }
 }

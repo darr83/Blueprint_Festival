@@ -42,7 +42,8 @@ public partial class LitterView : Node3D
             {
                 VertexColorUseAsAlbedo = true,
                 Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
-                ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+                Roughness = 1f,
+                MetallicSpecular = 0f,
             },
             Multimesh = new MultiMesh
             {

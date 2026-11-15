@@ -163,6 +163,21 @@ public partial class PersonView : Node3D
             body.Ball(new Vector3(0, 1.12f, -depth * 0.42f), new Vector3(0.27f, 0.17f, 0.19f), top.Darkened(0.1f));
             body.Box(new Vector3(0, 0.74f, (depth / 2) - 0.005f), new Vector3(0.2f, 0.09f, 0.03f), top.Darkened(0.12f));
         }
+        else if (look.Top == TopStyle.Check && look.TopDetail is { } check)
+        {
+            // Bands across and down, crossing into a check.
+            for (var i = 0; i < 4; i++)
+            {
+                body.Tube(new Vector3(0, 0.71f + (i * 0.11f), 0), new Vector3(torsoSize.X * 1.02f, 0.035f, depth * 1.03f), new Color(check));
+            }
+
+            foreach (var x in new[] { -0.11f, -0.04f, 0.04f, 0.11f })
+            {
+                body.Box(new Vector3(x * (shoulder / 0.185f), 0.88f, (depth / 2) - 0.008f), new Vector3(0.03f, 0.46f, 0.03f), new Color(check));
+            }
+        }
+
+        BuildStageWear(body, look, torsoSize, torsoAt, depth, shoulder, top, legColour);
 
         var hipW = 0.30f * (0.8f + (0.2f * build));
         if (look.Legs == LegStyle.Skirt)
@@ -189,6 +204,7 @@ public partial class PersonView : Node3D
         {
             BuildHair(body, look, headY, headR, hair);
             BuildHat(body, look, headY, headR);
+            BuildHeadphones(body, look, headY, headR);
         }
 
         var bodyNode = body.BuildNode("Body");
@@ -196,11 +212,11 @@ public partial class PersonView : Node3D
         _upper.AddChild(bodyNode);
 
         // ---- arms: sleeves to match the top, a hand, and the festival wristband on the right wrist
-        var sleeve = poncho ?? top;
-        var covered = poncho is not null ? 0.55f : look.Top switch
+        var sleeve = poncho ?? (look.Jacket is { } jacket ? new Color(jacket) : look.Top == TopStyle.Check && look.TopDetail is { } c ? top.Lerp(new Color(c), 0.35f) : top);
+        var covered = poncho is not null ? 0.55f : look.Jacket is not null ? 1f : look.Top switch
         {
             TopStyle.Vest => 0f,
-            TopStyle.LongSleeve or TopStyle.Hoodie => 1f,
+            TopStyle.LongSleeve or TopStyle.Hoodie or TopStyle.Check => 1f,
             _ => 0.42f,
         };
         _armLeft = BuildArm("Arm left", -1, shoulder, sleeve, skin, covered, null);
@@ -287,6 +303,20 @@ public partial class PersonView : Node3D
             case HairStyle.Afro:
                 body.Ball(new Vector3(0, headY + (headR * 0.4f), -headR * 0.28f), headR * 2 * 1.38f, hair);
                 break;
+            case HairStyle.Mane:
+                // Big and loose, falling past the shoulders and framing the face.
+                Cap(1.12f, 0.24f, 0.2f);
+                body.Ball(new Vector3(0, headY - (headR * 1.05f), -headR * 0.45f), new Vector3(headR * 2.75f, headR * 3.3f, headR * 1.5f), hair);
+                foreach (var side in new[] { -1f, 1f })
+                {
+                    body.Ball(new Vector3(side * headR * 0.92f, headY - (headR * 0.6f), headR * 0.05f), new Vector3(headR * 0.62f, headR * 2.1f, headR * 0.9f), hair);
+                }
+
+                break;
+            case HairStyle.Quiff:
+                Cap(1.03f, 0.18f, 0.16f);
+                body.Ball(new Vector3(0, headY + (headR * 0.98f), headR * 0.32f), new Vector3(headR * 1.25f, headR * 0.8f, headR * 1.15f), hair, new Vector3(-22, 0, 0));
+                break;
             case HairStyle.Curly:
                 Cap(1.04f);
                 for (var i = 0; i < 9; i++)
@@ -327,6 +357,107 @@ public partial class PersonView : Node3D
                 body.Ball(new Vector3(0, brimY + 0.0f, -0.01f), new Vector3(headR * 2.12f, headR * 1.3f, headR * 2.12f), colour);
                 body.Box(new Vector3(0, brimY + 0.0f, headR * 1.15f), new Vector3(headR * 1.3f, 0.022f, headR * 0.9f), colour.Darkened(0.1f));
                 break;
+            case Hat.CapBackwards:
+                body.Ball(new Vector3(0, brimY + 0.0f, -0.01f), new Vector3(headR * 2.12f, headR * 1.3f, headR * 2.12f), colour);
+                body.Box(new Vector3(0, brimY - 0.01f, -headR * 1.15f), new Vector3(headR * 1.3f, 0.022f, headR * 0.9f), colour.Darkened(0.1f), new Vector3(-12, 0, 0));
+                break;
+            case Hat.Beanie:
+                body.Ball(new Vector3(0, brimY - 0.01f, -0.015f), new Vector3(headR * 2.18f, headR * 1.55f, headR * 2.18f), colour);
+                body.Tube(new Vector3(0, brimY - 0.05f, -0.015f), new Vector3(headR * 2.24f, 0.07f, headR * 2.24f), colour.Darkened(0.12f));
+                break;
+        }
+    }
+
+    /// <summary>What stars wear on stage: an open jacket, dungarees, sparkles and a chain.</summary>
+    private static void BuildStageWear(MeshBuilder body, PersonLook look, Vector3 torsoSize, Vector3 torsoAt, float depth, float shoulder, Color top, Color legColour)
+    {
+        var front = depth / 2;
+        if (look.Jacket is { } jacketColour)
+        {
+            // The jacket over the top, open at the front so the top shows, with lapels.
+            var jacket = new Color(jacketColour);
+            var grown = new Vector3(torsoSize.X * 1.06f, torsoSize.Y * 0.98f, depth * 1.08f);
+            body.Pill(torsoAt + new Vector3(0, -0.01f, 0), grown, jacket);
+            var gap = shoulder * 0.42f;
+            body.Box(new Vector3(0, 0.9f, front * 1.08f - 0.002f), new Vector3(gap * 2, 0.4f, 0.03f), top);
+            if (look.TopDetail is { } print && look.Top == TopStyle.TShirt)
+            {
+                body.Ball(new Vector3(0, 0.95f, front * 1.08f + 0.012f), new Vector3(gap * 1.2f, gap * 1.2f, 0.03f), new Color(print));
+            }
+
+            foreach (var side in new[] { -1f, 1f })
+            {
+                body.Box(new Vector3(side * (gap + 0.025f), 1.02f, front * 1.08f + 0.006f), new Vector3(0.05f, 0.16f, 0.025f), jacket.Darkened(0.2f), new Vector3(0, 0, side * -18));
+            }
+        }
+
+        if (look.Dungarees)
+        {
+            // A bib over the tummy, two straps over the shoulders and a button on each.
+            body.Box(new Vector3(0, 0.79f, front - 0.004f), new Vector3(shoulder * 1.35f, 0.3f, 0.04f), legColour);
+            body.Box(new Vector3(0, 0.86f, front + 0.014f), new Vector3(0.09f, 0.07f, 0.01f), legColour.Darkened(0.15f));
+            foreach (var side in new[] { -1f, 1f })
+            {
+                body.Box(new Vector3(side * shoulder * 0.55f, 1.0f, front - 0.01f), new Vector3(0.045f, 0.2f, 0.035f), legColour);
+                body.Box(new Vector3(side * shoulder * 0.55f, 0.88f, -front + 0.01f), new Vector3(0.045f, 0.46f, 0.035f), legColour);
+                body.Box(new Vector3(side * shoulder * 0.55f, 1.15f, 0), new Vector3(0.045f, 0.03f, depth * 0.9f), legColour);
+                body.Ball(new Vector3(side * shoulder * 0.55f, 0.92f, front + 0.02f), 0.03f, new Color("#F2C14E"));
+            }
+        }
+
+        if (look.Sparkles is { } sparkleColour)
+        {
+            var sparkle = new Color(sparkleColour);
+            var z = front * (look.Jacket is null ? 1f : 1.08f);
+            for (var i = 0; i < 14; i++)
+            {
+                // Dots spread over the front, kept off the middle when a jacket hangs open.
+                var x = ((i * 0.37f) % 1f) - 0.5f;
+                if (look.Jacket is not null && Mathf.Abs(x) < 0.25f)
+                {
+                    x += x < 0 ? -0.22f : 0.22f;
+                }
+
+                var y = 0.68f + (((i * 0.61f) % 1f) * 0.42f);
+                body.Ball(new Vector3(x * torsoSize.X * 0.95f, y, z - 0.002f), new Vector3(0.045f, 0.045f, 0.03f), sparkle);
+            }
+        }
+
+        if (look.Chain is { } chainColour)
+        {
+            var chain = new Color(chainColour);
+            for (var i = -3; i <= 3; i++)
+            {
+                var t = i / 3f;
+                body.Ball(new Vector3(t * shoulder * 0.45f, 1.08f - ((1 - (t * t)) * 0.1f), front + 0.012f), 0.03f, chain);
+            }
+
+            body.Ball(new Vector3(0, 0.95f, front + 0.02f), 0.05f, chain);
+        }
+    }
+
+    private static void BuildHeadphones(MeshBuilder body, PersonLook look, float headY, float headR)
+    {
+        if (look.Headphones is not { } colour)
+        {
+            return;
+        }
+
+        var c = new Color(colour);
+        foreach (var side in new[] { -1f, 1f })
+        {
+            body.Tube(new Vector3(side * headR * 1.02f, headY, 0), new Vector3(headR * 0.75f, 0.07f, headR * 0.75f), new Color("#26292E"), new Vector3(0, 0, 90));
+            body.Tube(new Vector3(side * headR * 1.09f, headY, 0), new Vector3(headR * 0.6f, 0.03f, headR * 0.6f), c, new Vector3(0, 0, 90));
+        }
+
+        // The band over the top of the head, in short straight pieces.
+        const int pieces = 7;
+        for (var i = 0; i < pieces; i++)
+        {
+            var a = Mathf.Pi * (i + 0.5f) / pieces;
+            var at = new Vector3(Mathf.Cos(a) * headR * 1.08f, headY + (Mathf.Sin(a) * headR * 1.3f) + 0.01f, 0);
+            var tilt = Mathf.RadToDeg(Mathf.Atan2(Mathf.Cos(a) * 1.3f, -Mathf.Sin(a) * 1.08f));
+            body.Box(at, new Vector3(headR * 0.62f, 0.035f, 0.06f), new Color("#26292E"), new Vector3(0, 0, tilt));
         }
     }
 

@@ -16,7 +16,6 @@ public static class Performers
     private static readonly Color WoodDark = new("#6F4423");
     private static readonly Color Cream = new("#F6F0E2");
 
-    private static readonly string[] Outfits = { "#E94F7B", "#F6B93B", "#26292E", "#F5F5F5", "#7B4FE9", "#2FB7A8", "#D9483B" };
     private static readonly string[] Guitars = { "#D9483B", "#F6B93B", "#3C8DAD", "#F5F5F5", "#2FB7A8" };
 
     public static string Name(BandRole role) => role switch
@@ -27,26 +26,14 @@ public static class Performers
         _ => role.ToString(),
     };
 
-    /// <summary>One performer facing south, with whatever they play. The same seed always gives the same person.</summary>
-    public static Node3D Build(BandRole role, int seed)
+    /// <summary>
+    /// One performer facing south, dressed for their music (see <see cref="StarLooks"/>), with
+    /// whatever they play. The same seed always gives the same instrument.
+    /// </summary>
+    public static Node3D Build(BandRole role, PersonLook look, int seed)
     {
         var node = new Node3D { Name = Name(role) };
         seed = System.Math.Abs(seed % 100000);
-        var outfit = Outfits[(seed * 7 + (int)role) % Outfits.Length];
-        var look = LookGenerator.FestivalGoer(seed * 31 + 900, AgeGroup.Adult) with
-        {
-            Poncho = null,
-            Hat = role == BandRole.Fiddler ? Hat.Cowboy : role == BandRole.Dj ? Hat.Cap : Hat.None,
-            HatColour = role == BandRole.Dj ? "#26292E" : "#D4B77A",
-            Sunglasses = role is BandRole.Dj or BandRole.Bassist,
-            Top = role == BandRole.Singer ? TopStyle.Vest : role == BandRole.Drummer ? TopStyle.Vest : TopStyle.TShirt,
-            TopColour = outfit,
-            TopDetail = role == BandRole.Singer ? "#F6B93B" : null,
-            Legs = LegStyle.Trousers,
-            LegColour = outfit == "#26292E" ? "#3F5B8C" : "#26292E",
-            Feet = Footwear.Boots,
-            FeetColour = "#2E2E33",
-        };
         var person = PersonView.Build(look);
         person.Name = "Person";
         person.SetPose(Pose.Performing);
