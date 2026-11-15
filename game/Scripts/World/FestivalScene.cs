@@ -57,6 +57,8 @@ public partial class FestivalScene : Node3D
     public MoneyPanel Money { get; private set; } = null!;
     public StallPanel StallMenu { get; private set; } = null!;
 
+    public SignPanel SignBox { get; private set; } = null!;
+
     public BuildBar BuildBar { get; private set; } = null!;
 
     public LitterView Litter { get; private set; } = null!;
@@ -200,6 +202,9 @@ public partial class FestivalScene : Node3D
         StallMenu = new StallPanel { Name = "StallPanel" };
         _hud.AddChild(StallMenu);
         StallMenu.Initialise(Game, Build);
+        SignBox = new SignPanel { Name = "SignPanel" };
+        _hud.AddChild(SignBox);
+        SignBox.Initialise(Game, Build);
         Mixer = new FireworksPanel { Name = "FireworksPanel" };
         _hud.AddChild(Mixer);
         Mixer.Initialise(Game, Fireworks, Build);

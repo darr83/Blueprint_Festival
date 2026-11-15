@@ -280,7 +280,7 @@ public sealed partial class FestivalGame
             return 0;
         }
 
-        var line = Site.PadRefundAt(tile) > 0 ? Fireworks.Line : Site.ScreenRefundAt(tile) > 0 ? BigScreens.Line : Site.LightRefundAt(tile) > 0 ? LightsLine : Site.ComfortRefundAt(tile) > 0 ? Comforts.Line : Site.StageAt(tile) is not null ? "Stage" : Site.StallAt(tile) is not null ? "Stalls and toilets" : "Fences and gates";
+        var line = Site.PadRefundAt(tile) > 0 ? Fireworks.Line : Site.ScreenRefundAt(tile) > 0 ? BigScreens.Line : Site.LightRefundAt(tile) > 0 ? LightsLine : Site.ComfortRefundAt(tile) > 0 ? Comforts.Line : Site.SignRefundAt(tile) > 0 ? Signs.Line : Site.StageAt(tile) is not null ? "Stage" : Site.StallAt(tile) is not null ? "Stalls and toilets" : "Fences and gates";
         var refund = Site.RemoveAt(tile);
         if (refund != 0)
         {

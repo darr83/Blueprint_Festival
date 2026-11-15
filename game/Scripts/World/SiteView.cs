@@ -35,6 +35,9 @@ public partial class SiteView : Node3D
     /// <summary>How many seats, sinks and sails are drawn.</summary>
     public int ComfortCount { get; private set; }
 
+    /// <summary>How many signs are drawn.</summary>
+    public int SignCount { get; private set; }
+
     /// <summary>How many queue lanes have their barriers drawn.</summary>
     public int LaneCount { get; private set; }
 
@@ -45,10 +48,15 @@ public partial class SiteView : Node3D
     {
         _game = game;
         game.Site.Changed += MarkStale;
+        game.Site.SignWritten += MarkStale;
         Rebuild();
     }
 
-    public override void _ExitTree() => _game.Site.Changed -= MarkStale;
+    public override void _ExitTree()
+    {
+        _game.Site.Changed -= MarkStale;
+        _game.Site.SignWritten -= MarkStale;
+    }
 
     private void MarkStale() => _stale = true;
 
@@ -200,6 +208,15 @@ public partial class SiteView : Node3D
         }
 
         ComfortCount = site.Comforts.Count;
+        foreach (var sign in site.Signs)
+        {
+            var node = SiteProps.Sign(sign, site);
+            node.Position = Middle(sign.Rect);
+            node.RotationDegrees = new Vector3(0, Turn(sign.Facing), 0);
+            AddChild(node);
+        }
+
+        SignCount = site.Signs.Count;
         for (var i = 0; i < site.Gates.Count; i++)
         {
             var node = SiteProps.Gate(site.Gates[i].Kind, _game.Name);

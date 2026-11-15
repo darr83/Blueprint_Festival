@@ -2179,6 +2179,12 @@ public sealed partial class Crowd
     {
         var (x, y, _) = queue.At(Entry(queue, queue.People));
         var walk = Math.Abs(x - party.X) + Math.Abs(y - party.Y);
+        // Somebody who has just read a finger post or the site map minds a longer walk less.
+        if (_site.Signs.Count > 0 && _site.WayShown(party.X, party.Y))
+        {
+            walk *= Signs.ShownWalk;
+        }
+
         return ((queue.People + (_serving[stall].Count(p => p is not null) * 2.2)) * info.SecondsPerPerson / Math.Max(1, info.Servers)) + (walk / party.Speed);
     }
 
@@ -2342,6 +2348,12 @@ public sealed partial class Crowd
             }
 
             var appeal = Appeal(party, stall, now) + Bargain(party, stall);
+            if (_site.Signs.Count > 0 && _site.Advertised(stall))
+            {
+                // A sandwich board out the front catches the eye.
+                appeal *= Signs.BoardPull;
+            }
+
             if (appeal <= 0 || !WorthIt(party, stall))
             {
                 continue;

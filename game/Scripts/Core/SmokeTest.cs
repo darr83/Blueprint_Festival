@@ -329,6 +329,21 @@ public partial class SmokeTest : Node
                     opened.Site.Rebuild();
                     Check(benchOut && opened.Game.Seats == 3 && opened.Site.ComfortCount == 1, $"A bench should go out with three seats, not {opened.Game.Seats}.");
                     Check(opened.Game.Remove(bench) == 12 && opened.Game.Seats == 0, "Taking the bench away should give its £12 back.");
+
+                    // Signs: a finger post goes up, its box opens, new words are typed on it, and it comes down for its money.
+                    opened.BuildBar.Toggle(BuildMode.Sign);
+                    Check(opened.BuildBar.ChoiceCount == 4 && opened.BuildBar.Choose(UI.BuildBar.SignKey(SignKind.FingerPost)) && opened.Build.Mode == BuildMode.Sign, "The Signs tab should offer four signs.");
+                    var post = new TilePoint(grass.X + 41, grass.Y + 56);
+                    var postUp = opened.Build.ClickAt(post).Ok;
+                    opened.Site.Rebuild();
+                    Check(postUp && opened.Site.SignCount == 1 && opened.SignBox.Visible && opened.SignBox.Rows == 3, "A finger post should go up and its writing box open with three lines.");
+                    opened.SignBox.Type(1, "Tea tent");
+                    opened.SignBox.Point(1, true);
+                    opened.SignBox.Paint(2);
+                    var written = opened.Game.Site.Signs[0];
+                    Check(written.Line(1) == "Tea tent" && written.PointsRight(1) && written.Colour == 2, $"The post should say what was typed, not '{written.Line(1)}'.");
+                    opened.SignBox.Close();
+                    Check(!opened.SignBox.Visible && opened.Game.Remove(post) == 10 && opened.Game.Site.Signs.Count == 0, "Taking the post down should give its £10 back.");
                     Check(opened.Weather.StreaksShown == 0 && opened.Sky.Overcast < 0.01f, "A fine day should have no rain and no cloud.");
                     Check(opened.TopBar.WeatherText.StartsWith("Fine", StringComparison.Ordinal), $"The top bar should say the day is fine, not '{opened.TopBar.WeatherText}'.");
                     opened.BuildBar.Close();

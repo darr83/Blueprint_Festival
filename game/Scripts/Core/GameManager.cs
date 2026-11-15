@@ -143,6 +143,10 @@ public partial class GameManager : Node
             {
                 AddChild(new ComfortShots(arg["--comfort-shots=".Length..]) { Name = "ComfortShots" });
             }
+            else if (arg.StartsWith("--sign-shots=", StringComparison.Ordinal))
+            {
+                AddChild(new SignShots(arg["--sign-shots=".Length..]) { Name = "SignShots" });
+            }
             else if (arg.StartsWith("--shots=", StringComparison.Ordinal))
             {
                 AddChild(new Shots(arg["--shots=".Length..]) { Name = "Shots" });

@@ -57,6 +57,9 @@ public partial class BuildBar : VBoxContainer
     /// <summary>Opens the firework mixer. Set by the scene.</summary>
     public System.Action? OpenMixer { get; set; }
 
+    /// <summary>The key of a sign, under Signs.</summary>
+    public static string SignKey(SignKind kind) => $"sign{kind}";
+
     /// <summary>The key of a seat, a sink or a sail, under Comforts.</summary>
     public static string ComfortKey(ComfortKind kind) => $"comfort{kind}";
 
@@ -123,7 +126,7 @@ public partial class BuildBar : VBoxContainer
 
         // A row of round buttons, each with its name underneath, straight on the field.
         var row = new HBoxContainer { SizeFlagsHorizontal = SizeFlags.ShrinkCenter, MouseFilter = MouseFilterEnum.Ignore };
-        row.AddThemeConstantOverride("separation", 5);
+        row.AddThemeConstantOverride("separation", 3);
         _tabRow = row;
         AddChild(row);
 
@@ -135,6 +138,7 @@ public partial class BuildBar : VBoxContainer
         AddTab(row, BuildMode.Ground, "ground", "Ground", "Straw, trackway, pallets, mats, sand and artificial grass");
         AddTab(row, BuildMode.Path, "path", "Paths", "Mown, bark, gravel and boardwalk paths, up to 6 m wide");
         AddTab(row, BuildMode.Comfort, "bench", "Comforts", "Seats, tables, hand washing and shade");
+        AddTab(row, BuildMode.Sign, "sign", "Signs", "Signs with your own words on: boards, finger posts, banners and a site map");
         AddTab(row, BuildMode.Light, "light", "Lights", "Path lights, floodlights and fairy lights for after dark");
         AddTab(row, BuildMode.Fireworks, "firework", "Fireworks", "A launch pad, and firework shows to plan on the mixer");
         AddTab(row, BuildMode.Remove, "remove", "Take down", "Remove something and get the money back");
@@ -253,6 +257,13 @@ public partial class BuildBar : VBoxContainer
                     "Rolled gravel. Hardly any mud and hardly any wear.\nDrag to lay it.", () => _tool.PickGround(GroundKind.Gravel));
                 AddChoice($"ground{GroundKind.Boardwalk}", "Boardwalk", $"£{FestivalGame.CostOf(GroundKind.Boardwalk)} per 2 m",
                     "Timber planks. No mud and no wear, and smart with it.\nDrag to lay it.", () => _tool.PickGround(GroundKind.Boardwalk));
+                break;
+            case BuildMode.Sign:
+                foreach (var s in Signs.Everything)
+                {
+                    AddChoice(SignKey(s.Kind), s.Name, $"£{s.Cost:N0}", $"{s.About}\n{s.Width / 2f:0.#} m wide. R turns it.", () => _tool.PickSign(s.Kind));
+                }
+
                 break;
             case BuildMode.Comfort:
                 foreach (var c in Comforts.Everything)
@@ -410,6 +421,7 @@ public partial class BuildBar : VBoxContainer
             : k.StartsWith("screen") ? ("screen", UiStyle.StagePink)
             : k.StartsWith("pad") || k.StartsWith("fireworks") ? ("firework", UiStyle.StagePink)
             : k is "groundmownpath" or "groundbarkchip" or "groundgravel" or "groundboardwalk" ? ("path", UiStyle.StagePink)
+            : k.StartsWith("sign") ? ("sign", UiStyle.StagePink)
             : k.StartsWith("ground") ? ("ground", UiStyle.StagePink)
             : k is "comforthandgel" or "comforthandwash" ? ("drop", UiStyle.StagePink)
             : k.StartsWith("comfort") ? ("bench", UiStyle.StagePink)
@@ -470,6 +482,7 @@ public partial class BuildBar : VBoxContainer
             BuildMode.Screen => ScreenKey(_tool.Screen),
             BuildMode.LaunchPad => PadKey(_tool.Pad),
             BuildMode.Comfort => ComfortKey(_tool.Comfort),
+            BuildMode.Sign => SignKey(_tool.Sign),
             _ => "",
         };
         foreach (var (key, button) in _choices)
