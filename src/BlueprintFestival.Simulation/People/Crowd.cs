@@ -926,8 +926,17 @@ public sealed partial class Crowd
     /// <summary>Where a party goes at the end of their day: back down the lane, or to their tent.</summary>
     private TilePoint Home(Party party) => party.Pitch is { } pitch && party.Ticketed == true ? pitch : LaneEnd(party);
 
-    /// <summary>The share of the crowd that camps when camping is on offer.</summary>
-    public const double CamperShare = 0.35;
+    /// <summary>The most of the crowd that will ever camp, however cheap the pitches.</summary>
+    public const double MostCamping = 0.5;
+
+    /// <summary>
+    /// The share of the crowd that brings a tent at a pitch price: half when pitches are free, nearly
+    /// two in five at four pounds, a quarter at seven, a sixth at ten, and only a few past twenty.
+    /// </summary>
+    public static double CamperShareAt(int pounds) => MostCamping / (1 + Math.Pow(Math.Max(0, pounds) / 7.0, 2));
+
+    /// <summary>The share of the crowd that camps when camping is on offer, set from the pitch price.</summary>
+    public double CamperShare { get; set; } = CamperShareAt(4);
 
     /// <summary>How many people have a tent in the camping field.</summary>
     public int Campers => _parties.Where(p => p.Camper).Sum(p => p.Members.Count);

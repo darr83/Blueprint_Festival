@@ -64,7 +64,7 @@ public sealed partial class FestivalGame
                 Earn("Tickets", people * TicketPrice);
             }
         };
-        Crowd.CamperArrived += people => Earn("Camping", people * CampingFee);
+        Crowd.CamperArrived += people => Earn("Camping", people * CampingPrice);
         Crowd.CarParked += () =>
         {
             if (ParkingCharge > 0)

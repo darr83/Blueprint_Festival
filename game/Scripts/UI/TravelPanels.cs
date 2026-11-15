@@ -7,7 +7,20 @@ namespace BlueprintFestival.UI;
 /// bring, and how the tickets sold so far would travel.
 /// </summary>
 public sealed record TravelView(int Walkers, int Spaces, int CanDrive, int Parking, int FairParking, int Buses, int BusSeats, int BusCost,
-    int CanGetHere, int MusicRoom, int Licence, int Sold, int OnFoot, int ByCar, int ByBus);
+    int CanGetHere, int MusicRoom, int Licence, int Sold, int OnFoot, int ByCar, int ByBus)
+{
+    /// <summary>What a pitch costs, or null with no camping field this year.</summary>
+    public int? Pitch { get; init; }
+
+    /// <summary>The share of the crowd that brings a tent at that price, in percent.</summary>
+    public int Camping { get; init; }
+
+    /// <summary>About how many will camp.</summary>
+    public int Campers { get; init; }
+
+    /// <summary>How many people the camping fields hold.</summary>
+    public int Pitches { get; init; }
+}
 
 public static partial class YearPanels
 {
@@ -48,6 +61,14 @@ public static partial class YearPanels
         return cell;
     }
 
+    /// <summary>What the pitch price does, in a line: how many camp, and whether the field is full.</summary>
+    public static string CampingWords(int share, int campers, int pitches)
+    {
+        var full = pitches > 0 && campers > pitches ? " The field is full, so some go home instead." : "";
+        var cheap = share >= 45 ? "Cheap, so lots camp." : share <= 12 ? "Dear, so few camp." : "";
+        return $"About {share}% bring a tent, around {campers:N0} people. {cheap}{full}".TrimEnd();
+    }
+
     /// <summary>What holds ticket sales back, in a line: the licence, the music fields or the ways of getting there.</summary>
     public static string TravelSummary(TravelView view)
     {
@@ -62,7 +83,7 @@ public static partial class YearPanels
     /// Getting there: villagers on foot, the parking charge and the shuttle buses, each with what
     /// it brings. Laid out in a row for the wide screens and stacked for the build panel.
     /// </summary>
-    public static Control Travel(TravelView view, System.Action<int>? parking = null, System.Action<int>? buses = null, bool wide = true)
+    public static Control Travel(TravelView view, System.Action<int>? parking = null, System.Action<int>? buses = null, bool wide = true, System.Action<int>? camping = null)
     {
         var tile = Tile(false, wide ? 560 : 300);
         tile.Name = "Travel";
@@ -77,12 +98,17 @@ public static partial class YearPanels
         }
 
         box.AddChild(cells);
-        var width = wide ? 250 : 290;
+        var width = wide ? (view.Pitch is null ? 250 : 162) : 290;
         var dear = view.Parking > view.FairParking ? " Dear, so some will not pay it." : "";
         cells.AddChild(TravelCell("Parking, a car", view.Spaces > 0 ? Stepper("Parking", $"£{view.Parking}", parking) : null,
             view.Spaces > 0 ? $"{view.Spaces:N0} spaces bring about {view.CanDrive:N0}.{dear}" : "No car park field this year.", width));
         cells.AddChild(TravelCell("Shuttle buses", Stepper("Buses", $"{view.Buses}", buses),
             view.Buses > 0 ? $"Bring up to {view.Buses * view.BusSeats:N0}. £{view.Buses * view.BusCost:N0} on the day." : $"Each brings {view.BusSeats} from the station for £{view.BusCost}.", width));
+        if (view.Pitch is { } pitch)
+        {
+            cells.AddChild(TravelCell("Camping, a pitch", Stepper("Pitch", $"£{pitch}", camping), CampingWords(view.Camping, view.Campers, view.Pitches), width));
+        }
+
         var summary = UiStyle.Body($"Getting there: about {view.Walkers:N0} can walk. {TravelSummary(view)}", size: 13);
         summary.Name = "Summary";
         summary.AutowrapMode = TextServer.AutowrapMode.WordSmart;

@@ -68,6 +68,8 @@ public sealed partial class FestivalGame
     {
         ParkingCharge = other.ParkingCharge;
         BusesHired = other.BusesHired;
+        CampingPrice = other.CampingPrice;
+        Crowd.CamperShare = CamperShare;
         ApplyTravel();
         return this;
     }

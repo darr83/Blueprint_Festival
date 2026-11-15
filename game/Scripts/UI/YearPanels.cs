@@ -261,7 +261,8 @@ public static partial class YearPanels
 
     /// <summary>The small panel shown while building. In a year that sells ahead it is build week, and each day sells the last tickets.</summary>
     public static Control BuildDay(int expected, int bank, System.Action? open = null, string forecast = "", BuildWeekView? week = null,
-        System.Action? nextDay = null, System.Action<int>? price = null, TravelView? travel = null, System.Action<int>? parking = null, System.Action<int>? buses = null)
+        System.Action? nextDay = null, System.Action<int>? price = null, TravelView? travel = null, System.Action<int>? parking = null, System.Action<int>? buses = null,
+        System.Action<int>? camping = null)
     {
         var panel = Card(360);
         var box = new VBoxContainer();
@@ -306,7 +307,7 @@ public static partial class YearPanels
 
         if (travel is not null)
         {
-            box.AddChild(Travel(travel, parking, buses, wide: false));
+            box.AddChild(Travel(travel, parking, buses, wide: false, camping: camping));
         }
 
         box.AddChild(MoneyRow("Left to build with", $"£{bank:N0}"));
