@@ -82,6 +82,7 @@ public static class UiStyle
     private static readonly Dictionary<string, string> IconPaths = new()
     {
         ["stage"] = "<path d='M3 20h18M5 20V9h14v11M3 9l9-5 9 5'/><path d='M9 20v-5h6v5'/>",
+        ["area"] = "<path d='M3 7V4h3M18 4h3v3M21 17v3h-3M6 20H3v-3M3 11v2M21 11v2M10 4h4M10 20h4'/><circle cx='9' cy='11' r='1.5'/><circle cx='15' cy='11' r='1.5'/><path d='M7 16a2 2 0 0 1 4 0M13 16a2 2 0 0 1 4 0'/>",
         ["fence"] = "<path d='M5 21V6l2-3 2 3v15M15 21V6l2-3 2 3v15M3 10h18M3 16h18'/>",
         ["gate"] = "<path d='M4 21V5a8 8 0 0 1 16 0v16'/><path d='M9 21v-9h6v9'/>",
         ["stall"] = "<path d='M3 9l2-5h14l2 5'/><path d='M3 9a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0'/><path d='M5 12v9h14v-9'/>",
