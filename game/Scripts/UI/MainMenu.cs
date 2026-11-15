@@ -50,6 +50,7 @@ public partial class MainMenu : Control
         var sliders = new SoundSliders { Name = "SoundSliders", Visible = false };
         column.AddChild(UiStyle.SecondaryButton("Sound", () => sliders.Visible = !sliders.Visible));
         column.AddChild(sliders);
+        column.AddChild(UiStyle.SecondaryButton("Mark the choruses", () => OpenChorusMarker()));
         column.AddChild(BlueprintFestival.Core.ScreenMode.MakeButton());
         column.AddChild(BlueprintFestival.Core.Graphics.MakeButton());
         column.AddChild(UiStyle.SecondaryButton("Quit", () => GetTree().Quit()));
@@ -63,6 +64,14 @@ public partial class MainMenu : Control
         AddChild(version);
         version.SetAnchorsAndOffsetsPreset(LayoutPreset.BottomLeft, LayoutPresetMode.Minsize, 18);
         version.GrowVertical = GrowDirection.Begin;
+    }
+
+    /// <summary>Opens the chorus marker over the menu, where the songs' choruses are marked for the crowd to sing along.</summary>
+    public ChorusMarker OpenChorusMarker()
+    {
+        var marker = new ChorusMarker { Name = "ChorusMarker" };
+        AddChild(marker);
+        return marker;
     }
 
     private void StartNew() => GameManager.Instance.StartNewFestival(_name.Text);

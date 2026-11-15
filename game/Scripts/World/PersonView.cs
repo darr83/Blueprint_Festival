@@ -875,6 +875,14 @@ public partial class PersonView : Node3D
                 return (new Vector3(-12, 0, -190 + open), new Vector3(-12, 0, 190 - open), (0.04f * e * (1 - wave)) - 0.02f, new Vector3(-3 * hit * e, 0, 0), 0);
             }
 
+            case DanceMove.SingAlong:
+            {
+                // Singing the chorus: both arms up high, swaying slowly from side to side over two
+                // hits, head and shoulders tipped back, the knees giving a little on each hit.
+                var side = Mathf.Sin(through * Mathf.Tau) * 24f * e;
+                return (new Vector3(-14, 0, -158 + side), new Vector3(-14, 0, 158 + side), -0.015f * hit * e, new Vector3(-11f, 0, side * 0.22f), side * 0.25f);
+            }
+
             default:
                 // Nodding along on the beat with hands by their sides.
                 return (new Vector3(0, 0, -7), new Vector3(0, 0, 7), -0.012f * hit, new Vector3(8 * hit * e, 0, 0), 0);

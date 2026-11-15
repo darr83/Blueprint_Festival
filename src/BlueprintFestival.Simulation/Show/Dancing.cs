@@ -35,6 +35,9 @@ public enum DanceMove
 
     /// <summary>Clapping with both hands above the head on every hit.</summary>
     ClapHigh,
+
+    /// <summary>Singing along in a chorus: both arms up, swaying slowly from side to side, head back.</summary>
+    SingAlong,
 }
 
 /// <summary>Which beats someone dances on.</summary>
@@ -136,7 +139,7 @@ public static class Dancing
     /// </summary>
     public static DanceTiming TimingOf(DanceMove move, int person)
     {
-        if (move == DanceMove.Sway)
+        if (move is DanceMove.Sway or DanceMove.SingAlong)
         {
             return DanceTiming.OnTheHit;
         }
@@ -167,7 +170,7 @@ public static class Dancing
     /// a hip hop nod leans one way and then the other.
     /// </summary>
     public static int BeatsAMove(DanceMove move) =>
-        move is DanceMove.Sway or DanceMove.Jump or DanceMove.Nod or DanceMove.Bounce or DanceMove.Wave or DanceMove.Point or DanceMove.Step ? 2 : 1;
+        move is DanceMove.Sway or DanceMove.Jump or DanceMove.Nod or DanceMove.Bounce or DanceMove.Wave or DanceMove.Point or DanceMove.Step or DanceMove.SingAlong ? 2 : 1;
 
     /// <summary>
     /// How far off the beat someone is, as a part of a beat: nobody is more than a twentieth of a

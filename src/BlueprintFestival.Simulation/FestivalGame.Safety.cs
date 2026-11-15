@@ -189,7 +189,7 @@ public sealed partial class FestivalGame
                 var tile = dx == 0
                     ? new TilePoint(rect.X + i, dy > 0 ? rect.Bottom - 1 + deep : rect.Y - deep)
                     : new TilePoint(dx > 0 ? rect.Right - 1 + deep : rect.X - deep, rect.Y + i);
-                if (Site.FenceAt(tile) == FenceKind.CrowdBarrier)
+                if (Site.FenceAt(tile) == FenceKind.CrowdBarrier || Site.IsAreaBarrier(tile))
                 {
                     covered++;
                 }

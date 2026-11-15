@@ -48,6 +48,9 @@ public partial class SiteView : Node3D
     public int SignCount { get; private set; }
 
     /// <summary>How many queue lanes have their barriers drawn.</summary>
+    /// <summary>How many crowd areas are drawn.</summary>
+    public int AreaCount { get; private set; }
+
     public int LaneCount { get; private set; }
 
     /// <summary>How many straight runs of fence are drawn.</summary>
@@ -235,9 +238,9 @@ public partial class SiteView : Node3D
     /// Adds one straight run of queue barrier down the middle of its tiles. Where a run across meets
     /// a run up and down, the two are joined at the corner instead of crossing or stopping short.
     /// </summary>
-    public static void AddBarrier(MeshBuilder builder, SiteLayout site, int x, int y, int length, bool vertical)
+    public static void AddBarrier(MeshBuilder builder, SiteLayout site, int x, int y, int length, bool vertical, bool area = false)
     {
-        bool Has(int tx, int ty) => site.IsBarrier(new TilePoint(tx, ty));
+        bool Has(int tx, int ty) => area ? site.IsAreaBarrier(new TilePoint(tx, ty)) : site.IsBarrier(new TilePoint(tx, ty));
         Vector3 from, to;
         if (vertical)
         {
@@ -392,6 +395,20 @@ public partial class SiteView : Node3D
 
             AddChild(builder.BuildNode("QueueBarriers"));
         }
+
+        // The barriers round the crowd areas, gaps left open.
+        if (site.AreaBarriers.Count > 0)
+        {
+            var builder = new MeshBuilder();
+            foreach (var (x, y, length, vertical) in SiteLayout.RunsOf(site.AreaBarriers))
+            {
+                AddBarrier(builder, site, x, y, length, vertical, area: true);
+            }
+
+            AddChild(builder.BuildNode("AreaBarriers"));
+        }
+
+        AreaCount = site.Areas.Count;
 
         LaneCount = site.Lanes.Count;
 

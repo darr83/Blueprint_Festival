@@ -59,6 +59,9 @@ public enum BuildMode
 
     /// <summary>Marking ground for VIP guests only.</summary>
     VipGround,
+
+    /// <summary>Drawing a crowd area in front of a stage, opening its gaps and setting its limit. Also the Areas group on the build bar.</summary>
+    Area,
 }
 
 /// <summary>
@@ -112,6 +115,28 @@ public partial class BuildTool : Node3D
 
     public DecorKind Decor { get; private set; }
 
+    /// <summary>The kind of crowd area being drawn.</summary>
+    public AreaKind Area { get; private set; }
+
+    /// <summary>The crowd area whose limit is being set, or -1.</summary>
+    public int SelectedArea { get; private set; } = -1;
+
+    /// <summary>Raised when a crowd area is picked to change, or put down.</summary>
+    public event Action? AreaPicked;
+
+    /// <summary>Picks a crowd area to change its limit, or none.</summary>
+    public void SelectArea(int area)
+    {
+        SelectedArea = area;
+        AreaPicked?.Invoke();
+    }
+
+    private MeshInstance3D? _areaMarks;
+    private readonly StandardMaterial3D[] _areaMaterials = new StandardMaterial3D[3];
+
+    /// <summary>True while the crowd areas are tinted on the ground: while drawing them.</summary>
+    public bool AreaMarksShown => _areaMarks is { Visible: true };
+
     /// <summary>Raised when a sign has just gone up, with a tile it stands on, so its words can be written.</summary>
     public event Action<TilePoint>? SignPlaced;
 
@@ -155,11 +180,69 @@ public partial class BuildTool : Node3D
             Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
             AlbedoColor = new Color(0.89f, 0.69f, 0.24f, 0.62f),
         };
+        for (var k = 0; k < 3; k++)
+        {
+            _areaMaterials[k] = new StandardMaterial3D
+            {
+                ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+                Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+                AlbedoColor = AreaColour((AreaKind)k, 0.5f),
+            };
+        }
+
         game.Site.Changed += DrawKeepOut;
         DrawKeepOut();
     }
 
     public override void _ExitTree() => _game.Site.Changed -= DrawKeepOut;
+
+    /// <summary>The colour each kind of crowd area is tinted: pink for a front pen, teal for standing, gold for VIPs.</summary>
+    public static Color AreaColour(AreaKind kind, float alpha) => kind switch
+    {
+        AreaKind.FrontPen => new Color(1f, 0.36f, 0.62f, alpha),
+        AreaKind.Vip => new Color(0.96f, 0.72f, 0.16f, alpha),
+        _ => new Color(0.11f, 0.61f, 0.6f, alpha),
+    };
+
+    public void PickArea(AreaKind kind) => Pick(BuildMode.Area, () => Area = kind);
+
+    /// <summary>Draws a crowd area over the box between two tiles, and picks it to set its limit.</summary>
+    public BuildCheck DragArea(TilePoint from, TilePoint to)
+    {
+        var result = _game.BuildArea(Area, from, to);
+        Refused = !result.Ok;
+        SoundBoard.Cue(result.Ok ? Sounds.BuildFence : Sounds.Refuse);
+        Status = !result.Ok ? result.Problem ?? "That cannot go there." : $"{CrowdAreas.Name(Area)} up. Set how many it lets in.";
+        if (result.Ok)
+        {
+            SelectArea(_game.Site.Areas.Count - 1);
+        }
+
+        return result;
+    }
+
+    /// <summary>A click with the area tool: on an area's barrier it opens or closes a gap, inside an area it picks it.</summary>
+    public void ClickArea(TilePoint at)
+    {
+        var site = _game.Site;
+        var area = site.AreaAt(at);
+        if (area < 0)
+        {
+            SelectArea(-1);
+            Status = $"Hold the mouse button and drag out a {CrowdAreas.Name(Area).ToLowerInvariant()}.";
+            return;
+        }
+
+        if (site.Areas[area].IsEdge(at))
+        {
+            var problem = _game.ToggleAreaGap(at);
+            Refused = problem is not null;
+            SoundBoard.Cue(problem is null ? Sounds.BuildFence : Sounds.Refuse);
+            Status = problem ?? (site.IsAreaBarrier(at) ? "Gap closed." : "Gap opened. Post security by it to count people in.");
+        }
+
+        SelectArea(area);
+    }
 
     public void PickVipGround() => Pick(BuildMode.VipGround, () => { });
 
@@ -237,6 +320,27 @@ public partial class BuildTool : Node3D
         _vipMarks.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
         _vipMarks.Visible = Mode == BuildMode.VipGround;
         AddChild(_vipMarks);
+        _areaMarks?.QueueFree();
+        _areaMarks = new MeshInstance3D { Name = "AreaMarks", Visible = Mode == BuildMode.Area };
+        foreach (var kind in new[] { AreaKind.FrontPen, AreaKind.Standing, AreaKind.Vip })
+        {
+            var tint = new MeshBuilder();
+            foreach (var a in _game.Site.Areas.Where(a => a.Kind == kind))
+            {
+                var inner = new TileRect(a.Rect.X + 1, a.Rect.Y + 1, a.Rect.Width - 2, a.Rect.Height - 2);
+                tint.Box(SiteView.Middle(inner) + new Vector3(0, 0.04f, 0), new Vector3(inner.Width * T, 0.02f, inner.Height * T), Colors.White);
+            }
+
+            if (!tint.IsEmpty)
+            {
+                var node = tint.BuildNode($"Area{kind}");
+                node.MaterialOverride = _areaMaterials[(int)kind];
+                node.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
+                _areaMarks.AddChild(node);
+            }
+        }
+
+        AddChild(_areaMarks);
         _keepOut = builder.IsEmpty ? new MeshInstance3D { Name = "KeepOut" } : builder.BuildNode("KeepOut");
         _keepOut.MaterialOverride = _keepOutMaterial;
         _keepOut.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
@@ -271,6 +375,7 @@ public partial class BuildTool : Node3D
             BuildMode.Lane => "Hold the mouse button and drag out a queue from the front of a gate, stall or toilets. Drag again from its end to turn a corner.",
             BuildMode.KeepOut => "Hold the mouse button and drag over ground customers must keep off. Start on marked ground to clear it.",
             BuildMode.VipGround => "Hold the mouse button and drag over ground for VIP guests only. Start on VIP ground to clear it.",
+            BuildMode.Area => $"Hold the mouse button and drag out a {CrowdAreas.Name(Area).ToLowerInvariant()}. Click an area's barrier to open or close a gap; click inside to set how many it lets in.",
             BuildMode.Light => "Click on the grass to put the light up.",
             BuildMode.LaunchPad => "Click on the grass to put the launch pad down. Its safe zone must be clear. Fence it off from the firework mixer.",
             BuildMode.Screen => "Click on the grass to put the screen up. R turns it. It shows the nearest stage to the people in front of it.",
@@ -287,6 +392,16 @@ public partial class BuildTool : Node3D
         if (_vipMarks is not null)
         {
             _vipMarks.Visible = mode == BuildMode.VipGround;
+        }
+
+        if (_areaMarks is not null)
+        {
+            _areaMarks.Visible = mode == BuildMode.Area;
+        }
+
+        if (mode != BuildMode.Area && SelectedArea >= 0)
+        {
+            SelectArea(-1);
         }
     }
 
@@ -923,6 +1038,32 @@ public partial class BuildTool : Node3D
                 return;
             }
 
+            case BuildMode.Area:
+            {
+                ClearGhostOnly();
+                var site = _game.Site;
+                if (_dragFrom is not { } start || start == at)
+                {
+                    var under = site.AreaAt(at);
+                    pad = new TileRect(at.X, at.Y, 1, 1);
+                    ShowPad(pad, true);
+                    Refused = false;
+                    Status = under < 0 ? $"Hold the mouse button and drag out a {CrowdAreas.Name(Area).ToLowerInvariant()}."
+                        : site.Areas[under].IsEdge(at) ? (site.IsAreaBarrier(at) ? "Click to open a gap in the barrier here." : "Click to close this gap.")
+                        : $"{CrowdAreas.Name(site.Areas[under].Kind)}: click to set how many it lets in.";
+                    return;
+                }
+
+                check = _game.CheckArea(Area, start, at);
+                pad = SiteLayout.BoxOf(start, at);
+                ShowPad(pad, check.Ok);
+                Refused = !check.Ok;
+                var metres = Math.Max(0, pad.Width - 2) * Math.Max(0, pad.Height - 2) * FieldMap.TileMetres * FieldMap.TileMetres;
+                Status = !check.Ok ? check.Problem ?? ""
+                    : $"{CrowdAreas.Name(Area)}: {pad.Width * FieldMap.TileMetres:0.#} m × {pad.Height * FieldMap.TileMetres:0.#} m, lets in {CrowdAreas.Suggested(metres):N0}. Barrier £{check.Cost:N0}";
+                return;
+            }
+
             case BuildMode.VipGround:
             {
                 var from = _dragFrom ?? at;
@@ -1062,7 +1203,7 @@ public partial class BuildTool : Node3D
                 break;
 
             case InputEventMouseButton { ButtonIndex: MouseButton.Left } click when _hovering:
-                if (Mode is BuildMode.Fence or BuildMode.Ground or BuildMode.Lane or BuildMode.KeepOut or BuildMode.VipGround or BuildMode.Fairy or BuildMode.Bunting)
+                if (Mode is BuildMode.Fence or BuildMode.Ground or BuildMode.Lane or BuildMode.KeepOut or BuildMode.VipGround or BuildMode.Fairy or BuildMode.Bunting or BuildMode.Area)
                 {
                     if (click.Pressed)
                     {
@@ -1071,7 +1212,18 @@ public partial class BuildTool : Node3D
                     else if (_dragFrom is { } from)
                     {
                         _dragFrom = null;
-                        if (Mode == BuildMode.Fence)
+                        if (Mode == BuildMode.Area)
+                        {
+                            if (from == _hover)
+                            {
+                                ClickArea(from);
+                            }
+                            else
+                            {
+                                DragArea(from, _hover);
+                            }
+                        }
+                        else if (Mode == BuildMode.Fence)
                         {
                             DragFence(from, _hover);
                         }

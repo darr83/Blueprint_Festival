@@ -120,6 +120,9 @@ public sealed class Party
 
     public TilePoint Target { get; internal set; }
 
+    /// <summary>The crowd area this party is waiting by the gaps of to be let in, or -1.</summary>
+    public int WaitFor { get; internal set; } = -1;
+
     public DateTime WaitUntil { get; internal set; }
 
     public bool IsOnSite => State is not (PartyState.Expected or PartyState.Gone);
@@ -587,6 +590,9 @@ public sealed partial class Crowd
     private int[] _claimsSecond = Array.Empty<int>();
     private int _claimSlotSecond = -1;
     private int _measuredMinute = -1;
+
+    /// <summary>The full crowd area the last search for a place to watch was turned away from, or -1.</summary>
+    private int _turnedAway = -1;
 
     public Crowd(FieldMap map, int seed, DateTime festivalDay)
         : this(map, new SiteLayout(map), seed, festivalDay)
@@ -1075,8 +1081,22 @@ public sealed partial class Crowd
     }
 
     /// <summary>A place to stand in the field, well clear of the hedge. Null if there is nowhere.</summary>
-    private TilePoint? SomewhereInField(GameRandom random) =>
-        _standable.Count == 0 ? null : _standable[random.Next(_standable.Count)];
+    private TilePoint? SomewhereInField(GameRandom random)
+    {
+        if (_standable.Count == 0)
+        {
+            return null;
+        }
+
+        // People wandering about keep out of the crowd areas: those are for watching the acts from.
+        var tile = _standable[random.Next(_standable.Count)];
+        for (var tries = 0; tries < 6 && _site.AreaInside(tile) >= 0; tries++)
+        {
+            tile = _standable[random.Next(_standable.Count)];
+        }
+
+        return tile;
+    }
 
     /// <summary>
     /// Called whenever something is built or taken down: routes are worked out again, queues re-form,
@@ -1087,6 +1107,7 @@ public sealed partial class Crowd
         _paths.Refresh();
         _vipPathsStale = true;
         RefreshVipPlaces();
+        SizeAreas();
 
         // People stand on the festival side of the gates, or anywhere in the field if it is open.
         const int inset = 4;
@@ -1911,6 +1932,7 @@ public sealed partial class Crowd
         {
             _measuredMinute = now.Minute;
             Density.Measure(Loose());
+            CountAreas(now);
         }
 
         var closing = now.TimeOfDay >= EveryoneOut;
@@ -3126,9 +3148,18 @@ public sealed partial class Crowd
             return false;
         }
 
-        // VIP guests watch from a VIP platform near the stage if there is room on it.
+        // VIP guests watch from a VIP platform near the stage if there is room on it, or from a VIP area.
         var deck = party.Vip ? PlatformSpot(party, stage) : null;
-        if ((deck ?? PlaceToWatch(stage, party.Random, slot.Act.Draw, party.Members.Count)) is not { } spot)
+        var vipArea = party.Vip && deck is null ? VipAreaSpot(party, stage) : null;
+        var chosen = deck ?? vipArea ?? PlaceToWatch(stage, party.Random, slot.Act.Draw, party.Members.Count);
+        var waitFor = -1;
+        if (deck is null && vipArea is null && _turnedAway >= 0 && slot.Act.Draw >= KeenToWait && party.Random.NextDouble() < 0.6 && WaitByGap(_turnedAway, party) is { } wait)
+        {
+            // A keen fan turned away from a full pen waits by its gap to be let in.
+            (chosen, waitFor) = (wait, _turnedAway);
+        }
+
+        if (chosen is not { } spot)
         {
             return false;
         }
@@ -3144,6 +3175,16 @@ public sealed partial class Crowd
         if (deck is null)
         {
             Claim(spot, party.Members.Count, second);
+        }
+
+        if (waitFor >= 0)
+        {
+            party.WaitFor = waitFor;
+            _waitingAt[waitFor] += party.Members.Count;
+        }
+        else
+        {
+            NoteInside(spot, party.Members.Count);
         }
 
         return true;
@@ -3278,6 +3319,7 @@ public sealed partial class Crowd
         var reach = AudienceReach(draw);
         var barrier = BarrierDepth?.Invoke(stage) ?? 0;
         var nearest = barrier > 0 ? barrier + 0.6 : 1.2;
+        _turnedAway = -1;
         for (var attempt = 0; attempt < 44; attempt++)
         {
             // Turned away from the front, people try further and further back.
@@ -3294,6 +3336,21 @@ public sealed partial class Crowd
             // People only squeeze in to be near the front. Further back they stop where it is merely busy.
             var keen = deep - nearest <= FrontDepth ? Squeeze(draw) : Math.Min(Squeeze(draw), StewardLimit);
             var limit = standBack ? DensityMap.Busy : Math.Min(keen, Stewarded?.Invoke(x, y) == true ? StewardLimit : PackedLimit);
+            if (_site.AreaInside(tile) is >= 0 and var area)
+            {
+                // Security on the gaps of a full area turn people away; inside a kept one nobody packs in past its limit.
+                if (!MayPickInside(area, stage, people))
+                {
+                    _turnedAway = area;
+                    continue;
+                }
+
+                if (Kept(area))
+                {
+                    limit = Math.Min(limit, PackInside(area));
+                }
+            }
+
             if (Claimed(x, y, people) <= limit)
             {
                 return tile;
