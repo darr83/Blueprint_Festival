@@ -157,12 +157,35 @@ public partial class SmokeTest : Node
 
                     // Somewhere to eat, drink and go to the toilet.
                     opened.BuildBar.Toggle(BuildMode.Stall);
-                    Check(opened.BuildBar.ChoiceCount == 7, "The build bar should offer six stalls and the litter bin.");
-                    Check(opened.BuildBar.Choose("stallFoodVan") && opened.Build.Mode == BuildMode.Stall, "The food van should be on the build bar.");
+                    Check(opened.BuildBar.Shelf == StallGroup.Food && opened.BuildBar.ChoiceCount == 6, "The Stalls tab should open on its six food stalls.");
+                    opened.BuildBar.ShowShelf(StallGroup.Drink);
+                    Check(opened.BuildBar.ChoiceCount == 4, "The drink shelf should offer the bar, coffee, slush and cocktails.");
+                    opened.BuildBar.ShowShelf(StallGroup.Other);
+                    Check(opened.BuildBar.ChoiceCount == 3, "The third shelf should offer ponchos, hats and merchandise.");
+                    opened.BuildBar.ShowShelf(StallGroup.Services);
+                    Check(opened.BuildBar.ChoiceCount == 4, "The last shelf should offer two sizes of toilets, the water point and the litter bin.");
+                    Check(opened.BuildBar.Choose("stallBurgers") && opened.Build.Mode == BuildMode.Stall && opened.BuildBar.Shelf == StallGroup.Food, "The burger van should be on the build bar, on the food shelf.");
                     opened.Build.ShowGhost(new TilePoint(grass.X + 20, grass.Y + 18));
                     Check(opened.Build.Status.Contains("£120"), $"The bar should show the hire price, not '{opened.Build.Status}'.");
                     Check(opened.Build.ClickAt(new TilePoint(grass.X + 20, grass.Y + 18)).Ok, "A food van should go on the grass.");
                     Check(!opened.Build.ClickAt(new TilePoint(grass.X + 22, grass.Y + 18)).Ok, "One stall should not go on top of another.");
+                    foreach (var kind in Enum.GetValues<StallKind>())
+                    {
+                        // Every stall can be drawn, with someone behind the counter of each one that sells.
+                        var drawn = BlueprintFestival.World.SiteProps.Stall(kind);
+                        Check(drawn.GetChildCount() > 0 && (!Catalogue.Sells(kind) || BlueprintFestival.World.SiteProps.StaffSpots(kind).Length == Math.Min(2, Catalogue.Of(kind).Servers)), $"The {Catalogue.Of(kind).Name} should be drawn and staffed.");
+                        drawn.Free();
+                    }
+
+                    foreach (var item in Enum.GetValues<Carried>())
+                    {
+                        if (item != Carried.None)
+                        {
+                            var held = BlueprintFestival.World.SiteProps.CarriedItem(item, 3);
+                            Check(held.Mesh is not null, $"Something should be drawn in the hand for {item}.");
+                            held.Free();
+                        }
+                    }
                     Check(opened.BuildBar.Choose("stallBar") && opened.Build.ClickAt(new TilePoint(grass.X + 20, grass.Y + 36)).Ok, "A bar should go on the grass.");
                     Check(opened.BuildBar.Choose("stallToilets") && opened.Build.ClickAt(new TilePoint(grass.X + 20, grass.Y + 52)).Ok, "Toilets should go on the grass.");
 
@@ -428,16 +451,11 @@ public partial class SmokeTest : Node
                     plan.Year.PickHeadliner(0);
                     Check(game.TicketPrice == 8 && game.HeadlinerPicked == 0, "Clicking a ticket price and a headliner should choose them.");
                     Check(BlueprintFestival.UI.YearScreen.PlanOf(game).Forecast.Contains("chance of rain", StringComparison.Ordinal), "The planning screen should carry the long-range forecast.");
-                    plan.Year.TogglePonchos();
-                    Check(game.PonchosOrdered && game.PonchoCost == game.Crowd.Expected, "Clicking the ponchos should order one for everyone expected.");
-                    plan.Year.TogglePonchos();
-                    Check(!game.PonchosOrdered, "Clicking the ponchos again should cancel them.");
                     var board = SoundBoard.Instance;
                     Check(board is { Listed: 62 }, "The sound board should be loaded with all 62 sounds on its list.");
                     Check(Sounds.Loops.All(board!.Knows) && board.Knows(Sounds.Till), "The sound board should know the background sounds and the till.");
                     Check(board.Announcements == (50, 50), $"All 50 announcements introducing the acts should be loaded with their files, not {board.Announcements}.");
                     Check(board.Asked(Sounds.Notebook) == 1, "The planning notebook should be heard opening.");
-                    Check(board.Asked(Sounds.Ponchos) == 1, "Ordering ponchos should be heard.");
                     board.SetVolume("Crowd", 0.5f, save: false);
                     Check(Mathf.Abs(SoundBoard.Volume("Crowd") - 0.5f) < 0.01f, "The crowd volume slider should turn the crowd down.");
                     board.SetVolume("Crowd", 0, save: false);

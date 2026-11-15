@@ -74,7 +74,17 @@ public sealed partial class FestivalGame
         };
         Crowd.Replanned += ApplyTravel;
         // The stallholders keep most of what they take; the festival gets its share for the pitch.
-        Crowd.Served += (kind, _, paid) => Earn(TakingsLine(kind), ((paid * Catalogue.PitchShare) + 50) / 100);
+        Crowd.Served += (kind, _, paid) =>
+        {
+            // The festival's share, kept to the penny so a run of small sales is not rounded up or away.
+            _sharePence += paid * Catalogue.PitchShare;
+            var pounds = _sharePence / 100;
+            _sharePence -= pounds * 100;
+            if (pounds > 0)
+            {
+                Earn(TakingsLine(kind), pounds);
+            }
+        };
         Crowd.Sold += NoteSale;
         Crowd.Dropped += (x, y) => _litter.Add(new LitterPiece(Math.Round(x, 2), Math.Round(y, 2)));
         Clock.Ticked += Tick;
@@ -401,6 +411,7 @@ public sealed partial class FestivalGame
         Weather = SaveWeather(),
         StallSales = _stallSales.Count > 0 ? SaveStallSales() : null,
         PricedOut = Crowd.PricedOut,
+        SharePence = _sharePence,
     };
 
     public static FestivalGame Load(SaveData data)
@@ -455,6 +466,7 @@ public sealed partial class FestivalGame
         }
 
         game.RestoreStallSales(data.StallSales, data.PricedOut);
+        game._sharePence = data.SharePence;
 
         return game;
     }
@@ -474,6 +486,9 @@ public sealed record SaveData(int Version, string Name, ClockState Clock, int? S
     public List<StallSalesSave>? StallSales { get; init; }
 
     public int PricedOut { get; init; }
+
+    /// <summary>The pennies of the festival's share of stall takings not yet made up to a pound.</summary>
+    public int SharePence { get; init; }
 
     /// <summary>Where the festival is in its year. Missing from a festival with nothing to plan.</summary>
     public YearSave? Year { get; init; }

@@ -109,6 +109,9 @@ public static class UiStyle
         ["shield"] = "<path d='M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z'/>",
         ["ticket"] = "<path d='M3 8a2 2 0 0 0 0 4v4h18v-4a2 2 0 0 0 0-4V4H3z'/><path d='M14 5v2M14 9v2M14 13v2'/>",
         ["cup"] = "<path d='M5 8h11v5a5 5 0 0 1-5 5h-1a5 5 0 0 1-5-5z'/><path d='M16 9h2a2 2 0 0 1 0 5h-2M4 21h13'/>",
+        ["food"] = "<path d='M4 11a8 6 0 0 1 16 0zM3 14.5h18M5 18h14a1 1 0 0 0 1-1v-.5H4v.5a1 1 0 0 0 1 1z'/>",
+        ["hat"] = "<path d='M7 14V9a5 5 0 0 1 10 0v5'/><path d='M3 17c2-2 4-3 9-3s7 1 9 3c-2 1.5-5 2-9 2s-7-.5-9-2z'/>",
+        ["bag"] = "<path d='M5 8h14l1 13H4z'/><path d='M9 11V6a3 3 0 0 1 6 0v5'/>",
         ["glass"] = "<path d='M6 3h12l-1.5 9a4.5 4.5 0 0 1-9 0zM12 16.5V21M8 21h8'/>",
     };
 

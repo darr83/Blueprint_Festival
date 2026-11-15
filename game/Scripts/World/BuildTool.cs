@@ -449,7 +449,8 @@ public partial class BuildTool : Node3D
     }
 
     /// <summary>The tile under the mouse, or null if the mouse is over a panel or off the map.</summary>
-    private TilePoint? TileUnderMouse()
+    /// <summary>The tile the mouse is over, or null when it is over a panel, off the map, or the view is a stage camera's.</summary>
+    public TilePoint? TileUnderMouse()
     {
         var viewport = GetViewport();
         if (viewport.GuiGetHoveredControl() is not null || !_camera.Camera.Current)

@@ -166,7 +166,7 @@ public partial class SiteView : Node3D
             for (var j = 0; j < spots.Length; j++)
             {
                 var person = SiteProps.Stallholder((stall.X * 31) + (stall.Y * 7) + j);
-                person.Position = spots[j] + (stall.Kind == StallKind.Burgers ? new Vector3(0, 0, 0) : Vector3.Zero);
+                person.Position = spots[j];
                 node.AddChild(person);
             }
 

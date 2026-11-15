@@ -120,15 +120,9 @@ public partial class WeatherShots : Node
         game.SetWeather(DayWeather.Of(hot ? WeatherKind.Hot : WeatherKind.Rain, 3));
         festival.Camera.ShowWholeField();
         festival.Year.PickHeadliner(game.Headliners.ToList().FindIndex(h => h.Stars == game.Headliners.Min(o => o.Stars)));
-        var ponchos = name is "1_planning_with_a_wet_forecast" or "5_straw_and_trackway_hold_up";
-        if (ponchos)
-        {
-            festival.Year.TogglePonchos();
-        }
-
         if (name == "1_planning_with_a_wet_forecast")
         {
-            GD.Print($"[weather] {name}: '{game.EarlyForecast}', expected {game.Crowd.Expected}, ponchos £{game.PonchoCost}");
+            GD.Print($"[weather] {name}: '{game.EarlyForecast}', expected {game.Crowd.Expected}");
             return;
         }
 

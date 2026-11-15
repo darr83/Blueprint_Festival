@@ -239,7 +239,7 @@ public static class Catalogue
         new StallInfo(StallKind.Coffee, "Coffee cart", 6, 5, 70, Need.Drink, 0, 40, 1, "Coffee, tea and hot chocolate. Busiest in the morning and in the rain."),
         new StallInfo(StallKind.Slush, "Slush stand", 6, 5, 60, Need.Drink, 0, 20, 1, "Iced slush and lemonade. Children love it, and so does everyone on a hot day."),
         new StallInfo(StallKind.Cocktails, "Cocktail bar", 10, 7, 180, Need.Drink, 0, 40, 2, "A thatched beach bar. Grown-ups' drinks, and a fruit punch for everyone else."),
-        new StallInfo(StallKind.Ponchos, "Poncho stall", 6, 5, 40, null, 0, 20, 1, "Rain ponchos. Nobody looks until it rains, then everybody wants one."),
+        new StallInfo(StallKind.Ponchos, "Poncho stall", 6, 5, 40, null, 0, 12, 1, "Rain ponchos. Nobody looks until it rains, then everybody wants one."),
         new StallInfo(StallKind.BucketHats, "Hat stall", 6, 6, 50, null, 0, 30, 1, "Bucket hats. They sell best in hot sun."),
         new StallInfo(StallKind.Merchandise, "Merchandise tent", 10, 8, 150, null, 0, 40, 2, "The festival's own T-shirts, posters and bags. People who are having a good day take something home."),
     };
@@ -268,9 +268,9 @@ public static class Catalogue
         },
         [StallKind.Pizza] = new[]
         {
-            new StallItem("Margherita slice", 4, Carried.Pizza, 0.8),
-            new StallItem("Pepperoni slice", 5, Carried.Pizza, 0.8),
-            new StallItem("Veggie slice", 4, Carried.Pizza, 0.8),
+            new StallItem("Margherita slice", 4, Carried.Pizza, 0.9),
+            new StallItem("Pepperoni slice", 5, Carried.Pizza, 0.9),
+            new StallItem("Veggie slice", 4, Carried.Pizza, 0.9),
         },
         [StallKind.Noodles] = new[]
         {

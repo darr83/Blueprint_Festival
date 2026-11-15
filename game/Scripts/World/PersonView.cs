@@ -63,6 +63,37 @@ public partial class PersonView : Node3D
     private float _headR;
     private float _mouthY;
     private MeshInstance3D? _ticket;
+    private MeshInstance3D? _held;
+    private float _hold;
+
+    /// <summary>What they have in their left hand.</summary>
+    public BlueprintFestival.Simulation.Site.Carried Holding { get; private set; }
+
+    /// <summary>
+    /// Puts something in their left hand, or takes it away. Food and drink are held up in front of
+    /// them; a bag of merchandise hangs from the hand at their side.
+    /// </summary>
+    public void Hold(BlueprintFestival.Simulation.Site.Carried item)
+    {
+        if (item == Holding)
+        {
+            return;
+        }
+
+        Holding = item;
+        _held?.QueueFree();
+        _held = null;
+        if (item == BlueprintFestival.Simulation.Site.Carried.None)
+        {
+            return;
+        }
+
+        _held = SiteProps.CarriedItem(item, Look.Seed);
+        _held.Position = new Vector3(0, -ArmLength, 0);
+        _armLeft.AddChild(_held);
+    }
+
+    private bool HeldUp => Holding is not (BlueprintFestival.Simulation.Site.Carried.None or BlueprintFestival.Simulation.Site.Carried.Bag);
     private MeshInstance3D? _mouth;
 
     public PersonLook Look { get; private set; } = null!;
@@ -380,6 +411,7 @@ public partial class PersonView : Node3D
         _show = Mathf.MoveToward(_show, Pose == Pose.ShowingTicket ? 1f : 0f, step * 5f);
         _clap = Mathf.MoveToward(_clap, Pose == Pose.Clapping ? 1f : 0f, step * 5f);
         _perform = Mathf.MoveToward(_perform, Pose == Pose.Performing ? 1f : 0f, step * 6f);
+        _hold = Mathf.MoveToward(_hold, HeldUp ? 1f : 0f, step * 5f);
         ApplyPose();
     }
 
@@ -470,6 +502,7 @@ public partial class PersonView : Node3D
         _show = pose == Pose.ShowingTicket ? 1 : 0;
         _clap = pose == Pose.Clapping ? 1 : 0;
         _perform = pose == Pose.Performing ? 1 : 0;
+        _hold = HeldUp ? 1 : 0;
         ApplyPose();
     }
 
@@ -517,7 +550,24 @@ public partial class PersonView : Node3D
             turn *= 1 - _perform;
         }
 
+        if (_hold > 0)
+        {
+            // Whatever else they are doing, the hand with the drink or the food in it stays up and steady.
+            left = left.Lerp(new Vector3(-72, 0, -6), _hold);
+        }
+        else if (Holding == BlueprintFestival.Simulation.Site.Carried.Bag)
+        {
+            // A bag swings less than an empty hand.
+            left = new Vector3(left.X * 0.35f, 0, Mathf.Clamp(left.Z, -14f, 0f));
+        }
+
         _armLeft.RotationDegrees = left;
+        if (_held is not null)
+        {
+            // Held level, whichever way the arm is pointing.
+            _held.RotationDegrees = HeldUp ? new Vector3(-left.X, 0, -left.Z) : Vector3.Zero;
+        }
+
         right.X = Mathf.Lerp(right.X, -100f, _show);
         _armRight.RotationDegrees = right;
 

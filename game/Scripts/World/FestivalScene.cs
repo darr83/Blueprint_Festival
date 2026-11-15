@@ -49,6 +49,7 @@ public partial class FestivalScene : Node3D
     public ShowView SecondActs { get; private set; } = null!;
 
     public MoneyPanel Money { get; private set; } = null!;
+    public StallPanel StallMenu { get; private set; } = null!;
 
     public BuildBar BuildBar { get; private set; } = null!;
 
@@ -183,6 +184,9 @@ public partial class FestivalScene : Node3D
         TopBar.Initialise(Game, OpenMenu);
         _hud.AddChild(TopBar.SkipButton);
         _hud.AddChild(TopBar.GateButton);
+        StallMenu = new StallPanel { Name = "StallPanel" };
+        _hud.AddChild(StallMenu);
+        StallMenu.Initialise(Game, Build);
         Money = new MoneyPanel { Name = "MoneyPanel" };
         _hud.AddChild(Money);
         Money.Initialise(Game);

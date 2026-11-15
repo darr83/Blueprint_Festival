@@ -2133,13 +2133,16 @@ public sealed class Crowd
             return stall.Kind == StallKind.WaterPoint ? 60 + (150 * Roll(party.Id, 31, (int)stall.Kind)) : 0;
         }
 
-        var score = (Cheapest(party, stall) * 60) + (150 * Roll(party.Id, 31, (int)stall.Kind));
+        // Someone properly hungry or thirsty wants a meal or a long drink: a snack is a poor second.
+        var menu = Catalogue.MenuOf(stall.Kind);
+        var snack = 1 - Math.Min(1, menu.Max(m => m.Fills));
+        var score = (Cheapest(party, stall) * 60) + (300 * Roll(party.Id, 31, (int)stall.Kind)) + (snack * 300);
         var hot = Heat >= 1.5;
         var wet = Rain > 0.05;
         var hour = now.TimeOfDay.TotalHours;
         score += stall.Kind switch
         {
-            StallKind.IceCream or StallKind.Slush => (hot ? -150 : 0) + (wet ? 200 : 0) + (stall.Kind == StallKind.Slush && party.HasChild ? -60 : 0),
+            StallKind.IceCream or StallKind.Slush => (hot ? -80 : 0) + (wet ? 200 : 0) + (stall.Kind == StallKind.Slush ? (party.HasChild ? -40 : 60) : 0),
             StallKind.Coffee => (hour < 12 ? -120 : 0) + (wet ? -120 : 0) + (hot ? 150 : 0),
             StallKind.Cocktails => (party.HasChild ? 200 : 0) + (hour >= 17 ? -100 : 0),
             StallKind.Bar => party.HasChild ? 60 : 0,
@@ -2202,7 +2205,7 @@ public sealed class Crowd
     public static double Tempted(double dearness) => Math.Clamp(1 + ((1 - dearness) * 1.2), 0.2, 1.8);
 
     /// <summary>How often a party with nothing pressing thinks about a treat or the shops, in minutes.</summary>
-    public const double FancyEveryMinutes = 10;
+    public const double FancyEveryMinutes = 15;
 
     /// <summary>
     /// The chance that a party, thinking about it, fancies what a stall sells just now. Ponchos go
@@ -2219,20 +2222,35 @@ public sealed class Crowd
             case StallKind.Ponchos:
                 return wet ? 0.7 : DressedForRain ? 0.04 : 0;
             case StallKind.BucketHats:
-                return party.BoughtHats || wet ? 0 : hot ? 0.14 : 0.04;
+                return party.BoughtHats || wet ? 0 : hot ? 0.035 : 0.01;
             case StallKind.Merchandise:
-                return party.BoughtMerch || party.Mood < 0.6 ? 0 : 0.035 + (party.Decided >= 0 || party.DecidedSecond >= 0 ? 0.035 : 0);
+                return party.BoughtMerch || party.Mood < 0.6 ? 0 : 0.012 + (party.Decided >= 0 || party.DecidedSecond >= 0 ? 0.018 : 0);
             case StallKind.IceCream:
-                return party.Hunger < 0.2 ? 0 : 0.06 * (hot ? 3 : 1) * (wet ? 0.2 : 1) * (party.HasChild ? 1.5 : 1);
+                return party.Hunger < 0.2 ? 0 : 0.03 * (hot ? 2.5 : 1) * (wet ? 0.2 : 1) * (party.HasChild ? 1.5 : 1);
             case StallKind.Slush:
-                return party.Thirst < 0.2 ? 0 : 0.05 * (hot ? 3 : 1) * (wet ? 0.2 : 1) * (party.HasChild ? 2 : 1);
+                return party.Thirst < 0.25 ? 0 : 0.02 * (hot ? 2.5 : 1) * (wet ? 0.2 : 1) * (party.HasChild ? 2 : 1);
             case StallKind.Coffee:
-                return party.Thirst < 0.2 ? 0 : 0.05 * (hour < 12 ? 2 : 1) * (wet ? 2 : 1) * (hot ? 0.3 : 1);
+                return party.Thirst < 0.25 ? 0 : 0.02 * (hour < 12 ? 2 : 1) * (wet ? 2 : 1) * (hot ? 0.3 : 1);
             case StallKind.Cocktails:
-                return party.Thirst < 0.2 || !party.Members.Any(GrownUp) ? 0 : 0.04 * (hour >= 17 ? 2 : 1) * (party.HasChild ? 0.3 : 1);
+                return party.Thirst < 0.25 || !party.Members.Any(GrownUp) ? 0 : 0.015 * (hour >= 17 ? 2.5 : 1) * (party.HasChild ? 0.3 : 1);
             default:
                 return 0;
         }
+    }
+
+    /// <summary>
+    /// The extra pull of a bargain: food or drink well under its usual price tempts people who are
+    /// only a little hungry or thirsty and would otherwise have waited.
+    /// </summary>
+    public double Bargain(Party party, PlacedStall stall)
+    {
+        if (Catalogue.Of(stall.Kind).Serves is not { } need || !Catalogue.Sells(stall.Kind))
+        {
+            return 0;
+        }
+
+        var wanting = need == Need.Food ? party.Hunger : party.Thirst;
+        return wanting < 0.3 ? 0 : Math.Max(0, 0.9 - Cheapest(party, stall)) * 0.15;
     }
 
     /// <summary>
@@ -2258,7 +2276,7 @@ public sealed class Crowd
                 continue;
             }
 
-            var appeal = Appeal(party, stall, now);
+            var appeal = Appeal(party, stall, now) + Bargain(party, stall);
             if (appeal <= 0 || !WorthIt(party, stall))
             {
                 continue;
@@ -2562,7 +2580,8 @@ public sealed class Crowd
             // People only wait so long once they have joined the queue.
             if (party.InLine && now - party.QueuedSince > TimeSpan.FromMinutes(PatienceMinutes))
             {
-                var fancied = party.Fancying;
+                // Someone who only fancied a treat, and is not by now properly hungry or thirsty, just shrugs.
+                var fancied = party.Fancying && !(info.Serves is { } served && party.Level(served) >= Seeking);
                 LeaveStall(party);
                 if (!fancied)
                 {

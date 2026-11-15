@@ -10,6 +10,8 @@ public sealed record StallSales(IReadOnlyList<int> Sold, int Takings)
 
 public sealed partial class FestivalGame
 {
+    private int _sharePence;
+
     private readonly Dictionary<(int X, int Y), (int[] Sold, int Takings)> _stallSales = new();
 
     /// <summary>

@@ -23,6 +23,19 @@ public partial class BuildBar : VBoxContainer
     private HBoxContainer _choiceRow = null!;
     private Label _status = null!;
     private BuildMode _open = BuildMode.None;
+    private HBoxContainer _shelfRow = null!;
+    private readonly Dictionary<StallGroup, Button> _shelves = new();
+
+    /// <summary>Which shelf of the Stalls tab is showing: food, drink, the shops, or toilets and water.</summary>
+    public StallGroup Shelf { get; private set; } = StallGroup.Food;
+
+    private static string ShelfName(StallGroup group) => group switch
+    {
+        StallGroup.Food => "Food",
+        StallGroup.Drink => "Drink",
+        StallGroup.Other => "Ponchos, hats and merchandise",
+        _ => "Toilets, water and bins",
+    };
 
     /// <summary>The key of the queue lane choice, under Fences.</summary>
     public const string LaneKey = "fenceQueueLane";
@@ -57,9 +70,23 @@ public partial class BuildBar : VBoxContainer
 
         _choicePanel = new PanelContainer { Visible = false, SizeFlagsHorizontal = SizeFlags.ShrinkCenter };
         _choicePanel.AddThemeStyleboxOverride("panel", UiStyle.Card(margin: 12, radius: 14));
-        _choiceRow = new HBoxContainer();
+        var shelves = new VBoxContainer();
+        shelves.AddThemeConstantOverride("separation", 8);
+        _choicePanel.AddChild(shelves);
+        _shelfRow = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center, Visible = false };
+        _shelfRow.AddThemeConstantOverride("separation", 6);
+        foreach (var group in new[] { StallGroup.Food, StallGroup.Drink, StallGroup.Other, StallGroup.Services })
+        {
+            var chip = UiStyle.ChipButton(ShelfName(group), () => ShowShelf(group), Sounds.Tab);
+            chip.ToggleMode = true;
+            _shelfRow.AddChild(chip);
+            _shelves[group] = chip;
+        }
+
+        shelves.AddChild(_shelfRow);
+        _choiceRow = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
         _choiceRow.AddThemeConstantOverride("separation", 8);
-        _choicePanel.AddChild(_choiceRow);
+        shelves.AddChild(_choiceRow);
         AddChild(_choicePanel);
 
         // A row of round buttons, each with its name underneath, straight on the field.
@@ -70,7 +97,7 @@ public partial class BuildBar : VBoxContainer
         AddTab(row, BuildMode.Stage, "stage", "Stages", "Somewhere for the acts to play, and big screens to show them");
         AddTab(row, BuildMode.Fence, "fence", "Fences", "Keep people in, out, or in a line");
         AddTab(row, BuildMode.Gate, "gate", "Gates", "Where tickets are checked");
-        AddTab(row, BuildMode.Stall, "stall", "Stalls", "Food, drink, toilets and water");
+        AddTab(row, BuildMode.Stall, "stall", "Stalls", "Food, drink, ponchos, hats and merchandise, toilets and water");
         AddTab(row, BuildMode.Staff, "staff", "Staff", "Ticket staff, security, first aid and cleaners");
         AddTab(row, BuildMode.Ground, "ground", "Ground", "Straw, trackway and paths, to keep feet out of the mud");
         AddTab(row, BuildMode.Light, "light", "Lights", "Path lights, floodlights and fairy lights for after dark");
@@ -115,13 +142,8 @@ public partial class BuildBar : VBoxContainer
         }
 
         _open = mode;
-        foreach (var child in _choiceRow.GetChildren())
-        {
-            _choiceRow.RemoveChild(child);
-            child.QueueFree();
-        }
-
-        _choices.Clear();
+        ClearChoices();
+        _shelfRow.Visible = mode == BuildMode.Stall;
         switch (mode)
         {
             case BuildMode.Stage:
@@ -158,12 +180,7 @@ public partial class BuildBar : VBoxContainer
 
                 break;
             case BuildMode.Stall:
-                foreach (var s in Catalogue.Stalls.Where(s => s.Serves is not null || s.Kind == StallKind.Bin))
-                {
-                    var takes = s.Kind == StallKind.Bin ? "" : s.Price > 0 ? $"People pay £{s.Price} each." : "Free to use.";
-                    AddChoice($"stall{s.Kind}", s.Name, $"£{s.Cost:N0}", $"{s.About}\n{takes} {s.Width / 2f:0.#} m wide, {s.Depth / 2f:0.#} m deep.", () => _tool.PickStall(s.Kind));
-                }
-
+                AddShelf();
                 break;
             case BuildMode.Staff:
             {
@@ -214,6 +231,49 @@ public partial class BuildBar : VBoxContainer
         }
     }
 
+    private void ClearChoices()
+    {
+        foreach (var child in _choiceRow.GetChildren())
+        {
+            _choiceRow.RemoveChild(child);
+            child.QueueFree();
+        }
+
+        _choices.Clear();
+    }
+
+    /// <summary>Fills the Stalls tab with one shelf of stalls.</summary>
+    private void AddShelf()
+    {
+        foreach (var s in Catalogue.StallsIn(Shelf))
+        {
+            var menu = Catalogue.MenuOf(s.Kind);
+            var sells = menu.Count > 0
+                ? $"Sells {string.Join(", ", menu.Select(m => $"{m.Name.ToLowerInvariant()} £{m.UsualPrice}"))}.\nOnce it is up, click it to set its prices."
+                : s.Kind == StallKind.Bin ? "" : "Free to use.";
+            AddChoice($"stall{s.Kind}", s.Name, $"£{s.Cost:N0}", $"{s.About}\n{sells}\n{s.Width / 2f:0.#} m wide, {s.Depth / 2f:0.#} m deep. R turns it.", () => _tool.PickStall(s.Kind));
+        }
+
+        foreach (var (group, chip) in _shelves)
+        {
+            chip.SetPressedNoSignal(group == Shelf);
+        }
+    }
+
+    /// <summary>Shows another shelf of the Stalls tab.</summary>
+    public void ShowShelf(StallGroup group)
+    {
+        Shelf = group;
+        if (_open != BuildMode.Stall)
+        {
+            return;
+        }
+
+        ClearChoices();
+        AddShelf();
+        _tool.Stop();
+    }
+
     public void Close()
     {
         _open = BuildMode.None;
@@ -224,6 +284,13 @@ public partial class BuildBar : VBoxContainer
     /// <summary>Presses one of the open group's choices, as a click would. The key is like "stageBandstand".</summary>
     public bool Choose(string key)
     {
+        if (!_choices.ContainsKey(key) && _open == BuildMode.Stall && key.StartsWith("stall", System.StringComparison.Ordinal)
+            && System.Enum.TryParse<StallKind>(key["stall".Length..], out var kind) && Catalogue.GroupOf(kind) != Shelf)
+        {
+            // It is on another shelf: turn to that one first.
+            ShowShelf(Catalogue.GroupOf(kind));
+        }
+
         if (!_choices.TryGetValue(key, out var button))
         {
             return false;
@@ -241,8 +308,12 @@ public partial class BuildBar : VBoxContainer
         return booth && (k.Contains("aid") || k.Contains("medical")) ? ("cross", UiStyle.FirstAidGreen)
             : booth && k.Contains("toilet") ? ("door", UiStyle.StagePink)
             : booth && k.Contains("water") ? ("drop", UiStyle.StagePink)
-            : k.StartsWith("stallbar") ? ("glass", UiStyle.StagePink)
-            : k.StartsWith("stalltea") ? ("cup", UiStyle.StagePink)
+            : k is "stallbar" or "stallcocktails" or "stallslush" ? ("glass", UiStyle.StagePink)
+            : k == "stallcoffee" ? ("cup", UiStyle.StagePink)
+            : k == "stallbuckethats" ? ("hat", UiStyle.StagePink)
+            : k == "stallmerchandise" ? ("bag", UiStyle.StagePink)
+            : k == "stallponchos" ? ("drop", UiStyle.StagePink)
+            : k is "stallhotdogs" or "stallburgers" or "stallfries" or "stallpizza" or "stallnoodles" or "stallicecream" ? ("food", UiStyle.StagePink)
             : booth && k.Contains("security") ? ("shield", UiStyle.StagePink)
             : k == "stallbin" ? ("bin", UiStyle.StagePink)
             : k == "staffcleaner" ? ("broom", UiStyle.StagePink)

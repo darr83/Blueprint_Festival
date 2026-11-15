@@ -168,7 +168,8 @@ public sealed class SoundScript : IDisposable
         StallKind.Coffee => Sounds.TeaCup,
         StallKind.HotDogs or StallKind.Burgers or StallKind.Fries or StallKind.Pizza or StallKind.Noodles => Sounds.Fry,
         StallKind.Bar or StallKind.Slush or StallKind.Cocktails => Sounds.PourDrink,
-        StallKind.IceCream or StallKind.Ponchos or StallKind.BucketHats or StallKind.Merchandise => Sounds.Till,
+        StallKind.Ponchos => Sounds.Ponchos,
+        StallKind.IceCream or StallKind.BucketHats or StallKind.Merchandise => Sounds.Till,
         StallKind.WaterPoint => Sounds.WaterTap,
         _ => Sounds.ToiletDoor,
     };
