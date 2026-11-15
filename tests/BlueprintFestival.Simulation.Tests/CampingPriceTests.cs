@@ -78,7 +78,9 @@ public class CampingPriceTests
     [Fact]
     public void The_pitch_price_is_fixed_once_the_gates_open()
     {
-        var game = GrowthTests.Built(5000, 90000, camping: true);
+        var game = Showground();
+        game.BookCamping(true);
+        Assert.True(game.ConfirmPlan());
         game.SetCampingPrice(9);
         game.StartDay();
 
