@@ -413,6 +413,7 @@ public sealed partial class FestivalGame
         var rain = Weather.RainAt(now);
         Crowd.Rain = rain;
         Crowd.Damp = Wetness >= DampGround;
+        Crowd.Night = Light < 0.4;
 
         // An hour of pouring rain leaves the ground most of the way to sodden; it takes a long dry spell to come back.
         Wetness = Math.Clamp(Wetness + (rain > 0.05 ? rain * 0.012 : Weather.Kind == WeatherKind.Hot ? -0.003 : -0.0012), 0, 1);
@@ -553,6 +554,7 @@ public sealed partial class FestivalGame
         Dress();
         Crowd.Rain = Math.Clamp(save.Falling, 0, 1);
         Crowd.Damp = Wetness >= DampGround;
+        Crowd.Night = Light < 0.4;
     }
 }
 

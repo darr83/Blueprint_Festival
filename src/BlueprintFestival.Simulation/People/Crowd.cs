@@ -484,7 +484,29 @@ public sealed partial class Crowd
     /// </summary>
     public bool KeepsToPaths(Party party) => (uint)(party.Id * 2246822519u) % 1000 < PathShare * 1000;
 
-    private List<TilePoint>? Route(Party party, TilePoint from, TilePoint to) => (party.Vip ? _vipPaths : _paths).FindPath(from, to, KeepsToPaths(party));
+    private List<TilePoint>? Route(Party party, TilePoint from, TilePoint to) => PathsFor(party).FindPath(from, to, KeepsToPaths(party));
+
+    private bool _vipPathsStale = true;
+
+    /// <summary>
+    /// The route finder for this party. VIPs only need their own when some ground is kept for
+    /// them; until then they walk where everyone else does, and their finder is not kept up to date.
+    /// </summary>
+    private PathFinder PathsFor(Party party)
+    {
+        if (!party.Vip || !_map.HasVipOnly)
+        {
+            return _paths;
+        }
+
+        if (_vipPathsStale)
+        {
+            _vipPaths.Refresh();
+            _vipPathsStale = false;
+        }
+
+        return _vipPaths;
+    }
 
     /// <summary>Whether people have dressed for a wet day: wellies, and a rain poncho for about half of them.</summary>
     public bool DressedForRain { get; set; }
@@ -499,6 +521,9 @@ public sealed partial class Crowd
 
     /// <summary>How dark a place is right now, from 0 to 1, if the game knows: night with no light near is 1.</summary>
     public Func<double, double, double>? Darkness { get; set; }
+
+    /// <summary>True once the daylight has gone: a fire pit cheers people more then.</summary>
+    public bool Night { get; set; }
 
     /// <summary>True if a place, in metres, can see and hear a big screen well, if the game knows.</summary>
     public Func<double, double, bool>? OnScreen { get; set; }
@@ -1006,7 +1031,7 @@ public sealed partial class Crowd
     private void SiteChanged()
     {
         _paths.Refresh();
-        _vipPaths.Refresh();
+        _vipPathsStale = true;
         RefreshVipPlaces();
 
         // People stand on the festival side of the gates, or anywhere in the field if it is open.
@@ -2090,6 +2115,12 @@ public sealed partial class Crowd
         {
             // A sit down does everyone good.
             change += SitPerHour * perHour;
+        }
+
+        if (_site.Decorations.Count > 0 || _site.Bunting.Count > 0)
+        {
+            // A field that has been dressed up is a nicer place to be.
+            change += _site.CharmAt(party.X, party.Y, Night) * Decor.CharmPerHour * perHour;
         }
 
         if (Rain > 0.05 && !sheltered)

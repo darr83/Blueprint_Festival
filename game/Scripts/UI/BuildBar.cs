@@ -61,6 +61,54 @@ public partial class BuildBar : VBoxContainer
     /// <summary>Opens the firework mixer. Set by the scene.</summary>
     public System.Action? OpenMixer { get; set; }
 
+    /// <summary>The key of a decoration, on the Decorations shelf under Decor.</summary>
+    public static string DecorKey(DecorKind kind) => $"decor{kind}";
+
+    /// <summary>The key of bunting, on the Decorations shelf under Decor.</summary>
+    public const string BuntingKey = "decorBunting";
+
+    /// <summary>True when the Decor group is showing its decorations, false for its signs.</summary>
+    public bool DecorShelf { get; private set; }
+
+    private HBoxContainer _decorRow = null!;
+    private readonly Button[] _decorChips = new Button[2];
+
+    /// <summary>Turns the Decor group to its signs or to its decorations.</summary>
+    public void ShowDecorShelf(bool decorations)
+    {
+        DecorShelf = decorations;
+        if (_open != BuildMode.Sign)
+        {
+            return;
+        }
+
+        ClearChoices();
+        AddDecorShelf();
+        _tool.Stop();
+    }
+
+    private void AddDecorShelf()
+    {
+        if (DecorShelf)
+        {
+            AddChoice(BuntingKey, "Bunting", $"£{Decor.BuntingPerMetre} a metre", "Little flags on a line between two poles, high enough to walk under.\nDrag to string it, up to 16 m. Start on a pole to carry on.", () => _tool.PickBunting());
+            foreach (var d in Decor.Everything)
+            {
+                AddChoice(DecorKey(d.Kind), d.Name, $"£{d.Cost:N0}", $"{d.About}\nCheers up people within {d.Reach:0} m. R turns it.", () => _tool.PickDecor(d.Kind));
+            }
+        }
+        else
+        {
+            foreach (var s in Signs.Everything)
+            {
+                AddChoice(SignKey(s.Kind), s.Name, $"£{s.Cost:N0}", $"{s.About}\n{s.Width / 2f:0.#} m wide. R turns it.", () => _tool.PickSign(s.Kind));
+            }
+        }
+
+        _decorChips[0].SetPressedNoSignal(!DecorShelf);
+        _decorChips[1].SetPressedNoSignal(DecorShelf);
+    }
+
     /// <summary>The key of a sign, under Signs.</summary>
     public static string SignKey(SignKind kind) => $"sign{kind}";
 
@@ -110,6 +158,18 @@ public partial class BuildBar : VBoxContainer
         }
 
         shelves.AddChild(_shelfRow);
+        _decorRow = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center, Visible = false };
+        _decorRow.AddThemeConstantOverride("separation", 6);
+        for (var i = 0; i < 2; i++)
+        {
+            var decorations = i == 1;
+            var chip = UiStyle.ChipButton(decorations ? "Decorations" : "Signs", () => ShowDecorShelf(decorations), Sounds.Tab);
+            chip.ToggleMode = true;
+            _decorRow.AddChild(chip);
+            _decorChips[i] = chip;
+        }
+
+        shelves.AddChild(_decorRow);
         _widthRow = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center, Visible = false };
         _widthRow.AddThemeConstantOverride("separation", 6);
         for (var patches = 1; patches <= FestivalGame.WidestPath; patches++)
@@ -142,7 +202,7 @@ public partial class BuildBar : VBoxContainer
         AddTab(row, BuildMode.Ground, "ground", "Ground", "Straw, trackway, pallets, mats, sand and artificial grass");
         AddTab(row, BuildMode.Path, "path", "Paths", "Mown, bark, gravel and boardwalk paths, up to 6 m wide");
         AddTab(row, BuildMode.Comfort, "bench", "Comforts", "Seats, tables, hand washing and shade");
-        AddTab(row, BuildMode.Sign, "sign", "Signs", "Signs with your own words on: boards, finger posts, banners and a site map");
+        AddTab(row, BuildMode.Sign, "sign", "Decor", "Signs with your own words on, and decorations: bunting, flags, flowers, a fire pit and giant letters");
         AddTab(row, BuildMode.Light, "light", "Lights", "Path lights, floodlights and fairy lights for after dark");
         AddTab(row, BuildMode.Fireworks, "firework", "Fireworks", "A launch pad, and firework shows to plan on the mixer");
         AddTab(row, BuildMode.Remove, "remove", "Take down", "Remove something and get the money back");
@@ -188,6 +248,7 @@ public partial class BuildBar : VBoxContainer
         _open = mode;
         ClearChoices();
         _shelfRow.Visible = mode == BuildMode.Stall;
+        _decorRow.Visible = mode == BuildMode.Sign;
         _widthRow.Visible = mode == BuildMode.Path;
         switch (mode)
         {
@@ -265,11 +326,7 @@ public partial class BuildBar : VBoxContainer
                     "Timber planks. No mud and no wear, and smart with it.\nDrag to lay it.", () => _tool.PickGround(GroundKind.Boardwalk));
                 break;
             case BuildMode.Sign:
-                foreach (var s in Signs.Everything)
-                {
-                    AddChoice(SignKey(s.Kind), s.Name, $"£{s.Cost:N0}", $"{s.About}\n{s.Width / 2f:0.#} m wide. R turns it.", () => _tool.PickSign(s.Kind));
-                }
-
+                AddDecorShelf();
                 break;
             case BuildMode.Comfort:
                 foreach (var c in Comforts.Everything)
@@ -392,6 +449,12 @@ public partial class BuildBar : VBoxContainer
             ShowShelf(Catalogue.GroupOf(kind));
         }
 
+        if (!_choices.ContainsKey(key) && _open == BuildMode.Sign && (key.StartsWith("decor", System.StringComparison.Ordinal) != DecorShelf))
+        {
+            // It is on the other shelf of the Decor group.
+            ShowDecorShelf(!DecorShelf);
+        }
+
         if (!_choices.TryGetValue(key, out var button))
         {
             return false;
@@ -428,6 +491,7 @@ public partial class BuildBar : VBoxContainer
             : k.StartsWith("pad") || k.StartsWith("fireworks") ? ("firework", UiStyle.StagePink)
             : k is "groundmownpath" or "groundbarkchip" or "groundgravel" or "groundboardwalk" ? ("path", UiStyle.StagePink)
             : k.StartsWith("sign") ? ("sign", UiStyle.StagePink)
+            : k.StartsWith("decor") ? ("flag", UiStyle.StagePink)
             : k.StartsWith("ground") ? ("ground", UiStyle.StagePink)
             : k is "comforthandgel" or "comforthandwash" ? ("drop", UiStyle.StagePink)
             : k.StartsWith("comfort") ? ("bench", UiStyle.StagePink)
@@ -490,6 +554,8 @@ public partial class BuildBar : VBoxContainer
             BuildMode.LaunchPad => PadKey(_tool.Pad),
             BuildMode.Comfort => ComfortKey(_tool.Comfort),
             BuildMode.Sign => SignKey(_tool.Sign),
+            BuildMode.Decor => DecorKey(_tool.Decor),
+            BuildMode.Bunting => BuntingKey,
             _ => "",
         };
         foreach (var (key, button) in _choices)

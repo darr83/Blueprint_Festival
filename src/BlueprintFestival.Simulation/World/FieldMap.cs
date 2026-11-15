@@ -364,14 +364,19 @@ public sealed class FieldMap
     public void SetVipOnly(IEnumerable<TilePoint> tiles)
     {
         Array.Clear(_vipOnly);
+        HasVipOnly = false;
         foreach (var p in tiles)
         {
             if (InBounds(p.X, p.Y))
             {
                 _vipOnly[(p.Y * Width) + p.X] = true;
+                HasVipOnly = true;
             }
         }
     }
+
+    /// <summary>True if any tile at all is kept for VIP guests.</summary>
+    public bool HasVipOnly { get; private set; }
 
     /// <summary>True where staff can walk: anywhere the public can, and the ground the public are kept off.</summary>
     public bool IsWalkableForStaff(int x, int y) => this[x, y] is Ground.Grass or Ground.Lane && !_blocked[(y * Width) + x];

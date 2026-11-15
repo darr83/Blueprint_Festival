@@ -246,11 +246,20 @@ public static partial class SiteProps
             door.AddChild(leaf.BuildNode("Leaf"));
             foreach (var (sign, colour) in new[] { ("Vacant", new Color("#1E9E52")), ("Engaged", new Color("#D9483B")) })
             {
+                // A big plate across the top of the door, easy to read from across the field.
                 var disc = new MeshBuilder();
-                disc.Tube(new Vector3(0.4f, 1.75f, 0.036f), new Vector3(0.16f, 0.02f, 0.16f), colour, new Vector3(90, 0, 0));
+                disc.Box(new Vector3(0.4f, 1.72f, 0.03f), new Vector3(0.62f, 0.3f, 0.03f), colour);
                 var node3 = disc.BuildNode(sign);
                 node3.Visible = sign == "Vacant";
                 door.AddChild(node3);
+
+                // And a lamp on the roof, so it shows from behind and from far off as well.
+                var lamp = new MeshBuilder();
+                lamp.Tube(new Vector3(x, 2.43f, -0.15f), new Vector3(0.2f, 0.1f, 0.2f), Charcoal);
+                lamp.Ball(new Vector3(x, 2.58f, -0.15f), 0.34f, colour.Lightened(0.15f));
+                var lampNode = lamp.BuildNode($"Lamp{i}{sign}");
+                lampNode.Visible = sign == "Vacant";
+                node.AddChild(lampNode);
             }
 
             node.AddChild(door);

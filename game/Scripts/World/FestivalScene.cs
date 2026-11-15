@@ -73,6 +73,12 @@ public partial class FestivalScene : Node3D
 
     public CrowdPanel CrowdSafety { get; private set; } = null!;
 
+    /// <summary>The event day panel, "The day so far".</summary>
+    public DayPanel DayBoard { get; private set; } = null!;
+
+    /// <summary>The button under the festival's name that opens the event day panel.</summary>
+    public Button DayButton { get; private set; } = null!;
+
     public FestivalSounds Sounds { get; private set; } = null!;
 
     public CampView Camp { get; private set; } = null!;
@@ -214,6 +220,15 @@ public partial class FestivalScene : Node3D
         _hud.AddChild(Money);
         Money.Initialise(Game);
         TopBar.MoneyPressed += ToggleMoney;
+        DayBoard = new DayPanel();
+        _hud.AddChild(DayBoard);
+        DayBoard.Initialise(Game);
+        DayButton = UiStyle.SecondaryButton("The day so far  (H)", ToggleDayBoard);
+        DayButton.Name = "DayButton";
+        DayButton.Theme = UiStyle.Theme;
+        DayButton.TooltipText = "Everything about the day at a glance: the acts, how people feel, incidents and money";
+        _hud.AddChild(DayButton);
+        DayButton.Position = new Vector2(22, UiStyle.TopClear - 2);
         Year = new YearScreen { Name = "YearScreen" };
         _hud.AddChild(Year);
         Year.Initialise(Game, this);
@@ -239,7 +254,7 @@ public partial class FestivalScene : Node3D
         };
         Game.CrushWarning += OnCrushWarning;
 
-        _hint = UiStyle.Body("Q / E turn view    WASD move    Wheel zoom\nSpace pause    C crowd view", muted: true, size: 13);
+        _hint = UiStyle.Body("Q / E turn view    WASD move    Wheel zoom\nSpace pause    C crowd view    H the day so far", muted: true, size: 13);
         _hint.Theme = UiStyle.Theme;
         _hint.AddThemeColorOverride("font_color", new Color(1, 1, 1, 0.85f));
         _hint.AddThemeColorOverride("font_shadow_color", new Color(0, 0, 0, 0.5f));
@@ -254,7 +269,12 @@ public partial class FestivalScene : Node3D
     {
         Game.Advance(delta);
         Sky.Apply(Game, StageCam.Yaw);
-        CrowdSafety.RightInset = Money.Visible ? Money.Size.X + 14 : 0;
+        CrowdSafety.RightInset = Money.Visible ? Money.Size.X + 14 : DayBoard.Visible ? DayBoard.Size.X + 14 : 0;
+        DayButton.Visible = Game.Phase is Phase.Day or Phase.Tidy && !Year.HasCentrePanel;
+        if (!DayButton.Visible && DayBoard.Visible)
+        {
+            DayBoard.Visible = false;
+        }
         if (_viewFromWarning && Density.Showing && !Game.CrushBuilding && Game.CrowdStatus != Crowding.CrushRisk)
         {
             // The knot of people has cleared by itself: put the view back as the player had it.
@@ -355,12 +375,19 @@ public partial class FestivalScene : Node3D
             case Key.B:
                 StageCam.Toggle(StageShot.Back);
                 break;
+            case Key.H when DayButton.Visible:
+                ToggleDayBoard();
+                break;
             case Key.Tab:
                 // On a stage camera, on to the next stage.
                 StageCam.NextStage();
                 break;
             case Key.Escape:
-                if (StageCam.Showing is not null)
+                if (DayBoard.Visible)
+                {
+                    DayBoard.Visible = false;
+                }
+                else if (StageCam.Showing is not null)
                 {
                     // Esc leaves a stage camera first; pressed again it opens the menu.
                     StageCam.Show(null);
@@ -424,7 +451,18 @@ public partial class FestivalScene : Node3D
         Money.Visible = !Money.Visible;
         if (Money.Visible)
         {
+            DayBoard.Visible = false;
             Money.Refresh();
+        }
+    }
+
+    /// <summary>Opens or shuts the event day panel. It takes the money panel's place on the right.</summary>
+    public void ToggleDayBoard()
+    {
+        DayBoard.Toggle();
+        if (DayBoard.Visible)
+        {
+            Money.Visible = false;
         }
     }
 

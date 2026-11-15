@@ -311,6 +311,8 @@ public sealed partial class FestivalGame
 
         var result = new FireworkResult(show.Minute, outcome, outcome == FireworkOutcome.CalledOff ? 0 : rating.Stars, hurt, why);
         _fireworkResults.Add(result);
+        Note(DayNoteKind.Fireworks, outcome == FireworkOutcome.CalledOff ? "Fireworks called off" : $"Fireworks: {result.Stars} star show",
+            outcome == FireworkOutcome.CalledOff ? why : hurt > 0 ? $"{hurt} hurt" : why.Length > 0 ? why : "Went off as planned", outcome == FireworkOutcome.CalledOff || hurt > 0 ? DayTone.Bad : DayTone.Good);
         FireworksStarted?.Invoke(show, result);
     }
 
@@ -334,7 +336,7 @@ public sealed partial class FestivalGame
         }
 
         Crowd.TakeIll(near);
-        _incidents.Add(new Incident(_nextIncident++, IncidentKind.Ill, near.X, near.Y, near.Id, now));
+        Raise(new Incident(_nextIncident++, IncidentKind.Ill, near.X, near.Y, near.Id, now), DayNoteKind.Hurt, "Burned by a firework");
         Crowd.Upset(near.X, near.Y, 8, 0.04);
         return true;
     }

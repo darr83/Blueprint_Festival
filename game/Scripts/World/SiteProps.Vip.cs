@@ -13,7 +13,7 @@ public static partial class SiteProps
     public static readonly Color VipInk = new("#1E1E24");
     private static readonly Color Velvet = new("#4B2766");
     private static readonly Color VelvetDark = new("#3A1D50");
-    private static readonly Color Leaf = new("#3F8F4E");
+    private static readonly Color LoungeLeaf = new("#3F8F4E");
 
     /// <summary>True for the VIP buildings drawn here.</summary>
     private static bool Vip(MeshBuilder b, Node3D node, StallKind kind)
@@ -117,7 +117,7 @@ public static partial class SiteProps
         {
             var x = side * ((w / 2) - 0.45f);
             b.Tube(new Vector3(x, 0.25f, (d / 2) - 0.45f), new Vector3(0.45f, 0.5f, 0.45f), VipGold);
-            b.Ball(new Vector3(x, 0.95f, (d / 2) - 0.45f), new Vector3(0.7f, 1.0f, 0.7f), Leaf);
+            b.Ball(new Vector3(x, 0.95f, (d / 2) - 0.45f), new Vector3(0.7f, 1.0f, 0.7f), LoungeLeaf);
             Stanchions(b, new Vector3(side * 2.85f, 0, (d / 2) - 0.25f), new Vector3(side * 1.15f, 0, (d / 2) - 0.25f));
         }
     }

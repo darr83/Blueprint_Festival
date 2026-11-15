@@ -161,7 +161,7 @@ public sealed partial class SiteLayout
     }
 
     /// <summary>VIP ground goes on clear grass, or under seats and tables, which then become VIP seats.</summary>
-    private bool CanMarkVip(TilePoint p) => _map[p] == Ground.Grass && (IsEmpty(p) || ((ComfortAt(p) is not null || SignAt(p) is not null) && !_keepOut.Contains(p)));
+    private bool CanMarkVip(TilePoint p) => _map[p] == Ground.Grass && (IsEmpty(p) || ((ComfortAt(p) is not null || SignAt(p) is not null || DecorAt(p) is not null || IsBuntingPole(p)) && !_keepOut.Contains(p)));
 
     /// <summary>True for a seat, table or shade standing on VIP ground: only VIP guests use it.</summary>
     public bool ForVips(PlacedComfort comfort) => TilesOf(comfort.Rect).Any(_vipGround.Contains);

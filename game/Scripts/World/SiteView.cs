@@ -13,6 +13,9 @@ public partial class SiteView : Node3D
 
     /// <summary>How far a cubicle door swings open, in degrees.</summary>
     private const float DoorOpenDegrees = -105f;
+    private const float DoorHoldSeconds = 0.7f;
+    private const float DoorSwingSpeed = 420f;
+    private readonly System.Collections.Generic.Dictionary<Node3D, float> _doorHeld = new();
 
     private readonly System.Collections.Generic.List<(int Stall, Node3D[] Doors)> _toilets = new();
     private readonly System.Collections.Generic.List<(PlacedStall Bin, Node3D Rubbish)> _bins = new();
@@ -34,6 +37,11 @@ public partial class SiteView : Node3D
 
     /// <summary>How many seats, sinks and sails are drawn.</summary>
     public int ComfortCount { get; private set; }
+
+    /// <summary>How many decorations and lines of bunting are drawn.</summary>
+    public int DecorCount { get; private set; }
+
+    private readonly System.Collections.Generic.List<OmniLight3D> _glows = new();
 
     /// <summary>How many signs are drawn.</summary>
     public int SignCount { get; private set; }
@@ -68,6 +76,16 @@ public partial class SiteView : Node3D
         }
 
         Doors((float)delta, snap: false);
+
+        // Fire pits glow as the daylight goes.
+        if (_glows.Count > 0)
+        {
+            var energy = 3.4f * (float)System.Math.Clamp(1.2 - (_game.Light * 1.5), 0, 1);
+            foreach (var glow in _glows)
+            {
+                glow.LightEnergy = energy;
+            }
+        }
     }
 
     /// <summary>
@@ -88,18 +106,29 @@ public partial class SiteView : Node3D
             rubbish.Visible = _game.BinFill(bin) >= FestivalGame.BinWantsEmptying;
         }
 
-        var faster = Mathf.Max(1, (int)_game.Clock.Speed);
         foreach (var (stall, doors) in _toilets)
         {
             for (var i = 0; i < doors.Length; i++)
             {
                 var look = _game.Crowd.Cubicle(stall, doors.Length - 1 - i);
                 var door = doors[i];
-                var wanted = look == Simulation.People.CubicleLook.DoorOpen ? DoorOpenDegrees : 0f;
+
+                // At 4x and 8x a door is only open for a blink, so keep it open long enough to see.
+                _doorHeld.TryGetValue(door, out var held);
+                held = look == Simulation.People.CubicleLook.DoorOpen ? DoorHoldSeconds : Mathf.Max(0f, held - delta);
+                _doorHeld[door] = held;
+
+                var wanted = held > 0f ? DoorOpenDegrees : 0f;
                 var now = door.RotationDegrees.Y;
-                door.RotationDegrees = new Vector3(0, snap ? wanted : Mathf.MoveToward(now, wanted, delta * 260f * faster), 0);
-                door.GetNode<Node3D>("Engaged").Visible = look == Simulation.People.CubicleLook.Engaged;
-                door.GetNode<Node3D>("Vacant").Visible = look != Simulation.People.CubicleLook.Engaged;
+                door.RotationDegrees = new Vector3(0, snap ? wanted : Mathf.MoveToward(now, wanted, delta * DoorSwingSpeed), 0);
+
+                var engaged = look == Simulation.People.CubicleLook.Engaged;
+                door.GetNode<Node3D>("Engaged").Visible = engaged;
+                door.GetNode<Node3D>("Vacant").Visible = !engaged;
+                var cabin = door.GetParent();
+                var number = door.Name.ToString().Substring("Door".Length);
+                cabin.GetNode<Node3D>($"Lamp{number}Engaged").Visible = engaged;
+                cabin.GetNode<Node3D>($"Lamp{number}Vacant").Visible = !engaged;
             }
         }
     }
@@ -158,6 +187,7 @@ public partial class SiteView : Node3D
         _toilets.Clear();
         _bins.Clear();
         _shutBars.Clear();
+        _doorHeld.Clear();
         var site = _game.Site;
         foreach (var stage in site.Stages)
         {
@@ -223,6 +253,25 @@ public partial class SiteView : Node3D
         }
 
         SignCount = site.Signs.Count;
+        _glows.Clear();
+        foreach (var decor in site.Decorations)
+        {
+            var node = SiteProps.Decoration(decor);
+            node.Position = Middle(decor.Rect);
+            node.RotationDegrees = new Vector3(0, Turn(decor.Facing), 0);
+            AddChild(node);
+            if (node.GetNodeOrNull<OmniLight3D>("Glow") is { } glow)
+            {
+                _glows.Add(glow);
+            }
+        }
+
+        foreach (var run in site.Bunting)
+        {
+            AddChild(SiteProps.BuntingBetween(run));
+        }
+
+        DecorCount = site.Decorations.Count + site.Bunting.Count;
         for (var i = 0; i < site.Gates.Count; i++)
         {
             var node = SiteProps.Gate(site.Gates[i].Kind, _game.Name);
