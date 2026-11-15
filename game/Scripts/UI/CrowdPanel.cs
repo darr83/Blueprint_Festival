@@ -255,6 +255,9 @@ public partial class CrowdPanel : Control
     /// <summary>How much room to leave on the right for another panel that is open there, in pixels.</summary>
     public float RightInset { get; set; }
 
+    /// <summary>How far down the screen the warning card reaches, or the top clearance while there is none.</summary>
+    public float WarningBottom => _warning.Visible ? _warning.Position.Y + _warning.Size.Y : UiStyle.TopClear;
+
     /// <summary>Brings the four choices up to date: what each would cost now, and which can be done.</summary>
     private void UpdateChoices()
     {

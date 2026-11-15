@@ -51,6 +51,10 @@ public partial class GameManager : Node
             {
                 AddChild(new StallShots(arg["--stall-shots=".Length..]) { Name = "StallShots" });
             }
+            else if (arg.StartsWith("--area-shots=", StringComparison.Ordinal))
+            {
+                AddChild(new AreaShots(arg["--area-shots=".Length..]) { Name = "AreaShots" });
+            }
             else if (arg.StartsWith("--vip-shots=", StringComparison.Ordinal))
             {
                 AddChild(new VipShots(arg["--vip-shots=".Length..]) { Name = "VipShots" });

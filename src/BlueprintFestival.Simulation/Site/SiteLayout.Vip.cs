@@ -187,7 +187,7 @@ public sealed partial class SiteLayout
     /// <summary>Drops VIP marks from ground something has since been built on, and tells the map.</summary>
     private void RefreshVipGround()
     {
-        _vipGround.RemoveWhere(p => _fence.ContainsKey(p) || StageAt(p) is not null || StallAt(p) is not null || GateAt(p) is not null || _laneOf.ContainsKey(p) || _barriers.Contains(p) || ScreenAt(p) is not null || FireworksAt(p));
+        _vipGround.RemoveWhere(p => _fence.ContainsKey(p) || StageAt(p) is not null || StallAt(p) is not null || GateAt(p) is not null || _laneOf.ContainsKey(p) || _barriers.Contains(p) || ScreenAt(p) is not null || FireworksAt(p) || _areaEdges.Contains(p));
         _keepOut.ExceptWith(_vipGround);
         _vipInside.Clear();
         _heights.Clear();
@@ -209,6 +209,6 @@ public sealed partial class SiteLayout
             }
         }
 
-        _map.SetVipOnly(_vipGround.Concat(_vipInside));
+        _map.SetVipOnly(_vipGround.Concat(_vipInside).Concat(VipAreaInside()));
     }
 }

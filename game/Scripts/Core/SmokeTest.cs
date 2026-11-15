@@ -224,6 +224,19 @@ public partial class SmokeTest : Node
                     opened.BuildBar.Toggle(BuildMode.Remove);
                     Check(opened.Build.ClickAt(new TilePoint(grass.X + 49, grass.Y + 55)).Ok && site.Lanes.Count == 0 && site.LaneBarriers.Count == 0, "Taking down a barrier should take the whole lane.");
 
+                    // Crowd areas: dragged out from the Areas group, barrier round them, a card to set how many they let in.
+                    opened.BuildBar.Toggle(BuildMode.Area);
+                    Check(opened.BuildBar.ChoiceCount == 4 && opened.BuildBar.Choose(UI.BuildBar.AreaKey(AreaKind.FrontPen)) && opened.Build.Mode == BuildMode.Area, "The Areas group should offer a front pen, a standing area, a VIP area and keep clear.");
+                    var (penFrom, penTo) = (new TilePoint(grass.X + 50, grass.Y + 50), new TilePoint(grass.X + 65, grass.Y + 61));
+                    opened.Build.HoldDrag(penFrom, penTo);
+                    Check(opened.Build.Status.Contains("lets in 70") && opened.Build.AreaMarksShown, $"The bar should say what the pen lets in, not '{opened.Build.Status}'.");
+                    Check(opened.Build.DragArea(penFrom, penTo).Ok && site.Areas.Count == 1 && opened.Areas.EditorShown && opened.Areas.LimitText == "70", "A front pen should go down and open its card at 70 people.");
+                    Check(opened.Game.SetAreaLimit(0, 90) == 90, "The pen's limit should change.");
+                    opened.Site.Rebuild();
+                    Check(opened.Site.AreaCount == 1 && opened.Site.GetNodeOrNull("AreaBarriers") is not null && !opened.Game.Field.IsWalkable(new TilePoint(grass.X + 50, grass.Y + 55)), "The pen's barrier should be drawn and block the way.");
+                    opened.BuildBar.Toggle(BuildMode.Remove);
+                    Check(!opened.Areas.EditorShown && opened.Build.ClickAt(new TilePoint(grass.X + 55, grass.Y + 55)).Ok && site.Areas.Count == 0 && site.AreaBarriers.Count == 0, "Taking the pen down should take its barrier too.");
+
                     // Lights: a floodlight is clicked down, fairy lights are dragged out and their poles go in by themselves.
                     opened.BuildBar.Toggle(BuildMode.Light);
                     Check(opened.BuildBar.ChoiceCount == 3 && opened.BuildBar.Choose(UI.BuildBar.LightKey(LightKind.Floodlight)) && opened.Build.Mode == BuildMode.Light, "The build bar should offer three kinds of light.");
