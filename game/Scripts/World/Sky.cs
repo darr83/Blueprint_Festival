@@ -134,13 +134,19 @@ public partial class Sky : Node3D
         var day = (float)Daylight.At(time);
         var golden = (float)Daylight.GoldenHour(time);
         var warmth = (float)SunPath.Warmth(time);
-        var light = SunPath.At(time);
+        // The sun moves in small steps rather than a hair every frame, so the shadows stay still in between.
+        var light = SteadyShadows.Stepped(SunPath.At(time));
         var strength = (float)light.Strength;
         Night = 1 - day;
         LightBearing = (float)light.Bearing;
 
         // A light shines along its own -Z: with no turn it comes from the south, a quarter turn brings it from the east.
-        _sun.RotationDegrees = new Vector3(-(float)light.Height, 180f - LightBearing, 0);
+        var turn = new Vector3(-(float)light.Height, 180f - LightBearing, 0);
+        if (!_sun.RotationDegrees.IsEqualApprox(turn))
+        {
+            _sun.RotationDegrees = turn;
+        }
+
         _fill.RotationDegrees = new Vector3(-40f, -LightBearing + 20f, 0);
         if (light.Moon)
         {
@@ -225,7 +231,8 @@ public partial class Sky : Node3D
     /// <summary>How near and how far from the site camera the ground on screen is, with room for tall things, for a view so many metres high.</summary>
     public static (float Near, float Far) ShadowStrip(float viewMetres)
     {
-        var reach = (viewMetres * 0.5f / Mathf.Tan(Mathf.DegToRad(CameraRig.PitchDegrees))) + 40f;
+        // In whole steps, so the shadows do not swim while a zoom eases in.
+        var reach = (float)SteadyShadows.Reach(viewMetres, CameraRig.PitchDegrees);
         return (Mathf.Max(0.5f, CameraDistance - reach), CameraDistance + reach);
     }
 }
