@@ -280,7 +280,7 @@ public sealed partial class FestivalGame
             return 0;
         }
 
-        var line = Site.PadRefundAt(tile) > 0 ? Fireworks.Line : Site.ScreenRefundAt(tile) > 0 ? BigScreens.Line : Site.LightRefundAt(tile) > 0 ? LightsLine : Site.StageAt(tile) is not null ? "Stage" : Site.StallAt(tile) is not null ? "Stalls and toilets" : "Fences and gates";
+        var line = Site.PadRefundAt(tile) > 0 ? Fireworks.Line : Site.ScreenRefundAt(tile) > 0 ? BigScreens.Line : Site.LightRefundAt(tile) > 0 ? LightsLine : Site.ComfortRefundAt(tile) > 0 ? Comforts.Line : Site.StageAt(tile) is not null ? "Stage" : Site.StallAt(tile) is not null ? "Stalls and toilets" : "Fences and gates";
         var refund = Site.RemoveAt(tile);
         if (refund != 0)
         {
@@ -410,6 +410,8 @@ public sealed partial class FestivalGame
         Safety = Planned ? SaveSafety() : null,
         Weather = SaveWeather(),
         StallSales = _stallSales.Count > 0 ? SaveStallSales() : null,
+        SatDown = Crowd.SatDown,
+        WashedHands = Crowd.WashedHands,
         PricedOut = Crowd.PricedOut,
         SharePence = _sharePence,
         Fireworks = SaveFireworks(),
@@ -467,6 +469,8 @@ public sealed partial class FestivalGame
         }
 
         game.RestoreStallSales(data.StallSales, data.PricedOut);
+        game.Crowd.SatDown = Math.Max(0, data.SatDown);
+        game.Crowd.WashedHands = Math.Max(0, data.WashedHands);
         game._sharePence = data.SharePence;
         game.RestoreFireworks(data.Fireworks);
 
@@ -488,6 +492,11 @@ public sealed record SaveData(int Version, string Name, ClockState Clock, int? S
     public List<StallSalesSave>? StallSales { get; init; }
 
     public int PricedOut { get; init; }
+
+    /// <summary>How many people have sat down, and how many have washed their hands, so far today.</summary>
+    public int SatDown { get; init; }
+
+    public int WashedHands { get; init; }
 
     /// <summary>The pennies of the festival's share of stall takings not yet made up to a pound.</summary>
     public int SharePence { get; init; }

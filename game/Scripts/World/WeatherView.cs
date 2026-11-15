@@ -180,6 +180,11 @@ public partial class WeatherView : Node3D
                 {
                     DrawPath(b, kind, column, row, x, z, size);
                 }
+                else if (kind is GroundKind.Pallets or GroundKind.Sand or GroundKind.RubberMats or GroundKind.ArtificialGrass or GroundKind.Boardwalk)
+                {
+                    // Planks lie across the way the boardwalk runs.
+                    SiteProps.Flooring(b, kind, x, z, size, (column * 31) + (row * 17), Run(kind, column, row, 1, 0) + Run(kind, column, row, -1, 0) >= Run(kind, column, row, 0, 1) + Run(kind, column, row, 0, -1));
+                }
                 else if (kind == GroundKind.Trackway)
                 {
                     // Two metal panels side by side, with ribs across them for grip.
@@ -207,6 +212,24 @@ public partial class WeatherView : Node3D
         _cover = b.BuildNode("GroundCover");
         _cover.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
         AddChild(_cover);
+    }
+
+    /// <summary>How many patches of the same floor lie in a row from a patch, one way, up to six.</summary>
+    private int Run(GroundKind kind, int column, int row, int dc, int dr)
+    {
+        var count = 0;
+        for (var k = 1; k <= 6; k++)
+        {
+            var (c, r) = (column + (dc * k), row + (dr * k));
+            if (c < 0 || r < 0 || c >= _game.WearColumns || r >= _game.WearRows || _game.GroundAt(c, r) != kind)
+            {
+                break;
+            }
+
+            count++;
+        }
+
+        return count;
     }
 
     /// <summary>True if the patch next door has a path on it too, so the two join up without an edge.</summary>

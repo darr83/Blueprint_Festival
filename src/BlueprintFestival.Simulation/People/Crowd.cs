@@ -37,6 +37,9 @@ public enum PartyState
 
     /// <summary>Gone home.</summary>
     Gone,
+
+    /// <summary>Sitting down: on a bench, at a table, in a deckchair or on the grass.</summary>
+    Sitting,
 }
 
 /// <summary>One person in a party, and where they stand relative to its middle.</summary>
@@ -253,6 +256,27 @@ public sealed class Party
 
     internal bool Moving { get; set; }
 
+    /// <summary>The seat they are sitting on or walking to, if any.</summary>
+    public PlacedComfort? Seat { get; internal set; }
+
+    /// <summary>Which of its seats each of them has.</summary>
+    internal int[]? Seats { get; set; }
+
+    /// <summary>True if they are sitting, or about to sit, on the ground: on artificial grass or sand.</summary>
+    public bool OnGround { get; internal set; }
+
+    /// <summary>When they will get up again.</summary>
+    internal DateTime SitUntil { get; set; }
+
+    /// <summary>No sitting down just for a rest before this: they have not long got up.</summary>
+    internal DateTime RestAfter { get; set; }
+
+    /// <summary>The sink or gel post they are on their way to.</summary>
+    internal PlacedComfort? Wash { get; set; }
+
+    /// <summary>True once they have paid to charge a phone today.</summary>
+    public bool Charged { get; internal set; }
+
     internal DateTime RetryAt { get; set; }
 
     public bool HasChild => Members.Any(m => m.Look.Age == AgeGroup.Child);
@@ -272,6 +296,9 @@ public readonly record struct PersonOnSite(int Id, PersonLook Look, double X, do
 
     /// <summary>True while this person is holding up their ticket for the gate staff.</summary>
     public bool Ticket { get; init; }
+
+    /// <summary>How high the seat they are sitting on is, in metres (0 on the ground), or null if they are on their feet.</summary>
+    public double? Seat { get; init; }
 }
 
 /// <summary>
@@ -279,7 +306,7 @@ public readonly record struct PersonOnSite(int Id, PersonLook Look, double X, do
 /// festival's seed: between 100 and 200 people in parties of one to four, arriving through the
 /// morning, wandering the field, and going home in the evening (families with children first).
 /// </summary>
-public sealed class Crowd
+public sealed partial class Crowd
 {
     /// <summary>
     /// How far someone walks in one tick (one game second). Game time runs 7.5 times faster than
@@ -725,6 +752,7 @@ public sealed class Crowd
                         party.State == PartyState.Unwell && i == 0)
                     {
                         Holding = m.Holding,
+                        Seat = party.State == PartyState.Sitting ? SeatHeight(party, i) : null,
                         Ticket = party.State == PartyState.Queuing && party.InLine && party.ServiceLeft >= 0 && i >= party.Checked && i < party.Checked + CheckersOn(party.Gate, party.Lane),
                     };
                 }
@@ -995,6 +1023,16 @@ public sealed class Crowd
             if (!party.IsOnSite)
             {
                 continue;
+            }
+
+            if ((party.Seat is { } seat && !_site.Comforts.Contains(seat)) || (party.Wash is { } wash && !_site.Comforts.Contains(wash)))
+            {
+                // What they were sitting on, or walking to, has been taken away.
+                GiveUpSeat(party);
+                if (party.State == PartyState.Sitting)
+                {
+                    party.State = PartyState.Standing;
+                }
             }
 
             var at = FieldMap.TileAt(party.X, party.Y);
@@ -1612,6 +1650,11 @@ public sealed class Crowd
             }
         }
 
+        if (party.State == PartyState.Sitting && party.Seat is { } comfort && party.Seats is { } seats && i < seats.Length)
+        {
+            return comfort.Place(Comforts.Of(comfort.Kind).Seats[seats[i]]);
+        }
+
         var m = party.Members[i];
         return (party.X + m.OffsetX, party.Y + m.OffsetY, party.Heading);
     }
@@ -1777,7 +1820,7 @@ public sealed class Crowd
         var headliner = Show?.Stage is null || Show.CalledOff is not null ? null : Show.Slots.FirstOrDefault(s => s.Headliner);
         foreach (var party in _parties)
         {
-            if (party.State is PartyState.Standing or PartyState.Strolling or PartyState.Watching or PartyState.AtStall)
+            if (party.State is PartyState.Standing or PartyState.Strolling or PartyState.Watching or PartyState.AtStall or PartyState.Sitting)
             {
                 Feel(party, now);
             }
@@ -1948,6 +1991,10 @@ public sealed class Crowd
                     {
                         // Off for a treat, or to the shops.
                     }
+                    else if (now >= party.WaitUntil && Rest(party, now))
+                    {
+                        // Off for a sit down, or to get under cover.
+                    }
                     else if (now >= party.WaitUntil)
                     {
                         Send(party, SomewhereInField(party.Random), PartyState.Strolling);
@@ -1961,6 +2008,10 @@ public sealed class Crowd
 
                     break;
 
+                case PartyState.Sitting:
+                    Sit(party, now, closing);
+                    break;
+
                 case PartyState.WalkingIn:
                 case PartyState.Strolling:
                 case PartyState.Leaving:
@@ -1969,6 +2020,10 @@ public sealed class Crowd
                         if (party.State == PartyState.Leaving)
                         {
                             party.State = PartyState.Gone;
+                        }
+                        else if (party.State == PartyState.Strolling && Settle(party, now))
+                        {
+                            // Sat down, or stopped to wash their hands.
                         }
                         else if (StillOn(party.Watch, now) && ShowOf(party.Watch)?.Stage is { } stage)
                         {
@@ -2000,7 +2055,8 @@ public sealed class Crowd
     {
         const double perHour = 1.0 / 3600;
         party.Hunger = Math.Min(1.2, party.Hunger + (party.Appetite * perHour / HoursToHungry));
-        party.Thirst = Math.Min(1.2, party.Thirst + (party.Appetite * Heat * perHour / HoursToThirsty));
+        var sheltered = Sheltered(party);
+        party.Thirst = Math.Min(1.2, party.Thirst + (party.Appetite * (sheltered ? Math.Min(Heat, 1) : Heat) * perHour / HoursToThirsty));
         party.Toilet = Math.Min(1.2, party.Toilet + (party.Appetite * perHour / HoursToToilet));
 
         var change = party.State == PartyState.Watching ? Enjoyed(ShowOf(party.Watch)?.Playing(now)?.Act.Rating ?? 3) * ShareOfTheAct(party) * perHour : 0;
@@ -2012,7 +2068,13 @@ public sealed class Crowd
             }
         }
 
-        if (Rain > 0.05)
+        if (party.State == PartyState.Sitting)
+        {
+            // A sit down does everyone good.
+            change += SitPerHour * perHour;
+        }
+
+        if (Rain > 0.05 && !sheltered)
         {
             // Rain is miserable without a poncho and only a nuisance with one.
             var covered = (double)party.Members.Count(m => m.Look.Poncho is not null) / party.Members.Count;
@@ -2233,6 +2295,9 @@ public sealed class Crowd
                 return party.Thirst < 0.25 ? 0 : 0.02 * (hour < 12 ? 2 : 1) * (wet ? 2 : 1) * (hot ? 0.3 : 1);
             case StallKind.Cocktails:
                 return party.Thirst < 0.25 || !party.Members.Any(GrownUp) ? 0 : 0.015 * (hour >= 17 ? 2.5 : 1) * (party.HasChild ? 0.3 : 1);
+            case StallKind.PhoneCharging:
+                // Batteries run down as the day goes on.
+                return party.Charged ? 0 : hour < 12 ? 0.004 : hour < 16 ? 0.012 : 0.02;
             default:
                 return 0;
         }
@@ -2740,7 +2805,20 @@ public sealed class Crowd
             }
         }
 
+        if (stall.Kind == StallKind.PhoneCharging && buyers > 0)
+        {
+            party.Charged = true;
+        }
+
         Served?.Invoke(stall.Kind, party.Members.Count, paid);
+        if (info.Serves == Need.Toilet)
+        {
+            GoAndWash(party, now);
+        }
+        else if (handful && info.Serves is not null)
+        {
+            SitToEat(party, now);
+        }
     }
 
     /// <summary>
@@ -2771,6 +2849,12 @@ public sealed class Crowd
 
         if (total <= 0)
         {
+            return -1;
+        }
+
+        if (stall.Kind == StallKind.PhoneCharging && member != party.Members[0] && Roll(member.Id, 55, party.Id) > 0.35)
+        {
+            // One phone between them is usually enough.
             return -1;
         }
 
@@ -2916,7 +3000,7 @@ public sealed class Crowd
     }
 
     /// <summary>How fast a party gets through where it is: a busy place is slow going and a packed one slower still.</summary>
-    private double Pace(Party party) => (1 - (0.5 * (Mud?.Invoke(party.X, party.Y) ?? 0))) * (Density.StatusAt(party.X, party.Y) switch
+    private double Pace(Party party) => (1 - (0.5 * (Mud?.Invoke(party.X, party.Y) ?? 0))) * (Footing?.Invoke(party.X, party.Y) ?? 1) * (Density.StatusAt(party.X, party.Y) switch
     {
         Crowding.CrushRisk => 0.45,
         Crowding.Busy => 0.75,
@@ -3197,6 +3281,7 @@ public sealed class Crowd
     /// <summary>Sets a party walking somewhere. If there is no way there, they stand where they are.</summary>
     private void Send(Party party, TilePoint? target, PartyState state)
     {
+        GiveUpSeat(party);
         var from = FieldMap.TileAt(party.X, party.Y);
         party.Target = target ?? from;
         if (state == PartyState.Leaving && target is not null && target != party.Pitch && WayOut(party, from) is { } gate
@@ -3273,12 +3358,16 @@ public sealed class Crowd
                 Holding = p.Members.Any(m => m.Holding != Carried.None) ? p.Members.Select(m => (int)m.Holding).ToList() : null,
                 Bought = p.Members.Any(m => m.Bought != 0) ? p.Members.Select(m => m.Bought).ToList() : null,
                 HoldUntil = p.HoldUntil, FancyAt = p.FancyAt, GrumbleAt = p.GrumbleAt, BoughtHats = p.BoughtHats, BoughtMerch = p.BoughtMerch, Fancying = p.Fancying,
+                Charged = p.Charged, OnGround = p.State == PartyState.Sitting && p.OnGround, SitUntil = p.State == PartyState.Sitting ? p.SitUntil : default, RestAfter = p.RestAfter,
+                Seat = p.State == PartyState.Sitting && p.Seat is { } sat ? new TilePoint(sat.X, sat.Y) : null,
+                Seats = p.State == PartyState.Sitting && p.Seat is not null ? p.Seats?.ToList() : null,
             })
         .ToList();
 
     /// <summary>Puts back parties from a save. Anyone not in the save has not arrived yet.</summary>
     public void Restore(IEnumerable<PartySave> saved)
     {
+        _seats.Clear();
         foreach (var queue in _queues.SelectMany(q => q))
         {
             queue.Parties.Clear();
@@ -3335,7 +3424,9 @@ public sealed class Crowd
             party.GrumbleAt = s.GrumbleAt;
             party.BoughtHats = s.BoughtHats;
             party.BoughtMerch = s.BoughtMerch;
+            party.Charged = s.Charged;
             party.Fancying = false;
+            RestoreSeat(party, s);
             for (var m = 0; m < party.Members.Count; m++)
             {
                 party.Members[m].Holding = s.Holding is { } held && m < held.Count ? (Carried)held[m] : Carried.None;
@@ -3476,6 +3567,20 @@ public sealed record PartySave(int Id, PartyState State, double X, double Y, dou
     int Gate = -1, int Lane = 0, int QueuePlace = 0, int ServiceLeft = -1, bool? Ticketed = null, int Watch = -1, int Decided = -1)
 {
     public double Hunger { get; init; }
+
+    public bool Charged { get; init; }
+
+    /// <summary>The corner tile of the seat a sitting party is on, and which of its seats each of them has.</summary>
+    public TilePoint? Seat { get; init; }
+
+    public List<int>? Seats { get; init; }
+
+    public bool OnGround { get; init; }
+
+    public DateTime SitUntil { get; init; }
+
+    /// <summary>No sitting down just for a rest before this.</summary>
+    public DateTime RestAfter { get; init; }
 
     public double Thirst { get; init; }
 

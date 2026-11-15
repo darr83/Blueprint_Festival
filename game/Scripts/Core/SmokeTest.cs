@@ -169,7 +169,7 @@ public partial class SmokeTest : Node
                     opened.BuildBar.ShowShelf(StallGroup.Drink);
                     Check(opened.BuildBar.ChoiceCount == 4, "The drink shelf should offer the bar, coffee, slush and cocktails.");
                     opened.BuildBar.ShowShelf(StallGroup.Other);
-                    Check(opened.BuildBar.ChoiceCount == 3, "The third shelf should offer ponchos, hats and merchandise.");
+                    Check(opened.BuildBar.ChoiceCount == 4, "The third shelf should offer ponchos, hats, merchandise and phone charging.");
                     opened.BuildBar.ShowShelf(StallGroup.Services);
                     Check(opened.BuildBar.ChoiceCount == 4, "The last shelf should offer two sizes of toilets, the water point and the litter bin.");
                     Check(opened.BuildBar.Choose("stallBurgers") && opened.Build.Mode == BuildMode.Stall && opened.BuildBar.Shelf == StallGroup.Food, "The burger van should be on the build bar, on the food shelf.");
@@ -296,7 +296,7 @@ public partial class SmokeTest : Node
 
                     // Ground cover: straw goes down by the patch, and is drawn.
                     opened.BuildBar.Toggle(BuildMode.Ground);
-                    Check(opened.BuildBar.ChoiceCount == 5 && opened.BuildBar.Choose("groundStraw") && opened.Build.Mode == BuildMode.Ground, "The build bar should offer straw, trackway and three paths.");
+                    Check(opened.BuildBar.ChoiceCount == 6 && opened.BuildBar.Choose("groundStraw") && opened.Build.Mode == BuildMode.Ground, "The Ground tab should offer straw, trackway, pallets, mats, sand and laid grass.");
                     var patch = new TilePoint(grass.X + 41, grass.Y + 41);
                     Check(opened.Build.DragGround(patch, patch).Ok && opened.Game.GroundCovered == 1, "Straw should go down on a patch of grass.");
                     Check(!opened.Build.DragGround(patch, patch).Ok, "Straw should not be laid twice on the same patch.");
@@ -305,7 +305,8 @@ public partial class SmokeTest : Node
                     Check(opened.Game.Money == 1554 - 120 - 200 - 40 - 3, $"A patch of straw should cost £3, leaving £1,191, not £{opened.Game.Money}.");
 
                     // A path goes down in a line, is drawn, and can be lifted again (once the gates are open there is no money back).
-                    Check(opened.BuildBar.Choose("groundGravel"), "The ground tab should offer a gravel path.");
+                    opened.BuildBar.Toggle(BuildMode.Path);
+                    Check(opened.BuildBar.ChoiceCount == 4 && opened.BuildBar.Choose("groundGravel") && opened.Build.Mode == BuildMode.Ground && opened.Build.PathWidth == 1, "The Paths tab should offer mown, bark, gravel and boardwalk paths, one patch wide to start.");
                     var pathFrom = new TilePoint(grass.X + 49, grass.Y + 61);
                     Check(opened.Build.DragGround(pathFrom, new TilePoint(grass.X + 58, grass.Y + 63)).Ok && opened.Game.PathPatches == 3 && opened.Game.Crowd.HasPaths, $"A gravel path three patches long should go down, not {opened.Game.PathPatches}.");
                     opened.Weather.Refresh();
@@ -319,6 +320,15 @@ public partial class SmokeTest : Node
                     }
 
                     Check(opened.Game.PathPatches == 0 && !opened.Game.Crowd.HasPaths && opened.Game.Money == 1554 - 120 - 200 - 40 - 3 - (3 * 7), $"Lifting the path should leave no path and the £21 it cost spent: {opened.Game.PathPatches} left, £{opened.Game.Money}.");
+
+                    // Seats and comforts: a bench goes out, is drawn, and comes back for its money.
+                    opened.BuildBar.Toggle(BuildMode.Comfort);
+                    Check(opened.BuildBar.ChoiceCount == 9 && opened.BuildBar.Choose(UI.BuildBar.ComfortKey(ComfortKind.Bench)) && opened.Build.Mode == BuildMode.Comfort, "The Comforts tab should offer nine seats, sinks and shades.");
+                    var bench = new TilePoint(grass.X + 41, grass.Y + 50);
+                    var benchOut = opened.Build.ClickAt(bench).Ok;
+                    opened.Site.Rebuild();
+                    Check(benchOut && opened.Game.Seats == 3 && opened.Site.ComfortCount == 1, $"A bench should go out with three seats, not {opened.Game.Seats}.");
+                    Check(opened.Game.Remove(bench) == 12 && opened.Game.Seats == 0, "Taking the bench away should give its £12 back.");
                     Check(opened.Weather.StreaksShown == 0 && opened.Sky.Overcast < 0.01f, "A fine day should have no rain and no cloud.");
                     Check(opened.TopBar.WeatherText.StartsWith("Fine", StringComparison.Ordinal), $"The top bar should say the day is fine, not '{opened.TopBar.WeatherText}'.");
                     opened.BuildBar.Close();

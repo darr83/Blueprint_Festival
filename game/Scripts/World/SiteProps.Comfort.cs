@@ -4,7 +4,7 @@ using Godot;
 
 namespace BlueprintFestival.World;
 
-/// <summary>Seats, hand washing, shade and the charging tent: the comforts the player dots about the field.</summary>
+/// <summary>Seats, hand washing and shade: the comforts the player dots about the field. Also the new floors, and the phone charging tent.</summary>
 public static partial class SiteProps
 {
     private static readonly Color SoapBlue = new("#4FA8D8");
@@ -54,11 +54,8 @@ public static partial class SiteProps
             case ComfortKind.HandWash:
                 HandWash(b, node);
                 break;
-            case ComfortKind.ShadeSail:
-                ShadeSail(b);
-                break;
             default:
-                ChargingTent(b, node);
+                ShadeSail(b);
                 break;
         }
 
@@ -356,11 +353,11 @@ public static partial class SiteProps
     /// One 2 m patch of laid floor: pallets, sand, rubber mats, artificial grass or a boardwalk.
     /// The pick is any whole number that differs from patch to patch, so no two look quite alike.
     /// </summary>
-    public static void Flooring(MeshBuilder b, int kind, float x, float z, float size, int pick, bool planksAcross)
+    public static void Flooring(MeshBuilder b, BlueprintFestival.Simulation.GroundKind kind, float x, float z, float size, int pick, bool planksAcross)
     {
         switch (kind)
         {
-            case 0:
+            case BlueprintFestival.Simulation.GroundKind.Pallets:
                 // Four pallets, each a little askew: slats on top of three bearers.
                 for (var i = 0; i < 4; i++)
                 {
@@ -381,7 +378,7 @@ public static partial class SiteProps
                 }
 
                 break;
-            case 1:
+            case BlueprintFestival.Simulation.GroundKind.Sand:
                 // Sand: a pale bed with a few darker ripples.
                 b.Box(new Vector3(x, 0.03f, z), new Vector3(size, 0.06f, size), Sand);
                 for (var i = 0; i < 5; i++)
@@ -393,7 +390,7 @@ public static partial class SiteProps
                 }
 
                 break;
-            case 2:
+            case BlueprintFestival.Simulation.GroundKind.RubberMats:
                 // Rubber mats: four black squares, each with rows of holes.
                 for (var i = 0; i < 4; i++)
                 {
@@ -407,7 +404,7 @@ public static partial class SiteProps
                 }
 
                 break;
-            case 3:
+            case BlueprintFestival.Simulation.GroundKind.ArtificialGrass:
                 // Artificial grass: too green and too tidy, with a neat stitched edge.
                 b.Box(new Vector3(x, 0.02f, z), new Vector3(size, 0.04f, size), Turf);
                 b.Box(new Vector3(x, 0.041f, z), new Vector3(size / 2, 0.004f, size), TurfDark);

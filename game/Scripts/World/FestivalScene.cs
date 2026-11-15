@@ -234,7 +234,7 @@ public partial class FestivalScene : Node3D
         };
         Game.CrushWarning += OnCrushWarning;
 
-        _hint = UiStyle.Body("Q / E turn view    WASD move    Wheel zoom    Space pause    C crowd view", muted: true, size: 13);
+        _hint = UiStyle.Body("Q / E turn view    WASD move    Wheel zoom\nSpace pause    C crowd view", muted: true, size: 13);
         _hint.Theme = UiStyle.Theme;
         _hint.AddThemeColorOverride("font_color", new Color(1, 1, 1, 0.85f));
         _hint.AddThemeColorOverride("font_shadow_color", new Color(0, 0, 0, 0.5f));

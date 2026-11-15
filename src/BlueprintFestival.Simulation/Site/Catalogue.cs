@@ -102,6 +102,9 @@ public enum StallKind
 
     /// <summary>A tent selling the festival's own T-shirts, posters and bags.</summary>
     Merchandise,
+
+    /// <summary>A little tent with a wall of lockers, where a phone can be charged for a pound or two.</summary>
+    PhoneCharging,
 }
 
 /// <summary>Which shelf of the build bar a stall is on.</summary>
@@ -242,6 +245,7 @@ public static class Catalogue
         new StallInfo(StallKind.Ponchos, "Poncho stall", 6, 5, 40, null, 0, 12, 1, "Rain ponchos. Nobody looks until it rains, then everybody wants one."),
         new StallInfo(StallKind.BucketHats, "Hat stall", 6, 6, 50, null, 0, 30, 1, "Bucket hats. They sell best in hot sun."),
         new StallInfo(StallKind.Merchandise, "Merchandise tent", 10, 8, 150, null, 0, 40, 2, "The festival's own T-shirts, posters and bags. People who are having a good day take something home."),
+        new StallInfo(StallKind.PhoneCharging, "Phone charging tent", 6, 6, 120, null, 0, 30, 2, "Lockers to charge a phone in. More people want one as the day goes on."),
     };
 
     private static readonly IReadOnlyList<StallItem> NothingToSell = Array.Empty<StallItem>();
@@ -321,6 +325,12 @@ public static class Catalogue
             new StallItem("Patterned bucket hat", 8, Carried.None, 0, Worn.BucketHat),
             new StallItem("Child's bucket hat", 4, Carried.None, 0, Worn.BucketHat, ForChildren: true),
         },
+        [StallKind.PhoneCharging] = new[]
+        {
+            new StallItem("Quick top-up", 2, Carried.None, 0),
+            new StallItem("Full charge", 4, Carried.None, 0, AdultsOnly: true),
+            new StallItem("Power bank to borrow", 6, Carried.None, 0, AdultsOnly: true),
+        },
         [StallKind.Merchandise] = new[]
         {
             new StallItem("Festival T-shirt", 15, Carried.Bag, 0),
@@ -349,7 +359,7 @@ public static class Catalogue
     {
         StallKind.HotDogs or StallKind.Burgers or StallKind.Fries or StallKind.Pizza or StallKind.Noodles or StallKind.IceCream => StallGroup.Food,
         StallKind.Bar or StallKind.Coffee or StallKind.Slush or StallKind.Cocktails => StallGroup.Drink,
-        StallKind.Ponchos or StallKind.BucketHats or StallKind.Merchandise => StallGroup.Other,
+        StallKind.Ponchos or StallKind.BucketHats or StallKind.Merchandise or StallKind.PhoneCharging => StallGroup.Other,
         _ => StallGroup.Services,
     };
 
@@ -360,7 +370,7 @@ public static class Catalogue
     {
         StallKind.HotDogs, StallKind.Burgers, StallKind.Fries, StallKind.Pizza, StallKind.Noodles, StallKind.IceCream,
         StallKind.Bar, StallKind.Coffee, StallKind.Slush, StallKind.Cocktails,
-        StallKind.Ponchos, StallKind.BucketHats, StallKind.Merchandise,
+        StallKind.Ponchos, StallKind.BucketHats, StallKind.Merchandise, StallKind.PhoneCharging,
         StallKind.Toilets, StallKind.ToiletBlock, StallKind.WaterPoint, StallKind.Bin,
     };
 

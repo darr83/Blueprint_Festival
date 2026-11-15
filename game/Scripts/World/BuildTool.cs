@@ -41,6 +41,12 @@ public enum BuildMode
 
     /// <summary>The Fireworks group of the build bar: the launch pads and the show mixer.</summary>
     Fireworks,
+
+    /// <summary>Putting out a seat, a sink or a shade sail. Also the Comforts group on the build bar.</summary>
+    Comfort,
+
+    /// <summary>The Paths group on the build bar. The tool itself lays a path as <see cref="Ground"/>.</summary>
+    Path,
 }
 
 /// <summary>
@@ -85,6 +91,14 @@ public partial class BuildTool : Node3D
     public ScreenKind Screen { get; private set; }
 
     public LaunchPadKind Pad { get; private set; }
+
+    public ComfortKind Comfort { get; private set; }
+
+    /// <summary>How many patches wide a dragged path is laid: 1 (2 m), 2 or 3.</summary>
+    public int PathWidth { get; private set; } = 1;
+
+    /// <summary>Sets how wide dragged paths are laid, in patches.</summary>
+    public void SetPathWidth(int patches) => PathWidth = Math.Clamp(patches, 1, FestivalGame.WidestPath);
 
     public Facing Facing { get; private set; } = Facing.South;
 
@@ -138,6 +152,8 @@ public partial class BuildTool : Node3D
 
     public void PickLaunchPad(LaunchPadKind kind) => Pick(BuildMode.LaunchPad, () => Pad = kind);
 
+    public void PickComfort(ComfortKind kind) => Pick(BuildMode.Comfort, () => Comfort = kind);
+
     public void PickRemove() => Pick(BuildMode.Remove, () => { });
 
     public void PickLane() => Pick(BuildMode.Lane, () => { });
@@ -185,7 +201,10 @@ public partial class BuildTool : Node3D
             BuildMode.Gate => "Click to put the gate up. R turns it. Close the fence either side so it is the only way in.",
             BuildMode.Stall => "Click on the grass to put it up. R turns it. People queue at the front.",
             BuildMode.Staff => Hire == StaffKind.TicketStaff ? "Click a gate to put them on it. One for each lane." : "Click on the grass to post them there.",
-            BuildMode.Ground when IsPathLine => "Hold the mouse button and drag to lay a path, 2 m wide. Some people keep to paths; others cut across.",
+            BuildMode.Ground when IsPathLine => $"Hold the mouse button and drag to lay a path, {PathWidth * 2} m wide. Some people keep to paths; others cut across.",
+            BuildMode.Comfort => Comforts.Of(Comfort).Seats.Length > 0 ? "Click on the grass to put it out. R turns it. People with food look for a seat near where they bought it."
+                : Comforts.Of(Comfort).Washes ? "Click on the grass to put it out. R turns it. It counts for toilets and food stalls within 14 m."
+                : "Click on the grass to put it up. R turns it. People walk and stand underneath.",
             BuildMode.Ground => "Click a patch of grass, or hold the mouse button and drag to cover a stretch.",
             BuildMode.Lane => "Hold the mouse button and drag out a queue from the front of a gate, stall or toilets. Drag again from its end to turn a corner.",
             BuildMode.KeepOut => "Hold the mouse button and drag over ground customers must keep off. Start on marked ground to clear it.",
@@ -193,7 +212,7 @@ public partial class BuildTool : Node3D
             BuildMode.LaunchPad => "Click on the grass to put the launch pad down. Its safe zone must be clear. Fence it off from the firework mixer.",
             BuildMode.Screen => "Click on the grass to put the screen up. R turns it. It shows the nearest stage to the people in front of it.",
             BuildMode.Fairy => "Hold the mouse button and drag to string fairy lights. The poles go in by themselves. Start on a pole to carry on from it.",
-            BuildMode.Remove => "Click a stage, a screen, the launch pad, a stall, a gate, a light or a stretch of fence to take it down. You get the money back. Click staff to send them home.",
+            BuildMode.Remove => "Click a stage, a screen, the launch pad, a stall, a seat, a gate, a light or a stretch of fence to take it down. You get the money back. Click staff to send them home.",
             _ => "",
         };
         ClearGhost();
@@ -273,6 +292,12 @@ public partial class BuildTool : Node3D
         return (at.X - (size / 2), at.Y - (size / 2));
     }
 
+    private (int X, int Y) ComfortCorner(TilePoint at)
+    {
+        var rect = new PlacedComfort(Comfort, 0, 0, Facing).Rect;
+        return (at.X - (rect.Width / 2), at.Y - (rect.Height / 2));
+    }
+
     private (int X, int Y) StallCorner(TilePoint at)
     {
         var rect = new PlacedStall(Stall, 0, 0, Facing).Rect;
@@ -336,6 +361,13 @@ public partial class BuildTool : Node3D
                 break;
             }
 
+            case BuildMode.Comfort:
+            {
+                var (x, y) = ComfortCorner(at);
+                result = _game.BuildComfort(Comfort, x, y, Facing);
+                break;
+            }
+
             case BuildMode.Staff:
                 result = _game.HireStaff(Hire, at);
                 Said(result, "Hired");
@@ -395,7 +427,7 @@ public partial class BuildTool : Node3D
     }
 
     /// <summary>True when the ground picked is a path, laid in a line one patch wide rather than over a box.</summary>
-    private bool IsPathLine => Ground is GroundKind.MownPath or GroundKind.BarkChip or GroundKind.Gravel;
+    private bool IsPathLine => FestivalGame.IsPathLine(Ground);
 
     /// <summary>The patches a path dragged between two tiles would cover, as the box round them, clipped to the field.</summary>
     private (int C0, int R0, int C1, int R1)? PathPatches(TilePoint from, TilePoint to)
@@ -405,7 +437,7 @@ public partial class BuildTool : Node3D
             return Patches(from, to);
         }
 
-        var line = _game.PathLine((a, b), (c, d)).ToList();
+        var line = _game.PathLine((a, b), (c, d), PathWidth).ToList();
         return line.Count == 0 ? null : (line.Min(p => p.Column), line.Min(p => p.Row), line.Max(p => p.Column), line.Max(p => p.Row));
     }
 
@@ -625,6 +657,17 @@ public partial class BuildTool : Node3D
                 break;
             }
 
+            case BuildMode.Comfort:
+            {
+                var (x, y) = ComfortCorner(at);
+                check = _game.CheckComfort(Comfort, x, y, Facing);
+                pad = new PlacedComfort(Comfort, x, y, Facing).Rect;
+                Ghost($"comfort{Comfort}", () => SiteProps.Comfort(Comfort));
+                _ghost!.Position = SiteView.Middle(pad);
+                _ghost.RotationDegrees = new Vector3(0, SiteView.Turn(Facing), 0);
+                break;
+            }
+
             case BuildMode.Screen:
             {
                 var (x, y) = ScreenCorner(at);
@@ -759,6 +802,7 @@ public partial class BuildTool : Node3D
         BuildMode.Light or BuildMode.Fairy => Lighting.Of(Light).Name,
         BuildMode.Screen => BigScreens.Of(Screen).Name,
         BuildMode.LaunchPad => LaunchPads.Of(Pad).Name,
+        BuildMode.Comfort => Comforts.Of(Comfort).Name,
         BuildMode.Stage => Catalogue.Of(Stage).Name,
         BuildMode.Gate => Catalogue.Of(Gate).Name,
         BuildMode.Stall => Catalogue.Of(Stall).Name,

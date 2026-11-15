@@ -24,6 +24,8 @@ public partial class BuildBar : VBoxContainer
     private Label _status = null!;
     private BuildMode _open = BuildMode.None;
     private HBoxContainer _shelfRow = null!;
+    private HBoxContainer _widthRow = null!;
+    private readonly List<Button> _widths = new();
     private readonly Dictionary<StallGroup, Button> _shelves = new();
 
     /// <summary>Which shelf of the Stalls tab is showing: food, drink, the shops, or toilets and water.</summary>
@@ -54,6 +56,9 @@ public partial class BuildBar : VBoxContainer
 
     /// <summary>Opens the firework mixer. Set by the scene.</summary>
     public System.Action? OpenMixer { get; set; }
+
+    /// <summary>The key of a seat, a sink or a sail, under Comforts.</summary>
+    public static string ComfortKey(ComfortKind kind) => $"comfort{kind}";
 
     /// <summary>The key of a kind of light, under Lights.</summary>
     public static string LightKey(LightKind kind) => $"light{kind}";
@@ -98,6 +103,19 @@ public partial class BuildBar : VBoxContainer
         }
 
         shelves.AddChild(_shelfRow);
+        _widthRow = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center, Visible = false };
+        _widthRow.AddThemeConstantOverride("separation", 6);
+        for (var patches = 1; patches <= FestivalGame.WidestPath; patches++)
+        {
+            var wide = patches;
+            var chip = UiStyle.ChipButton($"{patches * 2} m wide", () => SetPathWidth(wide), Sounds.Tab);
+            chip.ToggleMode = true;
+            chip.TooltipText = "How wide the next path you drag is laid. A wider path costs more and carries more people.";
+            _widthRow.AddChild(chip);
+            _widths.Add(chip);
+        }
+
+        shelves.AddChild(_widthRow);
         _choiceRow = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
         _choiceRow.AddThemeConstantOverride("separation", 8);
         shelves.AddChild(_choiceRow);
@@ -105,7 +123,7 @@ public partial class BuildBar : VBoxContainer
 
         // A row of round buttons, each with its name underneath, straight on the field.
         var row = new HBoxContainer { SizeFlagsHorizontal = SizeFlags.ShrinkCenter, MouseFilter = MouseFilterEnum.Ignore };
-        row.AddThemeConstantOverride("separation", 10);
+        row.AddThemeConstantOverride("separation", 5);
         _tabRow = row;
         AddChild(row);
 
@@ -114,7 +132,9 @@ public partial class BuildBar : VBoxContainer
         AddTab(row, BuildMode.Gate, "gate", "Gates", "Where tickets are checked");
         AddTab(row, BuildMode.Stall, "stall", "Stalls", "Food, drink, ponchos, hats and merchandise, toilets and water");
         AddTab(row, BuildMode.Staff, "staff", "Staff", "Ticket staff, security, first aid and cleaners");
-        AddTab(row, BuildMode.Ground, "ground", "Ground", "Straw, trackway and paths, to keep feet out of the mud");
+        AddTab(row, BuildMode.Ground, "ground", "Ground", "Straw, trackway, pallets, mats, sand and artificial grass");
+        AddTab(row, BuildMode.Path, "path", "Paths", "Mown, bark, gravel and boardwalk paths, up to 6 m wide");
+        AddTab(row, BuildMode.Comfort, "bench", "Comforts", "Seats, tables, hand washing and shade");
         AddTab(row, BuildMode.Light, "light", "Lights", "Path lights, floodlights and fairy lights for after dark");
         AddTab(row, BuildMode.Fireworks, "firework", "Fireworks", "A launch pad, and firework shows to plan on the mixer");
         AddTab(row, BuildMode.Remove, "remove", "Take down", "Remove something and get the money back");
@@ -136,14 +156,14 @@ public partial class BuildBar : VBoxContainer
 
     private void AddTab(Container row, BuildMode mode, string icon, string text, string tip)
     {
-        var button = UiStyle.RoundButton(icon, () => Toggle(mode), 62, floating: true, sound: Sounds.Tab);
+        var button = UiStyle.RoundButton(icon, () => Toggle(mode), 54, floating: true, sound: Sounds.Tab);
         button.ToggleMode = true;
         button.TooltipText = tip;
         button.SizeFlagsHorizontal = SizeFlags.ShrinkCenter;
-        var column = new VBoxContainer { CustomMinimumSize = new Vector2(72, 0), MouseFilter = MouseFilterEnum.Ignore };
+        var column = new VBoxContainer { CustomMinimumSize = new Vector2(62, 0), MouseFilter = MouseFilterEnum.Ignore };
         column.AddThemeConstantOverride("separation", 4);
         column.AddChild(button);
-        column.AddChild(Outlined(text, 13));
+        column.AddChild(Outlined(text, 12));
         row.AddChild(column);
         _tabs[mode] = button;
     }
@@ -160,6 +180,7 @@ public partial class BuildBar : VBoxContainer
         _open = mode;
         ClearChoices();
         _shelfRow.Visible = mode == BuildMode.Stall;
+        _widthRow.Visible = mode == BuildMode.Path;
         switch (mode)
         {
             case BuildMode.Stage:
@@ -218,12 +239,28 @@ public partial class BuildBar : VBoxContainer
                     "Scattered on wet ground it soaks up most of the mud. It can go down on the day, once you see where the mud is.\nA patch is 2 m square.", () => _tool.PickGround(GroundKind.Straw));
                 AddChoice($"ground{GroundKind.Trackway}", "Trackway", $"£{FestivalGame.CostOf(GroundKind.Trackway)} a patch",
                     "Metal panels. No mud at all, and the grass underneath comes to no harm.\nA patch is 2 m square.", () => _tool.PickGround(GroundKind.Trackway));
+                AddFloor(GroundKind.Pallets, "Old pallets laid side by side. Cheap and nearly dry, but slow to walk over. People follow them like a path.");
+                AddFloor(GroundKind.RubberMats, "Black rubber mats. Hardly any mud and they never wear: best in front of bars and toilets. People follow them like a path.");
+                AddFloor(GroundKind.Sand, "A bed of sand: a beach in a field. On a dry day people sit on it.");
+                AddFloor(GroundKind.ArtificialGrass, "A lawn that never turns to mud. On a dry day people sit on it.");
+                break;
+            case BuildMode.Path:
                 AddChoice($"ground{GroundKind.MownPath}", "Mown path", $"£{FestivalGame.CostOf(GroundKind.MownPath)} per 2 m",
-                    "A strip of grass cut short. Shows people the way, but it is still grass: it wears and goes to mud like any other.\nDrag to lay it, 2 m wide.", () => _tool.PickGround(GroundKind.MownPath));
+                    "A strip of grass cut short. Shows people the way, but it is still grass: it wears and goes to mud like any other.\nDrag to lay it.", () => _tool.PickGround(GroundKind.MownPath));
                 AddChoice($"ground{GroundKind.BarkChip}", "Bark chip path", $"£{FestivalGame.CostOf(GroundKind.BarkChip)} per 2 m",
-                    "Soft underfoot. Soaks up most of the mud and saves the grass.\nDrag to lay it, 2 m wide.", () => _tool.PickGround(GroundKind.BarkChip));
+                    "Soft underfoot. Soaks up most of the mud and saves the grass.\nDrag to lay it.", () => _tool.PickGround(GroundKind.BarkChip));
                 AddChoice($"ground{GroundKind.Gravel}", "Gravel path", $"£{FestivalGame.CostOf(GroundKind.Gravel)} per 2 m",
-                    "Rolled gravel. Hardly any mud and hardly any wear.\nDrag to lay it, 2 m wide.", () => _tool.PickGround(GroundKind.Gravel));
+                    "Rolled gravel. Hardly any mud and hardly any wear.\nDrag to lay it.", () => _tool.PickGround(GroundKind.Gravel));
+                AddChoice($"ground{GroundKind.Boardwalk}", "Boardwalk", $"£{FestivalGame.CostOf(GroundKind.Boardwalk)} per 2 m",
+                    "Timber planks. No mud and no wear, and smart with it.\nDrag to lay it.", () => _tool.PickGround(GroundKind.Boardwalk));
+                break;
+            case BuildMode.Comfort:
+                foreach (var c in Comforts.Everything)
+                {
+                    var seats = c.Seats.Length > 0 ? $"Seats {c.Seats.Length}. " : "";
+                    AddChoice(ComfortKey(c.Kind), c.Name, $"£{c.Cost:N0}", $"{c.About}\n{seats}{c.Width / 2f:0.#} m wide, {c.Depth / 2f:0.#} m deep. R turns it.", () => _tool.PickComfort(c.Kind));
+                }
+
                 break;
             case BuildMode.Light:
                 foreach (var l in Lighting.All)
@@ -293,6 +330,20 @@ public partial class BuildBar : VBoxContainer
         }
     }
 
+    private void AddFloor(GroundKind kind, string about) =>
+        AddChoice($"ground{kind}", FestivalGame.NameOf(kind), $"£{FestivalGame.CostOf(kind)} a patch", $"{about}\nA patch is 2 m square. Click, or drag to cover a stretch.", () => _tool.PickGround(kind));
+
+    /// <summary>Sets how wide the next dragged path is laid, in patches of 2 m.</summary>
+    public void SetPathWidth(int patches)
+    {
+        _tool.SetPathWidth(patches);
+        if (_tool.Mode == BuildMode.Ground)
+        {
+            // Pick the path up again so the hint under the pointer says the new width.
+            _tool.PickGround(_tool.Ground);
+        }
+    }
+
     /// <summary>Shows another shelf of the Stalls tab.</summary>
     public void ShowShelf(StallGroup group)
     {
@@ -358,7 +409,10 @@ public partial class BuildBar : VBoxContainer
             : k.StartsWith("light") ? ("light", UiStyle.StagePink)
             : k.StartsWith("screen") ? ("screen", UiStyle.StagePink)
             : k.StartsWith("pad") || k.StartsWith("fireworks") ? ("firework", UiStyle.StagePink)
+            : k is "groundmownpath" or "groundbarkchip" or "groundgravel" or "groundboardwalk" ? ("path", UiStyle.StagePink)
             : k.StartsWith("ground") ? ("ground", UiStyle.StagePink)
+            : k is "comforthandgel" or "comforthandwash" ? ("drop", UiStyle.StagePink)
+            : k.StartsWith("comfort") ? ("bench", UiStyle.StagePink)
             : ("stall", UiStyle.StagePink);
     }
 
@@ -415,11 +469,17 @@ public partial class BuildBar : VBoxContainer
             BuildMode.Light or BuildMode.Fairy => LightKey(_tool.Light),
             BuildMode.Screen => ScreenKey(_tool.Screen),
             BuildMode.LaunchPad => PadKey(_tool.Pad),
+            BuildMode.Comfort => ComfortKey(_tool.Comfort),
             _ => "",
         };
         foreach (var (key, button) in _choices)
         {
             button.SetPressedNoSignal(key == picked);
+        }
+
+        for (var i = 0; i < _widths.Count; i++)
+        {
+            _widths[i].SetPressedNoSignal(_tool.PathWidth == i + 1);
         }
 
         _status.Text = _tool.Mode == BuildMode.None

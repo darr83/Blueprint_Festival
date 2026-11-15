@@ -73,6 +73,9 @@ public partial class CrowdView : Node3D
     /// <summary>How many of the people drawn in full are dancing.</summary>
     public int Dancers { get; private set; }
 
+    /// <summary>How many people drawn in full are sitting down.</summary>
+    public int Sitters { get; private set; }
+
     /// <summary>How many people are clapping along to the music being heard.</summary>
     public int Clappers { get; private set; }
 
@@ -306,6 +309,7 @@ public partial class CrowdView : Node3D
 
         _seen.Clear();
         var dancers = 0;
+        var sitters = 0;
         var carrying = 0;
         var heard = HeardStage();
         _clappers = 0;
@@ -372,7 +376,13 @@ public partial class CrowdView : Node3D
                     view.Dance(move, (float)Dancing.Through(d.Beat, move, person.Id), (float)Dancing.Energy(person.Id));
                 }
 
-                view.Pose = person.Ticket ? Pose.ShowingTicket : person.Walking && speed > 0 ? Pose.Walking : dance is not null ? Pose.Dancing
+                if (person.Seat is { } seat)
+                {
+                    view.SeatHeight = (float)seat;
+                    sitters++;
+                }
+
+                view.Pose = person.Ticket ? Pose.ShowingTicket : person.Seat is not null ? Pose.Sitting : person.Walking && speed > 0 ? Pose.Walking : dance is not null ? Pose.Dancing
                     : applause is not null ? Applause(person.Id, applause) : cheering ? Pose.Cheering : Pose.Standing;
                 dancers += view.Pose == Pose.Dancing ? 1 : 0;
                 carrying += view.Holding != Simulation.Site.Carried.None ? 1 : 0;
@@ -415,6 +425,12 @@ public partial class CrowdView : Node3D
                 at += new Vector3(0, SimpleLift(beat, person.Id), 0);
             }
 
+            if (person.Seat is { } low)
+            {
+                // Sitting down: the simple figure is drawn lower, so its head is where a sitter's would be.
+                at += new Vector3(0, (float)low - (0.6f * tall), 0);
+            }
+
             Put(_bodyBuffer, simple, basis, at + (basis * new Vector3(0, 0.58f, 0)), _topColours[person.Id]);
             Put(_headBuffer, simple, basis, at + (basis * new Vector3(0, 1.33f, 0)), _skinColours[person.Id]);
             Put(_hairBuffer, simple, basis, at + (basis * new Vector3(0, 1.39f, 0)), _hairColours[person.Id]);
@@ -424,6 +440,7 @@ public partial class CrowdView : Node3D
         Simple = simple;
         Carrying = carrying;
         Dancers = dancers;
+        Sitters = sitters;
         Clappers = _clappers;
         // The clapping is as near or far as the stage's music.
         var loud = heard is not null && Music?.For(heard == _secondBeat ? _game.SecondShow : _game.Show) is { } stage ? stage.Place : 1f;
