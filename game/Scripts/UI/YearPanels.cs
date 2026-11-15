@@ -261,7 +261,8 @@ public static partial class YearPanels
 
     /// <summary>The small panel shown while building. In a year that sells ahead it is build week, and each day sells the last tickets.</summary>
     public static Control BuildDay(int expected, int bank, System.Action? open = null, string forecast = "", BuildWeekView? week = null,
-        System.Action? nextDay = null, System.Action<int>? price = null, TravelView? travel = null, System.Action<int>? parking = null, System.Action<int>? buses = null)
+        System.Action? nextDay = null, System.Action<int>? price = null, TravelView? travel = null, System.Action<int>? parking = null, System.Action<int>? buses = null,
+        System.Action<int>? vipPrice = null)
     {
         var panel = Card(360);
         var box = new VBoxContainer();
@@ -301,6 +302,15 @@ public static partial class YearPanels
                 box.AddChild(MoneyRow("Likely to sell today", $"about {week.Forecast:N0}", muted: true));
                 box.AddChild(MoneyRow("Adverts today", $"£{week.AdCost:N0}", muted: true));
                 box.AddChild(PriceRow(week.Price, week.Fair, price));
+            }
+
+            if (week.Vip is { } vip)
+            {
+                box.AddChild(MoneyRow("VIP tickets sold", vip.Sold >= vip.OnSale ? $"{vip.Sold:N0}, sold out" : $"{vip.Sold:N0} of {vip.OnSale:N0}"));
+                if (week.Day is not null && vip.Sold < vip.OnSale)
+                {
+                    box.AddChild(PriceRow(vip.Price, vip.Fair, vipPrice, "VIP ticket price"));
+                }
             }
         }
 

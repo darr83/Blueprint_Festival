@@ -136,6 +136,9 @@ public sealed record PersonLook
     /// <summary>The colour of a rain poncho worn over everything, or null when not wearing one.</summary>
     public string? Poncho { get; init; }
 
+    /// <summary>The colour of the VIP lanyard round the neck, with a pass hanging on the chest, or null for an ordinary ticket.</summary>
+    public string? Lanyard { get; init; }
+
     /// <summary>Everyone who has come through the gate wears a festival wristband.</summary>
     public string Wristband { get; init; } = "#E94F7B";
 }

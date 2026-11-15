@@ -47,7 +47,7 @@ public sealed partial class FestivalGame
     /// <summary>What the next turn is called, or null when selling is over.</summary>
     public string? NextSalesTurn => SalesTurn < SalesMonths.Count ? SalesMonths[SalesTurn] : SalesTurn < SalesTurns ? BuildDays[SalesTurn - SalesMonths.Count] : null;
 
-    public bool SoldOut => TicketsSold >= OnSale;
+    public bool SoldOut => TicketsSold >= OnSale || (OrdinaryLeft == 0 && VipLeft == 0);
 
     public bool AdvertOn(string id) => _adverts.Contains(id);
 
@@ -123,6 +123,9 @@ public sealed partial class FestivalGame
     /// <summary>What has been taken for the tickets sold ahead.</summary>
     public int TicketTakings => _salesLog.Sum(l => l.Tickets * l.Price);
 
+    /// <summary>What has been taken for the VIP tickets sold ahead.</summary>
+    public int VipTakings => _salesLog.Sum(l => l.Vips * l.VipPrice);
+
     /// <summary>
     /// The mood people arrive in, from what they paid against what the line-up is worth: a bargain
     /// starts the day well and a dear ticket has them expecting a lot.
@@ -136,7 +139,7 @@ public sealed partial class FestivalGame
                 return People.Crowd.StartingMood;
             }
 
-            var paid = (double)TicketTakings / TicketsSold;
+            var paid = (double)TicketTakings / Math.Max(1, TicketsSold - VipTicketsSold);
             return People.Crowd.StartingMood + Math.Clamp(0.45 * ((FairPrice / Math.Max(1, paid)) - 1), -0.25, 0.08);
         }
     }
@@ -157,14 +160,17 @@ public sealed partial class FestivalGame
     }
 
     /// <summary>About how many tickets the next turn would sell as things stand, before luck.</summary>
-    public int SalesForecast => NextSalesTurn is null ? 0 : Math.Min(OnSale - TicketsSold, (int)Math.Round(Demand(SalesTurn)));
+    public int SalesForecast => NextSalesTurn is null ? 0 : Math.Min(OrdinaryLeft, (int)Math.Round(Demand(SalesTurn)));
 
-    private double Demand(int turn)
+    private double Demand(int turn) => Interest(turn) * PricePull;
+
+    /// <summary>How many would buy in a turn before the price is counted: who hears, the line-up, keenness and how near the day is.</summary>
+    private double Interest(int turn)
     {
         var week = turn >= SalesMonths.Count;
         var word = LastHappiness is { } h ? 0.6 + (0.5 * h / 100.0) : 1.0;
         var heard = (OnSale * 0.035 * word) + (Math.Pow(AdvertReach, 0.85) * 0.12);
-        return heard * LineUpPull * PricePull * Keenness * (week ? DayUrgency * ForecastPull : Urgency[turn]);
+        return heard * LineUpPull * Keenness * (week ? DayUrgency * ForecastPull : Urgency[turn]);
     }
 
     /// <summary>
@@ -182,6 +188,7 @@ public sealed partial class FestivalGame
         SoldAhead = true;
         SalesTurn = 0;
         TicketsSold = 0;
+        VipTicketsSold = 0;
         Crowd.Replan(10);
         Phase = Phase.Sell;
         return true;
@@ -206,21 +213,29 @@ public sealed partial class FestivalGame
         }
 
         var luck = GameRandom.FromSeed(Seed, 40 + SalesTurn).Between(0.93, 1.07);
-        var tickets = Math.Clamp((int)Math.Round(Demand(SalesTurn) * luck), 0, OnSale - TicketsSold);
+        var tickets = Math.Clamp((int)Math.Round(Demand(SalesTurn) * luck), 0, OrdinaryLeft);
+        var vips = Math.Clamp((int)Math.Round(VipDemand(SalesTurn) * luck), 0, VipLeft);
         if (cost > 0)
         {
             Spend("Advertising", cost);
         }
 
         Earn("Tickets", tickets * TicketPrice);
-        TicketsSold += tickets;
-        var line = new SalesLine(when, tickets, TicketPrice, cost);
+        if (vips > 0)
+        {
+            Earn("VIP tickets", vips * VipTicketPrice);
+        }
+
+        TicketsSold += tickets + vips;
+        VipTicketsSold += vips;
+        var line = new SalesLine(when, tickets, TicketPrice, cost, vips, VipTicketsSold > 0 || vips > 0 ? VipTicketPrice : 0);
         _salesLog.Add(line);
         SalesTurn++;
         if (SalesTurn >= SalesMonths.Count)
         {
             // From build week on, the crowd that will come is the crowd that has bought.
             ApplyPlan(Math.Max(10, TicketsSold));
+            Crowd.VipTickets = VipTicketsSold;
             Phase = Phase.Build;
         }
 
@@ -239,7 +254,7 @@ public sealed partial class FestivalGame
         }
     }
 
-    private SalesSave? SaveSales() => SoldAhead ? new SalesSave(SalesTurn, TicketsSold, _adverts.OrderBy(a => a).ToList(), _salesLog.ToList()) : null;
+    private SalesSave? SaveSales() => SoldAhead ? new SalesSave(SalesTurn, TicketsSold, _adverts.OrderBy(a => a).ToList(), _salesLog.ToList(), VipTicketsSold, _vipPrice) : null;
 
     private void RestoreSales(SalesSave? sales)
     {
@@ -255,5 +270,8 @@ public sealed partial class FestivalGame
         _adverts.UnionWith((sales.Adverts ?? new()).Where(a => Adverts.Find(a) is not null));
         _salesLog.Clear();
         _salesLog.AddRange(sales.Log ?? new());
+        VipTicketsSold = Math.Clamp(sales.VipSold, 0, TicketsSold);
+        _vipPrice = sales.VipPrice is { } vp ? Math.Clamp(vp, 1, MaxVipTicketPrice) : null;
+        Crowd.VipTickets = SalesTurn >= SalesMonths.Count ? VipTicketsSold : 0;
     }
 }

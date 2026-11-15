@@ -33,11 +33,14 @@ public sealed record AdvertView(string Id, string Name, int Cost, int Reach, str
 
 /// <summary>What the ticket sales screen shows.</summary>
 public sealed record SalesView(string Festival, int Licence, int Bank, int Turn, string? Next, int Sold, int Taken, int AdSpend, int Reach, int AdCost,
-    int Forecast, int Price, int FairPrice, int Pull, IReadOnlyList<AdvertView> Adverts, IReadOnlyList<(string When, int Tickets, int Price, int AdCost)> Log,
-    IReadOnlyList<int> SoldAfter, TravelView? Travel = null);
+    int Forecast, int Price, int FairPrice, int Pull, IReadOnlyList<AdvertView> Adverts, IReadOnlyList<(string When, int Tickets, int Price, int AdCost, int Vips, int VipPrice)> Log,
+    IReadOnlyList<int> SoldAfter, TravelView? Travel = null, VipView? Vip = null);
+
+/// <summary>The VIP tickets: how many are sold of how many, at what price, what the line-up makes them worth, and what the next turn would likely sell.</summary>
+public sealed record VipView(int Sold, int OnSale, int Price, int Fair, int Forecast, int Taken);
 
 /// <summary>What the build panel shows in build week. Day is null once every day is sold.</summary>
-public sealed record BuildWeekView(string? Day, int Sold, int Licence, int Forecast, int AdCost, int Price, int Fair, TravelView? Travel = null);
+public sealed record BuildWeekView(string? Day, int Sold, int Licence, int Forecast, int AdCost, int Price, int Fair, TravelView? Travel = null, VipView? Vip = null);
 
 /// <summary>Tickets sold over the year as a line that climbs from January to the gates.</summary>
 public partial class SalesChart : Control
@@ -152,11 +155,11 @@ public static partial class YearPanels
         : ($"About right. Fair is about £{fair}.", UiStyle.FirstAidGreen);
 
     /// <summary>The ticket price with a button either side, and what the line-up is worth.</summary>
-    internal static Control PriceRow(int price, int fair, System.Action<int>? change)
+    internal static Control PriceRow(int price, int fair, System.Action<int>? change, string caption = "Ticket price")
     {
         var column = new VBoxContainer();
         column.AddThemeConstantOverride("separation", 2);
-        column.AddChild(UiStyle.Caps("Ticket price"));
+        column.AddChild(UiStyle.Caps(caption));
         var row = new HBoxContainer();
         row.AddThemeConstantOverride("separation", 10);
         var label = UiStyle.Heading($"£{price}", 32);
@@ -177,7 +180,7 @@ public static partial class YearPanels
     }
 
     /// <summary>The ticket price printed on a ticket, with a number that matters on the stub.</summary>
-    internal static Control PriceTicket(int price, int fair, System.Action<int>? change, string stubCaption, string stubNumber)
+    internal static Control PriceTicket(int price, int fair, System.Action<int>? change, string stubCaption, string stubNumber, string heading = "Ticket price")
     {
         var stub = new VBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
         stub.AddThemeConstantOverride("separation", -2);
@@ -186,7 +189,7 @@ public static partial class YearPanels
         caption.HorizontalAlignment = number.HorizontalAlignment = HorizontalAlignment.Center;
         stub.AddChild(caption);
         stub.AddChild(number);
-        return Ticket.With(PriceRow(price, fair, change), stub);
+        return Ticket.With(PriceRow(price, fair, change, heading), stub);
     }
 
     /// <summary>One line of the running order: the time in pink, the act in the poster font, the music, the stars and the fee.</summary>
@@ -453,7 +456,7 @@ public static partial class YearPanels
     /// the sales line, the adverts to switch on and off, the price on a ticket, and a button that runs the month.
     /// </summary>
     public static Control Sales(SalesView view, System.Action? run = null, System.Action<string>? toggleAdvert = null, System.Action<int>? price = null, bool busy = false,
-        System.Action<int>? parking = null, System.Action<int>? buses = null)
+        System.Action<int>? parking = null, System.Action<int>? buses = null, System.Action<int>? vipPrice = null)
     {
         var panel = Card(1220);
         var box = new VBoxContainer();
@@ -505,7 +508,8 @@ public static partial class YearPanels
         for (var i = view.Log.Count - 1; i >= Mathf.Max(0, view.Log.Count - 3); i--)
         {
             var line = view.Log[i];
-            left.AddChild(MoneyRow(line.When, $"{line.Tickets:N0} tickets at £{line.Price}  ·  £{line.AdCost:N0} on adverts", muted: true));
+            var vips = line.Vips > 0 ? $"  ·  {line.Vips:N0} VIP at £{line.VipPrice}" : "";
+            left.AddChild(MoneyRow(line.When, $"{line.Tickets:N0} tickets at £{line.Price}{vips}  ·  £{line.AdCost:N0} on adverts", muted: true));
         }
 
         var right = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
@@ -537,6 +541,12 @@ public static partial class YearPanels
         }
 
         right.AddChild(PriceTicket(view.Price, view.FairPrice, busy ? null : price, "Likely", view.Sold >= view.Licence ? "0" : $"~{view.Forecast:N0}"));
+        if (view.Vip is { } vip)
+        {
+            var ticket = PriceTicket(vip.Price, vip.Fair, busy ? null : vipPrice, $"VIP {vip.Sold:N0} of {vip.OnSale:N0}", vip.Sold >= vip.OnSale ? "Sold out" : $"~{vip.Forecast:N0}", "VIP ticket price  ·  gold lanyard");
+            ticket.Name = "VipTicket";
+            right.AddChild(ticket);
+        }
         if (view.Travel is not null)
         {
             right.AddChild(Travel(view.Travel, busy ? null : parking, busy ? null : buses));

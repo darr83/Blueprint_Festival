@@ -36,6 +36,9 @@ public sealed partial class FestivalGame
     /// </summary>
     public int? SetPrice(int stall, int item, int price) => CanSetPrices ? Site.SetPrice(stall, item, price) : null;
 
+    /// <summary>Keeps a stall for VIP guests only, or opens it to everyone, while the prices can still be changed.</summary>
+    public bool SetVipOnly(int stall, bool vipOnly) => CanSetPrices && Site.SetVipOnly(stall, vipOnly);
+
     /// <summary>Puts everything on a stall's menu back to its usual price.</summary>
     public bool ResetPrices(int stall)
     {

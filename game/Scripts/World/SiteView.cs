@@ -181,6 +181,12 @@ public partial class SiteView : Node3D
                 node.AddChild(person);
             }
 
+            if (stall.VipOnly && !Catalogue.AlwaysVip(stall.Kind))
+            {
+                var info = Catalogue.Of(stall.Kind);
+                node.AddChild(SiteProps.VipSign(info.Width * T, info.Depth * T));
+            }
+
             AddChild(node);
             if (stall.Kind == StallKind.Bin)
             {

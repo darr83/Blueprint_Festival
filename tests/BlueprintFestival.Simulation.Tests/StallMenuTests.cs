@@ -15,6 +15,7 @@ public class StallMenuTests
         StallKind.HotDogs, StallKind.Burgers, StallKind.Fries, StallKind.Pizza, StallKind.Noodles, StallKind.IceCream,
         StallKind.Bar, StallKind.Coffee, StallKind.Slush, StallKind.Cocktails,
         StallKind.Ponchos, StallKind.BucketHats, StallKind.Merchandise, StallKind.PhoneCharging,
+        StallKind.VipLounge,
     };
 
     private static void RunUntil(FestivalGame game, double hour)
@@ -89,7 +90,7 @@ public class StallMenuTests
             Assert.All(menu, m => Assert.True(m.UsualPrice >= 2 && m.Name.Length > 2));
             Assert.Contains(menu, m => !m.AdultsOnly && !m.ForChildren);
             Assert.True(Catalogue.HasQueue(kind));
-            Assert.Equal(Catalogue.GroupOf(kind) == StallGroup.Food ? Need.Food : Catalogue.GroupOf(kind) == StallGroup.Drink ? Need.Drink : null, Catalogue.Of(kind).Serves);
+            Assert.Equal(Catalogue.GroupOf(kind) == StallGroup.Food ? Need.Food : Catalogue.GroupOf(kind) is StallGroup.Drink or StallGroup.Vip ? Need.Drink : null, Catalogue.Of(kind).Serves);
         }
 
         // What is bought is carried or worn.

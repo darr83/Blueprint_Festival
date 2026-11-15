@@ -36,6 +36,7 @@ public partial class BuildBar : VBoxContainer
         StallGroup.Food => "Food",
         StallGroup.Drink => "Drink",
         StallGroup.Other => "Ponchos, hats and merchandise",
+        StallGroup.Vip => "VIP",
         _ => "Toilets, water and bins",
     };
 
@@ -44,6 +45,9 @@ public partial class BuildBar : VBoxContainer
 
     /// <summary>The key of the "no customers" choice, under Fences.</summary>
     public const string KeepOutKey = "fenceNoCustomers";
+
+    /// <summary>The key of the VIP ground choice, under Fences.</summary>
+    public const string VipGroundKey = "fenceVipGround";
 
     /// <summary>The key of a size of big screen, under Stages.</summary>
     public static string ScreenKey(ScreenKind kind) => $"screen{kind}";
@@ -97,7 +101,7 @@ public partial class BuildBar : VBoxContainer
         _choicePanel.AddChild(shelves);
         _shelfRow = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center, Visible = false };
         _shelfRow.AddThemeConstantOverride("separation", 6);
-        foreach (var group in new[] { StallGroup.Food, StallGroup.Drink, StallGroup.Other, StallGroup.Services })
+        foreach (var group in new[] { StallGroup.Food, StallGroup.Drink, StallGroup.Other, StallGroup.Services, StallGroup.Vip })
         {
             var chip = UiStyle.ChipButton(ShelfName(group), () => ShowShelf(group), Sounds.Tab);
             chip.ToggleMode = true;
@@ -133,7 +137,7 @@ public partial class BuildBar : VBoxContainer
         AddTab(row, BuildMode.Stage, "stage", "Stages", "Somewhere for the acts to play, and big screens to show them");
         AddTab(row, BuildMode.Fence, "fence", "Fences", "Keep people in, out, or in a line");
         AddTab(row, BuildMode.Gate, "gate", "Gates", "Where tickets are checked");
-        AddTab(row, BuildMode.Stall, "stall", "Stalls", "Food, drink, ponchos, hats and merchandise, toilets and water");
+        AddTab(row, BuildMode.Stall, "stall", "Stalls", "Food, drink, ponchos, hats and merchandise, toilets and water, and the VIP lounge and platform");
         AddTab(row, BuildMode.Staff, "staff", "Staff", "Ticket staff, security, first aid and cleaners");
         AddTab(row, BuildMode.Ground, "ground", "Ground", "Straw, trackway, pallets, mats, sand and artificial grass");
         AddTab(row, BuildMode.Path, "path", "Paths", "Mown, bark, gravel and boardwalk paths, up to 6 m wide");
@@ -211,6 +215,8 @@ public partial class BuildBar : VBoxContainer
                     "Drag along the ground where people should queue for a gate, a stall or the toilets. The barriers go up either side by themselves.\nStart within 3 m of the front. Drag again from its end to turn a corner.", () => _tool.PickLane());
                 AddChoice(KeepOutKey, "No customers", "Free",
                     "Mark ground customers must keep off, such as behind the stalls. Staff still go there.\nDrag to mark it; start on marked ground to clear it. It only shows while you are marking.", () => _tool.PickKeepOut());
+                AddChoice(VipGroundKey, "VIP ground", "Free",
+                    "Mark ground for VIP guests only. Everyone else walks round it; staff still go there. Seats put on it are VIP seats.\nDrag to mark it; start on VIP ground to clear it. It shows in gold only while you are marking.", () => _tool.PickVipGround());
 
                 break;
             case BuildMode.Gate:
@@ -475,6 +481,7 @@ public partial class BuildBar : VBoxContainer
             BuildMode.Fence => $"fence{_tool.Fence}",
             BuildMode.Lane => LaneKey,
             BuildMode.KeepOut => KeepOutKey,
+            BuildMode.VipGround => VipGroundKey,
             BuildMode.Gate => $"gate{_tool.Gate}",
             BuildMode.Stall => $"stall{_tool.Stall}",
             BuildMode.Ground => $"ground{_tool.Ground}",

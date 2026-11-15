@@ -47,6 +47,7 @@ public sealed class FieldMap
     private readonly Ground[] _tiles;
     private readonly bool[] _blocked;
     private readonly bool[] _staffOnly;
+    private readonly bool[] _vipOnly;
 
     private FieldMap(int width, int height)
     {
@@ -55,6 +56,7 @@ public sealed class FieldMap
         _tiles = new Ground[width * height];
         _blocked = new bool[width * height];
         _staffOnly = new bool[width * height];
+        _vipOnly = new bool[width * height];
     }
 
     /// <summary>Width of the whole map in tiles (west to east).</summary>
@@ -348,7 +350,28 @@ public sealed class FieldMap
     public bool InBounds(int x, int y) => x >= 0 && y >= 0 && x < Width && y < Height;
 
     /// <summary>True where people can walk: grass or lane with nothing built on it.</summary>
-    public bool IsWalkable(int x, int y) => this[x, y] is Ground.Grass or Ground.Lane && !_blocked[(y * Width) + x] && !_staffOnly[(y * Width) + x];
+    public bool IsWalkable(int x, int y) => this[x, y] is Ground.Grass or Ground.Lane && !_blocked[(y * Width) + x] && !_staffOnly[(y * Width) + x] && !_vipOnly[(y * Width) + x];
+
+    /// <summary>True where VIP guests can walk: anywhere the public can, and the ground marked for VIPs.</summary>
+    public bool IsWalkableForVip(int x, int y) => this[x, y] is Ground.Grass or Ground.Lane && !_blocked[(y * Width) + x] && !_staffOnly[(y * Width) + x];
+
+    public bool IsWalkableForVip(TilePoint p) => IsWalkableForVip(p.X, p.Y);
+
+    /// <summary>True on ground marked for VIP guests only.</summary>
+    public bool IsVipOnly(TilePoint p) => InBounds(p.X, p.Y) && _vipOnly[(p.Y * Width) + p.X];
+
+    /// <summary>Says which tiles only VIP guests (and staff) may walk on.</summary>
+    public void SetVipOnly(IEnumerable<TilePoint> tiles)
+    {
+        Array.Clear(_vipOnly);
+        foreach (var p in tiles)
+        {
+            if (InBounds(p.X, p.Y))
+            {
+                _vipOnly[(p.Y * Width) + p.X] = true;
+            }
+        }
+    }
 
     /// <summary>True where staff can walk: anywhere the public can, and the ground the public are kept off.</summary>
     public bool IsWalkableForStaff(int x, int y) => this[x, y] is Ground.Grass or Ground.Lane && !_blocked[(y * Width) + x];
