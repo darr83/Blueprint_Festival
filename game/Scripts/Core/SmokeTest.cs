@@ -151,7 +151,7 @@ public partial class SmokeTest : Node
                     Check(opened.Build.Facing == Simulation.Site.Facing.West, "R should turn the piece a quarter turn.");
 
                     opened.BuildBar.Toggle(BuildMode.Fence);
-                    Check(opened.BuildBar.ChoiceCount == 6 && opened.BuildBar.Choose("fencePaling"), "The build bar should offer four fences, the queue lane and the no-customers mark.");
+                    Check(opened.BuildBar.ChoiceCount == 7 && opened.BuildBar.Choose("fencePaling"), "The build bar should offer four fences, the queue lane, the no-customers mark and VIP ground.");
                     Check(opened.Build.DragFence(new TilePoint(gap.X, gap.Y + 1), new TilePoint(gap.Right - 1, gap.Y + 1)).Ok, "A fence should close the gap.");
                     Check(!site.OpenWayIn, "With the gap fenced there should be no way in.");
 
