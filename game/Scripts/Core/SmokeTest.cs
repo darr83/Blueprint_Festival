@@ -644,6 +644,12 @@ public partial class SmokeTest : Node
                     var gap = game.Field.Gap;
                     Check(build.Year.Showing == Phase.Build && build.Year.HasSidePanel && !build.Year.HasCentrePanel, "The build day panel should be up.");
                     Check(build.BuildBar.Visible, "The build bar should be there on the build day.");
+                    build.Year.SideBottomForTest = 440;
+                    build.Year.FitSide();
+                    Check(build.Year.SideRect.End.Y <= 440.5f && build.Year.SideScrolls, $"On a short screen the build day panel should scroll and keep its button on screen, not reach {build.Year.SideRect.End.Y}.");
+                    build.Year.SideBottomForTest = null;
+                    build.Year.FitSide();
+                    Check(build.Year.SideRect.End.Y <= build.ViewButtons.GlobalPosition.Y + 0.5f, $"The build day panel should stop above the view buttons, not reach {build.Year.SideRect.End.Y}.");
                     Check(build.TopBar.TimeText == "08:00" && game.Crowd.OnSite == 0, "The clock should wait until the gates open.");
                     Check(game.BuildStage(StageKind.Bandstand, grass.X + 74, grass.Y + 10, Facing.South).Ok, "A bandstand should go up on the build day.");
                     Check(game.BuildFence(FenceKind.Paling, new TilePoint(gap.X, gap.Y + 1), new TilePoint(gap.Right - 1, gap.Y + 1)).Ok, "A fence should close the gap.");

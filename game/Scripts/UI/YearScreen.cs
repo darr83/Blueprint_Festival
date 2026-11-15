@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using BlueprintFestival.Core;
 using BlueprintFestival.Simulation;
+using BlueprintFestival.Simulation.Core;
 using BlueprintFestival.Simulation.Sales;
 using BlueprintFestival.Simulation.Show;
 using BlueprintFestival.Simulation.World;
@@ -27,6 +28,8 @@ public partial class YearScreen : Control
     private int _litterShown = -1;
     private int _moneyShown = int.MinValue;
     private Control? _side;
+    private int _sideScrollWanted;
+    private int _sideScrollTries;
     private int _slot = RunningOrder.SetsAStage - 1;
     private float _run = -1;
     private int _turnShown = -1;
@@ -56,6 +59,13 @@ public partial class YearScreen : Control
     public bool HasCentrePanel { get; private set; }
 
     public bool HasSidePanel => _side is not null;
+
+    /// <summary>Where the side panel is on screen, or an empty rect when there is none.</summary>
+    public Rect2 SideRect => _side?.GetGlobalRect() ?? default;
+
+    /// <summary>True when the side panel's lines are cut short to fit, and scroll.</summary>
+    public bool SideScrolls => _side?.FindChild(YearPanels.SideScroll, true, false) is ScrollContainer { } s && s.GetChildCount() > 0
+        && s.GetChild(0) is Control lines && s.CustomMinimumSize.Y + 0.5f < lines.GetCombinedMinimumSize().Y;
 
     public void Initialise(FestivalGame game, FestivalScene scene)
     {
@@ -100,6 +110,48 @@ public partial class YearScreen : Control
         if (_side is not null)
         {
             _side.Visible = !_scene.Money.Visible && !_scene.DayBoard.Visible;
+            FitSide();
+        }
+    }
+
+    /// <summary>Set by the smoke test to try the side panel on a short screen; null uses the real screen.</summary>
+    public float? SideBottomForTest { get; set; }
+
+    /// <summary>
+    /// Makes the side panel fit the screen: its lines scroll when there is no room for them all,
+    /// so its buttons always show above the view buttons and the build bar.
+    /// </summary>
+    public void FitSide()
+    {
+        if (_side?.FindChild(YearPanels.SideScroll, true, false) is not ScrollContainer scroll
+            || scroll.GetChildCount() == 0 || scroll.GetChild(0) is not Control lines
+            || _side.FindChild(YearPanels.SideFooter, true, false) is not Control footer)
+        {
+            return;
+        }
+
+        var view = _scene.ViewButtons;
+        var bottom = SideBottomForTest ?? SidePanelRoom.Bottom(GetViewportRect().Size.Y,
+            view.Visible ? view.GlobalPosition.Y : null, _scene.BuildBar.Visible ? _scene.BuildBar.Top : null);
+        var frame = _side.GetThemeStylebox("panel")?.GetMinimumSize().Y ?? 0;
+        // The footer and the gap above it, which the scrolling lines must leave room for.
+        var below = footer.GetCombinedMinimumSize().Y + 8;
+        var want = SidePanelRoom.ScrollHeight(lines.GetCombinedMinimumSize().Y, _side.GlobalPosition.Y, bottom, frame, below);
+        if (!Mathf.IsEqualApprox(scroll.CustomMinimumSize.Y, want))
+        {
+            scroll.CustomMinimumSize = new Vector2(0, want);
+            _side.Size = new Vector2(_side.Size.X, 0);
+        }
+
+        // The scroll bar only takes the old position once the new lines are laid out, a frame or two on.
+        if (_sideScrollWanted > 0 && _sideScrollTries > 0)
+        {
+            scroll.ScrollVertical = _sideScrollWanted;
+            _sideScrollTries--;
+            if (scroll.ScrollVertical == _sideScrollWanted)
+            {
+                _sideScrollWanted = 0;
+            }
         }
     }
 
@@ -108,6 +160,9 @@ public partial class YearScreen : Control
         var old = GetChildren();
 
         var scroll = FindChild("Artists", true, false) is ScrollContainer artists ? artists.ScrollVertical : 0;
+        // A price change rebuilds the panel: keep it scrolled where the player had it.
+        _sideScrollWanted = FindChild(YearPanels.SideScroll, true, false) is ScrollContainer side ? side.ScrollVertical : 0;
+        _sideScrollTries = 3;
         _shown = Running ? Phase.Sell : _game.Phase;
         _turnShown = _game.SalesTurn;
         _priceShown = _game.TicketPrice;
@@ -174,6 +229,7 @@ public partial class YearScreen : Control
         panel.GrowHorizontal = GrowDirection.Begin;
         panel.Position = new Vector2(panel.Position.X, UiStyle.TopClear);
         _side = panel;
+        FitSide();
     }
 
     /// <summary>What a kind of act is called on the planning screen.</summary>

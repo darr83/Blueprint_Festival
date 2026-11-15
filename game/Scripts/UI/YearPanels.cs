@@ -265,9 +265,7 @@ public static partial class YearPanels
         System.Action<int>? camping = null, System.Action<int>? vipPrice = null)
     {
         var panel = Card(360);
-        var box = new VBoxContainer();
-        box.AddThemeConstantOverride("separation", 8);
-        panel.AddChild(box);
+        var (box, footer) = Scrolling(panel);
         box.AddChild(UiStyle.Caps(week is null ? "Friday" : "Build week", pink: true));
         box.AddChild(UiStyle.Heading(week is null ? "Build day" : week.Day ?? "Ready to open", 28));
         var words = UiStyle.Body(week is null
@@ -319,19 +317,45 @@ public static partial class YearPanels
             box.AddChild(Travel(travel, parking, buses, wide: false, camping: camping));
         }
 
-        box.AddChild(MoneyRow("Left to build with", $"£{bank:N0}"));
-        box.AddChild(new Control { CustomMinimumSize = new Vector2(0, 4) });
+        footer.AddChild(MoneyRow("Left to build with", $"£{bank:N0}"));
+        footer.AddChild(new Control { CustomMinimumSize = new Vector2(0, 4) });
         if (week?.Day is not null)
         {
-            box.AddChild(UiStyle.Button($"End {week.Day}", nextDay ?? (() => { }), BlueprintFestival.Simulation.Sound.Sounds.Coins));
-            box.AddChild(UiStyle.SecondaryButton("Skip the rest and start the day", open ?? (() => { })));
+            footer.AddChild(UiStyle.Button($"End {week.Day}", nextDay ?? (() => { }), BlueprintFestival.Simulation.Sound.Sounds.Coins));
+            footer.AddChild(UiStyle.SecondaryButton("Skip the rest and start the day", open ?? (() => { })));
         }
         else
         {
-            box.AddChild(UiStyle.Button("Start the day", open ?? (() => { })));
+            footer.AddChild(UiStyle.Button("Start the day", open ?? (() => { })));
         }
 
         return panel;
+    }
+
+    /// <summary>The name of the scrolling middle of a side panel, which <see cref="YearScreen"/> sizes to the screen.</summary>
+    public const string SideScroll = "SideScroll";
+
+    /// <summary>The name of the part of a side panel under the scrolling middle: its buttons, which always show.</summary>
+    public const string SideFooter = "SideFooter";
+
+    /// <summary>
+    /// Splits a side panel into lines that scroll when the screen is short, and a footer with the
+    /// buttons that always shows under them.
+    /// </summary>
+    private static (VBoxContainer Box, VBoxContainer Footer) Scrolling(PanelContainer panel)
+    {
+        var outer = new VBoxContainer();
+        outer.AddThemeConstantOverride("separation", 8);
+        panel.AddChild(outer);
+        var scroll = new ScrollContainer { Name = SideScroll, HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled };
+        outer.AddChild(scroll);
+        var box = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+        box.AddThemeConstantOverride("separation", 8);
+        scroll.AddChild(box);
+        var footer = new VBoxContainer { Name = SideFooter };
+        footer.AddThemeConstantOverride("separation", 8);
+        outer.AddChild(footer);
+        return (box, footer);
     }
 
     /// <summary>The small panel shown the morning after, while the field is tidied.</summary>
