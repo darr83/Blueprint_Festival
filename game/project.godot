@@ -16,6 +16,7 @@ config/icon="res://icon.svg"
 
 SoundBoard="*res://Scripts/Audio/SoundBoard.cs"
 GameManager="*res://Scripts/Core/GameManager.cs"
+ScreenMode="*res://Scripts/Core/ScreenMode.cs"
 
 [display]
 
