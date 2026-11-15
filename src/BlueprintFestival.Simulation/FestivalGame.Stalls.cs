@@ -115,6 +115,7 @@ public sealed partial class FestivalGame
         StallGroup.Food => "Food stalls",
         StallGroup.Drink => "Drink stalls",
         StallGroup.Other => "Ponchos, hats and merchandise",
+        StallGroup.Fair => "Fairground",
         _ => Catalogue.Of(kind).Name,
     };
 

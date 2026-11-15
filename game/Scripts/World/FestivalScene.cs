@@ -76,6 +76,12 @@ public partial class FestivalScene : Node3D
 
     public CrowdPanel CrowdSafety { get; private set; } = null!;
 
+    /// <summary>The card for setting a crowd area's limit, and the card when one fills up.</summary>
+    public AreaPanel Areas { get; private set; } = null!;
+
+    /// <summary>The labels over the crowd areas.</summary>
+    public AreaLabels AreaTags { get; private set; } = null!;
+
     /// <summary>The event day panel, "The day so far".</summary>
     public DayPanel DayBoard { get; private set; } = null!;
 
@@ -172,6 +178,7 @@ public partial class FestivalScene : Node3D
         Crowd = new CrowdView { Name = "Crowd" };
         AddChild(Crowd);
         Crowd.Initialise(Game);
+        Crowd.RideSeat = Site.RideSeat;
         Crowd.Music = Music;
         Acts.Music = Music;
         SecondActs.Music = Music;
@@ -272,6 +279,17 @@ public partial class FestivalScene : Node3D
             Camera.LookAt((float)x, (float)y, 18f);
         };
         Game.CrushWarning += OnCrushWarning;
+        Areas = new AreaPanel { Name = "AreaPanel" };
+        _hud.AddChild(Areas);
+        Areas.Initialise(Game, Build);
+        Areas.ShowMe += (x, y) =>
+        {
+            StageCam.Show(null);
+            Camera.LookAt((float)x, (float)y, 18f);
+        };
+        AreaTags = new AreaLabels { Name = "AreaLabels" };
+        AddChild(AreaTags);
+        AreaTags.Initialise(Game, Build, Density);
 
         _hint = UiStyle.Body("Q / E turn view    WASD move    Wheel zoom\nSpace pause    C crowd view    H the day so far", muted: true, size: 13);
         _hint.Theme = UiStyle.Theme;
@@ -322,6 +340,7 @@ public partial class FestivalScene : Node3D
         Game.Advance(delta);
         Sky.Apply(Game, StageCam.Yaw);
         CrowdSafety.RightInset = Money.Visible ? Money.Size.X + 14 : DayBoard.Visible ? DayBoard.Size.X + 14 : 0;
+        Areas.TopInset = CrowdSafety.WarningBottom;
         DayButton.Visible = Game.Phase is Phase.Day or Phase.Tidy && !Year.HasCentrePanel;
         PlaceDayButton();
         PlaceGapButton();

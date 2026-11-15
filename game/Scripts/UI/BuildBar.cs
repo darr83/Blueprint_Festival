@@ -37,6 +37,7 @@ public partial class BuildBar : VBoxContainer
         StallGroup.Drink => "Drink",
         StallGroup.Other => "Ponchos, hats and merchandise",
         StallGroup.Vip => "VIP",
+        StallGroup.Fair => "Fairground",
         _ => "Toilets, water and bins",
     };
 
@@ -48,6 +49,16 @@ public partial class BuildBar : VBoxContainer
 
     /// <summary>The key of the VIP ground choice, under Fences.</summary>
     public const string VipGroundKey = "fenceVipGround";
+
+    /// <summary>The key of a kind of crowd area, under Areas.</summary>
+    public static string AreaKey(AreaKind kind) => $"area{kind}";
+
+    private static string AreaAbout(AreaKind kind) => (kind switch
+    {
+        AreaKind.FrontPen => "A pen at the front of a stage. Security on its gaps count people in and close them when it is full, so nobody is pushed in from behind.",
+        AreaKind.Vip => "A pen for VIP guests only, with a gold lanyard to get in. Put it near the stage.",
+        _ => "A standing area with its own limit, anywhere in front of a stage.",
+    }) + $"\nDrag to draw it. It lets in {CrowdAreas.ComfortablePerMetre:0} people a square metre to start with; click inside to change that. The barrier goes round by itself, with gaps on the side away from the stage. Post one security by each gap.";
 
     /// <summary>The key of a size of big screen, under Stages.</summary>
     public static string ScreenKey(ScreenKind kind) => $"screen{kind}";
@@ -155,7 +166,7 @@ public partial class BuildBar : VBoxContainer
         _choicePanel.AddChild(shelves);
         _shelfRow = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center, Visible = false };
         _shelfRow.AddThemeConstantOverride("separation", 6);
-        foreach (var group in new[] { StallGroup.Food, StallGroup.Drink, StallGroup.Other, StallGroup.Services, StallGroup.Vip })
+        foreach (var group in new[] { StallGroup.Food, StallGroup.Drink, StallGroup.Other, StallGroup.Fair, StallGroup.Services, StallGroup.Vip })
         {
             var chip = UiStyle.ChipButton(ShelfName(group), () => ShowShelf(group), Sounds.Tab);
             chip.ToggleMode = true;
@@ -208,6 +219,7 @@ public partial class BuildBar : VBoxContainer
         AddTab(row, BuildMode.Ground, "ground", "Ground", "Straw, trackway, pallets, mats, sand and artificial grass");
         AddTab(row, BuildMode.Path, "path", "Paths", "Mown, bark, gravel and boardwalk paths, up to 6 m wide");
         AddTab(row, BuildMode.Comfort, "bench", "Comforts", "Seats, tables, hand washing and shade");
+        AddTab(row, BuildMode.Area, "area", "Areas", "Pens and areas in front of the stages, each with its own limit on how many people get in");
         AddTab(row, BuildMode.Sign, "sign", "Decor", "Signs with your own words on, and decorations: bunting, flags, flowers, a fire pit and giant letters");
         AddTab(row, BuildMode.Light, "light", "Lights", "Path lights, floodlights and fairy lights for after dark");
         AddTab(row, BuildMode.Fireworks, "firework", "Fireworks", "A launch pad, and firework shows to plan on the mixer");
@@ -369,6 +381,15 @@ public partial class BuildBar : VBoxContainer
                         OpenMixer?.Invoke();
                     });
                 break;
+            case BuildMode.Area:
+                foreach (var kind in new[] { AreaKind.FrontPen, AreaKind.Standing, AreaKind.Vip })
+                {
+                    AddChoice(AreaKey(kind), CrowdAreas.Name(kind), $"£{Catalogue.Of(FenceKind.CrowdBarrier).CostPerMetre} a metre", AreaAbout(kind), () => _tool.PickArea(kind));
+                }
+
+                AddChoice(KeepOutKey, "Keep clear", "Free",
+                    "Ground nobody stands on, such as a walkway round a pen for security. Staff still go there.\nDrag to mark it; start on marked ground to clear it. It only shows while you are marking.", () => _tool.PickKeepOut());
+                break;
             case BuildMode.Remove:
                 _tool.PickRemove();
                 break;
@@ -398,7 +419,9 @@ public partial class BuildBar : VBoxContainer
         foreach (var s in Catalogue.StallsIn(Shelf))
         {
             var menu = Catalogue.MenuOf(s.Kind);
-            var sells = menu.Count > 0
+            var sells = Rides.IsFair(s.Kind)
+                ? $"{menu[0].Name} costs £{menu[0].UsualPrice} to start with.\nOnce it is up, click it to set the price. It cannot go in a camping field."
+                : menu.Count > 0
                 ? $"Sells {string.Join(", ", menu.Select(m => $"{m.Name.ToLowerInvariant()} £{m.UsualPrice}"))}.\nOnce it is up, click it to set its prices."
                 : s.Kind == StallKind.Bin ? "" : "Free to use.";
             AddChoice($"stall{s.Kind}", s.Name, $"£{s.Cost:N0}", $"{s.About}\n{sells}\n{s.Width / 2f:0.#} m wide, {s.Depth / 2f:0.#} m deep. R turns it.", () => _tool.PickStall(s.Kind));
@@ -494,6 +517,7 @@ public partial class BuildBar : VBoxContainer
             : booth && k.Contains("ticket") ? ("ticket", UiStyle.StagePink)
             : k.StartsWith("stage") ? ("stage", UiStyle.StagePink)
             : k.StartsWith("fence") ? ("fence", UiStyle.StagePink)
+            : k.StartsWith("area") ? ("area", UiStyle.StagePink)
             : k.StartsWith("gate") ? ("gate", UiStyle.StagePink)
             : k.StartsWith("staff") ? ("staff", UiStyle.StagePink)
             : k.StartsWith("light") ? ("light", UiStyle.StagePink)
@@ -556,6 +580,7 @@ public partial class BuildBar : VBoxContainer
             BuildMode.Lane => LaneKey,
             BuildMode.KeepOut => KeepOutKey,
             BuildMode.VipGround => VipGroundKey,
+            BuildMode.Area => AreaKey(_tool.Area),
             BuildMode.Gate => $"gate{_tool.Gate}",
             BuildMode.Stall => $"stall{_tool.Stall}",
             BuildMode.Ground => $"ground{_tool.Ground}",

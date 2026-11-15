@@ -296,7 +296,7 @@ public sealed partial class SiteLayout
 
     public PlacedStall? StallAt(TilePoint p) => _stalls.FirstOrDefault(s => s.Rect.Contains(p));
 
-    public bool IsEmpty(TilePoint p) => !_fence.ContainsKey(p) && StageAt(p) is null && GateAt(p) is null && StallAt(p) is null && !_laneOf.ContainsKey(p) && !_barriers.Contains(p) && !HasLight(p) && ScreenAt(p) is null && !FireworksAt(p) && ComfortAt(p) is null && SignAt(p) is null && DecorAt(p) is null && !IsBuntingPole(p) && !_pitches.Contains(p);
+    public bool IsEmpty(TilePoint p) => !_fence.ContainsKey(p) && StageAt(p) is null && GateAt(p) is null && StallAt(p) is null && !_laneOf.ContainsKey(p) && !_barriers.Contains(p) && !HasLight(p) && ScreenAt(p) is null && !FireworksAt(p) && ComfortAt(p) is null && SignAt(p) is null && DecorAt(p) is null && !IsBuntingPole(p) && !_pitches.Contains(p) && !_areaEdges.Contains(p);
 
     /// <summary>The queue lanes the player has laid: each is the tiles people stand along, in order from one end to the other.</summary>
     public IReadOnlyList<IReadOnlyList<TilePoint>> Lanes => _lanes;
@@ -583,11 +583,17 @@ public sealed partial class SiteLayout
     public BuildCheck CheckStall(StallKind kind, int x, int y, Facing facing)
     {
         var stall = new PlacedStall(kind, x, y, facing);
+        var fair = Rides.IsFair(kind);
         foreach (var p in TilesOf(stall.Rect))
         {
+            if (fair && _map.UseAt(p) == FieldUse.Camping)
+            {
+                return BuildCheck.No("The fairground cannot go in a camping field.");
+            }
+
             if (!_map.Rented(p) || !IsBuildable(p))
             {
-                return BuildCheck.No("A stall must stand on the grass inside the hedge.");
+                return BuildCheck.No(fair ? "It must stand on the grass inside the hedge." : "A stall must stand on the grass inside the hedge.");
             }
 
             if (!IsEmpty(p))
@@ -853,7 +859,7 @@ public sealed partial class SiteLayout
             return LaneCost(_lanes[lane].Count);
         }
 
-        return _fence.TryGetValue(p, out var kind) ? FenceCost(kind, FenceRunThrough(p).Count) : 0;
+        return _fence.TryGetValue(p, out var kind) ? FenceCost(kind, FenceRunThrough(p).Count) : AreaRefundAt(p);
     }
 
     /// <summary>The whole straight stretch of one kind of fence that a tile is part of.</summary>
@@ -928,6 +934,10 @@ public sealed partial class SiteLayout
         {
             _lanes.RemoveAt(lane);
         }
+        else if (RemoveAreaAt(p))
+        {
+            // A crowd area, and the barrier round it.
+        }
         else
         {
             return 0;
@@ -993,7 +1003,7 @@ public sealed partial class SiteLayout
     public SiteSave Save() => new(_stages.ToList(), _gates.ToList(), FenceRuns(), _stalls.ToList(),
         _lanes.Count == 0 ? null : _lanes.Select(l => l.ToList()).ToList(),
         _keepOut.Count == 0 ? null : RunsOf(_keepOut).Select(r => r.Vertical ? new TileRect(r.X, r.Y, 1, r.Length) : new TileRect(r.X, r.Y, r.Length, 1)).ToList(),
-        _lights.Count == 0 ? null : _lights.ToList(), _fairy.Count == 0 ? null : _fairy.ToList(), _screens.Count == 0 ? null : _screens.ToList(), _pad, _comforts.Count == 0 ? null : _comforts.ToList(), _signs.Count == 0 ? null : _signs.ToList(), _decor.Count == 0 ? null : _decor.ToList(), _bunting.Count == 0 ? null : _bunting.ToList(), SaveVipGround());
+        _lights.Count == 0 ? null : _lights.ToList(), _fairy.Count == 0 ? null : _fairy.ToList(), _screens.Count == 0 ? null : _screens.ToList(), _pad, _comforts.Count == 0 ? null : _comforts.ToList(), _signs.Count == 0 ? null : _signs.ToList(), _decor.Count == 0 ? null : _decor.ToList(), _bunting.Count == 0 ? null : _bunting.ToList(), SaveVipGround(), _areas.Count == 0 ? null : _areas.ToList());
 
     /// <summary>Puts back a saved layout, skipping anything that no longer fits.</summary>
     public void Restore(SiteSave save)
@@ -1011,6 +1021,7 @@ public sealed partial class SiteLayout
         _screens.Clear();
         _pad = null;
         _padFence.Clear();
+        _areas.Clear();
         foreach (var s in save.Stages ?? new())
         {
             if (CheckStage(s.Kind, s.X, s.Y, s.Facing).Ok)
@@ -1082,6 +1093,7 @@ public sealed partial class SiteLayout
         RestoreSigns(save);
         RestoreDecor(save);
         RestoreVipGround(save);
+        RestoreAreas(save);
         Refresh();
     }
 
@@ -1108,12 +1120,13 @@ public sealed partial class SiteLayout
     private void Refresh()
     {
         LayBarriers();
+        LayAreas();
         _litStale = true;
         _roofStale = true;
         _charmStale = true;
         _poles.Clear();
-        _keepOut.RemoveWhere(p => _fence.ContainsKey(p) || StageAt(p) is not null || StallAt(p) is not null || GateAt(p) is not null || _laneOf.ContainsKey(p) || _barriers.Contains(p) || ScreenAt(p) is not null || FireworksAt(p) || ComfortAt(p) is not null || SignAt(p) is not null || DecorAt(p) is not null || IsBuntingPole(p));
-        _map.SetBlocked(_stages.SelectMany(s => TilesOf(s.Rect)).Concat(_stalls.SelectMany(BlockedBy)).Concat(_fence.Keys).Concat(_laneOf.Keys).Concat(_barriers).Concat(LightsInTheWay).Concat(ScreensInTheWay).Concat(PadInTheWay).Concat(ComfortsInTheWay).Concat(SignsInTheWay).Concat(DecorInTheWay).Concat(_pitches));
+        _keepOut.RemoveWhere(p => _fence.ContainsKey(p) || StageAt(p) is not null || StallAt(p) is not null || GateAt(p) is not null || _laneOf.ContainsKey(p) || _barriers.Contains(p) || ScreenAt(p) is not null || FireworksAt(p) || ComfortAt(p) is not null || SignAt(p) is not null || DecorAt(p) is not null || IsBuntingPole(p) || _areaEdges.Contains(p));
+        _map.SetBlocked(_stages.SelectMany(s => TilesOf(s.Rect)).Concat(_stalls.SelectMany(BlockedBy)).Concat(_fence.Keys).Concat(_laneOf.Keys).Concat(_barriers).Concat(LightsInTheWay).Concat(ScreensInTheWay).Concat(PadInTheWay).Concat(ComfortsInTheWay).Concat(SignsInTheWay).Concat(DecorInTheWay).Concat(_pitches).Concat(_areaEdges));
         RefreshVipGround();
         // Shut gates are closed to the public: nobody walks through one until the gates are opened.
         _map.SetStaffOnly(_gatesShut ? _keepOut.Concat(_gates.SelectMany(g => TilesOf(g.Rect))) : _keepOut);
@@ -1232,4 +1245,4 @@ public sealed partial class SiteLayout
 /// <summary>The layout as written to a save file.</summary>
 public sealed record SiteSave(List<PlacedStage>? Stages, List<PlacedGate>? Gates, List<FenceRun>? Fences, List<PlacedStall>? Stalls = null,
     List<List<TilePoint>>? Lanes = null, List<TileRect>? KeepOut = null,
-    List<PlacedLight>? Lights = null, List<FairyString>? FairyLights = null, List<PlacedScreen>? Screens = null, PlacedLaunchPad? LaunchPad = null, List<PlacedComfort>? Comforts = null, List<PlacedSign>? Signs = null, List<PlacedDecor>? Decor = null, List<BuntingRun>? Bunting = null, List<TileRect>? VipGround = null);
+    List<PlacedLight>? Lights = null, List<FairyString>? FairyLights = null, List<PlacedScreen>? Screens = null, PlacedLaunchPad? LaunchPad = null, List<PlacedComfort>? Comforts = null, List<PlacedSign>? Signs = null, List<PlacedDecor>? Decor = null, List<BuntingRun>? Bunting = null, List<TileRect>? VipGround = null, List<PlacedArea>? Areas = null);

@@ -185,7 +185,7 @@ public partial class StallPanel : PanelContainer
         var top = new HBoxContainer();
         var titles = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
         titles.AddThemeConstantOverride("separation", 0);
-        titles.AddChild(UiStyle.Caps(menu.Count > 0 ? "Menu board" : "Stall", pink: true));
+        titles.AddChild(UiStyle.Caps(Rides.IsFair(placed.Kind) ? "Price board" : menu.Count > 0 ? "Menu board" : "Stall", pink: true));
         titles.AddChild(UiStyle.Heading(info.Name, 26));
         top.AddChild(titles);
         var close = UiStyle.SecondaryButton("Close", Close);

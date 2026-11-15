@@ -278,6 +278,15 @@ public partial class CrowdView : Node3D
         };
     }
 
+    /// <summary>Where a seat of a ride is just now: set by the scene, which knows the rides.</summary>
+    public System.Func<int, int, Transform3D?>? RideSeat { get; set; }
+
+    /// <summary>How high a ride's seat is above the floor of its car, in metres.</summary>
+    private const float RideSeatHeight = 0.45f;
+
+    /// <summary>How many people were drawn sat on a ride in the last frame.</summary>
+    public int Riders { get; private set; }
+
     private void Sync(double delta, bool snap)
     {
         var speed = (int)_game.Clock.Speed;
@@ -342,6 +351,7 @@ public partial class CrowdView : Node3D
         _seen.Clear();
         var dancers = 0;
         var sitters = 0;
+        var riders = 0;
         var carrying = 0;
         var heard = HeardStage();
         _clappers = 0;
@@ -356,6 +366,16 @@ public partial class CrowdView : Node3D
             var tilt = person.Unwell ? -Mathf.Pi / 2 : 0f;
             var target = new Vector3((float)person.X, lift + (float)_game.Site.HeightAt(Simulation.World.FieldMap.TileAt(person.X, person.Y)), (float)person.Y);
             var heading = (float)person.Heading;
+
+            // Someone on a ride is wherever their seat has got to, sat down and facing the way it faces.
+            var riding = person.Ride >= 0 && RideSeat?.Invoke(person.Ride, person.RideSeat) is { } place ? place : (Transform3D?)null;
+            if (riding is { } seated)
+            {
+                target = seated.Origin;
+                var ahead = seated.Basis.Z;
+                heading = Mathf.Atan2(ahead.X, ahead.Z);
+            }
+
             var has = _views.TryGetValue(person.Id, out var view);
             var near = everyone || new Vector2(target.X - focus.X, target.Z - focus.Z).Length() < (has ? reach * 1.15f : reach);
             if (near && !has && (snap || everyone || made < MadePerFrame))
@@ -394,8 +414,8 @@ public partial class CrowdView : Node3D
             {
                 _seen.Add(person.Id);
                 view!.Hold(person.Holding);
-                view.Position = view.Position.Lerp(target, glide);
-                view.Rotation = new Vector3(tilt, Mathf.LerpAngle(view.Rotation.Y, heading, glide), 0);
+                view.Position = riding is null ? view.Position.Lerp(target, glide) : target;
+                view.Rotation = new Vector3(tilt, riding is null ? Mathf.LerpAngle(view.Rotation.Y, heading, glide) : heading, 0);
 
                 // People watching the stage put their arms up now and then, each in their own time;
                 // more of them, more often, for the headline act.
@@ -419,8 +439,13 @@ public partial class CrowdView : Node3D
                     view.SeatHeight = (float)seat;
                     sitters++;
                 }
+                else if (riding is not null)
+                {
+                    view.SeatHeight = RideSeatHeight;
+                    riders++;
+                }
 
-                view.Pose = person.Ticket ? Pose.ShowingTicket : person.Seat is not null ? Pose.Sitting : person.Walking && speed > 0 ? Pose.Walking : dance is not null ? Pose.Dancing
+                view.Pose = person.Ticket ? Pose.ShowingTicket : person.Seat is not null || riding is not null ? Pose.Sitting : person.Walking && speed > 0 ? Pose.Walking : dance is not null ? Pose.Dancing
                     : applause is not null ? Applause(person.Id, applause) : cheering ? Pose.Cheering : Pose.Standing;
                 dancers += view.Pose == Pose.Dancing ? 1 : 0;
                 carrying += view.Holding != Simulation.Site.Carried.None ? 1 : 0;
@@ -451,7 +476,7 @@ public partial class CrowdView : Node3D
             }
 
             Remember(person.Id, person.Look);
-            var at = _shownStamp[person.Id] == _stamp - 1 ? _shown[person.Id].Lerp(target, glide) : target;
+            var at = riding is null && _shownStamp[person.Id] == _stamp - 1 ? _shown[person.Id].Lerp(target, glide) : target;
             _shown[person.Id] = at;
             _shownStamp[person.Id] = _stamp;
             var tall = _heights[person.Id];
@@ -464,7 +489,12 @@ public partial class CrowdView : Node3D
                 at += new Vector3(0, SimpleLift(beat, person.Id), 0);
             }
 
-            if (person.Seat is { } low)
+            if (riding is not null)
+            {
+                at += new Vector3(0, RideSeatHeight - (0.6f * tall), 0);
+                riders++;
+            }
+            else if (person.Seat is { } low)
             {
                 // Sitting down: the simple figure is drawn lower, so its head is where a sitter's would be.
                 at += new Vector3(0, (float)low - (0.6f * tall), 0);
@@ -477,6 +507,7 @@ public partial class CrowdView : Node3D
         }
 
         Simple = simple;
+        Riders = riders;
         Carrying = carrying;
         Dancers = dancers;
         Sitters = sitters;

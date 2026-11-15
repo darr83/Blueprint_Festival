@@ -116,10 +116,15 @@ public static class Sounds
     public const string ChampagnePop = "champagne_pop";
     public const string BinDrop = "bin_drop";
     public const string FireCrackle = "amb_fire_pit";
+    public const string Fairground = "amb_fairground";
+    public const string BuildRide = "build_ride";
+    public const string RideBell = "ride_bell";
+    public const string HookADuck = "hook_a_duck";
+    public const string TeddyWin = "teddy_win";
 
     /// <summary>The sounds that play round and round for as long as they are wanted.</summary>
     public static readonly IReadOnlyList<string> Loops =
-        [Day, Night, RainLight, RainHeavy, CrowdSmall, CrowdMedium, CrowdLarge, CrowdQueue, ApplauseLoop, FireCrackle];
+        [Day, Night, RainLight, RainHeavy, CrowdSmall, CrowdMedium, CrowdLarge, CrowdQueue, ApplauseLoop, FireCrackle, Fairground];
 
     /// <summary>
     /// The clapping that goes on under the cheers between songs and at the end of a set. The game
@@ -162,6 +167,7 @@ public sealed class SoundScript : IDisposable
         Remember();
         game.Crowd.TicketsSold += OnTickets;
         game.Crowd.Served += OnServed;
+        game.Crowd.TeddyWon += OnTeddy;
         game.CrushWarning += OnCrushWarning;
         game.CrushInjury += OnCrushInjury;
         game.Announced += OnAnnounced;
@@ -179,6 +185,7 @@ public sealed class SoundScript : IDisposable
     {
         _game.Crowd.TicketsSold -= OnTickets;
         _game.Crowd.Served -= OnServed;
+        _game.Crowd.TeddyWon -= OnTeddy;
         _game.CrushWarning -= OnCrushWarning;
         _game.CrushInjury -= OnCrushInjury;
         _game.Announced -= OnAnnounced;
@@ -201,6 +208,24 @@ public sealed class SoundScript : IDisposable
         return (Math.Clamp(people / 40.0, 0, 1) * (1 - toMedium), toMedium * (1 - toLarge), toLarge);
     }
 
+    /// <summary>How many rides are going round with somebody on them just now.</summary>
+    public static int RidesGoing(FestivalGame game)
+    {
+        var going = 0;
+        for (var i = 0; i < game.Site.Stalls.Count; i++)
+        {
+            var stall = game.Site.Stalls[i];
+            going += Rides.IsRide(stall.Kind) && !Rides.TurnAt(stall, game.Now).Boarding && game.Crowd.Riding(i) > 0 ? 1 : 0;
+        }
+
+        return going;
+    }
+
+    /// <summary>How loud the fairground is with this many rides going: one is plain to hear, more are a little louder.</summary>
+    public static double FairgroundLevel(int rides) => rides <= 0 ? 0 : Math.Clamp(0.55 + (rides * 0.15), 0, 1);
+
+    private void OnTeddy(PlacedStall stall) => Cue?.Invoke(Sounds.TeddyWin);
+
     /// <summary>The cheer that greets an act watched by this many people.</summary>
     public static string CheerFor(int watching) => watching < 60 ? Sounds.CheerSmall : watching < 500 ? Sounds.CheerMedium : Sounds.CheerBig;
 
@@ -222,6 +247,8 @@ public sealed class SoundScript : IDisposable
         StallKind.WaterPoint => Sounds.WaterTap,
         StallKind.Bin => Sounds.BinDrop,
         StallKind.Toilets or StallKind.ToiletBlock => Sounds.ToiletDoor,
+        StallKind.HookADuck => Sounds.HookADuck,
+        StallKind.BigWheel or StallKind.Waltzer or StallKind.Twister or StallKind.Carousel or StallKind.Skylark => Sounds.RideBell,
         // The first aid and medical tents are heard through the radio instead.
         _ => null,
     };
@@ -247,6 +274,9 @@ public sealed class SoundScript : IDisposable
         // Fire pits crackle once it is getting dark, more of them a little louder; rain dampens them.
         var pits = game.Site.Decorations.Count(d => d.Kind == DecorKind.FirePit);
         _levels[Sounds.FireCrackle] = pits == 0 ? 0 : Math.Clamp(0.5 + (pits * 0.15), 0, 1) * Math.Clamp((0.7 - game.Light) / 0.4, 0, 1) * hush;
+
+        // The fairground: its organ and the squeals from the rides, for as long as a ride is going round with people on it.
+        _levels[Sounds.Fairground] = day ? FairgroundLevel(RidesGoing(game)) : 0;
 
         var (small, medium, large) = day ? Murmur(game.Crowd.InField) : (0, 0, 0);
         _levels[Sounds.CrowdSmall] = small;
