@@ -55,7 +55,7 @@ def ask(key, sound):
             "text": sound["prompt"],
             "duration_seconds": sound["seconds"],
             "loop": sound["loop"],
-            "prompt_influence": 0.45,
+            "prompt_influence": sound.get("influence", 0.45),
         }).encode()
     request = urllib.request.Request(url, data=body, headers={"xi-api-key": key, "Content-Type": "application/json"})
     for attempt in range(4):

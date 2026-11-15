@@ -69,9 +69,16 @@ public static class Sounds
     public const string SetEndOvation = "set_end_ovation";
     public const string ApplauseLoop = "applause_loop";
     public const string FireworkLaunch = "firework_launch";
+    public const string FireworkWhistle = "firework_whistle";
     public const string FireworkBurst = "firework_burst";
+    public const string FireworkBurst2 = "firework_burst_2";
+    public const string FireworkWillow = "firework_burst_3";
     public const string FireworkCrackle = "firework_crackle";
+    public const string FireworkFountain = "firework_fountain";
+    public const string FireworkCandle = "firework_candle";
+    public const string FireworkMine = "firework_mine";
     public const string FireworkOoh = "firework_ooh";
+    public const string FireworkCheer = "firework_cheer";
 
     /// <summary>One clap of the crowd clapping along, each a little different; one plays on each clap of the beat.</summary>
     public static readonly IReadOnlyList<string> Claps = [Clap1, Clap2, Clap3];

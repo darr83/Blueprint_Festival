@@ -263,15 +263,21 @@ public partial class FireworksView : Node3D
         }
 
         Flash(at, colours[0], count / 40f);
-        SoundBoard.Cue(Sounds.FireworkBurst);
     }
 
-    private void Shell(Vector3 from, float height, Action<Spark> burst)
+    private void Shell(Vector3 from, float height, Action<Spark> burst, string launch = Sounds.FireworkLaunch)
     {
         // Faster than a real shell, so the burst comes soon after the thud.
         const float gravity = 22f;
         Add(new Spark { Position = from, Velocity = new Vector3(Rnd(-1, 1), Mathf.Sqrt(2 * gravity * height), Rnd(-1, 1)), Colour = new Color("#FFE7B0"), Life = 99, MaxLife = 99, Size = 1.1f, Gravity = gravity, Drag = 1, Burst = burst });
-        SoundBoard.Cue(Sounds.FireworkLaunch);
+        SoundBoard.Cue(launch);
+    }
+
+    /// <summary>A shell bursting: its stars, and the bang that goes with that kind.</summary>
+    private static void Boom(string sound, Action stars)
+    {
+        stars();
+        SoundBoard.Cue(sound);
     }
 
     private void Add(Spark spark)
@@ -306,11 +312,11 @@ public partial class FireworksView : Node3D
 
         var at = LaunchPoint(index);
         bool Once(string key) => _fired.Add($"{index}:{key}");
-        void Every(double step, Action<int> fire)
+        void Every(double step, Action<int> fire, string tag = "")
         {
             for (var k = (int)Math.Ceiling(Math.Max(0, rel0) / step); k * step < Math.Min(rel1, info.Seconds); k++)
             {
-                if (Once(k.ToString()))
+                if (Once(tag + k))
                 {
                     fire(k);
                 }
@@ -327,7 +333,7 @@ public partial class FireworksView : Node3D
 
                 if (Once("s"))
                 {
-                    SoundBoard.Cue(Sounds.FireworkCrackle);
+                    SoundBoard.Cue(Sounds.FireworkFountain);
                 }
 
                 break;
@@ -340,7 +346,7 @@ public partial class FireworksView : Node3D
                     }
 
                     Flash(at + new Vector3(0, 4, 0), Pinks[0], 1);
-                    SoundBoard.Cue(Sounds.FireworkBurst);
+                    SoundBoard.Cue(Sounds.FireworkMine);
                 }
 
                 break;
@@ -348,39 +354,36 @@ public partial class FireworksView : Node3D
                 Every(0.6, k =>
                 {
                     Add(new Spark { Position = at, Velocity = new Vector3(Rnd(-1, 1), Rnd(17, 20), Rnd(-1, 1)), Colour = Violets[k % 2], Life = 1.5f, MaxLife = 1.5f, Size = 1.2f, Gravity = 4, Drag = 0.995f });
-                    SoundBoard.Cue(Sounds.FireworkLaunch);
+                    SoundBoard.Cue(Sounds.FireworkCandle);
                 });
                 break;
             case FireworkKind.CrackleCake:
                 Every(0.25, _ => Ring(at + new Vector3(Rnd(-6, 6), Rnd(10, 16), Rnd(-6, 6)), 14, Golds, 5, 0.7f, 2, 0.98f, 0.5f));
-                if (Once("s"))
-                {
-                    SoundBoard.Cue(Sounds.FireworkCrackle);
-                }
+                Every(2.5, _ => SoundBoard.Cue(Sounds.FireworkCrackle), "c");
 
                 break;
             case FireworkKind.Rocket:
                 if (Once("r"))
                 {
-                    Shell(at, Rnd(28, 34), s => Ring(s.Position, 40, Blues, 9, 1.4f));
+                    Shell(at, Rnd(28, 34), s => Boom(Sounds.FireworkBurst2, () => Ring(s.Position, 40, Blues, 9, 1.4f)), Sounds.FireworkWhistle);
                 }
 
                 break;
             case FireworkKind.PeonyShell:
                 if (Once("p"))
                 {
-                    Shell(at, Rnd(36, 40), s =>
+                    Shell(at, Rnd(36, 40), s => Boom(Sounds.FireworkBurst, () =>
                     {
                         Ring(s.Position, 70, Pinks, 13, 1.8f);
                         Ring(s.Position, 30, new[] { Colors.White }, 6, 1.4f);
-                    });
+                    }));
                 }
 
                 break;
             case FireworkKind.GoldWillow:
                 if (Once("w"))
                 {
-                    Shell(at, Rnd(38, 42), s => Ring(s.Position, 80, Golds, 9, 3.2f, 1.6f, 0.975f, 0.7f));
+                    Shell(at, Rnd(38, 42), s => Boom(Sounds.FireworkWillow, () => Ring(s.Position, 80, Golds, 9, 3.2f, 1.6f, 0.975f, 0.7f)));
                 }
 
                 break;
@@ -388,7 +391,8 @@ public partial class FireworksView : Node3D
                 Every(0.35, k =>
                 {
                     var colours = (k % 4) switch { 0 => Pinks, 1 => Blues, 2 => Golds, _ => Violets };
-                    Shell(at + new Vector3(Rnd(-8, 8), 0, Rnd(-8, 8)), Rnd(24, 40), s => Ring(s.Position, 50, colours, Rnd(9, 13), 1.5f));
+                    var boom = k % 2 == 0 ? Sounds.FireworkBurst : Sounds.FireworkBurst2;
+                    Shell(at + new Vector3(Rnd(-8, 8), 0, Rnd(-8, 8)), Rnd(24, 40), s => Boom(boom, () => Ring(s.Position, 50, colours, Rnd(9, 13), 1.5f)));
                 });
                 break;
         }
@@ -446,7 +450,7 @@ public partial class FireworksView : Node3D
             if (_time >= Fireworks.ShowSeconds + 4)
             {
                 _playing = null;
-                SoundBoard.Cue(Sounds.FireworkOoh);
+                SoundBoard.Cue(Sounds.FireworkCheer);
             }
         }
 
