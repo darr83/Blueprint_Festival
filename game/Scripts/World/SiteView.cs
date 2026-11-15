@@ -38,6 +38,11 @@ public partial class SiteView : Node3D
     /// <summary>How many seats, sinks and sails are drawn.</summary>
     public int ComfortCount { get; private set; }
 
+    /// <summary>How many decorations and lines of bunting are drawn.</summary>
+    public int DecorCount { get; private set; }
+
+    private readonly System.Collections.Generic.List<OmniLight3D> _glows = new();
+
     /// <summary>How many signs are drawn.</summary>
     public int SignCount { get; private set; }
 
@@ -71,6 +76,16 @@ public partial class SiteView : Node3D
         }
 
         Doors((float)delta, snap: false);
+
+        // Fire pits glow as the daylight goes.
+        if (_glows.Count > 0)
+        {
+            var energy = 3.4f * (float)System.Math.Clamp(1.2 - (_game.Light * 1.5), 0, 1);
+            foreach (var glow in _glows)
+            {
+                glow.LightEnergy = energy;
+            }
+        }
     }
 
     /// <summary>
@@ -232,6 +247,25 @@ public partial class SiteView : Node3D
         }
 
         SignCount = site.Signs.Count;
+        _glows.Clear();
+        foreach (var decor in site.Decorations)
+        {
+            var node = SiteProps.Decoration(decor);
+            node.Position = Middle(decor.Rect);
+            node.RotationDegrees = new Vector3(0, Turn(decor.Facing), 0);
+            AddChild(node);
+            if (node.GetNodeOrNull<OmniLight3D>("Glow") is { } glow)
+            {
+                _glows.Add(glow);
+            }
+        }
+
+        foreach (var run in site.Bunting)
+        {
+            AddChild(SiteProps.BuntingBetween(run));
+        }
+
+        DecorCount = site.Decorations.Count + site.Bunting.Count;
         for (var i = 0; i < site.Gates.Count; i++)
         {
             var node = SiteProps.Gate(site.Gates[i].Kind, _game.Name);

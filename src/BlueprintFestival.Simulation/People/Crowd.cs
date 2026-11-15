@@ -492,6 +492,9 @@ public sealed partial class Crowd
     /// <summary>How dark a place is right now, from 0 to 1, if the game knows: night with no light near is 1.</summary>
     public Func<double, double, double>? Darkness { get; set; }
 
+    /// <summary>True once the daylight has gone: a fire pit cheers people more then.</summary>
+    public bool Night { get; set; }
+
     /// <summary>True if a place, in metres, can see and hear a big screen well, if the game knows.</summary>
     public Func<double, double, bool>? OnScreen { get; set; }
 
@@ -2072,6 +2075,12 @@ public sealed partial class Crowd
         {
             // A sit down does everyone good.
             change += SitPerHour * perHour;
+        }
+
+        if (_site.Decorations.Count > 0 || _site.Bunting.Count > 0)
+        {
+            // A field that has been dressed up is a nicer place to be.
+            change += _site.CharmAt(party.X, party.Y, Night) * Decor.CharmPerHour * perHour;
         }
 
         if (Rain > 0.05 && !sheltered)

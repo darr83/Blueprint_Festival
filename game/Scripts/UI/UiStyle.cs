@@ -90,6 +90,7 @@ public static class UiStyle
         ["firework"] = "<path d='M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8'/><circle cx='12' cy='12' r='1.5'/>",
         ["screen"] = "<rect x='3' y='4' width='18' height='12' rx='1'/><path d='M8 20h8M12 16v4'/>",
         ["sign"] = "<path d='M12 3v18M12 5h7l2 2.5-2 2.5h-7zM12 12H6l-2 2.5L6 17h6z'/>",
+        ["flag"] = "<path d='M5 21V3M5 4h13l-3 4 3 4H5'/>",
         ["bench"] = "<path d='M4 7h16M4 11h16M3 15h18M6 15v5M18 15v5M6 7v8M18 7v8'/>",
         ["path"] = "<path d='M7 21c0-7 4-8 4-18M18 21c0-7-3-9-3-18M12.5 20v-3M13 13v-3M13 6V4'/>",
         ["ground"] = "<path d='M3 19c3-2 5-2 9 0s6 2 9 0M3 14c3-2 5-2 9 0s6 2 9 0M3 9c3-2 5-2 9 0s6 2 9 0'/>",
