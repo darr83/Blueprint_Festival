@@ -38,6 +38,7 @@ public partial class PauseMenu : Control
         }));
         column.AddChild(UiStyle.SecondaryButton("Main menu without saving", GameManager.Instance.ReturnToMenu));
         column.AddChild(BlueprintFestival.Core.ScreenMode.MakeButton());
+        column.AddChild(BlueprintFestival.Core.Graphics.MakeButton());
         column.AddChild(new HSeparator());
         column.AddChild(new SoundSliders { Name = "SoundSliders" });
         _message = UiStyle.Body("", muted: true, size: 14);

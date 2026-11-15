@@ -51,6 +51,7 @@ public partial class MainMenu : Control
         column.AddChild(UiStyle.SecondaryButton("Sound", () => sliders.Visible = !sliders.Visible));
         column.AddChild(sliders);
         column.AddChild(BlueprintFestival.Core.ScreenMode.MakeButton());
+        column.AddChild(BlueprintFestival.Core.Graphics.MakeButton());
         column.AddChild(UiStyle.SecondaryButton("Quit", () => GetTree().Quit()));
 
         _message = UiStyle.Body("", muted: true, size: 14);

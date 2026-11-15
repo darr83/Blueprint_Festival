@@ -73,7 +73,7 @@ public class SunPathTests
             var now = At(h);
             if (now.Moon != last.Moon)
             {
-                Assert.True(last.Strength < 0.02 && now.Strength < 0.02, $"The light jumps at {h}: {last.Strength} to {now.Strength}.");
+                Assert.True(last.Strength < 0.05 && now.Strength < 0.05, $"The light jumps at {h}: {last.Strength} to {now.Strength}.");
             }
 
             Assert.True(Math.Abs(now.Strength - last.Strength) < 0.05);

@@ -56,8 +56,8 @@ public partial class LightsView : Node3D
     /// <summary>How many lamps are throwing shadows right now.</summary>
     public int ShadowLampCount => _shadowLamps.Count(l => l.ShadowEnabled);
 
-    /// <summary>How many real lamps there are to light the ground.</summary>
-    public int LampCount => _lamps.Count;
+    /// <summary>How many real lamps the player's lights have to light the ground, not counting the stalls' own.</summary>
+    public int LampCount => _lamps.Count - StallLampCount;
 
     /// <summary>How brightly the lights are on: 0 by day, 1 at night.</summary>
     public float Strength { get; private set; }

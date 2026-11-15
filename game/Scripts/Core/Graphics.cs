@@ -32,6 +32,21 @@ public static class Graphics
         }
     }
 
+    /// <summary>The words on the menu button.</summary>
+    public static string ButtonText(bool shadows) => shadows ? "Shadows: on" : "Shadows: off";
+
+    /// <summary>A menu button that turns shadows on and off, and says which they are.</summary>
+    public static Button MakeButton()
+    {
+        var button = BlueprintFestival.UI.UiStyle.SecondaryButton(ButtonText(Shadows), () => Shadows = !Shadows);
+        button.Name = "ShadowsButton";
+        button.TooltipText = "Turn shadows off if the game runs slowly";
+        void Update() => button.Text = ButtonText(Shadows);
+        Changed += Update;
+        button.TreeExiting += () => Changed -= Update;
+        return button;
+    }
+
     private static bool Load()
     {
         var wanted = OS.GetEnvironment("SHADOWS");
