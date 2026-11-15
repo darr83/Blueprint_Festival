@@ -6,6 +6,7 @@ using BlueprintFestival.Simulation.World;
 namespace BlueprintFestival.Simulation.Tests;
 
 /// <summary>Big screens with speakers: putting them up, the ground they cover, and the people at the back they help.</summary>
+[Collection(BigDays.Name)]
 public class ScreenTests
 {
     [Fact]
