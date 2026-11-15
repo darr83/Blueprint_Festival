@@ -554,7 +554,7 @@ public partial class SmokeTest : Node
                     Check(game.TicketPrice == 8 && game.HeadlinerPicked == 0, "Clicking a ticket price and a headliner should choose them.");
                     Check(BlueprintFestival.UI.YearScreen.PlanOf(game).Forecast.Contains("chance of rain", StringComparison.Ordinal), "The planning screen should carry the long-range forecast.");
                     var board = SoundBoard.Instance;
-                    Check(board is { Listed: 66 }, "The sound board should be loaded with all 66 sounds on its list.");
+                    Check(board is { Listed: 73 }, "The sound board should be loaded with all 73 sounds on its list.");
                     Check(Sounds.Loops.All(board!.Knows) && board.Knows(Sounds.Till), "The sound board should know the background sounds and the till.");
                     Check(board.Announcements == (50, 50), $"All 50 announcements introducing the acts should be loaded with their files, not {board.Announcements}.");
                     Check(board.Asked(Sounds.Notebook) == 1, "The planning notebook should be heard opening.");
@@ -643,7 +643,7 @@ public partial class SmokeTest : Node
 
                     // Staff from the build bar: someone on the gate, a first-aider, security, and a first aid tent.
                     build.BuildBar.Toggle(BuildMode.Staff);
-                    Check(build.BuildBar.ChoiceCount == 7, "The Staff tab should offer four kinds of staff, the first aid tent, the medical tent and the litter bin.");
+                    Check(build.BuildBar.ChoiceCount == 11, "The Staff tab should offer four kinds of staff, four entertainers, the first aid tent, the medical tent and the litter bin.");
                     Check(build.BuildBar.Choose("staffCleaner") && build.BuildBar.Choose("stallBin"), "Cleaners and litter bins should be on the staff tab.");
                     Check(build.BuildBar.Choose("staffTicketStaff") && build.Build.Mode == BuildMode.Staff, "Ticket staff should be on the build bar.");
                     Check(!build.Build.ClickAt(new TilePoint(grass.X + 40, grass.Y + 40)).Ok && build.Build.Refused, "Ticket staff should only go on a gate.");
@@ -652,6 +652,8 @@ public partial class SmokeTest : Node
                     Check(build.BuildBar.Choose("staffSecurity") && build.Build.ClickAt(new TilePoint(grass.X + 70, grass.Y + 28)).Ok, "Security should be posted on the grass.");
                     Check(build.BuildBar.Choose("stallFirstAidTent") && build.Build.ClickAt(new TilePoint(grass.X + 56, grass.Y + 8)).Ok, "The first aid tent should go up.");
                     Check(build.BuildBar.Choose("stallMedicalTent"), "The medical tent should be on the staff tab.");
+                    Check(build.BuildBar.Choose("staffGuitarist") && build.BuildBar.Choose("staffPianist") && build.BuildBar.Choose("staffDrummer") && build.BuildBar.Choose("staffDj"), "The four entertainers should be on the staff tab.");
+                    Check(!build.Build.ClickAt(new TilePoint(grass.X + 80, grass.Y + 24)).Ok && build.Build.Refused, "An entertainer should not be let play right in front of the stage.");
                     var sound = SoundBoard.Instance!;
                     Check(sound.Asked(Sounds.RubberStamp) == 1, "The plan being stamped should be heard.");
                     Check(sound.Asked(Sounds.HireStaff) == 3 && sound.Asked(Sounds.Refuse) >= 1, "Hiring staff should be heard, and so should being told no.");

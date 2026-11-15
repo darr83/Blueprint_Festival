@@ -1,0 +1,14 @@
+Guitarist
+An acoustic guitarist, one of the entertainers you can hire for the camping and food fields. Plays country and folk, easy to stop and listen to.
+
+Put the guitarist's songs in this folder. Any number works; 3 to 6 is plenty.
+Every guitarist you hire plays from this same folder.
+
+Name each file with a number and the song's title, like this:
+
+    01 Song Title.mp3
+    02 Another Song.mp3
+    03 The Big Finish.mp3
+
+The number is the order the songs are played in, then round again until the set ends.
+The files can be .mp3, .ogg or .wav. With no songs they still play, in silence.

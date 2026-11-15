@@ -58,6 +58,29 @@ public static class StageMix
         return levels;
     }
 
+    /// <summary>How far an entertainer in the fields carries, in metres, against the height of the view: much less than a stage.</summary>
+    public const double BuskCarryPerViewMetre = 0.18;
+
+    /// <summary>An entertainer always carries at least this far, in metres.</summary>
+    public const double BuskLeastCarry = 7;
+
+    /// <summary>
+    /// How loud one of the entertainers is, from 0 to 1, with the view centred on a point and a given
+    /// height of view. Close in it is as loud as a stage; zoomed out, or looking elsewhere, it fades
+    /// to nothing, so the stages are not drowned by every guitar on the site.
+    /// </summary>
+    public static double Busker(double x, double y, double viewHeight, double bx, double by)
+    {
+        var zoom = ZoomedOut(viewHeight);
+        var overall = 0.85 * (1 - zoom) * (1 - zoom);
+        var carry = Math.Max(BuskLeastCarry, Math.Clamp(viewHeight, ClosestView, FurthestView) * BuskCarryPerViewMetre);
+        var dx = bx - x;
+        var dy = by - y;
+        var away = Math.Sqrt((dx * dx) + (dy * dy)) / carry;
+        var level = overall / (1 + (away * away * away));
+        return level < 0.01 ? 0 : level;
+    }
+
     /// <summary>
     /// How loud each stage is while a stage camera films one of them: that stage in full, the others
     /// faint in the distance.
