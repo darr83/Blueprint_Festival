@@ -320,7 +320,7 @@ public partial class BuildTool : Node3D
         var mark = !_game.Site.IsKeptClear(from);
         var result = _game.KeepOut(from, to, mark);
         Refused = !result.Ok;
-        SoundBoard.Cue(result.Ok ? Sounds.BuildGround : Sounds.Refuse);
+        SoundBoard.Cue(result.Ok ? mark ? Sounds.BuildTape : Sounds.TakeDown : Sounds.Refuse);
         Status = !result.Ok ? result.Problem ?? "That cannot be marked." : mark ? "Customers will keep off that ground." : "Customers can walk there again.";
         return result;
     }
@@ -331,7 +331,7 @@ public partial class BuildTool : Node3D
         var mark = !_game.Site.IsVipGround(from);
         var result = _game.VipGround(from, to, mark);
         Refused = !result.Ok;
-        SoundBoard.Cue(result.Ok ? Sounds.BuildGround : Sounds.Refuse);
+        SoundBoard.Cue(result.Ok ? mark ? Sounds.BuildVip : Sounds.TakeDown : Sounds.Refuse);
         Status = !result.Ok ? result.Problem ?? "That cannot be marked." : mark ? "Only VIP guests will go there." : "Everyone can walk there again.";
         return result;
     }
@@ -595,6 +595,42 @@ public partial class BuildTool : Node3D
         return result;
     }
 
+    /// <summary>The sound of the thing just built going up: each kind of thing has its own.</summary>
+    private string BuiltSound() => Mode switch
+    {
+        BuildMode.Stage => Sounds.BuildStage,
+        BuildMode.Screen => Sounds.BuildScreen,
+        BuildMode.LaunchPad => Sounds.BuildLaunchPad,
+        BuildMode.Fence or BuildMode.Lane => Sounds.BuildFence,
+        BuildMode.Gate => Sounds.BuildGate,
+        BuildMode.Staff => Sounds.HireStaff,
+        BuildMode.Ground => Sounds.BuildGround,
+        BuildMode.Light => Sounds.BuildLight,
+        BuildMode.Fairy => Sounds.BuildFairy,
+        BuildMode.Bunting => Sounds.BuildBunting,
+        BuildMode.Sign => Sounds.BuildSign,
+        BuildMode.Comfort => Comfort switch
+        {
+            ComfortKind.StrawBale => Sounds.BuildStraw,
+            ComfortKind.Deckchairs => Sounds.BuildDeckchair,
+            ComfortKind.ParasolTable => Sounds.BuildParasol,
+            ComfortKind.HandWash => Sounds.BuildHandWash,
+            ComfortKind.HandGel => Sounds.BuildHandGel,
+            ComfortKind.ShadeSail => Sounds.BuildShadeSail,
+            ComfortKind.SeatingMarquee => Sounds.BuildStall,
+            _ => Sounds.BuildBench,
+        },
+        BuildMode.Decor => Decor switch
+        {
+            DecorKind.Scarecrow => Sounds.BuildStraw,
+            DecorKind.FlagPole => Sounds.BuildFlag,
+            DecorKind.FirePit => Sounds.BuildFirePit,
+            DecorKind.GiantLetters => Sounds.BuildLetters,
+            _ => Sounds.BuildPlanter,
+        },
+        _ => Sounds.BuildStall,
+    };
+
     private TileRect PatchRect(int c0, int r0, int c1, int r1)
     {
         var f = _game.Field.Field;
@@ -604,15 +640,7 @@ public partial class BuildTool : Node3D
     private void Said(BuildCheck result, string done)
     {
         Refused = !result.Ok;
-        SoundBoard.Cue(!result.Ok ? Sounds.Refuse : Mode switch
-        {
-            BuildMode.Stage or BuildMode.Screen or BuildMode.LaunchPad => Sounds.BuildStage,
-            BuildMode.Fence or BuildMode.Lane => Sounds.BuildFence,
-            BuildMode.Gate => Sounds.BuildGate,
-            BuildMode.Staff => Sounds.HireStaff,
-            BuildMode.Ground => Sounds.BuildGround,
-            _ => Sounds.BuildStall,
-        });
+        SoundBoard.Cue(!result.Ok ? Sounds.Refuse : BuiltSound());
         Status = result.Ok ? $"{done} for £{result.Cost:N0}." : result.Problem ?? "That cannot go there.";
     }
 
