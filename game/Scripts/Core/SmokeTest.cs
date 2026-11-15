@@ -344,6 +344,20 @@ public partial class SmokeTest : Node
                     Check(written.Line(1) == "Tea tent" && written.PointsRight(1) && written.Colour == 2, $"The post should say what was typed, not '{written.Line(1)}'.");
                     opened.SignBox.Close();
                     Check(!opened.SignBox.Visible && opened.Game.Remove(post) == 10 && opened.Game.Site.Signs.Count == 0, "Taking the post down should give its £10 back.");
+                    // Decorations: the Decor tab's other shelf, a scarecrow and a line of bunting, and both come down for their money.
+                    opened.BuildBar.ShowDecorShelf(true);
+                    Check(opened.BuildBar.ChoiceCount == 7 && opened.BuildBar.Choose(UI.BuildBar.DecorKey(DecorKind.Scarecrow)) && opened.Build.Mode == BuildMode.Decor, $"The Decorations shelf should offer seven things, not {opened.BuildBar.ChoiceCount}.");
+                    var beforeDecor = opened.Game.Money;
+                    var crow = new TilePoint(grass.X + 41, grass.Y + 56);
+                    var crowUp = opened.Build.ClickAt(crow).Ok;
+                    Check(opened.BuildBar.Choose(UI.BuildBar.BuntingKey) && opened.Build.Mode == BuildMode.Bunting, "Bunting should be on the Decorations shelf.");
+                    var pole = new TilePoint(grass.X + 41, grass.Y + 60);
+                    var strung = opened.Build.DragBunting(pole, new TilePoint(pole.X + 12, pole.Y)).Ok;
+                    opened.Site.Rebuild();
+                    Check(crowUp && strung && opened.Site.DecorCount == 2 && opened.Game.Money == beforeDecor - 22, $"A scarecrow and 6 m of bunting should go up for £22, not £{beforeDecor - opened.Game.Money}.");
+                    Check(opened.Game.Remove(crow) == 10 && opened.Game.Remove(pole) == 12 && opened.Game.Money == beforeDecor, "Taking the scarecrow and the bunting down should give their money back.");
+                    opened.BuildBar.ShowDecorShelf(false);
+                    Check(opened.BuildBar.ChoiceCount == 4, "The Signs shelf should come back with its four signs.");
                     Check(opened.Weather.StreaksShown == 0 && opened.Sky.Overcast < 0.01f, "A fine day should have no rain and no cloud.");
                     Check(opened.TopBar.WeatherText.StartsWith("Fine", StringComparison.Ordinal), $"The top bar should say the day is fine, not '{opened.TopBar.WeatherText}'.");
                     opened.BuildBar.Close();
@@ -414,6 +428,7 @@ public partial class SmokeTest : Node
                     show.ToggleMoney();
                     Check(show.Money.Visible && show.Money.LineCount >= 5, $"The money panel should list the day's takings and spending, not {show.Money.LineCount} lines.");
                     show.ToggleMoney();
+                    CheckDayBoard(show);
                     CheckStageCams(show);
                     show.TogglePause();
                     Check(show.Game.Clock.IsPaused, "Space should pause the game.");
@@ -788,6 +803,26 @@ public partial class SmokeTest : Node
         {
             throw new InvalidOperationException(message);
         }
+    }
+
+    /// <summary>The event day panel opens on the button, shows every tab, and takes the money panel's place.</summary>
+    private void CheckDayBoard(FestivalScene show)
+    {
+        Check(show.DayButton.Visible && !show.DayBoard.Visible, "The day so far button should show on the day, with its panel shut.");
+        show.ToggleDayBoard();
+        Check(show.DayBoard.Visible && !show.Money.Visible, "The day so far panel should open, and the money panel stay shut.");
+        Check(show.DayBoard.Report is { Stages.Count: > 0 } report && report.Stages[0].Sets.Any(s => s.State == Simulation.Show.SetState.OnNow), "The day so far should show the act on now.");
+        show.DayBoard.Show(DayPanel.Tab.Acts);
+        Check(show.DayBoard.RowCount == show.Game.Show.Slots.Count, $"The acts tab should list every set, not {show.DayBoard.RowCount}.");
+        show.DayBoard.Show(DayPanel.Tab.Incidents);
+        Check(show.DayBoard.RowCount == show.Game.DayLog.Count, $"The incidents tab should list everything logged today, not {show.DayBoard.RowCount}.");
+        show.DayBoard.Show(DayPanel.Tab.Money);
+        Check(show.DayBoard.RowCount >= 3, $"The money tab should list money in and out, not {show.DayBoard.RowCount} lines.");
+        show.DayBoard.Show(DayPanel.Tab.People);
+        show.DayBoard.Show(DayPanel.Tab.Overview);
+        show.ToggleMoney();
+        Check(show.Money.Visible && !show.DayBoard.Visible, "Opening the money panel should shut the day so far panel.");
+        show.ToggleMoney();
     }
 
     /// <summary>The two stage camera buttons take over the view, and pressing again or Esc gives the site view back.</summary>

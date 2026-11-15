@@ -574,6 +574,7 @@ public sealed partial class FestivalGame
 
         Crowd.OpenTheGates(Clock.Now);
         GatesOpenedAt = Clock.Now;
+        Note(DayNoteKind.Gates, "Gates opened", "", DayTone.Plain);
     }
 
     private void Need(Phase phase)
@@ -591,6 +592,7 @@ public sealed partial class FestivalGame
         TickSafety(clock.Now);
         TickFireworks(clock.Now);
         TickWeather(clock.Now);
+        TickDayLog(clock.Now);
         if (clock.TickCount % 10 == 0)
         {
             Wear();

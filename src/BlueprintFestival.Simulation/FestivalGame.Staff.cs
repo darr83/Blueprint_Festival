@@ -381,6 +381,7 @@ public sealed partial class FestivalGame
                 {
                     Crowd.Recover(party!);
                     Treated++;
+                    Settle(incident, "Rested, back on the field", DayTone.Good);
                     Close(incident);
                 }
 
@@ -402,11 +403,13 @@ public sealed partial class FestivalGame
                 nearest.Incident = incident.Id;
                 incident.Staff = nearest.Id;
                 Walk(nearest, incident.X, incident.Y, StaffState.Going);
+                Settle(incident, wanted == StaffKind.FirstAider ? "First aider on the way" : "Security on the way", DayTone.Open);
             }
             else if (incident.Kind == IncidentKind.Ill && now - incident.Started > TimeSpan.FromMinutes(IllPatienceMinutes))
             {
                 // Nobody came. They get themselves home, and everyone who saw it thinks less of the festival.
                 Untreated++;
+                Settle(incident, "Nobody came: went home unwell", DayTone.Bad);
                 Crowd.Upset(incident.X, incident.Y, 8, 0.05);
                 Crowd.GoHome(party!, unhappy: true);
                 Close(incident);
@@ -414,6 +417,7 @@ public sealed partial class FestivalGame
             else if (incident.Kind != IncidentKind.Ill && now - incident.Started > TimeSpan.FromMinutes(TroublePatienceMinutes))
             {
                 TroubleIgnored++;
+                Settle(incident, incident.Kind == IncidentKind.LostChild ? "Nobody came: found by the family in the end" : "Nobody came to sort it", DayTone.Bad);
                 Crowd.Upset(incident.X, incident.Y, 10, 0.06);
                 Close(incident);
             }
@@ -458,7 +462,7 @@ public sealed partial class FestivalGame
         {
             var party = about[(int)(whoIll * about.Count)];
             Crowd.TakeIll(party);
-            _incidents.Add(new Incident(_nextIncident++, IncidentKind.Ill, party.X, party.Y, party.Id, now));
+            Raise(new Incident(_nextIncident++, IncidentKind.Ill, party.X, party.Y, party.Id, now), DayNoteKind.Ill, "Someone taken ill");
         }
 
         // Trouble is rare by day and less rare once the bar has been open a while.
@@ -468,7 +472,8 @@ public sealed partial class FestivalGame
             var party = about[(int)(whoTrouble * about.Count)];
             if (party.State != PartyState.Unwell)
             {
-                _incidents.Add(new Incident(_nextIncident++, party.HasChild ? IncidentKind.LostChild : IncidentKind.Scuffle, party.X, party.Y, -1, now));
+                Raise(new Incident(_nextIncident++, party.HasChild ? IncidentKind.LostChild : IncidentKind.Scuffle, party.X, party.Y, -1, now),
+                    party.HasChild ? DayNoteKind.LostChild : DayNoteKind.Trouble, party.HasChild ? "A child lost" : "Trouble");
             }
         }
     }
@@ -689,6 +694,7 @@ public sealed partial class FestivalGame
         if (incident.Kind != IncidentKind.Ill)
         {
             TroubleSorted++;
+            Settle(incident, incident.Kind == IncidentKind.LostChild ? "Back with the family" : "Sorted by security", DayTone.Good);
             Close(incident);
             return;
         }
@@ -701,6 +707,7 @@ public sealed partial class FestivalGame
         {
             Crowd.Recover(patient);
             Treated++;
+            Settle(incident, "Treated, back on the field", DayTone.Good);
             Close(incident);
         }
         else if (FreeBed(incident.X, incident.Y) is { } place)
@@ -710,11 +717,13 @@ public sealed partial class FestivalGame
             var tent = Site.Stalls[place.Tent];
             var (fx, fy, dx, dy) = SiteLayout.Front(tent.Rect, tent.Facing);
             Walk(member, fx + (dx * 0.6), fy + (dy * 0.6), StaffState.Escorting);
+            Settle(incident, $"Taken to the {Catalogue.Of(tent.Kind).Name.ToLowerInvariant()}", DayTone.Open);
         }
         else
         {
             // Nowhere for them to rest: they are seen to, then sent home.
             Treated++;
+            Settle(incident, "Treated, but no bed free: sent home", DayTone.Bad);
             Crowd.GoHome(patient, unhappy: false);
             Close(incident);
         }
