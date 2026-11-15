@@ -28,6 +28,59 @@ public class DancingTests
     }
 
     [Fact]
+    public void AboutOneInSevenAtEachStageDanceADifferentStyle()
+    {
+        foreach (var genre in Enum.GetValues<Genre>())
+        {
+            var styles = Dancing.OtherStyles(genre);
+            Assert.DoesNotContain(Dancing.MoveFor(genre), styles);
+            Assert.True(styles.Count >= 3);
+
+            var moves = Enumerable.Range(0, 4000).Select(p => Dancing.MoveFor(genre, p)).ToList();
+            Assert.True(moves.Distinct().Count() >= 5, $"{genre} has only {moves.Distinct().Count()} moves");
+
+            // Each of the other styles turns up, so the crowd is a mix and not one odd move out.
+            foreach (var style in styles)
+            {
+                Assert.InRange(moves.Count(m => m == style) / 4000.0, 0.02, 0.3);
+            }
+        }
+    }
+
+    [Fact]
+    public void SomeDanceOnTheOtherBeatAndSomeTwiceAsFast()
+    {
+        var timings = Enumerable.Range(0, 4000).Select(p => Dancing.TimingOf(DanceMove.HeadBang, p)).ToList();
+        Assert.InRange(timings.Count(t => t == DanceTiming.Offbeat) / 4000.0, 0.08, 0.16);
+        Assert.InRange(timings.Count(t => t == DanceTiming.DoubleTime) / 4000.0, 0.05, 0.11);
+        Assert.InRange(timings.Count(t => t == DanceTiming.OnTheHit) / 4000.0, 0.75, 0.85);
+
+        // The clapping heard follows those swaying, so they always clap on the hit; and nobody jumps twice as fast.
+        Assert.All(Enumerable.Range(0, 2000), p => Assert.Equal(DanceTiming.OnTheHit, Dancing.TimingOf(DanceMove.Sway, p)));
+        Assert.DoesNotContain(DanceTiming.DoubleTime, Enumerable.Range(0, 2000).Select(p => Dancing.TimingOf(DanceMove.Jump, p)));
+    }
+
+    [Fact]
+    public void OffbeatDancersLandOnTheBeatInBetweenAndDoubleTimeOnEveryBeat()
+    {
+        var offbeat = Enumerable.Range(0, 5000).First(p => Dancing.Lateness(p) == 0 && Dancing.TimingOf(DanceMove.HeadBang, p) == DanceTiming.Offbeat);
+        Assert.Equal(0.5, Dancing.Through(8, DanceMove.HeadBang, offbeat), 6);
+        Assert.Equal(0, Dancing.Through(9, DanceMove.HeadBang, offbeat), 6);
+        Assert.Equal(0.5, Dancing.Through(10, DanceMove.HeadBang, offbeat), 6);
+
+        var fast = Enumerable.Range(0, 5000).First(p => Dancing.Lateness(p) == 0 && Dancing.TimingOf(DanceMove.HeadBang, p) == DanceTiming.DoubleTime);
+        Assert.Equal(0, Dancing.Through(8, DanceMove.HeadBang, fast), 6);
+        Assert.Equal(0.5, Dancing.Through(8.5, DanceMove.HeadBang, fast), 6);
+        Assert.Equal(0, Dancing.Through(9, DanceMove.HeadBang, fast), 6);
+
+        // Still always somewhere in the move, whatever the timing.
+        foreach (var move in Enum.GetValues<DanceMove>())
+        {
+            Assert.All(Enumerable.Range(0, 300), b => Assert.InRange(Dancing.Through(b * 0.37, move, b), 0, 1 - 1e-12));
+        }
+    }
+
+    [Fact]
     public void NobodyDancesLikeTheyAreAtTheWrongGig()
     {
         // Nobody head-bangs to country or jumps to hip hop.
@@ -36,6 +89,7 @@ public class DancingTests
         Assert.DoesNotContain(DanceMove.Horns, country);
         Assert.DoesNotContain(DanceMove.Jump, country);
         Assert.DoesNotContain(DanceMove.Jump, Enumerable.Range(0, 2000).Select(p => Dancing.MoveFor(Genre.HipHop, p)));
+        Assert.DoesNotContain(DanceMove.Horns, Enumerable.Range(0, 2000).Select(p => Dancing.MoveFor(Genre.Pop, p)));
     }
 
     [Fact]
@@ -61,7 +115,7 @@ public class DancingTests
     [Fact]
     public void AMoveStartsAsTheBeatLands()
     {
-        var person = Enumerable.Range(0, 1000).First(p => Dancing.Lateness(p) == 0);
+        var person = Enumerable.Range(0, 5000).First(p => Dancing.Lateness(p) == 0 && Dancing.TimingOf(DanceMove.HeadBang, p) == DanceTiming.OnTheHit);
 
         // A head-bang lands on every other beat, and is halfway round on the beat between.
         Assert.Equal(2, Dancing.BeatsAHit);

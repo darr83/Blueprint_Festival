@@ -241,7 +241,7 @@ public partial class CrowdView : Node3D
         return move switch
         {
             DanceMove.Jump => inBeat > 0.5f ? Mathf.Sin((inBeat - 0.5f) * Mathf.Tau) * 0.22f * energy : 0f,
-            DanceMove.Tap or DanceMove.Sway => 0,
+            DanceMove.Tap or DanceMove.Sway or DanceMove.Wave or DanceMove.Step => 0,
             _ => (0.5f + (0.5f * Mathf.Cos(inBeat * Mathf.Tau))) * 0.05f * energy,
         };
     }
