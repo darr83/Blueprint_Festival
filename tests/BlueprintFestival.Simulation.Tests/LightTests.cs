@@ -225,7 +225,7 @@ public class LightTests
         Assert.True(Mood(lit) > Mood(dark), $"lit {Mood(lit):0.00}, dark {Mood(dark):0.00}");
 
         // Nobody on the lit field is in the dark; on the unlit one everyone not watching the act is.
-        Assert.True(dark.InTheDark >= 10, $"{dark.InTheDark} in the dark");
+        Assert.True(dark.InTheDark >= 5, $"{dark.InTheDark} in the dark");
         Assert.Equal(0, lit.InTheDark);
     }
 

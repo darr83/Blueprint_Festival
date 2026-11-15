@@ -155,8 +155,9 @@ public class NeedsTests
     [Fact]
     public void With_too_few_stalls_the_queue_grows_and_people_give_up()
     {
-        // One little coffee cart for a whole thirsty festival.
+        // One little coffee cart for a whole festival on a hot, thirsty day.
         var game = new FestivalGame("One Cart", seed: 8);
+        game.SetWeather(DayWeather.Of(WeatherKind.Hot, 3));
         var f = game.Field.Field;
         Assert.True(game.BuildStall(StallKind.Coffee, f.X + 40, f.Y + 20, Facing.South).Ok);
         var longest = 0;
