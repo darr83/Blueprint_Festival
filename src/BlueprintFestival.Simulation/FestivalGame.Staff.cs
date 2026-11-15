@@ -452,7 +452,8 @@ public sealed partial class FestivalGame
         var slipping = Wetness <= 0 ? 0 : about.Where(p => MudAtPlace(p.X, p.Y) >= Slippery).Sum(p => p.Members.Count);
         // A big crowd has more go wrong in it, but not in step with its size: most of it is just more of the same people having a good day.
         var size = Crowded(people) / Math.Max(1, people);
-        var illChance = (people + (parched * 3) + (packed * 2) + (slipping * 3)) * size * (evening ? 0.007 : 0.005) / 60;
+        // Somewhere to wash by the toilets and the food keeps tummy bugs down.
+        var illChance = (people + (parched * 3) + (packed * 2) + (slipping * 3)) * size * (evening ? 0.007 : 0.005) / 60 * (1 - (Comforts.CleanHandsSave * Site.Hygiene));
         if (illRoll < illChance)
         {
             var party = about[(int)(whoIll * about.Count)];

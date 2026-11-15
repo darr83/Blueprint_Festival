@@ -14,7 +14,7 @@ public class StallMenuTests
     {
         StallKind.HotDogs, StallKind.Burgers, StallKind.Fries, StallKind.Pizza, StallKind.Noodles, StallKind.IceCream,
         StallKind.Bar, StallKind.Coffee, StallKind.Slush, StallKind.Cocktails,
-        StallKind.Ponchos, StallKind.BucketHats, StallKind.Merchandise,
+        StallKind.Ponchos, StallKind.BucketHats, StallKind.Merchandise, StallKind.PhoneCharging,
     };
 
     private static void RunUntil(FestivalGame game, double hour)
@@ -70,7 +70,7 @@ public class StallMenuTests
     {
         Assert.Equal(new[] { StallKind.HotDogs, StallKind.Burgers, StallKind.Fries, StallKind.Pizza, StallKind.Noodles, StallKind.IceCream }, Catalogue.StallsIn(StallGroup.Food).Select(s => s.Kind));
         Assert.Equal(new[] { StallKind.Bar, StallKind.Coffee, StallKind.Slush, StallKind.Cocktails }, Catalogue.StallsIn(StallGroup.Drink).Select(s => s.Kind));
-        Assert.Equal(new[] { StallKind.Ponchos, StallKind.BucketHats, StallKind.Merchandise }, Catalogue.StallsIn(StallGroup.Other).Select(s => s.Kind));
+        Assert.Equal(new[] { StallKind.Ponchos, StallKind.BucketHats, StallKind.Merchandise, StallKind.PhoneCharging }, Catalogue.StallsIn(StallGroup.Other).Select(s => s.Kind));
         Assert.Equal(new[] { StallKind.Toilets, StallKind.ToiletBlock, StallKind.WaterPoint, StallKind.Bin }, Catalogue.StallsIn(StallGroup.Services).Select(s => s.Kind));
 
         foreach (var kind in Enum.GetValues<StallKind>())

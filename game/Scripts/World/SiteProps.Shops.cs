@@ -62,6 +62,9 @@ public static partial class SiteProps
             case StallKind.Merchandise:
                 MerchTent(b, node);
                 return true;
+            case StallKind.PhoneCharging:
+                ChargingTent(b, node);
+                return true;
             default:
                 return false;
         }
@@ -82,6 +85,7 @@ public static partial class SiteProps
         StallKind.Ponchos => new[] { new Vector3(-0.6f, 0, 0.1f) },
         StallKind.BucketHats => new[] { new Vector3(0.6f, 0, 0.2f) },
         StallKind.Merchandise => new[] { new Vector3(-1.2f, 0, 0.5f), new Vector3(1.2f, 0, 0.5f) },
+        StallKind.PhoneCharging => new[] { new Vector3(-0.6f, 0, 0.3f), new Vector3(0.6f, 0, 0.3f) },
         _ => null,
     };
 

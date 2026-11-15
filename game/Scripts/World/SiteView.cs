@@ -32,6 +32,9 @@ public partial class SiteView : Node3D
     /// <summary>How many stalls are drawn.</summary>
     public int StallCount { get; private set; }
 
+    /// <summary>How many seats, sinks and sails are drawn.</summary>
+    public int ComfortCount { get; private set; }
+
     /// <summary>How many queue lanes have their barriers drawn.</summary>
     public int LaneCount { get; private set; }
 
@@ -188,6 +191,15 @@ public partial class SiteView : Node3D
             }
         }
 
+        foreach (var comfort in site.Comforts)
+        {
+            var node = SiteProps.Comfort(comfort.Kind);
+            node.Position = Middle(comfort.Rect);
+            node.RotationDegrees = new Vector3(0, Turn(comfort.Facing), 0);
+            AddChild(node);
+        }
+
+        ComfortCount = site.Comforts.Count;
         for (var i = 0; i < site.Gates.Count; i++)
         {
             var node = SiteProps.Gate(site.Gates[i].Kind, _game.Name);
