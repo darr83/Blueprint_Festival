@@ -1,5 +1,7 @@
 using System.Collections.Generic;
+using BlueprintFestival.Audio;
 using BlueprintFestival.Simulation;
+using BlueprintFestival.Simulation.Show;
 using Godot;
 
 namespace BlueprintFestival.World;
@@ -7,6 +9,7 @@ namespace BlueprintFestival.World;
 /// <summary>
 /// Draws the staff in their uniforms, gliding to where the rules say they are, and a marker over
 /// anything still waiting for someone to come: a green cross for first aid, an amber sign for trouble.
+/// The entertainers stand on their pitches with their instruments and play along to their music.
 /// </summary>
 public partial class StaffView : Node3D
 {
@@ -14,7 +17,12 @@ public partial class StaffView : Node3D
     private readonly Dictionary<int, MeshInstance3D> _markers = new();
     private readonly HashSet<int> _seen = new();
     private readonly List<int> _gone = new();
+    private readonly Dictionary<int, (BandMember Member, StageBeat Beat)> _buskers = new();
     private FestivalGame _game = null!;
+    private double _time;
+
+    /// <summary>The entertainers' music, which they play along to. Without it they keep a steady beat.</summary>
+    public BuskerMusic? Buskers { get; set; }
 
     /// <summary>How many members of staff are drawn.</summary>
     public int Count => _views.Count;
@@ -37,11 +45,18 @@ public partial class StaffView : Node3D
     {
         var speed = _game.Phase == Phase.Day ? (int)_game.Clock.Speed : 0;
         var glide = snap ? 1f : Mathf.Min(1f, (float)delta * (6f + (2f * speed)));
+        _time += speed > 0 ? delta : 0;
         _seen.Clear();
         foreach (var member in _game.Staff)
         {
             _seen.Add(member.Id);
             var target = new Vector3((float)member.X, 0, (float)member.Y);
+            if (Busking.IsEntertainer(member.Kind))
+            {
+                Entertain(member, target, delta, speed);
+                continue;
+            }
+
             if (!_views.TryGetValue(member.Id, out var view))
             {
                 view = SiteProps.Staff(member.Kind, member.Id);
@@ -73,6 +88,22 @@ public partial class StaffView : Node3D
         }
 
         Sweep(_views);
+        if (_buskers.Count > 0)
+        {
+            _gone.Clear();
+            foreach (var id in _buskers.Keys)
+            {
+                if (!_seen.Contains(id))
+                {
+                    _gone.Add(id);
+                }
+            }
+
+            foreach (var id in _gone)
+            {
+                _buskers.Remove(id);
+            }
+        }
 
         var cameraYaw = GetViewport()?.GetCamera3D() is { } camera ? camera.GlobalRotation.Y : 0f;
         _seen.Clear();
@@ -97,6 +128,28 @@ public partial class StaffView : Node3D
         }
 
         Sweep(_markers);
+    }
+
+    /// <summary>An entertainer on their pitch: idle between sets, playing along to their music during one.</summary>
+    private void Entertain(StaffMember member, Vector3 at, double delta, int speed)
+    {
+        if (!_views.TryGetValue(member.Id, out var view))
+        {
+            view = SiteProps.Entertainer(member.Kind, member.Id);
+            view.Position = at;
+            view.Rotation = new Vector3(0, (float)member.PostHeading, 0);
+            _views[member.Id] = view;
+            AddChild(view);
+            var performer = view.GetNode<Node3D>("Performer");
+            _buskers[member.Id] = (new BandMember(performer, Busking.RoleOf(member.Kind), Vector3.Zero, member.Id % 5), new StageBeat());
+        }
+
+        var (band, beat) = _buskers[member.Id];
+        var held = speed <= 0;
+        var step = held ? 0 : delta;
+        var music = Buskers?.For(member.Id);
+        beat.Busk(_game.IsBusking(member), Busking.GenreOf(member.Kind), music?.Beat, music?.SongSeconds ?? 0, music?.SongPlaying ?? false, music?.BetweenSongs ?? false, held, step);
+        BandMoves.Animate(band, beat, _time, step);
     }
 
     private bool Arrived(Incident incident)

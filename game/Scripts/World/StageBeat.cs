@@ -95,6 +95,43 @@ public sealed class StageBeat
         Voice = Heard ? mine!.Voice : 0;
     }
 
+    /// <summary>
+    /// The beat for one of the entertainers in the fields rather than a stage: playing or not, their
+    /// own song and its beat if one is on, otherwise a steady beat for their sort of music. A few
+    /// seconds of applause follow the end of each set.
+    /// </summary>
+    public void Busk(bool playing, Genre genre, BeatInfo? beat, double songSeconds, bool songPlaying, bool betweenSongs, bool held, double delta)
+    {
+        Genre = genre;
+        Slot = null;
+        Voice = 0;
+        if (!held)
+        {
+            _clock += delta;
+        }
+
+        StageMoment moment;
+        if (playing)
+        {
+            moment = betweenSongs ? StageMoment.BetweenSongs : StageMoment.Song;
+            _slot = 1;
+        }
+        else if (_slot == 1 || (Moment == StageMoment.Applause && InMoment < 4))
+        {
+            // The set has just ended: a bow.
+            moment = StageMoment.Applause;
+            _slot = -1;
+        }
+        else
+        {
+            moment = StageMoment.Quiet;
+        }
+
+        Set(moment, held ? 0 : delta);
+        Heard = songPlaying;
+        Beat = songPlaying ? Dancing.BeatNow(beat, songSeconds, genre, songSeconds) : Dancing.BeatNow(null, 0, genre, _clock);
+    }
+
     public double DistanceSquared(double x, double y) => ((x - _frontX) * (x - _frontX)) + ((y - _frontY) * (y - _frontY));
 
     private void Set(StageMoment moment, double delta)

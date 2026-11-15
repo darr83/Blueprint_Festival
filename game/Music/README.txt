@@ -52,4 +52,9 @@ THE ARTISTS
   DJ Foxglove             DJ, headline act                  Electronic  4 stars   420k fans
   DJ Otter                DJ, headline act                  Electronic  5 stars   3.1m fans
 
+THE ENTERTAINERS
+
+The guitarist, pianist, drummer and DJ you can hire to play in the camping and food fields have
+their own folders inside "Entertainers". See the README there.
+
 Every artist is made up. None is a real act.

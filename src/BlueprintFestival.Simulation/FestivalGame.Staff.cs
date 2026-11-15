@@ -1,5 +1,6 @@
 using BlueprintFestival.Simulation.Core;
 using BlueprintFestival.Simulation.People;
+using BlueprintFestival.Simulation.Show;
 using BlueprintFestival.Simulation.Site;
 using BlueprintFestival.Simulation.World;
 
@@ -107,6 +108,11 @@ public sealed class StaffMember
 
     /// <summary>Ticks until they next set off along their beat.</summary>
     public int Wait { get; internal set; }
+
+    /// <summary>For an entertainer, the hours their sets start, in order. Each set lasts 45 minutes.</summary>
+    public IReadOnlyList<int> Sets => SetHours;
+
+    internal List<int> SetHours { get; } = new();
 
     internal List<TilePoint>? Path { get; set; }
 
@@ -282,6 +288,13 @@ public sealed partial class FestivalGame
                 return new BuildCheck(false, wage, $"Every lane of this gate has {CheckersALane} people checking tickets already.");
             }
         }
+        else if (Busking.IsEntertainer(kind))
+        {
+            if (CheckBusker(tile) is { } why)
+            {
+                return new BuildCheck(false, wage, why);
+            }
+        }
         else if (!Field.IsWalkableForStaff(tile) || !Field.Rented(tile))
         {
             return new BuildCheck(false, wage, "They need a clear bit of the field to stand on.");
@@ -321,7 +334,14 @@ public sealed partial class FestivalGame
         }
 
         Spend("Staff wages", check.Cost);
-        _staff.Add(new StaffMember(_nextStaff++, kind, tile, x, y, heading));
+        var member = new StaffMember(_nextStaff++, kind, tile, x, y, heading);
+        _staff.Add(member);
+        if (Busking.IsEntertainer(kind))
+        {
+            member.SetHours.AddRange(Busking.UsualHours);
+            UpdatePitches();
+        }
+
         return check;
     }
 
@@ -344,6 +364,12 @@ public sealed partial class FestivalGame
         if (member.Incident >= 0 && _incidents.FirstOrDefault(i => i.Id == member.Incident) is { } incident)
         {
             incident.Staff = -1;
+        }
+
+        if (Busking.IsEntertainer(member.Kind))
+        {
+            Crowd.BuskerGone(member.Id, Now);
+            UpdatePitches();
         }
 
         var refund = Phase == Phase.Build ? Catalogue.Of(member.Kind).Wage : 0;
@@ -730,15 +756,25 @@ public sealed partial class FestivalGame
     }
 
     private StaffSave SaveStaff() => new(
-        _staff.Select(s => new StaffMemberSave(s.Id, s.Kind, s.Tile, s.PostX, s.PostY, s.PostHeading, s.X, s.Y, s.Heading, s.State, s.Incident) { Path = s.Path?.Skip(s.PathIndex).ToList(), HoldX = s.HoldX, HoldY = s.HoldY, HoldLeft = s.HoldLeft, Wait = s.Wait }).ToList(),
+        _staff.Select(s => new StaffMemberSave(s.Id, s.Kind, s.Tile, s.PostX, s.PostY, s.PostHeading, s.X, s.Y, s.Heading, s.State, s.Incident) { Path = s.Path?.Skip(s.PathIndex).ToList(), HoldX = s.HoldX, HoldY = s.HoldY, HoldLeft = s.HoldLeft, Wait = s.Wait, Sets = Busking.IsEntertainer(s.Kind) ? s.SetHours.ToList() : null }).ToList(),
         _incidents.Select(i => new IncidentSave(i.Id, i.Kind, i.X, i.Y, i.Party, i.Started, i.Staff, i.Left, i.Resting, i.Crush) { Tent = i.Tent, Bed = i.Bed }).ToList(),
-        _chance.State, _nextStaff, _nextIncident, Treated, Untreated, TroubleSorted, TroubleIgnored) { Rounds = SaveRounds() };
+        _chance.State, _nextStaff, _nextIncident, Treated, Untreated, TroubleSorted, TroubleIgnored) { Rounds = SaveRounds(), BuskListeners = BuskListeners };
 
     private void RestoreStaff(StaffSave save)
     {
         foreach (var s in save.Staff ?? new())
         {
+            if (!Enum.IsDefined(s.Kind))
+            {
+                continue;
+            }
+
             var member = new StaffMember(s.Id, s.Kind, s.Tile, s.PostX, s.PostY, s.PostHeading) { X = s.X, Y = s.Y, Heading = s.Heading, State = Enum.IsDefined(s.State) ? s.State : StaffState.AtPost, Incident = s.Incident, HoldX = s.HoldX, HoldY = s.HoldY, HoldLeft = s.HoldLeft, Wait = s.Wait };
+            if (Busking.IsEntertainer(s.Kind))
+            {
+                member.SetHours.AddRange((s.Sets ?? Busking.UsualHours.ToList()).Where(h => h is >= Busking.FirstHour and <= Busking.LastHour).Distinct().Order());
+            }
+
             _staff.Add(member);
         }
 
@@ -785,6 +821,8 @@ public sealed partial class FestivalGame
         _nextIncident = Math.Max(save.NextIncident, _incidents.Count == 0 ? 0 : _incidents.Max(i => i.Id) + 1);
         (Treated, Untreated, TroubleSorted, TroubleIgnored) = (save.Treated, save.Untreated, save.TroubleSorted, save.TroubleIgnored);
         RestoreRounds(save.Rounds);
+        BuskListeners = save.BuskListeners;
+        UpdatePitches();
     }
 }
 
@@ -803,6 +841,9 @@ public sealed record StaffMemberSave(int Id, StaffKind Kind, TilePoint Tile, dou
 
     /// <summary>Ticks until they next set off along their beat.</summary>
     public int Wait { get; init; }
+
+    /// <summary>For an entertainer, the hours their sets start.</summary>
+    public List<int>? Sets { get; init; }
 }
 
 /// <summary>One incident as written to a save file.</summary>
@@ -820,4 +861,7 @@ public sealed record StaffSave(List<StaffMemberSave>? Staff, List<IncidentSave>?
 {
     /// <summary>The beats, the bins and the litter picked up.</summary>
     public RoundsSave? Rounds { get; init; }
+
+    /// <summary>How many people have stopped to listen to the entertainers today.</summary>
+    public int BuskListeners { get; init; }
 }

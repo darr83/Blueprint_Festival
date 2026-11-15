@@ -136,8 +136,21 @@ public class RosterTests
         var music = Path.Combine(Root(), "game", "Music");
         var folders = Directory.GetDirectories(music).Select(Path.GetFileName).ToList();
 
-        Assert.Equal(Roster.Artists.Select(a => a.Name).Order(), folders.Order());
+        Assert.Equal(Roster.Artists.Select(a => a.Name).Append("Entertainers").Order(), folders.Order());
         Assert.All(Roster.Artists, a => Assert.True(File.Exists(Path.Combine(music, a.Name, "PUT SONGS HERE.txt")), a.Name));
         Assert.True(File.Exists(Path.Combine(music, "README.txt")));
+    }
+
+    [Fact]
+    public void Every_entertainer_has_a_music_folder_of_their_own()
+    {
+        var music = Path.Combine(Root(), "game", "Music");
+        foreach (var kind in Busking.Kinds)
+        {
+            var folder = Path.Combine(music, Busking.MusicFolder(kind));
+            Assert.True(File.Exists(Path.Combine(folder, "PUT SONGS HERE.txt")), folder);
+        }
+
+        Assert.True(File.Exists(Path.Combine(music, "Entertainers", "README.txt")));
     }
 }

@@ -150,6 +150,20 @@ public sealed class Party
     /// <summary>The last set they made their mind up about, so they only decide once for each.</summary>
     public int Decided { get; internal set; } = -1;
 
+    /// <summary>The entertainer (their staff number) they have stopped to listen to, or are walking over to, or -1.</summary>
+    public int Busker { get; internal set; } = -1;
+
+    /// <summary>When they will move on from listening to the entertainer.</summary>
+    public DateTime BuskUntil { get; internal set; }
+
+    /// <summary>Where the entertainer they are listening to stands, in metres, so they can face them.</summary>
+    internal double BuskX { get; set; }
+
+    internal double BuskY { get; set; }
+
+    /// <summary>True while they are stood listening to an entertainer.</summary>
+    public bool ListeningToBusker => Busker >= 0 && State == PartyState.Standing;
+
     /// <summary>The last set on the second stage this party made its mind up about, or -1.</summary>
     public int DecidedSecond { get; internal set; } = -1;
 
@@ -1977,6 +1991,13 @@ public sealed partial class Crowd
                         break;
                     }
 
+                    if (party.Busker >= 0)
+                    {
+                        // The entertainer has had their time: move on.
+                        party.Busker = -1;
+                        party.WaitUntil = now;
+                    }
+
                     if (now >= party.Leaves || closing)
                     {
                         party.Watch = -1;
@@ -2023,6 +2044,14 @@ public sealed partial class Crowd
                         if (party.State == PartyState.Leaving)
                         {
                             party.State = PartyState.Gone;
+                        }
+                        else if (party.State == PartyState.Strolling && party.Busker >= 0)
+                        {
+                            // Got to the entertainer: stand and listen until it is time to move on.
+                            party.State = PartyState.Standing;
+                            party.Heading = Math.Atan2(party.BuskX - party.X, party.BuskY - party.Y) + (((party.Id % 7) - 3) * 0.05);
+                            party.RetryAt = party.BuskUntil > now ? party.BuskUntil : now;
+                            party.WaitUntil = party.RetryAt;
                         }
                         else if (party.State == PartyState.Strolling && Settle(party, now))
                         {
@@ -2081,6 +2110,12 @@ public sealed partial class Crowd
         {
             // A field that has been dressed up is a nicer place to be.
             change += _site.CharmAt(party.X, party.Y, Night) * Decor.CharmPerHour * perHour;
+        }
+
+        if (party.ListeningToBusker)
+        {
+            // A song from one of the entertainers brightens the day.
+            change += Busking.MoodPerHour * perHour;
         }
 
         if (Rain > 0.05 && !sheltered)
@@ -3319,6 +3354,54 @@ public sealed partial class Crowd
 
         party.PathIndex = 0;
         party.State = party.Path is null ? PartyState.Standing : state;
+    }
+
+    /// <summary>
+    /// Someone has stopped for an entertainer: they walk over to a spot in front of them, then stand
+    /// and listen until the time given. False if there is no way to the spot.
+    /// </summary>
+    internal bool StopForBusker(Party party, int busker, double bx, double by, TilePoint spot, DateTime until)
+    {
+        if (party.State is not (PartyState.Strolling or PartyState.Standing))
+        {
+            return false;
+        }
+
+        var from = FieldMap.TileAt(party.X, party.Y);
+        var path = Route(party, from, spot);
+        if (path is null)
+        {
+            return false;
+        }
+
+        GiveUpSeat(party);
+        party.Target = spot;
+        party.Path = path;
+        party.PathIndex = 0;
+        party.State = PartyState.Strolling;
+        party.Busker = busker;
+        party.BuskUntil = until;
+        (party.BuskX, party.BuskY) = (bx, by);
+        return true;
+    }
+
+    /// <summary>Everyone listening to an entertainer, or on their way over, moves on: the entertainer has gone.</summary>
+    internal void BuskerGone(int busker, DateTime now)
+    {
+        foreach (var party in _parties)
+        {
+            if (party.Busker != busker)
+            {
+                continue;
+            }
+
+            party.Busker = -1;
+            if (party.State == PartyState.Standing)
+            {
+                party.RetryAt = now;
+                party.WaitUntil = now;
+            }
+        }
     }
 
     /// <summary>Takes one tick's walk along the route. True once the party has got there.</summary>
