@@ -317,6 +317,51 @@ public sealed class Crowd
     /// </summary>
     public Func<int, int>? OpenLanes { get; set; }
 
+    /// <summary>
+    /// How many people are checking tickets on one lane of a gate, by gate and lane. Each one is
+    /// another ticket table, so two on a lane check people twice as fast. Left unset, one.
+    /// </summary>
+    public Func<int, int, int>? Checkers { get; set; }
+
+    /// <summary>
+    /// True while the gates are shut: people who arrive queue outside, and nobody's ticket is
+    /// checked until the gates are opened.
+    /// </summary>
+    public bool GatesShut { get; set; }
+
+    /// <summary>How long people will wait outside shut gates before they start to mind, in minutes.</summary>
+    public const double ShutGraceMinutes = 30;
+
+    /// <summary>Mood lost in an hour of waiting outside shut gates, once the first half hour is up.</summary>
+    public const double ShutPerHour = 0.12;
+
+    /// <summary>How long people will wait outside shut gates before they give up and go home, in minutes.</summary>
+    public const double ShutPatienceMinutes = 120;
+
+    /// <summary>
+    /// Opens the gates: ticket checks start, and the wait for someone to check tickets counts from
+    /// now rather than from when people joined the queue outside.
+    /// </summary>
+    public void OpenTheGates(DateTime now)
+    {
+        if (!GatesShut)
+        {
+            return;
+        }
+
+        GatesShut = false;
+        foreach (var party in _parties)
+        {
+            if (party.State == PartyState.Queuing && party.Gate >= 0)
+            {
+                party.QueuedSince = now;
+            }
+        }
+    }
+
+    /// <summary>How many tickets are checked at once at the front of a lane.</summary>
+    private int CheckersOn(int gate, int lane) => Math.Max(1, Checkers?.Invoke(gate, lane) ?? 1);
+
     /// <summary>How crowded every part of the map is, measured again each minute.</summary>
     public DensityMap Density { get; }
 
@@ -625,7 +670,7 @@ public sealed class Crowd
                         i == 0 && party.State != PartyState.Unwell ? party.Wants : null,
                         party.State == PartyState.Unwell && i == 0)
                     {
-                        Ticket = party.State == PartyState.Queuing && party.InLine && party.ServiceLeft >= 0 && i == party.Checked,
+                        Ticket = party.State == PartyState.Queuing && party.InLine && party.ServiceLeft >= 0 && i >= party.Checked && i < party.Checked + CheckersOn(party.Gate, party.Lane),
                     };
                 }
             }
@@ -1586,8 +1631,32 @@ public sealed class Crowd
             return;
         }
 
+        if (GatesShut)
+        {
+            // Waiting outside shut gates is fine for a while; after that people mind, and in the end give up.
+            var waited = _now - party.QueuedSince;
+            if (waited > TimeSpan.FromMinutes(ShutGraceMinutes))
+            {
+                party.Mood = Math.Max(0, party.Mood - (ShutPerHour / 3600));
+            }
+
+            if (waited > TimeSpan.FromMinutes(ShutPatienceMinutes))
+            {
+                LeaveQueue(party);
+                GoHome(party, unhappy: true);
+                return;
+            }
+        }
+
         if (!Shuffle(party, line) || party.LineTarget != 0)
         {
+            return;
+        }
+
+        if (GatesShut)
+        {
+            // The gates are not open yet. Nobody's ticket is looked at, and people wait at the front.
+            party.ServiceLeft = -1;
             return;
         }
 
@@ -1603,18 +1672,23 @@ public sealed class Crowd
             return;
         }
 
-        // At the front: each person in turn holds up their ticket and steps through.
+        // At the front: each person in turn holds up their ticket and steps through. With more
+        // than one person checking on the lane, that many tickets are looked at side by side.
+        var checkers = CheckersOn(party.Gate, party.Lane);
         var seconds = Catalogue.Of(_site.Gates[party.Gate].Kind).SecondsPerPerson;
+        var batch = Math.Min(checkers, party.Members.Count - party.Checked);
+        var wait = Math.Max(1, (int)Math.Round((double)seconds * batch / checkers));
         if (party.ServiceLeft < 0)
         {
-            party.ServiceLeft = seconds;
+            party.ServiceLeft = wait;
         }
         else if (--party.ServiceLeft <= 0)
         {
-            party.Checked++;
+            party.Checked += batch;
             if (party.Checked < party.Members.Count)
             {
-                party.ServiceLeft = seconds;
+                var next = Math.Min(checkers, party.Members.Count - party.Checked);
+                party.ServiceLeft = Math.Max(1, (int)Math.Round((double)seconds * next / checkers));
                 return;
             }
 

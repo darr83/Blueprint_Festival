@@ -167,6 +167,7 @@ public partial class FestivalScene : Node3D
         StageCam = new StageCam { Name = "StageCam" };
         AddChild(StageCam);
         StageCam.Initialise(Game, Camera);
+        Music.Follow(Camera, StageCam);
 
         Build = new BuildTool { Name = "BuildTool" };
         AddChild(Build);
@@ -181,6 +182,7 @@ public partial class FestivalScene : Node3D
         _hud.AddChild(TopBar);
         TopBar.Initialise(Game, OpenMenu);
         _hud.AddChild(TopBar.SkipButton);
+        _hud.AddChild(TopBar.GateButton);
         Money = new MoneyPanel { Name = "MoneyPanel" };
         _hud.AddChild(Money);
         Money.Initialise(Game);
@@ -286,6 +288,9 @@ public partial class FestivalScene : Node3D
             case Key.N:
                 Game.SkipToNextAct();
                 break;
+            case Key.G when Game.Phase == Phase.Day && Game.GatesShut:
+                Game.OpenGates();
+                break;
             case Key.C:
                 _viewFromWarning = false;
                 SetCrowdView(!Density.Showing);
@@ -295,6 +300,10 @@ public partial class FestivalScene : Node3D
                 break;
             case Key.B:
                 StageCam.Toggle(StageShot.Back);
+                break;
+            case Key.Tab:
+                // On a stage camera, on to the next stage.
+                StageCam.NextStage();
                 break;
             case Key.Escape:
                 if (StageCam.Showing is not null)

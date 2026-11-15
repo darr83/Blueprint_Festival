@@ -252,6 +252,32 @@ public sealed partial class FestivalGame
         return true;
     }
 
+    /// <summary>
+    /// Moves a set some hours earlier or later (any hour from midday to nine in the evening). The
+    /// other sets on the stage are pushed along to stay two hours apart. False if there is no room.
+    /// </summary>
+    public bool MoveSet(int set, int hours)
+    {
+        Need(Phase.Plan);
+        if (set >= RunningOrder.SecondBase && !SecondShow.Booked)
+        {
+            return false;
+        }
+
+        if (!StageOf(set).Move(set, hours))
+        {
+            return false;
+        }
+
+        Crowd.Replan(ExpectedAt(TicketPrice));
+        return true;
+    }
+
+    /// <summary>True if a set can be moved some hours earlier or later.</summary>
+    public bool CanMoveSet(int set, int hours) =>
+        Phase == Phase.Plan && (set < RunningOrder.SecondBase || SecondShow.Booked)
+        && RunningOrder.Moved(StageOf(set).Hours, set - StageOf(set).Base, hours) is not null;
+
     private void Place(int set, Artist? artist)
     {
         var show = StageOf(set);
@@ -477,8 +503,11 @@ public sealed partial class FestivalGame
         }
     }
 
-    /// <summary>The build day is over: the clock starts and people begin to arrive.</summary>
-    public void OpenGates()
+    /// <summary>
+    /// The build day is over: the clock starts at eight in the morning and people begin to arrive.
+    /// The gates stay shut, with people queuing outside, until the player opens them.
+    /// </summary>
+    public void StartDay()
     {
         Need(Phase.Build);
         FinishSales();
@@ -495,7 +524,36 @@ public sealed partial class FestivalGame
             Crowd.ArriveFeeling(ArrivalMood);
         }
 
+        Crowd.GatesShut = true;
+        GatesOpenedAt = null;
         Phase = Phase.Day;
+    }
+
+    /// <summary>True while the gates are shut on the day and people are queuing outside.</summary>
+    public bool GatesShut => Crowd.GatesShut;
+
+    /// <summary>When the gates were opened today, once they have been.</summary>
+    public DateTime? GatesOpenedAt { get; private set; }
+
+    /// <summary>
+    /// Opens the gates, so ticket staff start letting people in. Pressed on the build day, it
+    /// starts the day with the gates open straight away.
+    /// </summary>
+    public void OpenGates()
+    {
+        if (Phase == Phase.Build)
+        {
+            StartDay();
+        }
+
+        Need(Phase.Day);
+        if (!Crowd.GatesShut)
+        {
+            return;
+        }
+
+        Crowd.OpenTheGates(Clock.Now);
+        GatesOpenedAt = Clock.Now;
     }
 
     private void Need(Phase phase)
@@ -701,6 +759,10 @@ public sealed partial class FestivalGame
         LineUp = Enumerable.Range(0, RunningOrder.SetsAStage).Select(i => Show.At(i)?.Name)
             .Concat(Enumerable.Range(0, RunningOrder.SetsAStage).Select(i => SecondShow.At(RunningOrder.SecondBase + i)?.Name)).ToList(),
         Sales = SaveSales(),
+        GatesShut = Phase == Phase.Day && Crowd.GatesShut,
+        GatesOpenedAt = GatesOpenedAt,
+        MainHours = Show.Hours.ToList(),
+        SecondHours = SecondShow.Hours.ToList(),
     };
 
     private void RestoreYear(YearSave year)
@@ -709,6 +771,16 @@ public sealed partial class FestivalGame
         HeadlinerPicked = Math.Clamp(year.Headliner, 0, _offers.Count - 1);
         Show.SetHeadliner(_offers[HeadlinerPicked].Act);
         SecondShow.Booked = year.SecondStage;
+        if (year.MainHours is { } mainHours)
+        {
+            Show.SetHours(mainHours);
+        }
+
+        if (year.SecondHours is { } secondHours)
+        {
+            SecondShow.SetHours(secondHours);
+        }
+
         if (year.LineUp is { } names && names.Count == 2 * RunningOrder.SetsAStage)
         {
             for (var i = 0; i < names.Count; i++)
@@ -736,6 +808,8 @@ public sealed partial class FestivalGame
             Crowd.Replan(ExpectedAt(TicketPrice));
         }
 
+        Crowd.GatesShut = Phase == Phase.Day && year.GatesShut;
+        GatesOpenedAt = year.GatesOpenedAt;
         BailedOut = year.BailedOut;
         _loanThisYear = year.Loan;
         _fieldRepair = Math.Max(0, year.FieldRepair);
@@ -767,6 +841,12 @@ public sealed record YearSave(int Number, int Licence, Phase Phase, DateTime Day
     /// <summary>True if acts were booked for a second stage.</summary>
     public bool SecondStage { get; init; }
 
+    /// <summary>The hour each set starts on the main stage, or null in an older save (two, four, six and eight).</summary>
+    public List<int>? MainHours { get; init; }
+
+    /// <summary>The hour each set starts on the second stage, or null in an older save.</summary>
+    public List<int>? SecondHours { get; init; }
+
     /// <summary>True if the camping field was taken.</summary>
     public bool Camping { get; init; }
 
@@ -775,4 +855,10 @@ public sealed record YearSave(int Number, int Licence, Phase Phase, DateTime Day
 
     /// <summary>How ticket selling is going, for a year that sells its tickets ahead.</summary>
     public SalesSave? Sales { get; init; }
+
+    /// <summary>True if the day was saved with the gates still shut and people queuing outside.</summary>
+    public bool GatesShut { get; init; }
+
+    /// <summary>When the gates were opened on the day, once they had been.</summary>
+    public DateTime? GatesOpenedAt { get; init; }
 }

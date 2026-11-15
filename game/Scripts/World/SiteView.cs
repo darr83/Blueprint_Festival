@@ -16,6 +16,10 @@ public partial class SiteView : Node3D
 
     private readonly System.Collections.Generic.List<(int Stall, Node3D[] Doors)> _toilets = new();
     private readonly System.Collections.Generic.List<(PlacedStall Bin, Node3D Rubbish)> _bins = new();
+    private readonly System.Collections.Generic.List<Node3D> _shutBars = new();
+
+    /// <summary>True when the poles across the gates are showing, because the gates are shut.</summary>
+    public bool GatesLookShut => _shutBars.Count > 0 && _shutBars[0].Visible;
     private FestivalGame _game = null!;
     private bool _stale;
 
@@ -61,6 +65,12 @@ public partial class SiteView : Node3D
     /// </summary>
     public void Doors(float delta, bool snap)
     {
+        var shut = _game.Phase == Phase.Day && _game.GatesShut;
+        foreach (var bars in _shutBars)
+        {
+            bars.Visible = shut;
+        }
+
         foreach (var (bin, rubbish) in _bins)
         {
             // A bin that wants emptying has bags heaped over the rim.
@@ -136,6 +146,7 @@ public partial class SiteView : Node3D
 
         _toilets.Clear();
         _bins.Clear();
+        _shutBars.Clear();
         var site = _game.Site;
         foreach (var stage in site.Stages)
         {
@@ -183,6 +194,7 @@ public partial class SiteView : Node3D
             node.Position = Middle(site.Gates[i].Rect);
             node.RotationDegrees = new Vector3(0, Turn(site, site.Gates[i]), 0);
             AddChild(node);
+            _shutBars.Add(node.GetNode<Node3D>("Shut"));
         }
 
         var runs = site.FenceRuns();

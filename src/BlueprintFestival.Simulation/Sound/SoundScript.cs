@@ -101,6 +101,7 @@ public sealed class SoundScript : IDisposable
     private readonly FestivalGame _game;
     private readonly Dictionary<string, double> _levels = Sounds.Loops.Where(id => !Sounds.SetByTheGame(id)).ToDictionary(id => id, _ => 0.0);
     private Phase _phase;
+    private bool _shut;
     private int _playing = -1;
     private int _playingSecond = -1;
     private bool _paused;
@@ -199,6 +200,11 @@ public sealed class SoundScript : IDisposable
         {
             PhaseChanged(_phase, game.Phase);
         }
+        else if (day && _shut && !game.GatesShut)
+        {
+            // The day began with the gates shut, and they have just been opened.
+            Cue?.Invoke(Sounds.GatesOpen);
+        }
 
         if (day)
         {
@@ -227,6 +233,7 @@ public sealed class SoundScript : IDisposable
     {
         var game = _game;
         _phase = game.Phase;
+        _shut = game.GatesShut;
         _playing = game.Show.Playing(game.Now)?.Index ?? -1;
         _playingSecond = game.SecondShow.Playing(game.Now)?.Index ?? -1;
         _paused = game.ActPaused;
@@ -244,7 +251,7 @@ public sealed class SoundScript : IDisposable
             case Phase.Build when from == Phase.Plan:
                 Cue?.Invoke(Sounds.RubberStamp);
                 break;
-            case Phase.Day when from == Phase.Build:
+            case Phase.Day when from == Phase.Build && !_game.GatesShut:
                 Cue?.Invoke(Sounds.GatesOpen);
                 break;
             case Phase.Tidy:

@@ -463,6 +463,45 @@ public static partial class SiteProps
         }
 
         node.AddChild(b.BuildNode("Shapes"));
+        node.AddChild(ShutBars(kind));
+        return node;
+    }
+
+    /// <summary>
+    /// Striped poles across the way in, with a sign, shown while the gates are shut on the
+    /// morning of the festival. The scene shows or hides the child called "Shut".
+    /// </summary>
+    private static Node3D ShutBars(GateKind kind)
+    {
+        var bars = new MeshBuilder();
+        var info = Catalogue.Of(kind);
+        var half = kind == GateKind.VillageGate ? 2f : info.Width * 0.25f;
+        var lanes = kind == GateKind.VillageGate ? 1 : info.Lanes;
+        const float high = 1.0f;
+        const float z = 0.25f;
+        for (var lane = 0; lane < lanes; lane++)
+        {
+            var from = -half + (lane * half * 2 / lanes) + 0.15f;
+            var to = -half + ((lane + 1) * half * 2 / lanes) - 0.15f;
+            var stripes = Math.Max(2, (int)MathF.Round((to - from) / 0.35f));
+            var each = (to - from) / stripes;
+            for (var i = 0; i < stripes; i++)
+            {
+                bars.Box(new Vector3(from + ((i + 0.5f) * each), high, z), new Vector3(each, 0.09f, 0.09f), i % 2 == 0 ? Pink : Colors.White);
+            }
+
+            foreach (var x in new[] { from, to })
+            {
+                bars.Box(new Vector3(x, high / 2, z), new Vector3(0.1f, high, 0.1f), SteelDark);
+                bars.Box(new Vector3(x, 0.03f, z), new Vector3(0.4f, 0.06f, 0.4f), SteelDark);
+            }
+        }
+
+        // A board hung in the middle of the first pole that says the gates are not open yet.
+        var middle = -half + (half / lanes);
+        bars.Box(new Vector3(middle, high - 0.28f, z + 0.06f), new Vector3(0.9f, 0.42f, 0.03f), Colors.White);
+        var node = bars.BuildNode("Shut");
+        Painted(node, "Opening soon", new Vector3(middle, high - 0.28f, z + 0.085f), 0.8f, 0.16f, Pink);
         return node;
     }
 
