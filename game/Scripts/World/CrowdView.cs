@@ -57,6 +57,8 @@ public partial class CrowdView : Node3D
     private readonly CrowdClap _clap = new();
     private int _clappers;
     private int _applauding;
+    private int _singersMain;
+    private int _singersSecond;
 
     /// <summary>The music being played, which the crowd dances in time to. Null dances to a steady beat.</summary>
     public MusicPlayer? Music { get; set; }
@@ -81,6 +83,12 @@ public partial class CrowdView : Node3D
 
     /// <summary>How many claps have been played on the beat so far.</summary>
     public int ClapsPlayed => _clap.Played;
+
+    /// <summary>How many people are singing along in a chorus, at every stage.</summary>
+    public int Singers { get; private set; }
+
+    /// <summary>How loud the crowd singing along is heard, from 0 to 1.</summary>
+    public float SingingLevel { get; private set; }
 
     /// <summary>How many people are clapping or cheering between songs or at the end of a set.</summary>
     public int Applauding { get; private set; }
@@ -219,7 +227,31 @@ public partial class CrowdView : Node3D
     /// <summary>Whether someone is clapping along to the music being heard (the sway claps on every beat).</summary>
     private bool ClapsAlong(Simulation.People.PersonOnSite person, StageBeat? heard) =>
         heard is not null && person.Watching && !person.Walking && StageFor(person) == heard
-        && Dancing.MoveFor(heard.Genre, person.Id) == DanceMove.Sway;
+        && Dancing.MoveFor(heard.Genre, person.Id) == DanceMove.Sway
+        && !(SingAlong.ArmsUp(person.Id) && heard.Sings(person.Id, person.X, person.Y));
+
+    /// <summary>
+    /// The stage someone is singing along with, or null if they are not singing: they must be
+    /// watching and standing still, and the stage nearer to them in a chorus. Counted as they go.
+    /// </summary>
+    private StageBeat? SingingWith(Simulation.People.PersonOnSite person)
+    {
+        if (!person.Watching || person.Walking || person.Seat is not null || StageFor(person) is not { } stage || !stage.Sings(person.Id, person.X, person.Y))
+        {
+            return null;
+        }
+
+        if (stage == _secondBeat)
+        {
+            _singersSecond++;
+        }
+        else
+        {
+            _singersMain++;
+        }
+
+        return stage;
+    }
 
     /// <summary>
     /// What someone does when a song ends or the act takes its applause: most clap, some throw their
@@ -314,6 +346,8 @@ public partial class CrowdView : Node3D
         var heard = HeardStage();
         _clappers = 0;
         _applauding = 0;
+        _singersMain = 0;
+        _singersSecond = 0;
         foreach (var person in _people)
         {
             // Someone unwell lies on the ground, or on a bed if they have been taken to the first aid tent.
@@ -370,11 +404,15 @@ public partial class CrowdView : Node3D
                 var applause = person.Watching && !person.Walking ? ApplauseFor(person) : null;
                 _clappers += ClapsAlong(person, heard) ? 1 : 0;
                 _applauding += applause is not null ? 1 : 0;
+                var singing = SingingWith(person);
                 if (dance is { } d)
                 {
-                    var move = Dancing.MoveFor(d.Genre, person.Id);
+                    // In a chorus most of those singing throw both arms up and sway; the rest keep dancing.
+                    var move = singing is not null && SingAlong.ArmsUp(person.Id) ? DanceMove.SingAlong : Dancing.MoveFor(d.Genre, person.Id);
                     view.Dance(move, (float)Dancing.Through(d.Beat, move, person.Id), (float)Dancing.Energy(person.Id));
                 }
+
+                view.Mouth(singing is not null ? (float)(SingAlong.Mouth(person.Id, singing.Beat) * System.Math.Min(1, singing.Chorus * 1.5)) : 0f);
 
                 if (person.Seat is { } seat)
                 {
@@ -420,6 +458,7 @@ public partial class CrowdView : Node3D
             var basis = person.Unwell ? new Basis(Vector3.Right, tilt).Scaled(Vector3.One * tall) : Basis.FromScale(Vector3.One * tall);
             _clappers += ClapsAlong(person, heard) ? 1 : 0;
             _applauding += person.Watching && !person.Walking && ApplauseFor(person) is not null ? 1 : 0;
+            SingingWith(person);
             if (person.Watching && !person.Walking && BeatFor(person) is { } beat)
             {
                 at += new Vector3(0, SimpleLift(beat, person.Id), 0);
@@ -446,6 +485,7 @@ public partial class CrowdView : Node3D
         var loud = heard is not null && Music?.For(heard == _secondBeat ? _game.SecondShow : _game.Show) is { } stage ? stage.Place : 1f;
         _clap.Update(heard, _clappers, held, delta, loud);
         Applauding = _applauding;
+        Sing(heard, held);
         // The clapping under the cheers: louder at the end of a set than between songs, and louder the more people clap.
         var loudest = _mainBeat.Moment == StageMoment.Applause || _secondBeat.Moment == StageMoment.Applause ? 1f : 0.6f;
         var want = held || _applauding == 0 ? 0f : Mathf.Clamp(Mathf.Sqrt(_applauding / 250f), 0.25f, 1f) * loudest;
@@ -485,6 +525,47 @@ public partial class CrowdView : Node3D
             _views[id].QueueFree();
             _views.Remove(id);
             _bubbles.Remove(id);
+        }
+    }
+}
+
+public partial class CrowdView
+{
+    /// <summary>
+    /// The sound of the crowd singing along in a chorus: a wordless crowd singing under the music of
+    /// the stage being heard, louder the more people are singing, as near or far as the stage's music.
+    /// If the song has its singing on its own beside it, that is sung back too, with an echo.
+    /// </summary>
+    private void Sing(StageBeat? heard, bool held)
+    {
+        Singers = _singersMain + _singersSecond;
+        if (Music is not null)
+        {
+            if (Music.For(_game.Show) is { } main)
+            {
+                main.SingLevel = (float)SingAlong.Loudness(_singersMain);
+            }
+
+            if (Music.For(_game.SecondShow) is { } second)
+            {
+                second.SingLevel = (float)SingAlong.Loudness(_singersSecond);
+            }
+        }
+
+        var singers = heard == _secondBeat ? _singersSecond : heard == _mainBeat ? _singersMain : 0;
+        var stage = heard is null ? null : Music?.For(heard == _secondBeat ? _game.SecondShow : _game.Show);
+        var level = held || heard is null ? 0f : (float)(SingAlong.Loudness(singers) * heard.Chorus) * Mathf.Clamp((stage?.Place ?? 1f) * 1.4f, 0f, 1f);
+        if (stage?.HasVocals == true)
+        {
+            // The words are sung back from the song itself; the wordless crowd is kept low under them.
+            level *= 0.45f;
+        }
+
+        SingingLevel = level;
+        var pick = heard is null ? -1 : SingAlong.SoundFor(heard.SongFile, Sounds.Singing.Count);
+        for (var i = 0; i < Sounds.Singing.Count; i++)
+        {
+            SoundBoard.Instance?.SetLoop(Sounds.Singing[i], i == pick ? level : 0);
         }
     }
 }

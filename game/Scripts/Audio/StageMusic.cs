@@ -35,6 +35,12 @@ public partial class StageMusic : Node
     private int _analyser = -1;
     private float _voicePeak = 0.02f;
     private float _place = -1;
+    private AudioStreamPlayer _vocals = null!;
+    private Choruses _marks = Choruses.None;
+    private float _singLevel;
+
+    /// <summary>The bus the crowd's singing of the song's own words plays on, with an echo, feeding the Music bus.</summary>
+    public const string SingingBus = "Singing";
 
     /// <summary>The running order this stage plays.</summary>
     public RunningOrder Show => _show();
@@ -57,6 +63,9 @@ public partial class StageMusic : Node
     /// <summary>The title of the song that is on, or an empty string if nothing is.</summary>
     public string SongTitle { get; private set; } = "";
 
+    /// <summary>The file name of the song that is on, or an empty string.</summary>
+    public string SongFileName { get; private set; } = "";
+
     /// <summary>How many songs the act that is on has.</summary>
     public int SongCount => _songs.Count;
 
@@ -75,6 +84,28 @@ public partial class StageMusic : Node
     /// <summary>True while a song is playing out loud.</summary>
     public bool SongPlaying => _slot >= 0 && _player.Playing;
 
+    /// <summary>The choruses marked in the song that is on (none if it has not been marked).</summary>
+    public Choruses Marks => _marks;
+
+    /// <summary>How much the crowd should be singing along right now, from 0 to 1 (0 outside the choruses).</summary>
+    public double Chorus => SongPlaying && !_player.StreamPaused && _marks.Any ? _marks.SingingAt(SongSeconds) : 0;
+
+    /// <summary>How long the chorus going on has been going, in seconds; -1 outside the choruses.</summary>
+    public double ChorusSeconds => SongPlaying && !_player.StreamPaused && _marks.Any ? _marks.SecondsInto(SongSeconds) : -1;
+
+    /// <summary>True when the song that is on has its singing on its own beside it, for the crowd to sing the words.</summary>
+    public bool HasVocals => _vocals.Stream is not null;
+
+    /// <summary>
+    /// How loud the crowd is singing this stage's song, from 0 to 1. Set every frame by the crowd,
+    /// from how many are singing; turns up the song's own singing under the music, if it has one.
+    /// </summary>
+    public float SingLevel
+    {
+        get => _singLevel;
+        set => _singLevel = Mathf.Clamp(value, 0, 1);
+    }
+
     /// <summary>
     /// How far into the song that is on the listener is, in seconds: where the player has got to,
     /// plus the sound mixed since, less the time it takes to come out of the speakers.
@@ -91,6 +122,9 @@ public partial class StageMusic : Node
         _player = new AudioStreamPlayer { Name = "Song", Bus = _bus >= 0 ? bus : "Master", VolumeDb = -80 };
         AddChild(_player);
         _player.Finished += SongOver;
+        var singing = SingingBusIndex();
+        _vocals = new AudioStreamPlayer { Name = "CrowdVocals", Bus = singing >= 0 ? SingingBus : (_bus >= 0 ? bus : "Master"), VolumeDb = -80 };
+        AddChild(_vocals);
         if (_bus >= 0)
         {
             // Listens to the music for the singing, so the singer's mouth moves with it.
@@ -131,6 +165,29 @@ public partial class StageMusic : Node
         return index;
     }
 
+    /// <summary>The crowd-singing bus, made the first time: a big echo and the top taken off, so it sounds like a field singing.</summary>
+    private static int SingingBusIndex()
+    {
+        var index = AudioServer.GetBusIndex(SingingBus);
+        if (index >= 0)
+        {
+            return index;
+        }
+
+        if (AudioServer.GetBusIndex(MusicPlayer.Bus) < 0)
+        {
+            return -1;
+        }
+
+        AudioServer.AddBus();
+        index = AudioServer.BusCount - 1;
+        AudioServer.SetBusName(index, SingingBus);
+        AudioServer.SetBusSend(index, MusicPlayer.Bus);
+        AudioServer.AddBusEffect(index, new AudioEffectLowPassFilter { CutoffHz = 3800 });
+        AudioServer.AddBusEffect(index, new AudioEffectReverb { RoomSize = 0.85f, Damping = 0.6f, Spread = 1f, Wet = 0.55f, Dry = 0.5f, PredelayMsec = 60 });
+        return index;
+    }
+
     public override void _Process(double delta)
     {
         var now = _game.Now;
@@ -162,6 +219,7 @@ public partial class StageMusic : Node
         // The music stops while the act is stopped for the crowd's safety, and while the game is paused.
         var held = _game.ActPaused || _game.Clock.Speed == GameSpeed.Paused;
         _player.StreamPaused = held && _slot >= 0;
+        _vocals.StreamPaused = _player.StreamPaused;
         if (_gapLeft > 0 && !held)
         {
             _gapLeft -= delta;
@@ -187,6 +245,7 @@ public partial class StageMusic : Node
         if (on is not null && _fade <= 0.001f && _player.Playing)
         {
             _player.Stop();
+            _vocals.Stop();
             _gapLeft = 0.0001;
         }
 
@@ -194,10 +253,17 @@ public partial class StageMusic : Node
         _place = _place < 0 ? Wanted : Mathf.Lerp(_place, Wanted, Mathf.Min(1f, PlaceFollow * (float)delta));
         _level = Mathf.MoveToward(_level, _slot >= 0 && !held ? 1 : 0, FadePerSecond * (float)delta);
         _player.VolumeDb = Mathf.LinearToDb(Mathf.Max(_level * _fade * Place, 0.0001f));
+        // The song's own singing, sung back by the crowd: only in the choruses, and as loud as the crowd is singing.
+        _vocals.VolumeDb = Mathf.LinearToDb(Mathf.Max(_level * _fade * Place * (float)Chorus * _singLevel * 0.55f, 0.0001f));
+        if (_vocals.Playing && !_player.Playing)
+        {
+            _vocals.Stop();
+        }
         Listen(delta);
         if (_slot < 0 && _level <= 0 && _player.Playing)
         {
             _player.Stop();
+            _vocals.Stop();
         }
     }
 
@@ -207,6 +273,10 @@ public partial class StageMusic : Node
         if (_player.Playing)
         {
             _player.Seek((float)seconds);
+            if (_vocals.Playing)
+            {
+                _vocals.Seek((float)seconds);
+            }
         }
     }
 
@@ -216,6 +286,10 @@ public partial class StageMusic : Node
         if (_player.Playing && _player.Stream is { } stream)
         {
             _player.Seek((float)System.Math.Max(0, stream.GetLength() - secondsBefore));
+            if (_vocals.Playing)
+            {
+                _vocals.Seek(_player.GetPlaybackPosition());
+            }
         }
     }
 
@@ -230,6 +304,7 @@ public partial class StageMusic : Node
 
         _gapLeft = Performing.SongGapSeconds;
         SongsEnded++;
+        _vocals.Stop();
 
         // The cheer is as near or far as the stage's music.
         if (Place > 0.12f)
@@ -261,16 +336,26 @@ public partial class StageMusic : Node
         if (_slot < 0 || _songs.Count == 0)
         {
             SongTitle = "";
+            _marks = Choruses.None;
             return;
         }
 
         _song = (_song + 1) % _songs.Count;
         var song = _songs[_song];
         SongTitle = song.Title;
+        SongFileName = song.File;
+        _marks = ChorusLibrary.Of(Artist, song);
+        _vocals.Stop();
+        _vocals.Stream = ChorusLibrary.VocalsOf(Artist, song) is { } vocals && ResourceLoader.Load(vocals) is AudioStream sung ? sung : null;
         if (ResourceLoader.Load($"{MusicPlayer.Folder}/{Artist}/{song.File}") is AudioStream stream)
         {
             _player.Stream = stream;
             _player.Play();
+            if (_vocals.Stream is not null)
+            {
+                _vocals.VolumeDb = -80;
+                _vocals.Play();
+            }
         }
     }
 }

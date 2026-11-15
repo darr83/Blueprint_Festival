@@ -38,6 +38,25 @@ public sealed class StageBeat
     /// <summary>How loud the singing is right now, from 0 to 1, for the singer's mouth.</summary>
     public float Voice { get; private set; }
 
+    /// <summary>How much the crowd is singing along, from 0 to 1: above 0 only in a marked chorus.</summary>
+    public double Chorus { get; private set; }
+
+    /// <summary>How long the chorus going on has been going, in seconds; -1 outside the choruses.</summary>
+    public double ChorusSeconds { get; private set; } = -1;
+
+    /// <summary>How keen this stage's crowd is to sing along, from 0 to 1 (see <see cref="SingAlong.Share"/>).</summary>
+    public double SingShare { get; private set; }
+
+    /// <summary>The file name of the song being sung along to, so each song keeps its own crowd sound.</summary>
+    public string SongFile { get; private set; } = "";
+
+    /// <summary>
+    /// Whether one person watching this stage is singing along right now: in a chorus, the crowd keen
+    /// enough, and the singing spread back to where they stand.
+    /// </summary>
+    public bool Sings(int person, double x, double y) =>
+        Chorus > 0.12 && ChorusSeconds >= 0 && SingAlong.Sings(person, System.Math.Sqrt(DistanceSquared(x, y)), ChorusSeconds, SingShare);
+
     /// <summary>How long the stage has been in its moment, in real seconds.</summary>
     public double InMoment { get; private set; }
 
@@ -53,6 +72,8 @@ public sealed class StageBeat
             _slot = -1;
             Heard = false;
             Voice = 0;
+            Chorus = 0;
+            ChorusSeconds = -1;
             Set(StageMoment.Quiet, delta);
             Slot = game.ActPaused ? null : Slot;
             return;
@@ -93,6 +114,10 @@ public sealed class StageBeat
             ? Dancing.BeatNow(mine!.Beat, mine.SongSeconds, Genre, mine.SongSeconds)
             : Dancing.BeatNow(null, 0, Genre, _clock);
         Voice = Heard ? mine!.Voice : 0;
+        Chorus = Heard && moment == StageMoment.Song ? mine!.Chorus : 0;
+        ChorusSeconds = Chorus > 0 ? mine!.ChorusSeconds : -1;
+        SongFile = Heard ? mine!.SongFileName : "";
+        SingShare = Chorus > 0 ? SingAlong.Share(game.Crowd.Happiness, Slot.Act.Fans) : 0;
     }
 
     /// <summary>
@@ -105,6 +130,8 @@ public sealed class StageBeat
         Genre = genre;
         Slot = null;
         Voice = 0;
+        Chorus = 0;
+        ChorusSeconds = -1;
         if (!held)
         {
             _clock += delta;
