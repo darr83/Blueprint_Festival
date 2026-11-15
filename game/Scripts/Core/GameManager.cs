@@ -95,6 +95,10 @@ public partial class GameManager : Node
             {
                 AddChild(new PathShots(arg["--path-shots=".Length..]) { Name = "PathShots" });
             }
+            else if (arg.StartsWith("--lighting-shots=", StringComparison.Ordinal))
+            {
+                AddChild(new LightingShots(arg["--lighting-shots=".Length..]) { Name = "LightingShots" });
+            }
             else if (arg.StartsWith("--light-shots=", StringComparison.Ordinal))
             {
                 AddChild(new LightShots(arg["--light-shots=".Length..]) { Name = "LightShots" });
