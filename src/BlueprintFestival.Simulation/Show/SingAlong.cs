@@ -66,7 +66,7 @@ public static class SingAlong
     }
 
     /// <summary>How loud the crowd singing is, from 0 to 1, for this many people singing.</summary>
-    public static double Loudness(int singers) => singers <= 0 ? 0 : Math.Clamp(Math.Sqrt(singers / 350.0), 0.2, 1);
+    public static double Loudness(int singers) => singers <= 0 ? 0 : Math.Clamp(Math.Sqrt(singers / 350.0), 0.12, 1);
 
     private static int Roll(int person, int question)
     {
