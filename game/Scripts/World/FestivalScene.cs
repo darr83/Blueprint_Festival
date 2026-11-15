@@ -43,6 +43,12 @@ public partial class FestivalScene : Node3D
     /// <summary>The big screens, showing the stages live.</summary>
     public ScreenView Screens { get; private set; } = null!;
 
+    /// <summary>The launch pad, its safe zone and fence, and the fireworks in the sky.</summary>
+    public FireworksView Fireworks { get; private set; } = null!;
+
+    /// <summary>The firework mixer.</summary>
+    public FireworksPanel Mixer { get; private set; } = null!;
+
     public ShowView Acts { get; private set; } = null!;
 
     /// <summary>The acts on the second stage.</summary>
@@ -83,7 +89,9 @@ public partial class FestivalScene : Node3D
     public void LayOutCorners()
     {
         // A panel in the middle of the screen has the bottom of the screen to itself.
-        _viewButtons.Visible = _hint.Visible = !Year.HasCentrePanel;
+        _viewButtons.Visible = !Year.HasCentrePanel;
+        // The key hints step aside where the build buttons would run into them, on a narrow screen.
+        _hint.Visible = !Year.HasCentrePanel && (!BuildBar.Visible || _hint.Position.X + _hint.Size.X + 12 < BuildBar.TabsLeft);
         var height = GetViewport().GetVisibleRect().Size.Y;
         // The build buttons sit in the middle and the view buttons in the corner, level with them.
         const float lift = 0;
@@ -115,6 +123,11 @@ public partial class FestivalScene : Node3D
         Screens = new ScreenView { Name = "BigScreens" };
         AddChild(Screens);
         Screens.Initialise(Game);
+
+        Fireworks = new FireworksView { Name = "Fireworks" };
+        AddChild(Fireworks);
+        Fireworks.Initialise(Game);
+        Game.FireworksStarted += OnFireworks;
 
         Acts = new ShowView { Name = "Show" };
         AddChild(Acts);
@@ -187,6 +200,11 @@ public partial class FestivalScene : Node3D
         StallMenu = new StallPanel { Name = "StallPanel" };
         _hud.AddChild(StallMenu);
         StallMenu.Initialise(Game, Build);
+        Mixer = new FireworksPanel { Name = "FireworksPanel" };
+        _hud.AddChild(Mixer);
+        Mixer.Initialise(Game, Fireworks, Build);
+        Mixer.LookAtPad = LookAtPad;
+        BuildBar.OpenMixer = Mixer.Open;
         Money = new MoneyPanel { Name = "MoneyPanel" };
         _hud.AddChild(Money);
         Money.Initialise(Game);
@@ -256,7 +274,34 @@ public partial class FestivalScene : Node3D
             BuildBar.Visible = Game.CanBuild;
         }
 
+        Fireworks.ZoneShown = Mixer.Visible || Build.Mode == BuildMode.LaunchPad;
         LayOutCorners();
+    }
+
+    /// <summary>Points the camera at the launch pad from far enough back to see the fireworks above it.</summary>
+    public void LookAtPad()
+    {
+        if (Game.Site.LaunchPad is { } pad)
+        {
+            StageCam.Show(null);
+            var middle = SiteView.Middle(pad.Rect);
+            Camera.LookAt(middle.X, middle.Z, 60f);
+        }
+    }
+
+    /// <summary>A show's time has come: slow the clock so it can be watched, and look at it if the player is not busy.</summary>
+    private void OnFireworks(Simulation.Show.FireworkShow show, Simulation.Show.FireworkResult result)
+    {
+        if (result.Outcome == Simulation.Show.FireworkOutcome.CalledOff)
+        {
+            SoundBoard.Cue(Simulation.Sound.Sounds.Groan);
+            return;
+        }
+
+        if (Game.Clock.Speed > GameSpeed.Normal)
+        {
+            Game.Clock.SetSpeed(GameSpeed.Normal);
+        }
     }
 
     public override void _UnhandledInput(InputEvent @event)
@@ -349,7 +394,11 @@ public partial class FestivalScene : Node3D
         }
     }
 
-    public override void _ExitTree() => Game.CrushWarning -= OnCrushWarning;
+    public override void _ExitTree()
+    {
+        Game.CrushWarning -= OnCrushWarning;
+        Game.FireworksStarted -= OnFireworks;
+    }
 
     public void TogglePause()
     {

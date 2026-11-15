@@ -68,6 +68,10 @@ public static class Sounds
     public const string SongEndBig = "song_end_big";
     public const string SetEndOvation = "set_end_ovation";
     public const string ApplauseLoop = "applause_loop";
+    public const string FireworkLaunch = "firework_launch";
+    public const string FireworkBurst = "firework_burst";
+    public const string FireworkCrackle = "firework_crackle";
+    public const string FireworkOoh = "firework_ooh";
 
     /// <summary>One clap of the crowd clapping along, each a little different; one plays on each clap of the beat.</summary>
     public static readonly IReadOnlyList<string> Claps = [Clap1, Clap2, Clap3];

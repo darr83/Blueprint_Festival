@@ -280,7 +280,7 @@ public sealed partial class FestivalGame
             return 0;
         }
 
-        var line = Site.ScreenRefundAt(tile) > 0 ? BigScreens.Line : Site.LightRefundAt(tile) > 0 ? LightsLine : Site.StageAt(tile) is not null ? "Stage" : Site.StallAt(tile) is not null ? "Stalls and toilets" : "Fences and gates";
+        var line = Site.PadRefundAt(tile) > 0 ? Fireworks.Line : Site.ScreenRefundAt(tile) > 0 ? BigScreens.Line : Site.LightRefundAt(tile) > 0 ? LightsLine : Site.StageAt(tile) is not null ? "Stage" : Site.StallAt(tile) is not null ? "Stalls and toilets" : "Fences and gates";
         var refund = Site.RemoveAt(tile);
         if (refund != 0)
         {
@@ -412,6 +412,7 @@ public sealed partial class FestivalGame
         StallSales = _stallSales.Count > 0 ? SaveStallSales() : null,
         PricedOut = Crowd.PricedOut,
         SharePence = _sharePence,
+        Fireworks = SaveFireworks(),
     };
 
     public static FestivalGame Load(SaveData data)
@@ -467,6 +468,7 @@ public sealed partial class FestivalGame
 
         game.RestoreStallSales(data.StallSales, data.PricedOut);
         game._sharePence = data.SharePence;
+        game.RestoreFireworks(data.Fireworks);
 
         return game;
     }
@@ -489,6 +491,9 @@ public sealed record SaveData(int Version, string Name, ClockState Clock, int? S
 
     /// <summary>The pennies of the festival's share of stall takings not yet made up to a pound.</summary>
     public int SharePence { get; init; }
+
+    /// <summary>The day's firework shows and how they went.</summary>
+    public FireworksSave? Fireworks { get; init; }
 
     /// <summary>Where the festival is in its year. Missing from a festival with nothing to plan.</summary>
     public YearSave? Year { get; init; }

@@ -35,6 +35,12 @@ public enum BuildMode
 
     /// <summary>Putting up a big screen with its speakers. It is on the Stages group of the build bar.</summary>
     Screen,
+
+    /// <summary>Putting down the launch pad for the fireworks, with its safe zone round it.</summary>
+    LaunchPad,
+
+    /// <summary>The Fireworks group of the build bar: the launch pads and the show mixer.</summary>
+    Fireworks,
 }
 
 /// <summary>
@@ -77,6 +83,8 @@ public partial class BuildTool : Node3D
     public LightKind Light { get; private set; }
 
     public ScreenKind Screen { get; private set; }
+
+    public LaunchPadKind Pad { get; private set; }
 
     public Facing Facing { get; private set; } = Facing.South;
 
@@ -127,6 +135,8 @@ public partial class BuildTool : Node3D
     public void PickLight(LightKind kind) => Pick(kind == LightKind.FairyLights ? BuildMode.Fairy : BuildMode.Light, () => Light = kind);
 
     public void PickScreen(ScreenKind kind) => Pick(BuildMode.Screen, () => Screen = kind);
+
+    public void PickLaunchPad(LaunchPadKind kind) => Pick(BuildMode.LaunchPad, () => Pad = kind);
 
     public void PickRemove() => Pick(BuildMode.Remove, () => { });
 
@@ -180,9 +190,10 @@ public partial class BuildTool : Node3D
             BuildMode.Lane => "Hold the mouse button and drag out a queue from the front of a gate, stall or toilets. Drag again from its end to turn a corner.",
             BuildMode.KeepOut => "Hold the mouse button and drag over ground customers must keep off. Start on marked ground to clear it.",
             BuildMode.Light => "Click on the grass to put the light up.",
+            BuildMode.LaunchPad => "Click on the grass to put the launch pad down. Its safe zone must be clear. Fence it off from the firework mixer.",
             BuildMode.Screen => "Click on the grass to put the screen up. R turns it. It shows the nearest stage to the people in front of it.",
             BuildMode.Fairy => "Hold the mouse button and drag to string fairy lights. The poles go in by themselves. Start on a pole to carry on from it.",
-            BuildMode.Remove => "Click a stage, a screen, a stall, a gate, a light or a stretch of fence to take it down. You get the money back. Click staff to send them home.",
+            BuildMode.Remove => "Click a stage, a screen, the launch pad, a stall, a gate, a light or a stretch of fence to take it down. You get the money back. Click staff to send them home.",
             _ => "",
         };
         ClearGhost();
@@ -256,6 +267,12 @@ public partial class BuildTool : Node3D
         return (at.X - (rect.Width / 2), at.Y - (rect.Height / 2));
     }
 
+    private (int X, int Y) PadCorner(TilePoint at)
+    {
+        var size = LaunchPads.Of(Pad).Size;
+        return (at.X - (size / 2), at.Y - (size / 2));
+    }
+
     private (int X, int Y) StallCorner(TilePoint at)
     {
         var rect = new PlacedStall(Stall, 0, 0, Facing).Rect;
@@ -309,6 +326,13 @@ public partial class BuildTool : Node3D
             {
                 var (x, y) = ScreenCorner(at);
                 result = _game.BuildScreen(Screen, x, y, Facing);
+                break;
+            }
+
+            case BuildMode.LaunchPad:
+            {
+                var (x, y) = PadCorner(at);
+                result = _game.BuildLaunchPad(Pad, x, y);
                 break;
             }
 
@@ -438,7 +462,7 @@ public partial class BuildTool : Node3D
         Refused = !result.Ok;
         SoundBoard.Cue(!result.Ok ? Sounds.Refuse : Mode switch
         {
-            BuildMode.Stage or BuildMode.Screen => Sounds.BuildStage,
+            BuildMode.Stage or BuildMode.Screen or BuildMode.LaunchPad => Sounds.BuildStage,
             BuildMode.Fence or BuildMode.Lane => Sounds.BuildFence,
             BuildMode.Gate => Sounds.BuildGate,
             BuildMode.Staff => Sounds.HireStaff,
@@ -612,6 +636,18 @@ public partial class BuildTool : Node3D
                 break;
             }
 
+            case BuildMode.LaunchPad:
+            {
+                var (x, y) = PadCorner(at);
+                check = _game.CheckLaunchPad(Pad, x, y);
+                var placed = new PlacedLaunchPad(Pad, x, y, false);
+                pad = placed.Zone;
+                Ghost($"pad{Pad}", () => FireworksView.Model(Pad));
+                _ghost!.Position = SiteView.Middle(placed.Rect);
+                _ghost.RotationDegrees = Vector3.Zero;
+                break;
+            }
+
             case BuildMode.Light:
             {
                 check = _game.CheckLight(Light, at);
@@ -671,7 +707,7 @@ public partial class BuildTool : Node3D
             default:
             {
                 var site = _game.Site;
-                pad = site.StageAt(at)?.Rect ?? site.StallAt(at)?.Rect ?? site.GateAt(at)?.Rect ?? new TileRect(at.X, at.Y, 1, 1);
+                pad = (site.FireworksAt(at) ? site.LaunchPad?.Zone : null) ?? site.StageAt(at)?.Rect ?? site.StallAt(at)?.Rect ?? site.GateAt(at)?.Rect ?? new TileRect(at.X, at.Y, 1, 1);
                 var refund = site.RefundAt(at);
                 if (refund == 0 && site.IsEmpty(at) && _game.StaffAt(at) is null && _game.PatchAt(at) is var (c, r) && _game.GroundAt(c, r) is { } laid)
                 {
@@ -722,6 +758,7 @@ public partial class BuildTool : Node3D
         BuildMode.Lane => "Queue lane",
         BuildMode.Light or BuildMode.Fairy => Lighting.Of(Light).Name,
         BuildMode.Screen => BigScreens.Of(Screen).Name,
+        BuildMode.LaunchPad => LaunchPads.Of(Pad).Name,
         BuildMode.Stage => Catalogue.Of(Stage).Name,
         BuildMode.Gate => Catalogue.Of(Gate).Name,
         BuildMode.Stall => Catalogue.Of(Stall).Name,

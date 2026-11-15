@@ -563,6 +563,7 @@ public sealed partial class FestivalGame
         Crowd.Tick(clock.Now);
         TickStaff(clock.Now);
         TickSafety(clock.Now);
+        TickFireworks(clock.Now);
         TickWeather(clock.Now);
         if (clock.TickCount % 10 == 0)
         {

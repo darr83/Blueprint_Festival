@@ -569,6 +569,42 @@
       "volume": 0.9,
       "gap": 0,
       "prompt": "Steady continuous applause from an outdoor festival crowd, lots of hands clapping with the odd cheer and whistle, even and unbroken. No music."
+    },
+    {
+      "id": "firework_launch",
+      "bus": "Effects",
+      "seconds": 1.5,
+      "loop": false,
+      "volume": 0.7,
+      "gap": 0.08,
+      "prompt": "A single firework rocket launching from a mortar tube with a thud and a rising whistle into the night sky. No explosion, no people."
+    },
+    {
+      "id": "firework_burst",
+      "bus": "Effects",
+      "seconds": 2.0,
+      "loop": false,
+      "volume": 0.85,
+      "gap": 0.12,
+      "prompt": "One big firework shell exploding high in the sky, a deep boom echoing across an open field, then a soft sizzle of falling stars. No people."
+    },
+    {
+      "id": "firework_crackle",
+      "bus": "Effects",
+      "seconds": 2.5,
+      "loop": false,
+      "volume": 0.6,
+      "gap": 0.3,
+      "prompt": "Rapid crackling and popping of firework crackle stars and a fountain of sparks hissing, outdoors at night. No people, no music."
+    },
+    {
+      "id": "firework_ooh",
+      "bus": "Crowd",
+      "seconds": 3.0,
+      "loop": false,
+      "volume": 0.7,
+      "gap": 2.0,
+      "prompt": "A crowd of a few hundred people outdoors at night going ooh and aah at fireworks, then a short cheer and some clapping. No music."
     }
   ]
 }

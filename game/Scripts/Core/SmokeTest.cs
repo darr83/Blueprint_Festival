@@ -249,6 +249,47 @@ public partial class SmokeTest : Node
                     Check(opened.Build.ClickAt(screenAt).Ok && site.Screens.Count == 0, "Taking a screen down should give the money back.");
                     opened.Screens.Rebuild();
                     Check(opened.Screens.ScreenCount == 0 && opened.Screens.FeedCount == 0, "With the screen gone nothing should be filming for it.");
+
+                    // Fireworks: a launch pad from its own group, a show on the mixer, the fence round the safe zone.
+                    var beforeFireworks = opened.Game.Money;
+                    opened.BuildBar.Toggle(BuildMode.Fireworks);
+                    Check(opened.BuildBar.ChoiceCount == 3, $"The Fireworks group should offer two pads and the mixer, not {opened.BuildBar.ChoiceCount}.");
+                    Check(opened.BuildBar.Choose(UI.BuildBar.PadKey(LaunchPadKind.Small)) && opened.Build.Mode == BuildMode.LaunchPad, "The small launch pad should be on the Fireworks group.");
+                    TilePoint? padAt = null;
+                    for (var py = grass.Y + 16; py < grass.Bottom - 16 && padAt is null; py += 4)
+                    {
+                        for (var px = grass.X + 16; px < grass.Right - 16 && padAt is null; px += 4)
+                        {
+                            if (opened.Game.CheckLaunchPad(LaunchPadKind.Small, px - 3, py - 3).Ok)
+                            {
+                                padAt = new TilePoint(px, py);
+                            }
+                        }
+                    }
+
+                    Check(padAt is not null, "There should be clear grass somewhere for a launch pad and its safe zone.");
+                    if (padAt is { } padTile)
+                    {
+                        opened.Build.ShowGhost(padTile);
+                        Check(opened.Build.Status.Contains("£150"), $"The bar should show what a small pad costs, not '{opened.Build.Status}'.");
+                        Check(opened.Build.ClickAt(padTile).Ok && site.LaunchPad is not null, "The launch pad should go down.");
+                        opened.Fireworks.Rebuild();
+                        Check(opened.Fireworks.PadDrawn, "The launch pad should be drawn.");
+                        opened.BuildBar.Toggle(BuildMode.Fireworks);
+                        Check(opened.BuildBar.Choose(UI.BuildBar.MixerKey) && opened.Mixer.Visible, "The mixer should open from the Fireworks group.");
+                        Check(opened.Mixer.AddShow() && opened.Mixer.UseExample() && opened.Mixer.Rating?.Stars == 5, "The example show should get five stars on the small pad.");
+                        Check(opened.Mixer.SafetyText.Contains("no fence", StringComparison.Ordinal), $"Without a fence the mixer should say so, not '{opened.Mixer.SafetyText}'.");
+                        Check(opened.Mixer.SetFence(true) && opened.Mixer.SafetyText.StartsWith("Safe", StringComparison.Ordinal), "Fencing the safe zone should make the show safe.");
+                        opened.Mixer.Watch();
+                        Check(opened.Fireworks.Playing, "Watching the show should let it off from the pad.");
+                        opened.Fireworks.StopShow();
+                        Check(opened.Mixer.CancelShow() && opened.Game.FireworkShows.Count == 0, "Cancelling the show should take it off the day.");
+                        opened.Mixer.Close();
+                        opened.BuildBar.Toggle(BuildMode.Remove);
+                        Check(opened.Build.ClickAt(padTile).Ok && site.LaunchPad is null, "Taking the pad down should give the money back.");
+                        Check(opened.Game.Money == beforeFireworks, $"The fireworks should all be paid back, not leave £{opened.Game.Money} of £{beforeFireworks}.");
+                    }
+
                     opened.BuildBar.Close();
                     Check(opened.Build.Mode == BuildMode.None, "Closing the bar should put the tool down.");
                     Check(opened.Game.Money == 1554 - 120 - 200 - 40, $"The money should add up after the stalls, not be £{opened.Game.Money}.");
@@ -460,7 +501,7 @@ public partial class SmokeTest : Node
                     Check(game.TicketPrice == 8 && game.HeadlinerPicked == 0, "Clicking a ticket price and a headliner should choose them.");
                     Check(BlueprintFestival.UI.YearScreen.PlanOf(game).Forecast.Contains("chance of rain", StringComparison.Ordinal), "The planning screen should carry the long-range forecast.");
                     var board = SoundBoard.Instance;
-                    Check(board is { Listed: 62 }, "The sound board should be loaded with all 62 sounds on its list.");
+                    Check(board is { Listed: 66 }, "The sound board should be loaded with all 66 sounds on its list.");
                     Check(Sounds.Loops.All(board!.Knows) && board.Knows(Sounds.Till), "The sound board should know the background sounds and the till.");
                     Check(board.Announcements == (50, 50), $"All 50 announcements introducing the acts should be loaded with their files, not {board.Announcements}.");
                     Check(board.Asked(Sounds.Notebook) == 1, "The planning notebook should be heard opening.");
