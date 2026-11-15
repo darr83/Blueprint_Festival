@@ -566,7 +566,7 @@ public partial class SmokeTest : Node
                     Check(game.TicketPrice == 8 && game.HeadlinerPicked == 0, "Clicking a ticket price and a headliner should choose them.");
                     Check(BlueprintFestival.UI.YearScreen.PlanOf(game).Forecast.Contains("chance of rain", StringComparison.Ordinal), "The planning screen should carry the long-range forecast.");
                     var board = SoundBoard.Instance;
-                    Check(board is { Listed: 73 }, "The sound board should be loaded with all 73 sounds on its list.");
+                    Check(board is { Listed: 103 }, "The sound board should be loaded with all 103 sounds on its list.");
                     Check(Sounds.Loops.All(board!.Knows) && board.Knows(Sounds.Till), "The sound board should know the background sounds and the till.");
                     Check(board.Announcements == (50, 50), $"All 50 announcements introducing the acts should be loaded with their files, not {board.Announcements}.");
                     Check(board.Asked(Sounds.Notebook) == 1, "The planning notebook should be heard opening.");

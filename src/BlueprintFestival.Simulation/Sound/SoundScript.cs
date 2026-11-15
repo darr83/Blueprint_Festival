@@ -86,9 +86,40 @@ public static class Sounds
     /// <summary>The PA announcements asking a packed crowd to step back, in a different voice each; they take turns.</summary>
     public static readonly IReadOnlyList<string> StepBack = new[] { StepBack1, StepBack2, StepBack3 };
 
+    public const string BuildLight = "build_light";
+    public const string BuildFairy = "build_fairy";
+    public const string BuildBunting = "build_bunting";
+    public const string BuildScreen = "build_screen";
+    public const string BuildLaunchPad = "build_launch_pad";
+    public const string BuildStraw = "build_straw";
+    public const string BuildBench = "build_bench";
+    public const string BuildDeckchair = "build_deckchair";
+    public const string BuildParasol = "build_parasol";
+    public const string BuildHandWash = "build_hand_wash";
+    public const string BuildHandGel = "build_hand_gel";
+    public const string BuildShadeSail = "build_shade_sail";
+    public const string BuildSign = "build_sign";
+    public const string BuildPlanter = "build_planter";
+    public const string BuildFlag = "build_flag";
+    public const string BuildFirePit = "build_fire_pit";
+    public const string BuildLetters = "build_letters";
+    public const string BuildTape = "build_tape";
+    public const string BuildVip = "build_vip";
+    public const string CoffeeMachine = "coffee_machine";
+    public const string SlushMachine = "slush_machine";
+    public const string CocktailShaker = "cocktail_shaker";
+    public const string IceCreamScoop = "ice_cream_scoop";
+    public const string PizzaBox = "pizza_box";
+    public const string WokSizzle = "wok_sizzle";
+    public const string MerchBag = "merch_bag";
+    public const string ChargePlug = "charge_plug";
+    public const string ChampagnePop = "champagne_pop";
+    public const string BinDrop = "bin_drop";
+    public const string FireCrackle = "amb_fire_pit";
+
     /// <summary>The sounds that play round and round for as long as they are wanted.</summary>
     public static readonly IReadOnlyList<string> Loops =
-        [Day, Night, RainLight, RainHeavy, CrowdSmall, CrowdMedium, CrowdLarge, CrowdQueue, ApplauseLoop];
+        [Day, Night, RainLight, RainHeavy, CrowdSmall, CrowdMedium, CrowdLarge, CrowdQueue, ApplauseLoop, FireCrackle];
 
     /// <summary>
     /// The clapping that goes on under the cheers between songs and at the end of a set. The game
@@ -174,15 +205,25 @@ public sealed class SoundScript : IDisposable
     public static string CheerFor(int watching) => watching < 60 ? Sounds.CheerSmall : watching < 500 ? Sounds.CheerMedium : Sounds.CheerBig;
 
     /// <summary>The sound of someone being served at a stall of this kind.</summary>
-    public static string ServedAt(StallKind kind) => kind switch
+    public static string? ServedAt(StallKind kind) => kind switch
     {
-        StallKind.Coffee => Sounds.TeaCup,
-        StallKind.HotDogs or StallKind.Burgers or StallKind.Fries or StallKind.Pizza or StallKind.Noodles => Sounds.Fry,
-        StallKind.Bar or StallKind.Slush or StallKind.Cocktails => Sounds.PourDrink,
+        StallKind.Coffee => Sounds.CoffeeMachine,
+        StallKind.HotDogs or StallKind.Burgers or StallKind.Fries => Sounds.Fry,
+        StallKind.Pizza => Sounds.PizzaBox,
+        StallKind.Noodles => Sounds.WokSizzle,
+        StallKind.Bar => Sounds.PourDrink,
+        StallKind.Slush => Sounds.SlushMachine,
+        StallKind.Cocktails => Sounds.CocktailShaker,
+        StallKind.IceCream => Sounds.IceCreamScoop,
         StallKind.Ponchos => Sounds.Ponchos,
-        StallKind.IceCream or StallKind.BucketHats or StallKind.Merchandise => Sounds.Till,
+        StallKind.BucketHats or StallKind.Merchandise => Sounds.MerchBag,
+        StallKind.PhoneCharging => Sounds.ChargePlug,
+        StallKind.VipLounge or StallKind.VipPlatform => Sounds.ChampagnePop,
         StallKind.WaterPoint => Sounds.WaterTap,
-        _ => Sounds.ToiletDoor,
+        StallKind.Bin => Sounds.BinDrop,
+        StallKind.Toilets or StallKind.ToiletBlock => Sounds.ToiletDoor,
+        // The first aid and medical tents are heard through the radio instead.
+        _ => null,
     };
 
     /// <summary>
@@ -202,6 +243,10 @@ public sealed class SoundScript : IDisposable
         _levels[Sounds.Night] = (1 - game.Light) * hush;
         _levels[Sounds.RainLight] = rain <= 0.05 ? 0 : Math.Clamp(rain * 2.5, 0.3, 1) * (1 - Math.Clamp((rain - 0.45) / 0.3, 0, 1));
         _levels[Sounds.RainHeavy] = Math.Clamp((rain - 0.45) / 0.3, 0, 1);
+
+        // Fire pits crackle once it is getting dark, more of them a little louder; rain dampens them.
+        var pits = game.Site.Decorations.Count(d => d.Kind == DecorKind.FirePit);
+        _levels[Sounds.FireCrackle] = pits == 0 ? 0 : Math.Clamp(0.5 + (pits * 0.15), 0, 1) * Math.Clamp((0.7 - game.Light) / 0.4, 0, 1) * hush;
 
         var (small, medium, large) = day ? Murmur(game.Crowd.InField) : (0, 0, 0);
         _levels[Sounds.CrowdSmall] = small;
@@ -384,8 +429,12 @@ public sealed class SoundScript : IDisposable
 
     private void OnServed(StallKind kind, int people, int paid)
     {
-        Cue?.Invoke(ServedAt(kind));
-        if (paid > 0 && ServedAt(kind) != Sounds.Till)
+        if (ServedAt(kind) is { } sound)
+        {
+            Cue?.Invoke(sound);
+        }
+
+        if (paid > 0)
         {
             Cue?.Invoke(Sounds.Till);
         }

@@ -686,6 +686,276 @@
       "gap": 3.0,
       "influence": 0.6,
       "prompt": "A big outdoor crowd at night cheering, whooping and clapping loudly at the end of a fireworks display, then the applause dies down. Only people, no fireworks, no music."
+    },
+    {
+      "id": "build_light",
+      "bus": "Effects",
+      "seconds": 1.5,
+      "loop": false,
+      "volume": 0.7,
+      "gap": 0.0,
+      "prompt": "A metal lamp post pushed into the grass with a dull clunk, then a heavy electrical switch clicking on with a faint hum."
+    },
+    {
+      "id": "build_fairy",
+      "bus": "Effects",
+      "seconds": 2,
+      "loop": false,
+      "volume": 0.7,
+      "gap": 0.0,
+      "prompt": "A thin wooden pole tapped into soft ground, then a string of small festoon bulbs jingling gently as the cable is pulled taut."
+    },
+    {
+      "id": "build_bunting",
+      "bus": "Effects",
+      "seconds": 2,
+      "loop": false,
+      "volume": 0.7,
+      "gap": 0.0,
+      "prompt": "Cotton bunting flags fluttering in the breeze as a line of bunting is pulled tight between two poles, a light rope creak."
+    },
+    {
+      "id": "build_screen",
+      "bus": "Effects",
+      "seconds": 2.5,
+      "loop": false,
+      "volume": 0.8,
+      "gap": 0.0,
+      "prompt": "Steel scaffold poles clanking together outdoors as a tower goes up, then a deep speaker thump as a big sound system is switched on."
+    },
+    {
+      "id": "build_launch_pad",
+      "bus": "Effects",
+      "seconds": 2,
+      "loop": false,
+      "volume": 0.8,
+      "gap": 0.0,
+      "prompt": "Heavy wooden crates set down on grass and a metal firework rack clanking into place outdoors."
+    },
+    {
+      "id": "build_straw",
+      "bus": "Effects",
+      "seconds": 1.5,
+      "loop": false,
+      "volume": 0.7,
+      "gap": 0.0,
+      "prompt": "A big bale of straw dropped onto grass with a soft heavy thump and a dry rustle of straw."
+    },
+    {
+      "id": "build_bench",
+      "bus": "Effects",
+      "seconds": 1.5,
+      "loop": false,
+      "volume": 0.7,
+      "gap": 0.0,
+      "prompt": "A heavy wooden picnic bench set down on grass outdoors, a solid wooden knock and creak."
+    },
+    {
+      "id": "build_deckchair",
+      "bus": "Effects",
+      "seconds": 1.5,
+      "loop": false,
+      "volume": 0.7,
+      "gap": 0.0,
+      "prompt": "A striped canvas deckchair being unfolded, wooden frame clacking and the canvas snapping taut."
+    },
+    {
+      "id": "build_parasol",
+      "bus": "Effects",
+      "seconds": 1.5,
+      "loop": false,
+      "volume": 0.7,
+      "gap": 0.0,
+      "prompt": "A large garden parasol being pushed open with a whoosh of fabric and a click as it locks."
+    },
+    {
+      "id": "build_hand_wash",
+      "bus": "Effects",
+      "seconds": 2,
+      "loop": false,
+      "volume": 0.6,
+      "gap": 0.0,
+      "prompt": "A plastic hand washing station set down outdoors, then a foot pump pressed and a short splash of water into a basin."
+    },
+    {
+      "id": "build_hand_gel",
+      "bus": "Effects",
+      "seconds": 1,
+      "loop": false,
+      "volume": 0.6,
+      "gap": 0.0,
+      "prompt": "A plastic dispenser stand set down with a light knock, then one squirt from a hand gel pump."
+    },
+    {
+      "id": "build_shade_sail",
+      "bus": "Effects",
+      "seconds": 2,
+      "loop": false,
+      "volume": 0.7,
+      "gap": 0.0,
+      "prompt": "A large canvas shade sail being stretched out between posts, the canvas snapping taut and ropes creaking."
+    },
+    {
+      "id": "build_sign",
+      "bus": "Effects",
+      "seconds": 1.5,
+      "loop": false,
+      "volume": 0.7,
+      "gap": 0.0,
+      "prompt": "A wooden sign post knocked into the ground with three firm mallet blows outdoors."
+    },
+    {
+      "id": "build_planter",
+      "bus": "Effects",
+      "seconds": 1.5,
+      "loop": false,
+      "volume": 0.7,
+      "gap": 0.0,
+      "prompt": "A big wooden flower planter set down on grass with a heavy thud and a little soil settling."
+    },
+    {
+      "id": "build_flag",
+      "bus": "Effects",
+      "seconds": 2,
+      "loop": false,
+      "volume": 0.7,
+      "gap": 0.0,
+      "prompt": "A flag being hoisted up a tall pole, the rope rattling through the pulley and the flag flapping in a stiff breeze."
+    },
+    {
+      "id": "build_fire_pit",
+      "bus": "Effects",
+      "seconds": 2,
+      "loop": false,
+      "volume": 0.7,
+      "gap": 0.0,
+      "prompt": "A metal fire pit bowl set down, then logs catching light with a soft whoomp and the first crackles of a wood fire."
+    },
+    {
+      "id": "build_letters",
+      "bus": "Effects",
+      "seconds": 1.5,
+      "loop": false,
+      "volume": 0.8,
+      "gap": 0.0,
+      "prompt": "Big hollow letters, as tall as a person, set upright on grass outdoors with hollow plastic thuds."
+    },
+    {
+      "id": "build_tape",
+      "bus": "Effects",
+      "seconds": 1.5,
+      "loop": false,
+      "volume": 0.6,
+      "gap": 0.0,
+      "prompt": "A roll of plastic barrier tape being pulled out fast and tied off, a crinkly unrolling sound outdoors."
+    },
+    {
+      "id": "build_vip",
+      "bus": "Effects",
+      "seconds": 1.5,
+      "loop": false,
+      "volume": 0.6,
+      "gap": 0.0,
+      "prompt": "Chrome rope barrier posts set down and a velvet rope hooked on with a metal clink."
+    },
+    {
+      "id": "coffee_machine",
+      "bus": "Effects",
+      "seconds": 2,
+      "loop": false,
+      "volume": 0.45,
+      "gap": 0.6,
+      "prompt": "An espresso machine at an outdoor coffee van, a short burst of steam wand hissing and a cup set down."
+    },
+    {
+      "id": "slush_machine",
+      "bus": "Effects",
+      "seconds": 2,
+      "loop": false,
+      "volume": 0.45,
+      "gap": 0.6,
+      "prompt": "A slush machine churning and a tap pouring crushed iced drink into a plastic cup."
+    },
+    {
+      "id": "cocktail_shaker",
+      "bus": "Effects",
+      "seconds": 2,
+      "loop": false,
+      "volume": 0.45,
+      "gap": 0.6,
+      "prompt": "A bartender shaking a metal cocktail shaker full of ice, then pouring it into a glass."
+    },
+    {
+      "id": "ice_cream_scoop",
+      "bus": "Effects",
+      "seconds": 1.5,
+      "loop": false,
+      "volume": 0.45,
+      "gap": 0.6,
+      "prompt": "A metal scoop scraping ice cream from a tub and pressing it into a crunchy cone."
+    },
+    {
+      "id": "pizza_box",
+      "bus": "Effects",
+      "seconds": 1.5,
+      "loop": false,
+      "volume": 0.45,
+      "gap": 0.6,
+      "prompt": "A cardboard pizza box flipped open and shut, and a pizza peel sliding out of a wood fired oven."
+    },
+    {
+      "id": "wok_sizzle",
+      "bus": "Effects",
+      "seconds": 2,
+      "loop": false,
+      "volume": 0.45,
+      "gap": 0.6,
+      "prompt": "Noodles tossed in a hot wok, a loud sizzle and a metal spatula scraping."
+    },
+    {
+      "id": "merch_bag",
+      "bus": "Effects",
+      "seconds": 1.5,
+      "loop": false,
+      "volume": 0.45,
+      "gap": 0.6,
+      "prompt": "A paper carrier bag being opened and something soft folded into it, the paper rustling."
+    },
+    {
+      "id": "charge_plug",
+      "bus": "Effects",
+      "seconds": 1,
+      "loop": false,
+      "volume": 0.45,
+      "gap": 0.6,
+      "prompt": "A phone charging cable plugged into a socket with a small click and a short electronic chime."
+    },
+    {
+      "id": "champagne_pop",
+      "bus": "Effects",
+      "seconds": 2,
+      "loop": false,
+      "volume": 0.5,
+      "gap": 0.6,
+      "prompt": "A champagne cork popping, fizz poured into two glasses and the glasses clinking."
+    },
+    {
+      "id": "bin_drop",
+      "bus": "Effects",
+      "seconds": 1,
+      "loop": false,
+      "volume": 0.4,
+      "gap": 0.6,
+      "prompt": "An empty plastic cup and paper wrapper tossed into a wheelie bin, a hollow plastic thunk as the lid drops."
+    },
+    {
+      "id": "amb_fire_pit",
+      "bus": "Ambience",
+      "seconds": 15,
+      "loop": true,
+      "volume": 0.35,
+      "gap": 0.0,
+      "prompt": "A wood fire crackling and popping gently in a metal fire pit outdoors at night. No voices, no music."
     }
   ]
 }

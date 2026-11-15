@@ -96,6 +96,27 @@ public class SoundTests
     }
 
     [Fact]
+    public void Every_stall_but_the_first_aid_and_medical_tents_is_heard_serving()
+    {
+        foreach (var kind in Enum.GetValues<StallKind>())
+        {
+            var sound = SoundScript.ServedAt(kind);
+            if (kind is StallKind.FirstAidTent or StallKind.MedicalTent)
+            {
+                Assert.Null(sound);
+            }
+            else
+            {
+                Assert.NotNull(sound);
+            }
+        }
+
+        Assert.Equal(Sounds.BinDrop, SoundScript.ServedAt(StallKind.Bin));
+        Assert.Equal(Sounds.ToiletDoor, SoundScript.ServedAt(StallKind.ToiletBlock));
+        Assert.Equal(Sounds.ChampagnePop, SoundScript.ServedAt(StallKind.VipLounge));
+    }
+
+    [Fact]
     public void The_murmur_of_the_crowd_grows_with_the_crowd()
     {
         Assert.Equal((0, 0, 0), SoundScript.Murmur(0));
@@ -124,13 +145,13 @@ public class SoundTests
         // Tickets at the gate, and each kind of stall makes its own sound.
         Assert.InRange(heard.Count(h => h == Sounds.GateTicket), 20, 200);
         Assert.DoesNotContain(Sounds.GateTurnstile, heard);
-        foreach (var sound in new[] { Sounds.Fry, Sounds.PourDrink, Sounds.ToiletDoor, Sounds.WaterTap, Sounds.TeaCup, Sounds.Till })
+        foreach (var sound in new[] { Sounds.Fry, Sounds.PourDrink, Sounds.ToiletDoor, Sounds.WaterTap, Sounds.CoffeeMachine, Sounds.Till })
         {
             Assert.Contains(sound, heard);
         }
 
         // Water is free, so the till rings less often than people are served.
-        Assert.True(heard.Count(h => h == Sounds.Till) < heard.Count(h => h is Sounds.Fry or Sounds.PourDrink or Sounds.ToiletDoor or Sounds.WaterTap or Sounds.TeaCup));
+        Assert.True(heard.Count(h => h == Sounds.Till) < heard.Count(h => h is Sounds.Fry or Sounds.PourDrink or Sounds.ToiletDoor or Sounds.WaterTap or Sounds.CoffeeMachine));
 
         // The field by day and by night, and a small crowd; nobody heard rain.
         Assert.Equal(1, loudest[Sounds.Day], 2);
