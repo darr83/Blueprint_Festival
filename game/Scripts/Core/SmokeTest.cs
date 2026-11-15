@@ -414,6 +414,7 @@ public partial class SmokeTest : Node
                     show.ToggleMoney();
                     Check(show.Money.Visible && show.Money.LineCount >= 5, $"The money panel should list the day's takings and spending, not {show.Money.LineCount} lines.");
                     show.ToggleMoney();
+                    CheckDayBoard(show);
                     CheckStageCams(show);
                     show.TogglePause();
                     Check(show.Game.Clock.IsPaused, "Space should pause the game.");
@@ -775,6 +776,26 @@ public partial class SmokeTest : Node
         {
             throw new InvalidOperationException(message);
         }
+    }
+
+    /// <summary>The event day panel opens on the button, shows every tab, and takes the money panel's place.</summary>
+    private void CheckDayBoard(FestivalScene show)
+    {
+        Check(show.DayButton.Visible && !show.DayBoard.Visible, "The day so far button should show on the day, with its panel shut.");
+        show.ToggleDayBoard();
+        Check(show.DayBoard.Visible && !show.Money.Visible, "The day so far panel should open, and the money panel stay shut.");
+        Check(show.DayBoard.Report is { Stages.Count: > 0 } report && report.Stages[0].Sets.Any(s => s.State == Simulation.Show.SetState.OnNow), "The day so far should show the act on now.");
+        show.DayBoard.Show(DayPanel.Tab.Acts);
+        Check(show.DayBoard.RowCount == show.Game.Show.Slots.Count, $"The acts tab should list every set, not {show.DayBoard.RowCount}.");
+        show.DayBoard.Show(DayPanel.Tab.Incidents);
+        Check(show.DayBoard.RowCount == show.Game.DayLog.Count, $"The incidents tab should list everything logged today, not {show.DayBoard.RowCount}.");
+        show.DayBoard.Show(DayPanel.Tab.Money);
+        Check(show.DayBoard.RowCount >= 3, $"The money tab should list money in and out, not {show.DayBoard.RowCount} lines.");
+        show.DayBoard.Show(DayPanel.Tab.People);
+        show.DayBoard.Show(DayPanel.Tab.Overview);
+        show.ToggleMoney();
+        Check(show.Money.Visible && !show.DayBoard.Visible, "Opening the money panel should shut the day so far panel.");
+        show.ToggleMoney();
     }
 
     /// <summary>The two stage camera buttons take over the view, and pressing again or Esc gives the site view back.</summary>

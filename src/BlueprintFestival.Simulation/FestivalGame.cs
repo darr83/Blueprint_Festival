@@ -415,6 +415,7 @@ public sealed partial class FestivalGame
         PricedOut = Crowd.PricedOut,
         SharePence = _sharePence,
         Fireworks = SaveFireworks(),
+        DayLog = Planned ? SaveDayLog() : null,
     };
 
     public static FestivalGame Load(SaveData data)
@@ -473,6 +474,7 @@ public sealed partial class FestivalGame
         game.Crowd.WashedHands = Math.Max(0, data.WashedHands);
         game._sharePence = data.SharePence;
         game.RestoreFireworks(data.Fireworks);
+        game.LoadDayLog(data.DayLog);
 
         return game;
     }
@@ -503,6 +505,9 @@ public sealed record SaveData(int Version, string Name, ClockState Clock, int? S
 
     /// <summary>The day's firework shows and how they went.</summary>
     public FireworksSave? Fireworks { get; init; }
+
+    /// <summary>The day's log and happiness line for the event day panel; null in older saves.</summary>
+    public DayLogSave? DayLog { get; init; }
 
     /// <summary>Where the festival is in its year. Missing from a festival with nothing to plan.</summary>
     public YearSave? Year { get; init; }

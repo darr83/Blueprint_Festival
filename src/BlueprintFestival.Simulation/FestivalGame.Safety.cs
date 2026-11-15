@@ -70,6 +70,21 @@ public sealed partial class FestivalGame
     private bool _leftAlone;
     private DateTime _pausedUntil;
     private bool _wasRed;
+    private DayNote? _crushNote;
+    private const string WaitingForChoice = "Waiting for your choice";
+
+    /// <summary>Writes the player's choice against the crush on the day's log.</summary>
+    private void Chose(string what)
+    {
+        if (_crushNote is { } note)
+        {
+            (note.Outcome, note.Tone) = (what, DayTone.Open);
+        }
+        else
+        {
+            Note(DayNoteKind.Choice, what, "", DayTone.Plain);
+        }
+    }
 
     /// <summary>How crowded every part of the map is.</summary>
     public DensityMap Density => Crowd.Density;
@@ -313,6 +328,7 @@ public sealed partial class FestivalGame
             }
         }
 
+        Chose("You stopped the music for an announcement");
         Announced?.Invoke(ActsPaused);
         ActsPaused++;
         _handled = true;
@@ -402,6 +418,7 @@ public sealed partial class FestivalGame
         {
             Spend("Security overtime", Overtime * going.Count);
             SecuritySent++;
+            Chose($"You sent {going.Count} security in");
             _handled = true;
         }
 
@@ -435,6 +452,7 @@ public sealed partial class FestivalGame
         show.CutShort(slot.Index, Now);
         _cutShort[slot.Index] = Now;
         ActsCancelled++;
+        Chose($"You cancelled {slot.Act.Name}");
         _handled = true;
         ActCancelled?.Invoke(slot);
         return true;
@@ -453,6 +471,7 @@ public sealed partial class FestivalGame
 
         _leftAlone = true;
         TimesLeftAlone++;
+        Chose("You left it alone");
         return true;
     }
 
@@ -470,6 +489,16 @@ public sealed partial class FestivalGame
         {
             // The crush is over: the next one is a fresh choice.
             _redMinutes.Clear();
+            if (_crushNote is { Tone: DayTone.Open, Outcome: WaitingForChoice } eased)
+            {
+                (eased.Outcome, eased.Tone) = ("Eased off by itself", DayTone.Good);
+            }
+            else if (_crushNote is { } over && over.Tone == DayTone.Open)
+            {
+                over.Tone = DayTone.Good;
+            }
+
+            _crushNote = null;
             _wasRed = false;
             _handled = false;
             _leftAlone = false;
@@ -502,6 +531,7 @@ public sealed partial class FestivalGame
                     // unless security are right there and already lifting people out.
                     _wasRed = true;
                     var (wx, wy) = DensityMap.CentreOf(sx, sy);
+                    _crushNote = Note(DayNoteKind.Crush, $"Crowd too tight {Whereabouts(wx, wy)}".TrimEnd(), WaitingForChoice, DayTone.Open);
                     CrushWarning?.Invoke(wx, wy);
                 }
 
@@ -554,7 +584,7 @@ public sealed partial class FestivalGame
         }
 
         Crowd.TakeIll(party);
-        _incidents.Add(new Incident(_nextIncident++, IncidentKind.Ill, party.X, party.Y, party.Id, now) { Crush = true });
+        Raise(new Incident(_nextIncident++, IncidentKind.Ill, party.X, party.Y, party.Id, now) { Crush = true }, DayNoteKind.Hurt, "Hurt in a crush");
         CrushInjuries++;
         if (!_handled)
         {
@@ -567,6 +597,7 @@ public sealed partial class FestivalGame
         {
             // Too many people hurt: the music stops and everyone is sent home.
             SeriousIncident = true;
+            Note(DayNoteKind.CalledOff, "The day was called off", $"{CrushInjuries} hurt in crushes: everyone sent home", DayTone.Bad);
             Show.CallOff(now);
             SecondShow.CallOff(now);
             Crowd.SendEveryoneHome(now, 0.25);

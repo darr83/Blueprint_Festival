@@ -99,7 +99,7 @@ public partial class YearScreen : Control
 
         if (_side is not null)
         {
-            _side.Visible = !_scene.Money.Visible;
+            _side.Visible = !_scene.Money.Visible && !_scene.DayBoard.Visible;
         }
     }
 
