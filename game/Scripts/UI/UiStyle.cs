@@ -87,6 +87,7 @@ public static class UiStyle
         ["stall"] = "<path d='M3 9l2-5h14l2 5'/><path d='M3 9a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0'/><path d='M5 12v9h14v-9'/>",
         ["staff"] = "<circle cx='12' cy='7' r='4'/><path d='M4 21v-2a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v2'/>",
         ["light"] = "<path d='M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.8.8 1 1.5 1 2.5h6c0-1 .2-1.7 1-2.5A6 6 0 0 0 12 3z'/>",
+        ["screen"] = "<rect x='3' y='4' width='18' height='12' rx='1'/><path d='M8 20h8M12 16v4'/>",
         ["ground"] = "<path d='M3 19c3-2 5-2 9 0s6 2 9 0M3 14c3-2 5-2 9 0s6 2 9 0M3 9c3-2 5-2 9 0s6 2 9 0'/>",
         ["remove"] = "<path d='M4 7h16M10 11v6M14 11v6M5 7l1 13h12l1-13M9 7V4h6v3'/>",
         ["pause"] = "<path d='M9 5v14M15 5v14'/>",

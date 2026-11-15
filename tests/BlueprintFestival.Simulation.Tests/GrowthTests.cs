@@ -5,6 +5,7 @@ using BlueprintFestival.Simulation.World;
 
 namespace BlueprintFestival.Simulation.Tests;
 
+[Collection(BigDays.Name)]
 public class GrowthTests
 {
     /// <summary>

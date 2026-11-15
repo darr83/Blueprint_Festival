@@ -132,7 +132,7 @@ public partial class SmokeTest : Node
                     var gap = opened.Game.Field.Gap;
                     Check(opened.TopBar.MoneyText == "£2,000", $"A new festival should have £2,000, not {opened.TopBar.MoneyText}.");
                     opened.BuildBar.Toggle(BuildMode.Stage);
-                    Check(opened.BuildBar.ChoiceCount == 4, "The build bar should offer four stages.");
+                    Check(opened.BuildBar.ChoiceCount == 7, "The build bar should offer four stages and three big screens.");
                     Check(opened.BuildBar.Choose("stageBandstand"), "The bandstand should be on the build bar.");
                     Check(opened.Build.Mode == BuildMode.Stage, "Choosing a stage should hand it to the mouse.");
                     opened.Build.ShowGhost(new TilePoint(grass.X + 70, grass.Y + 18));
@@ -204,6 +204,20 @@ public partial class SmokeTest : Node
                     Check(opened.Lights.Strength == 0 && site.LitAt(new TilePoint(grass.X + 80, grass.Y + 62)) == 1, "The lights should be off by day, and light the ground round them.");
                     opened.BuildBar.Toggle(BuildMode.Remove);
                     Check(opened.Build.ClickAt(tower).Ok && opened.Build.ClickAt(strungTo).Ok && site.Lights.Count == 0 && site.FairyLights.Count == 0, "Taking down a light or a pole should give the money back.");
+
+                    // Big screens: on the Stages group, clicked down, drawn with the nearest stage on the picture.
+                    opened.BuildBar.Toggle(BuildMode.Stage);
+                    Check(opened.BuildBar.Choose(UI.BuildBar.ScreenKey(ScreenKind.Small)) && opened.Build.Mode == BuildMode.Screen, "The small screen should be on the Stages group.");
+                    var screenAt = new TilePoint(grass.X + 70, grass.Y + 64);
+                    opened.Build.ShowGhost(screenAt);
+                    Check(opened.Build.Status.Contains("£250"), $"The bar should show what a small screen costs, not '{opened.Build.Status}'.");
+                    Check(opened.Build.ClickAt(screenAt).Ok && site.Screens.Count == 1, "A small screen should go up on the grass.");
+                    opened.Screens.Rebuild();
+                    Check(opened.Screens.ScreenCount == 1 && opened.Screens.FeedCount == 1, "The screen should be drawn, with the stage's camera feeding it.");
+                    opened.BuildBar.Toggle(BuildMode.Remove);
+                    Check(opened.Build.ClickAt(screenAt).Ok && site.Screens.Count == 0, "Taking a screen down should give the money back.");
+                    opened.Screens.Rebuild();
+                    Check(opened.Screens.ScreenCount == 0 && opened.Screens.FeedCount == 0, "With the screen gone nothing should be filming for it.");
                     opened.BuildBar.Close();
                     Check(opened.Build.Mode == BuildMode.None, "Closing the bar should put the tool down.");
                     Check(opened.Game.Money == 1554 - 120 - 200 - 40, $"The money should add up after the stalls, not be £{opened.Game.Money}.");
