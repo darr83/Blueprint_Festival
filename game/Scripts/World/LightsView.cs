@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using BlueprintFestival.Core;
 using BlueprintFestival.Simulation;
 using BlueprintFestival.Simulation.Site;
 using BlueprintFestival.Simulation.World;
@@ -19,6 +20,12 @@ public partial class LightsView : Node3D
     /// <summary>The most real lamps lit at once, so a site covered in lights still draws quickly. The rest still glow.</summary>
     public const int MostLamps = 160;
 
+    /// <summary>The most lamps that throw shadows at once: the floodlights nearest the front of the list. Shadows from every lamp would be slow.</summary>
+    public const int MostShadowLamps = 6;
+
+    /// <summary>How much brighter than white a bulb is drawn at night, so it has a soft glow round it.</summary>
+    public const float BulbGlow = 3.2f;
+
     private static readonly Color Steel = new("#8E979C");
     private static readonly Color DarkSteel = new("#4A5358");
     private static readonly Color Wood = new("#8A6A45");
@@ -28,6 +35,7 @@ public partial class LightsView : Node3D
     private static readonly Color[] FairyColours = { new("#E94F7B"), new("#F6B93B"), new("#FFF1C9"), new("#2FD7E8"), new("#8BD46A") };
 
     private readonly List<(Light3D Light, float Full)> _lamps = new();
+    private readonly List<Light3D> _shadowLamps = new();
     private FestivalGame _game = null!;
     private StandardMaterial3D _glow = null!;
     private Node3D _rig = null!;
@@ -42,8 +50,14 @@ public partial class LightsView : Node3D
     /// <summary>How many fairy light poles are drawn: a pole two strings share is drawn once.</summary>
     public int PoleCount { get; private set; }
 
-    /// <summary>How many real lamps there are to light the ground.</summary>
-    public int LampCount => _lamps.Count;
+    /// <summary>How many stalls have a lamp of their own after dark.</summary>
+    public int StallLampCount { get; private set; }
+
+    /// <summary>How many lamps are throwing shadows right now.</summary>
+    public int ShadowLampCount => _shadowLamps.Count(l => l.ShadowEnabled);
+
+    /// <summary>How many real lamps the player's lights have to light the ground, not counting the stalls' own.</summary>
+    public int LampCount => _lamps.Count - StallLampCount;
 
     /// <summary>How brightly the lights are on: 0 by day, 1 at night.</summary>
     public float Strength { get; private set; }
@@ -53,10 +67,23 @@ public partial class LightsView : Node3D
         _game = game;
         _glow = GlowMaterial();
         game.Site.Changed += MarkStale;
+        Graphics.Changed += FollowSettings;
         Rebuild();
     }
 
-    public override void _ExitTree() => _game.Site.Changed -= MarkStale;
+    public override void _ExitTree()
+    {
+        _game.Site.Changed -= MarkStale;
+        Graphics.Changed -= FollowSettings;
+    }
+
+    private void FollowSettings()
+    {
+        foreach (var lamp in _shadowLamps)
+        {
+            lamp.ShadowEnabled = Graphics.Shadows;
+        }
+    }
 
     private void MarkStale() => _stale = true;
 
@@ -84,7 +111,7 @@ public partial class LightsView : Node3D
     {
         // They are switched on a little before it is fully dark.
         Strength = Mathf.Clamp((1f - (float)_game.Light) * 1.4f, 0f, 1f);
-        var grey = Mathf.Lerp(0.72f, 1f, Strength);
+        var grey = Mathf.Lerp(0.72f, BulbGlow, Strength * Strength);
         _glow.AlbedoColor = new Color(grey, grey, grey);
         _rig.Visible = Strength > 0.01f;
         foreach (var (light, full) in _lamps)
@@ -239,6 +266,7 @@ public partial class LightsView : Node3D
         }
 
         _lamps.Clear();
+        _shadowLamps.Clear();
         _rig = new Node3D { Name = "Lamps" };
         var site = _game.Site;
         var (frame, glow) = (new MeshBuilder(), new MeshBuilder());
@@ -250,12 +278,27 @@ public partial class LightsView : Node3D
             if (light.Kind == LightKind.Floodlight)
             {
                 AddFloodlight(frame, glow, at);
-                Lamp(new OmniLight3D { LightColor = new Color("#EEF4FF"), OmniRange = 25f, OmniAttenuation = 0.7f, Position = at + new Vector3(0, TowerHeight, 0) }, 5f);
+                var flood = new OmniLight3D
+                {
+                    LightColor = new Color("#EAF2FF"),
+                    OmniRange = 30f,
+                    OmniAttenuation = 0.6f,
+                    OmniShadowMode = OmniLight3D.ShadowMode.DualParaboloid,
+                    ShadowBias = 0.08f,
+                    ShadowBlur = 1.6f,
+                    ShadowOpacity = 0.8f,
+                    Position = at + new Vector3(0, TowerHeight + 0.3f, 0),
+                };
+                Lamp(flood, 7f);
+                if (_shadowLamps.Count < MostShadowLamps && flood.GetParent() is not null)
+                {
+                    _shadowLamps.Add(flood);
+                }
             }
             else
             {
                 AddPathLight(frame, glow, at);
-                Lamp(new OmniLight3D { LightColor = new Color("#FFD9A0"), OmniRange = 6.5f, Position = at + new Vector3(0, 1.5f, 0) }, 1.6f);
+                Lamp(new OmniLight3D { LightColor = new Color("#FFD9A0"), OmniRange = 7.5f, OmniAttenuation = 0.8f, Position = at + new Vector3(0, 1.5f, 0) }, 2.0f);
             }
         }
 
@@ -276,10 +319,25 @@ public partial class LightsView : Node3D
             {
                 var (a, b) = (Middle(own[i - 1]), Middle(own[i]));
                 AddString(frame, glow, a, b, strings + i);
-                Lamp(new OmniLight3D { LightColor = new Color("#FFD2A8"), OmniRange = 7f, Position = Hang(a, b, 0.5f) }, 1.3f);
+                Lamp(new OmniLight3D { LightColor = new Color("#FFD2A8"), OmniRange = 8f, OmniAttenuation = 0.8f, Position = Hang(a, b, 0.5f) }, 1.7f);
             }
 
             strings++;
+        }
+
+        // Every stall has a lamp of its own under the awning, so the bar and the food van glow after dark.
+        StallLampCount = 0;
+        foreach (var stall in site.Stalls)
+        {
+            if (stall.Kind == StallKind.WaterPoint)
+            {
+                continue;
+            }
+
+            var before = _lamps.Count;
+            var toilets = stall.Kind == StallKind.Toilets;
+            Lamp(new OmniLight3D { LightColor = toilets ? new Color("#DCEBFF") : new Color("#FFC98A"), OmniRange = 7f, OmniAttenuation = 0.9f, Position = SiteView.Middle(stall.Rect) + new Vector3(0, 2.6f, 0) + (Basis.FromEuler(new Vector3(0, Mathf.DegToRad(SiteView.Turn(stall.Facing)), 0)) * new Vector3(0, 0, 1.4f)) }, toilets ? 1.6f : 2.6f);
+            StallLampCount += _lamps.Count - before;
         }
 
         AddChild(Pair(frame, glow, _glow, "Lights"));
@@ -287,6 +345,7 @@ public partial class LightsView : Node3D
         LightCount = site.Lights.Count;
         StringCount = strings;
         PoleCount = poles.Count;
+        FollowSettings();
         Sync();
     }
 

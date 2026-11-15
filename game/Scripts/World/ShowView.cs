@@ -1,5 +1,7 @@
 using System.Collections.Generic;
+using System.Linq;
 using BlueprintFestival.Audio;
+using BlueprintFestival.Core;
 using BlueprintFestival.Simulation;
 using BlueprintFestival.Simulation.Show;
 using BlueprintFestival.Simulation.Site;
@@ -17,7 +19,41 @@ public partial class ShowView : Node3D
     private readonly List<BandMember> _band = new();
     private readonly StageBeat _beat = new();
     private readonly List<(Light3D Light, float Full)> _lights = new();
-    private readonly List<(StandardMaterial3D Material, Color Colour)> _beams = new();
+    private readonly List<Light3D> _shadowSpots = new();
+
+    /// <summary>How many stage lights are throwing shadows right now.</summary>
+    public int ShadowSpotCount => _shadowSpots.Count(l => l.ShadowEnabled);
+
+    private void FollowSettings()
+    {
+        foreach (var spot in _shadowSpots)
+        {
+            spot.ShadowEnabled = Graphics.Shadows;
+        }
+    }
+    private readonly List<(ShaderMaterial Material, Color Colour)> _beams = new();
+    private static Shader? _beamShader;
+
+    /// <summary>How a beam of stage light is drawn: light added to the picture, fading along its length and towards its edges.</summary>
+    private static Shader BeamShader => _beamShader ??= new Shader
+    {
+        Code = """
+            shader_type spatial;
+            render_mode unshaded, blend_add, cull_disabled, depth_draw_never, shadows_disabled;
+            uniform vec4 colour : source_color = vec4(1.0);
+            uniform float strength = 0.0;
+            void fragment() {
+                // Down the side of the cone the picture runs from 0 at the lamp to 0.5 at the far end.
+                float along = clamp(UV.y * 2.0, 0.0, 1.0);
+                float edge = abs(dot(normalize(NORMAL), normalize(VIEW)));
+                ALBEDO = colour.rgb * 1.6;
+                ALPHA = strength * pow(edge, 1.4) * pow(1.0 - along, 1.6);
+            }
+            """,
+    };
+
+    /// <summary>How bright the beams in the air are drawn at full strength.</summary>
+    public const float BeamStrength = 0.55f;
     private FestivalGame _game = null!;
     private Node3D _acts = null!;
     private Node3D _rig = null!;
@@ -53,8 +89,11 @@ public partial class ShowView : Node3D
         AddChild(_acts);
         _rig = new Node3D { Name = "Lights" };
         AddChild(_rig);
+        Graphics.Changed += FollowSettings;
         Sync(0);
     }
+
+    public override void _ExitTree() => Graphics.Changed -= FollowSettings;
 
     public override void _Process(double delta) => Sync(delta);
 
@@ -137,9 +176,9 @@ public partial class ShowView : Node3D
             light.LightEnergy = full * LightStrength;
         }
 
-        foreach (var (material, colour) in _beams)
+        foreach (var (material, _) in _beams)
         {
-            material.AlbedoColor = new Color(colour, 0.4f * LightStrength);
+            material.SetShaderParameter("strength", BeamStrength * LightStrength);
         }
 
         // The band plays to the music unless the game is paused.
@@ -187,6 +226,7 @@ public partial class ShowView : Node3D
         }
 
         _lights.Clear();
+        _shadowSpots.Clear();
         _beams.Clear();
         if (stage is null)
         {
@@ -212,27 +252,24 @@ public partial class ShowView : Node3D
         {
             var x = (i - 2) * 1.9f * k;
             var from = new Vector3(x, 6.3f * k, 2.6f * k);
-            var spot = new SpotLight3D { LightColor = colours[i], SpotRange = 14f * k, SpotAngle = 32f, ShadowEnabled = false, Position = from };
+            var spot = new SpotLight3D { LightColor = colours[i], SpotRange = 14f * k, SpotAngle = 32f, ShadowEnabled = Graphics.Shadows, ShadowBias = 0.1f, ShadowBlur = 1.5f, Position = from };
+            _shadowSpots.Add(spot);
             Add(spot, 9f * k);
             spot.LookAtFromPosition(from, new Vector3(x * 0.8f, 1.3f * k, 0.2f), Vector3.Up);
 
-            // A beam through the haze, pointing out over the crowd.
-            var material = new StandardMaterial3D
-            {
-                ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
-                Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
-                BlendMode = BaseMaterial3D.BlendModeEnum.Add,
-                AlbedoColor = new Color(colours[i], 0f),
-                CullMode = BaseMaterial3D.CullModeEnum.Disabled,
-            };
+            // A beam through the haze, pointing out over the crowd: bright at the lamp, fading to
+            // nothing at the far end, and soft at the edges.
+            var material = new ShaderMaterial { Shader = BeamShader };
+            material.SetShaderParameter("colour", colours[i]);
+            material.SetShaderParameter("strength", 0f);
             var tilt = new Vector3(-52, (i - 2) * 16, 0);
             _rig.AddChild(new MeshInstance3D
             {
-                Mesh = new CylinderMesh { TopRadius = 0.08f * k, BottomRadius = 1.3f * k, Height = 11f * k, RadialSegments = 12, Rings = 1 },
+                Mesh = new CylinderMesh { TopRadius = 0.08f * k, BottomRadius = 1.5f * k, Height = 12f * k, RadialSegments = 20, Rings = 1, CapTop = false, CapBottom = false },
                 MaterialOverride = material,
                 CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
                 RotationDegrees = tilt,
-                Position = from + (Basis.FromEuler(tilt * (Mathf.Pi / 180f)) * new Vector3(0, -5.5f * k, 0)) + new Vector3(0, 0.2f, 0.5f),
+                Position = from + (Basis.FromEuler(tilt * (Mathf.Pi / 180f)) * new Vector3(0, -6f * k, 0)) + new Vector3(0, 0.2f, 0.5f),
             });
             _beams.Add((material, colours[i]));
         }
