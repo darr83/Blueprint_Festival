@@ -37,25 +37,78 @@ public static partial class SiteProps
     private const float SkylarkArm = 11.4f;
 
     /// <summary>A fairground ride or the hook a duck stall, as it stands.</summary>
-    public static Node3D Ride(RideKind kind) => kind switch
+    public static Node3D Ride(StallKind kind)
     {
-        RideKind.BigWheel => BigWheel(),
-        RideKind.Waltzer => Waltzer(),
-        RideKind.Twister => Twister(),
-        RideKind.Carousel => Carousel(),
-        RideKind.Skylark => Skylark(),
-        _ => HookADuck(),
+        var ride = kind switch
+        {
+            StallKind.BigWheel => BigWheel(),
+            StallKind.Waltzer => Waltzer(),
+            StallKind.Twister => Twister(),
+            StallKind.Carousel => Carousel(),
+            StallKind.Skylark => Skylark(),
+            _ => HookADuck(),
+        };
+
+        // Steps and pay boxes stick out at the front: slide the ride back so the whole of it sits on its ground.
+        var slide = RideSlide(kind);
+        if (slide == 0)
+        {
+            return ride;
+        }
+
+        var node = new Node3D { Name = ride.Name };
+        ride.Name = "Ride";
+        ride.Position = new Vector3(0, 0, slide);
+        node.AddChild(ride);
+        return node;
+    }
+
+    private static float RideSlide(StallKind kind) => kind switch
+    {
+        StallKind.BigWheel => -0.9f,
+        StallKind.Skylark => -0.6f,
+        StallKind.Waltzer => -0.2f,
+        _ => 0,
     };
+
+    /// <summary>Where the attendant stands, in the pay box (beside the stall, at hook a duck).</summary>
+    private static Vector3[]? RideStaff(StallKind kind) => kind switch
+    {
+        StallKind.BigWheel => new[] { new Vector3(-7.6f, 0.8f, 1.5f + RideSlide(kind)) },
+        StallKind.Waltzer => new[] { new Vector3(0, 0.75f, 1.6f + RideSlide(kind)) },
+        StallKind.Twister => new[] { new Vector3(2.85f, 0, 6.72f) },
+        StallKind.Carousel => new[] { new Vector3(-4.6f, 0, 4.4f) },
+        StallKind.Skylark => new[] { new Vector3(-4.9f, 0.9f, -1.9f + RideSlide(kind)) },
+        StallKind.HookADuck => new[] { new Vector3(-2.75f, 0, 2.0f) },
+        _ => null,
+    };
+
+    /// <summary>Every place to sit on a ride, in the order the rules number them: four to each party.</summary>
+    public static void RideSeats(Node node, System.Collections.Generic.List<Node3D> found)
+    {
+        foreach (var child in node.GetChildren())
+        {
+            var name = child.Name.ToString();
+            if (child is Node3D seat && name.StartsWith("Seat", StringComparison.Ordinal) && !name.StartsWith("Seats", StringComparison.Ordinal))
+            {
+                found.Add(seat);
+            }
+            else
+            {
+                RideSeats(child, found);
+            }
+        }
+    }
 
     /// <summary>
     /// Puts a ride's moving parts where they are a number of seconds into a ride. The same seconds
     /// always give the same picture, so the ride can be drawn from the game clock.
     /// </summary>
-    public static void TurnRide(Node3D ride, RideKind kind, float seconds)
+    public static void TurnRide(Node3D ride, StallKind kind, float seconds)
     {
         switch (kind)
         {
-            case RideKind.BigWheel:
+            case StallKind.BigWheel:
             {
                 var turn = seconds * 0.22f;
                 if (ride.FindChild("Wheel", true, false) is Node3D wheel)
@@ -73,7 +126,7 @@ public static partial class SiteProps
                 break;
             }
 
-            case RideKind.Carousel:
+            case StallKind.Carousel:
             {
                 if (ride.FindChild("Turntable", true, false) is Node3D table)
                 {
@@ -92,7 +145,7 @@ public static partial class SiteProps
                 break;
             }
 
-            case RideKind.Waltzer:
+            case StallKind.Waltzer:
             {
                 if (ride.FindChild("Turntable", true, false) is Node3D table)
                 {
@@ -112,7 +165,7 @@ public static partial class SiteProps
                 break;
             }
 
-            case RideKind.Twister:
+            case StallKind.Twister:
             {
                 if (ride.FindChild("Spinner", true, false) is Node3D spinner)
                 {
@@ -129,7 +182,7 @@ public static partial class SiteProps
                 break;
             }
 
-            case RideKind.Skylark:
+            case StallKind.Skylark:
             {
                 if (ride.FindChild("Arm", true, false) is Node3D arm)
                 {
@@ -326,7 +379,7 @@ public static partial class SiteProps
         Steps(b, new Vector3(0, 0, 3.5f), 2.6f, deck, 3);
         Rail(b, new Vector3(-8.4f, deck, 2.5f), new Vector3(-1.5f, deck, 2.5f), FairPink);
         Rail(b, new Vector3(1.5f, deck, 2.5f), new Vector3(8.4f, deck, 2.5f), FairPink);
-        PayBox(b, node, new Vector3(-9.6f, 0, 1.6f));
+        PayBox(b, node, new Vector3(-7.6f, deck, 1.5f));
 
         // Two A-frames carry the axle.
         foreach (var z in new[] { -1.25f, 1.25f })
@@ -586,7 +639,7 @@ public static partial class SiteProps
         return node;
     }
 
-    /// <summary>A round tub with a high curved back, open to +Z. Three sit along the back.</summary>
+    /// <summary>A round tub with a high curved back, open to +Z. Four sit along the back.</summary>
     private static Node3D WaltzerCar(Color colour)
     {
         var car = new Node3D();
@@ -609,9 +662,12 @@ public static partial class SiteProps
         SunflowerBadge(b, new Vector3(0, 1.0f, -1.08f), 0.8f, 180);
         b.Tube(new Vector3(0, 0.95f, 0.45f), new Vector3(0.06f, 1.5f, 0.06f), FairSteel, new Vector3(0, 0, 90));
         car.AddChild(b.BuildNode("Shapes"));
-        car.AddChild(Seat("Seat0", new Vector3(0, 0.32f, -0.6f)));
-        car.AddChild(Seat("Seat1", new Vector3(-0.58f, 0.32f, -0.22f), 55));
-        car.AddChild(Seat("Seat2", new Vector3(0.58f, 0.32f, -0.22f), -55));
+        for (var i = 0; i < 4; i++)
+        {
+            // Four along the bench, each looking in to the middle.
+            var a = Mathf.DegToRad(204 + (44f * i));
+            car.AddChild(Seat($"Seat{i}", new Vector3(0.6f * MathF.Cos(a), 0.32f, 0.6f * MathF.Sin(a)), Mathf.RadToDeg(MathF.Atan2(-MathF.Cos(a), -MathF.Sin(a)))));
+        }
         return car;
     }
 
@@ -629,8 +685,8 @@ public static partial class SiteProps
         const int posts = 22;
         for (var i = 0; i < posts; i++)
         {
-            var from = Mathf.DegToRad(105 + (330f * i / posts));
-            var to = Mathf.DegToRad(105 + (330f * (i + 1) / posts));
+            var from = Mathf.DegToRad(105 + (315f * i / posts));
+            var to = Mathf.DegToRad(105 + (315f * (i + 1) / posts));
             Rail(b, new Vector3(edge * MathF.Cos(from), 0.24f, edge * MathF.Sin(from)), new Vector3(edge * MathF.Cos(to), 0.24f, edge * MathF.Sin(to)), i % 2 == 0 ? FairPink : FairYellow, 1.0f);
         }
 
@@ -644,7 +700,7 @@ public static partial class SiteProps
         b.Box(new Vector3(0, 3.5f, edge - 0.22f), new Vector3(4.3f, 0.82f, 0.14f), new Color("#1F8E82"));
         Painted(node, "Twister", new Vector3(0, 3.5f, edge - 0.14f), 4.0f, 0.72f, FairCream);
         Bulbs(b, new Vector3(-2.15f, 4.08f, edge - 0.15f), new Vector3(2.15f, 4.08f, edge - 0.15f), 12);
-        PayBox(b, node, new Vector3(3.6f, 0, edge + 0.3f));
+        PayBox(b, node, new Vector3(2.85f, 0, 6.72f));
 
         // The middle it all turns on.
         b.Cone(new Vector3(0, 0.95f, 0), new Vector3(2.6f, 1.45f, 2.6f), FairPink);
@@ -749,7 +805,7 @@ public static partial class SiteProps
         Rail(b, new Vector3(-3.3f, deck, 3.2f), new Vector3(3.3f, deck, 3.2f), FairPink);
         Rail(b, new Vector3(-5.9f, deck, 3.2f), new Vector3(-5.9f, deck, -3.2f), FairPink);
         Rail(b, new Vector3(5.9f, deck, 3.2f), new Vector3(5.9f, deck, -3.2f), FairPink);
-        PayBox(b, node, new Vector3(-7.4f, 0, 3.6f));
+        PayBox(b, node, new Vector3(-4.9f, deck, -1.9f));
 
         // Painted boards along the back: a summer sky with sunflowers and larks.
         for (var i = 0; i < 3; i++)
@@ -1001,13 +1057,7 @@ public static partial class SiteProps
         b.Ball(At(0, 0.56f, 0.21f), 0.06f * size, FairPinkDark);
     }
 
-    /// <summary>A teddy won at hook a duck, hugged to the chest by whoever carries it.</summary>
-    public static MeshInstance3D WonTeddy(int pick)
-    {
-        var b = new MeshBuilder();
-        Teddy(b, Vector3.Zero, 0.62f, TeddyFurs[((pick % TeddyFurs.Length) + TeddyFurs.Length) % TeddyFurs.Length]);
-        var node = b.BuildNode("Teddy");
-        node.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
-        return node;
-    }
+    /// <summary>A teddy won at hook a duck, sat on the hand of whoever carries it.</summary>
+    public static void WonTeddy(MeshBuilder b, Vector3 foot, int pick) =>
+        Teddy(b, foot, 0.42f, TeddyFurs[((pick % TeddyFurs.Length) + TeddyFurs.Length) % TeddyFurs.Length]);
 }

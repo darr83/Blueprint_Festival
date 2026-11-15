@@ -37,6 +37,7 @@ public partial class BuildBar : VBoxContainer
         StallGroup.Drink => "Drink",
         StallGroup.Other => "Ponchos, hats and merchandise",
         StallGroup.Vip => "VIP",
+        StallGroup.Fair => "Fairground",
         _ => "Toilets, water and bins",
     };
 
@@ -155,7 +156,7 @@ public partial class BuildBar : VBoxContainer
         _choicePanel.AddChild(shelves);
         _shelfRow = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center, Visible = false };
         _shelfRow.AddThemeConstantOverride("separation", 6);
-        foreach (var group in new[] { StallGroup.Food, StallGroup.Drink, StallGroup.Other, StallGroup.Services, StallGroup.Vip })
+        foreach (var group in new[] { StallGroup.Food, StallGroup.Drink, StallGroup.Other, StallGroup.Fair, StallGroup.Services, StallGroup.Vip })
         {
             var chip = UiStyle.ChipButton(ShelfName(group), () => ShowShelf(group), Sounds.Tab);
             chip.ToggleMode = true;
@@ -398,7 +399,9 @@ public partial class BuildBar : VBoxContainer
         foreach (var s in Catalogue.StallsIn(Shelf))
         {
             var menu = Catalogue.MenuOf(s.Kind);
-            var sells = menu.Count > 0
+            var sells = Rides.IsFair(s.Kind)
+                ? $"{menu[0].Name} costs £{menu[0].UsualPrice} to start with.\nOnce it is up, click it to set the price. It cannot go in a camping field."
+                : menu.Count > 0
                 ? $"Sells {string.Join(", ", menu.Select(m => $"{m.Name.ToLowerInvariant()} £{m.UsualPrice}"))}.\nOnce it is up, click it to set its prices."
                 : s.Kind == StallKind.Bin ? "" : "Free to use.";
             AddChoice($"stall{s.Kind}", s.Name, $"£{s.Cost:N0}", $"{s.About}\n{sells}\n{s.Width / 2f:0.#} m wide, {s.Depth / 2f:0.#} m deep. R turns it.", () => _tool.PickStall(s.Kind));

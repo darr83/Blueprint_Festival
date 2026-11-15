@@ -77,7 +77,13 @@ public class StallMenuTests
         foreach (var kind in Enum.GetValues<StallKind>())
         {
             var menu = Catalogue.MenuOf(kind);
-            Assert.Equal(Selling.Contains(kind), Catalogue.Sells(kind));
+            Assert.Equal(Selling.Contains(kind) || Rides.IsFair(kind), Catalogue.Sells(kind));
+            if (Rides.IsFair(kind))
+            {
+                // The fairground has its own tests.
+                continue;
+            }
+
             if (!Catalogue.Sells(kind))
             {
                 Assert.Empty(menu);

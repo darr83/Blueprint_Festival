@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using BlueprintFestival.Simulation;
 using BlueprintFestival.Simulation.Site;
 using BlueprintFestival.Simulation.World;
@@ -76,6 +77,7 @@ public partial class SiteView : Node3D
         }
 
         Doors((float)delta, snap: false);
+        TurnRides((float)delta, snap: false);
 
         // Fire pits glow as the daylight goes.
         if (_glows.Count > 0)
@@ -84,6 +86,82 @@ public partial class SiteView : Node3D
             foreach (var glow in _glows)
             {
                 glow.LightEnergy = energy;
+            }
+        }
+    }
+
+    /// <summary>One ride as it is drawn: its model, its seats, and how long it has spent going round (in seconds as watched at 1x).</summary>
+    private sealed class RideOnSite
+    {
+        public RideOnSite(int stall, PlacedStall placed, Node3D node, System.Collections.Generic.List<Node3D> seats)
+        {
+            (Stall, Placed, Node, Seats) = (stall, placed, node, seats);
+        }
+
+        public int Stall { get; }
+
+        public PlacedStall Placed { get; }
+
+        public Node3D Node { get; }
+
+        public System.Collections.Generic.List<Node3D> Seats { get; }
+
+        public float Turned { get; set; }
+
+        public float Shown { get; set; }
+
+        public bool Running { get; set; }
+    }
+
+    private readonly System.Collections.Generic.List<RideOnSite> _rides = new();
+    private readonly System.Collections.Generic.Dictionary<(int, int), float> _turning = new();
+    private System.DateTime _ridesAt;
+
+    /// <summary>How many rides are going round with people on them just now.</summary>
+    public int RidesRunning => _rides.Count(r => r.Running);
+
+    /// <summary>The rides that are going round just now, for the sound of them: what each is and where its middle is.</summary>
+    public System.Collections.Generic.IEnumerable<(StallKind Kind, Vector3 At, bool Running, int Riders)> RideSounds =>
+        _rides.Select(r => (r.Placed.Kind, r.Node.GlobalPosition, r.Running, _game.Crowd.Riding(r.Stall)));
+
+    /// <summary>Where one seat of a ride is just now, or null if there is no such ride.</summary>
+    public Transform3D? RideSeat(int stall, int seat)
+    {
+        foreach (var ride in _rides)
+        {
+            if (ride.Stall == stall && ride.Seats.Count > 0)
+            {
+                return ride.Seats[((seat % ride.Seats.Count) + ride.Seats.Count) % ride.Seats.Count].GlobalTransform;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Turns each ride on from where it had got to. A ride goes round while the rules say it is
+    /// running and somebody is on it, and stands still to let people off and on.
+    /// </summary>
+    public void TurnRides(float delta, bool snap)
+    {
+        var now = _game.Now;
+        var passed = (float)System.Math.Clamp((now - _ridesAt).TotalSeconds, 0, 240) / (float)Simulation.Core.GameClock.GameSecondsPerRealSecond;
+        _ridesAt = now;
+        foreach (var ride in _rides)
+        {
+            ride.Running = _game.Phase == Phase.Day && !Rides.TurnAt(ride.Placed, now).Boarding && _game.Crowd.Riding(ride.Stall) > 0;
+            if (ride.Running)
+            {
+                ride.Turned += passed;
+                _turning[(ride.Placed.X, ride.Placed.Y)] = ride.Turned;
+            }
+
+            // The clock moves in whole seconds: ease after it so the ride goes round smoothly.
+            var shown = snap ? ride.Turned : Mathf.Lerp(ride.Shown, ride.Turned, 1f - Mathf.Exp(-delta * 5f));
+            if (shown != ride.Shown || snap)
+            {
+                ride.Shown = shown;
+                SiteProps.TurnRide(ride.Node, ride.Placed.Kind, shown);
             }
         }
     }
@@ -185,6 +263,7 @@ public partial class SiteView : Node3D
         }
 
         _toilets.Clear();
+        _rides.Clear();
         _bins.Clear();
         _shutBars.Clear();
         _doorHeld.Clear();
@@ -218,6 +297,14 @@ public partial class SiteView : Node3D
             }
 
             AddChild(node);
+            if (Rides.IsRide(stall.Kind))
+            {
+                var seats = new System.Collections.Generic.List<Node3D>();
+                SiteProps.RideSeats(node, seats);
+                _turning.TryGetValue((stall.X, stall.Y), out var turned);
+                _rides.Add(new RideOnSite(i, stall, node, seats) { Turned = turned, Shown = turned });
+            }
+
             if (stall.Kind == StallKind.Bin)
             {
                 _bins.Add((stall, node.GetNode<Node3D>("Rubbish")));
@@ -308,6 +395,7 @@ public partial class SiteView : Node3D
 
         LaneCount = site.Lanes.Count;
 
+        TurnRides(0, snap: true);
         Doors(0, snap: true);
         StageCount = site.Stages.Count;
         GateCount = site.Gates.Count;

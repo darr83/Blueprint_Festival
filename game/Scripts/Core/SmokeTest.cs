@@ -176,6 +176,19 @@ public partial class SmokeTest : Node
                     Check(opened.BuildBar.ChoiceCount == 4, "The drink shelf should offer the bar, coffee, slush and cocktails.");
                     opened.BuildBar.ShowShelf(StallGroup.Other);
                     Check(opened.BuildBar.ChoiceCount == 4, "The third shelf should offer ponchos, hats, merchandise and phone charging.");
+                    opened.BuildBar.ShowShelf(StallGroup.Fair);
+                    Check(opened.BuildBar.ChoiceCount == 6, "The fairground shelf should offer five rides and hook a duck.");
+                    foreach (var fair in Catalogue.StallsIn(StallGroup.Fair))
+                    {
+                        // Every ride can be drawn, has seats for each party it takes, and turns without a hitch.
+                        var model = World.SiteProps.Stall(fair.Kind);
+                        var seats = new System.Collections.Generic.List<Node3D>();
+                        World.SiteProps.RideSeats(model, seats);
+                        World.SiteProps.TurnRide(model, fair.Kind, 12.5f);
+                        Check(seats.Count >= (Rides.IsRide(fair.Kind) ? fair.Servers * Rides.SeatsEach : 0), $"The {fair.Name} should seat {fair.Servers * Rides.SeatsEach}, not {seats.Count}.");
+                        model.Free();
+                    }
+
                     opened.BuildBar.ShowShelf(StallGroup.Services);
                     Check(opened.BuildBar.ChoiceCount == 4, "The last shelf should offer two sizes of toilets, the water point and the litter bin.");
                     Check(opened.BuildBar.Choose("stallBurgers") && opened.Build.Mode == BuildMode.Stall && opened.BuildBar.Shelf == StallGroup.Food, "The burger van should be on the build bar, on the food shelf.");

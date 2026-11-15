@@ -111,6 +111,24 @@ public enum StallKind
 
     /// <summary>A raised deck with glass rails and steps at the back, for VIP guests to watch a stage from.</summary>
     VipPlatform,
+
+    /// <summary>A fairground big wheel with twelve hanging cars.</summary>
+    BigWheel,
+
+    /// <summary>A fairground waltzer: spinning tubs on a turning floor under a striped roof.</summary>
+    Waltzer,
+
+    /// <summary>A fairground twister: three arms, each whirling four cars.</summary>
+    Twister,
+
+    /// <summary>A carousel of galloping horses.</summary>
+    Carousel,
+
+    /// <summary>A tall tower with a long arm that swings right over, a row of seats at each end.</summary>
+    Skylark,
+
+    /// <summary>A round stall with ducks to hook from the water, and big teddies to win.</summary>
+    HookADuck,
 }
 
 /// <summary>Which shelf of the build bar a stall is on.</summary>
@@ -123,6 +141,9 @@ public enum StallGroup
 
     /// <summary>The VIP lounge and the VIP viewing platform.</summary>
     Vip,
+
+    /// <summary>The fairground rides and hook a duck.</summary>
+    Fair,
 }
 
 /// <summary>What someone has in their hand after buying something.</summary>
@@ -143,6 +164,9 @@ public enum Carried
 
     /// <summary>A carrier bag of merchandise. It is kept all day.</summary>
     Bag,
+
+    /// <summary>A big teddy won at hook a duck. It is kept all day.</summary>
+    Teddy,
 }
 
 /// <summary>What buying something puts on the buyer, if anything.</summary>
@@ -269,6 +293,12 @@ public static class Catalogue
         new StallInfo(StallKind.PhoneCharging, "Phone charging tent", 6, 6, 120, null, 0, 30, 2, "Lockers to charge a phone in. More people want one as the day goes on."),
         new StallInfo(StallKind.VipLounge, "VIP lounge", 16, 12, 600, Need.Drink, 0, 30, 2, "A white marquee with sofas and its own bar. Only VIP guests go in, and they expect one."),
         new StallInfo(StallKind.VipPlatform, "VIP viewing platform", 12, 8, 300, null, 0, 0, 0, "A raised deck with glass rails. VIP guests watch the nearest stage from it, over everyone's heads."),
+        new StallInfo(StallKind.BigWheel, "Big wheel", 36, 14, 500, null, 0, 0, 6, "Twelve cars going slowly round, high over the field. Families love it."),
+        new StallInfo(StallKind.Waltzer, "Waltzer", 32, 32, 400, null, 0, 0, 8, "Spinning tubs on a turning floor. One for the teenagers and the grown-ups."),
+        new StallInfo(StallKind.Twister, "Twister", 32, 32, 350, null, 0, 0, 6, "Three arms, each whirling four cars round and round."),
+        new StallInfo(StallKind.Carousel, "Carousel", 22, 22, 250, null, 0, 0, 4, "Galloping horses under a striped roof. The children's favourite."),
+        new StallInfo(StallKind.Skylark, "Skylark", 26, 16, 600, null, 0, 0, 2, "A tall tower with a long arm that swings right over the top, four seats at each end. Not for little ones."),
+        new StallInfo(StallKind.HookADuck, "Hook a duck", 14, 14, 80, null, 0, 40, 4, "Hook a duck from the water. About one go in four wins a big teddy to carry round."),
     };
 
     private static readonly IReadOnlyList<StallItem> NothingToSell = Array.Empty<StallItem>();
@@ -361,6 +391,12 @@ public static class Catalogue
             new StallItem("Poster", 6, Carried.Bag, 0),
             new StallItem("Programme", 4, Carried.Bag, 0),
         },
+        [StallKind.BigWheel] = new[] { new StallItem("A ride", 3, Carried.None, 0) },
+        [StallKind.Waltzer] = new[] { new StallItem("A ride", 3, Carried.None, 0) },
+        [StallKind.Twister] = new[] { new StallItem("A ride", 3, Carried.None, 0) },
+        [StallKind.Carousel] = new[] { new StallItem("A ride", 2, Carried.None, 0) },
+        [StallKind.Skylark] = new[] { new StallItem("A ride", 4, Carried.None, 0) },
+        [StallKind.HookADuck] = new[] { new StallItem("A go", 3, Carried.None, 0) },
         [StallKind.VipLounge] = new[]
         {
             new StallItem("Glass of fizz", 9, Carried.Cocktail, AdultsOnly: true),
@@ -391,6 +427,7 @@ public static class Catalogue
         StallKind.Bar or StallKind.Coffee or StallKind.Slush or StallKind.Cocktails => StallGroup.Drink,
         StallKind.Ponchos or StallKind.BucketHats or StallKind.Merchandise or StallKind.PhoneCharging => StallGroup.Other,
         StallKind.VipLounge or StallKind.VipPlatform => StallGroup.Vip,
+        StallKind.BigWheel or StallKind.Waltzer or StallKind.Twister or StallKind.Carousel or StallKind.Skylark or StallKind.HookADuck => StallGroup.Fair,
         _ => StallGroup.Services,
     };
 
@@ -404,6 +441,7 @@ public static class Catalogue
         StallKind.Ponchos, StallKind.BucketHats, StallKind.Merchandise, StallKind.PhoneCharging,
         StallKind.Toilets, StallKind.ToiletBlock, StallKind.WaterPoint, StallKind.Bin,
         StallKind.VipLounge, StallKind.VipPlatform,
+        StallKind.Carousel, StallKind.BigWheel, StallKind.Waltzer, StallKind.Twister, StallKind.Skylark, StallKind.HookADuck,
     };
 
     /// <summary>True for the things only VIP guests may use, whatever the player sets.</summary>

@@ -583,11 +583,17 @@ public sealed partial class SiteLayout
     public BuildCheck CheckStall(StallKind kind, int x, int y, Facing facing)
     {
         var stall = new PlacedStall(kind, x, y, facing);
+        var fair = Rides.IsFair(kind);
         foreach (var p in TilesOf(stall.Rect))
         {
+            if (fair && _map.UseAt(p) == FieldUse.Camping)
+            {
+                return BuildCheck.No("The fairground cannot go in a camping field.");
+            }
+
             if (!_map.Rented(p) || !IsBuildable(p))
             {
-                return BuildCheck.No("A stall must stand on the grass inside the hedge.");
+                return BuildCheck.No(fair ? "It must stand on the grass inside the hedge." : "A stall must stand on the grass inside the hedge.");
             }
 
             if (!IsEmpty(p))

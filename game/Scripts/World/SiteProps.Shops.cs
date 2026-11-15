@@ -622,6 +622,9 @@ public static partial class SiteProps
         var up = new Vector3(0, 0.05f, 0.03f);
         switch (item)
         {
+            case Carried.Teddy:
+                WonTeddy(b, up, seed);
+                break;
             case Carried.Pint:
                 b.Tube(up + new Vector3(0, 0.1f, 0), new Vector3(0.11f, 0.2f, 0.11f), new Color("#E3A02C"));
                 b.Tube(up + new Vector3(0, 0.215f, 0), new Vector3(0.115f, 0.04f, 0.115f), Canvas);
