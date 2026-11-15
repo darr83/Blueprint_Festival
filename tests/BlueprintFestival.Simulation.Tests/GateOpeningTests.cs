@@ -156,4 +156,54 @@ public class GateOpeningTests
         Assert.False(again.GatesShut);
         Assert.Equal(loaded.GatesOpenedAt, again.GatesOpenedAt);
     }
+
+    [Fact]
+    public void A_fence_that_stops_short_of_the_hedge_is_found_and_nobody_walks_through_a_shut_gate()
+    {
+        var game = FestivalGame.NewFestival("Larkmoor Festival");
+        game.ChooseHeadliner(0);
+        Assert.True(game.ConfirmPlan());
+        var gap = game.Field.Gap;
+        var y = gap.Y + 1;
+
+        // The fence stops one tile short of the hedge, so the gate is not the only way in.
+        Assert.True(game.BuildFence(FenceKind.Rope, new TilePoint(gap.X, y), new TilePoint(gap.Right - 2, y)).Ok);
+        var width = Catalogue.Of(GateKind.VillageGate).Width;
+        var gx = gap.X + ((gap.Width - width) / 2);
+        Assert.True(game.BuildGate(GateKind.VillageGate, gx, y, false).Ok);
+        Assert.True(game.HireStaff(StaffKind.TicketStaff, new TilePoint(gx + 1, y)).Ok);
+        Assert.True(game.Site.OpenWayIn);
+        Assert.Equal(new TilePoint(gap.Right - 1, y), game.Site.GapInTheFence);
+
+        game.StartDay();
+        var onTheGate = 0;
+        while (game.Now.TimeOfDay < TimeSpan.FromHours(9))
+        {
+            game.Clock.Step();
+            onTheGate += game.Crowd.Parties.Count(p => p.IsOnSite && game.Site.GateAt(FieldMap.TileAt(p.X, p.Y)) is not null);
+        }
+
+        // People find the hole and get in free, but none of them walks through the shut gate.
+        Assert.True(game.Crowd.WalkedInFree > 0);
+        Assert.Equal(0, onTheGate);
+
+        // Fenced right up to the hedge, the gap is gone and people queue for the gate instead.
+        Assert.True(game.BuildFence(FenceKind.Rope, new TilePoint(gap.Right - 1, y), new TilePoint(gap.Right - 1, y)).Ok);
+        Assert.False(game.Site.OpenWayIn);
+        Assert.Null(game.Site.GapInTheFence);
+    }
+
+    [Fact]
+    public void A_whole_fence_has_no_gap_and_the_gates_are_open_to_the_public_again_after_the_day()
+    {
+        var game = BuildDay();
+        Assert.Null(game.Site.GapInTheFence);
+        game.StartDay();
+        var gate = game.Site.Gates[0].Rect;
+        var tile = new TilePoint(gate.X + 1, gate.Y);
+        Assert.False(game.Field.IsWalkable(tile));
+        Assert.True(game.Field.IsWalkableForStaff(tile));
+        game.OpenGates();
+        Assert.True(game.Field.IsWalkable(tile));
+    }
 }

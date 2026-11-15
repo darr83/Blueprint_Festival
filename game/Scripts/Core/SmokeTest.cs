@@ -152,7 +152,13 @@ public partial class SmokeTest : Node
 
                     opened.BuildBar.Toggle(BuildMode.Fence);
                     Check(opened.BuildBar.ChoiceCount == 7 && opened.BuildBar.Choose("fencePaling"), "The build bar should offer four fences, the queue lane, the no-customers mark and VIP ground.");
-                    Check(opened.Build.DragFence(new TilePoint(gap.X, gap.Y + 1), new TilePoint(gap.Right - 1, gap.Y + 1)).Ok, "A fence should close the gap.");
+                    Check(opened.Build.DragFence(new TilePoint(gap.X, gap.Y + 1), new TilePoint(gap.Right - 3, gap.Y + 1)).Ok, "A fence should go most of the way across the gap.");
+                    opened._Process(0);
+                    Check(opened.GapButton.Visible && site.GapInTheFence is not null, "A fence short of the hedge should be shown as a gap in the fence.");
+                    opened.LookAtGap();
+                    Check(opened.Build.DragFence(new TilePoint(gap.Right - 2, gap.Y + 1), new TilePoint(gap.Right - 1, gap.Y + 1)).Ok, "A fence should close the gap.");
+                    opened._Process(0);
+                    Check(!opened.GapButton.Visible && site.GapInTheFence is null, "With the gap closed there should be no gap warning.");
                     Check(!site.OpenWayIn, "With the gap fenced there should be no way in.");
 
                     opened.BuildBar.Toggle(BuildMode.Gate);

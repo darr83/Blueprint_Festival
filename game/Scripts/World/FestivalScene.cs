@@ -82,6 +82,12 @@ public partial class FestivalScene : Node3D
     /// <summary>The button under the festival's name that opens the event day panel.</summary>
     public Button DayButton { get; private set; } = null!;
 
+    /// <summary>
+    /// Shown while the fence has a gap in it, so people can get in without going through a gate:
+    /// "Gap in the fence", and clicking it takes the camera to the gap.
+    /// </summary>
+    public Button GapButton { get; private set; } = null!;
+
     public FestivalSounds Sounds { get; private set; } = null!;
 
     public CampView Camp { get; private set; } = null!;
@@ -235,6 +241,13 @@ public partial class FestivalScene : Node3D
         DayButton.TooltipText = "Everything about the day at a glance: the acts, how people feel, incidents and money";
         _hud.AddChild(DayButton);
         DayButton.Position = new Vector2(22, UiStyle.TopClear - 2);
+        GapButton = UiStyle.Button("Gap in the fence: people can walk in without a ticket. Show me", LookAtGap);
+        GapButton.Name = "GapButton";
+        GapButton.Theme = UiStyle.Theme;
+        GapButton.Modulate = new Color(1f, 0.82f, 0.62f);
+        GapButton.TooltipText = "The gates are not the only way in. Close the gap with fence so everyone has to show a ticket.";
+        GapButton.Visible = false;
+        _hud.AddChild(GapButton);
         Year = new YearScreen { Name = "YearScreen" };
         _hud.AddChild(Year);
         Year.Initialise(Game, this);
@@ -275,6 +288,27 @@ public partial class FestivalScene : Node3D
     /// The day so far button sits under the festival name, or, while the gates are shut and the
     /// "Open the gates" button is there, just to the right of that, so neither covers the other.
     /// </summary>
+    /// <summary>Points the camera at the gap in the fence.</summary>
+    public void LookAtGap()
+    {
+        if (Game.Site.GapInTheFence is { } gap)
+        {
+            var (x, y) = Simulation.World.FieldMap.CentreOf(gap);
+            Camera.LookAt((float)x, (float)y, 18f);
+        }
+    }
+
+    private void PlaceGapButton()
+    {
+        GapButton.Visible = Game.CanBuild && Game.Site.GapInTheFence is not null && !Year.HasCentrePanel;
+        if (GapButton.Visible)
+        {
+            var screen = GetViewport().GetVisibleRect().Size;
+            var top = TopBar.SkipButton.Visible ? TopBar.SkipButton.Position.Y + TopBar.SkipButton.Size.Y + 10 : UiStyle.TopClear + 6;
+            GapButton.Position = new Vector2((screen.X - GapButton.Size.X) / 2, top);
+        }
+    }
+
     private void PlaceDayButton()
     {
         var gates = TopBar.GateButton;
@@ -290,6 +324,7 @@ public partial class FestivalScene : Node3D
         CrowdSafety.RightInset = Money.Visible ? Money.Size.X + 14 : DayBoard.Visible ? DayBoard.Size.X + 14 : 0;
         DayButton.Visible = Game.Phase is Phase.Day or Phase.Tidy && !Year.HasCentrePanel;
         PlaceDayButton();
+        PlaceGapButton();
         DayBoard.BuildBarTop = BuildBar.Visible ? BuildBar.Top : null;
         Money.BuildBarTop = DayBoard.BuildBarTop;
         if (!DayButton.Visible && DayBoard.Visible)
