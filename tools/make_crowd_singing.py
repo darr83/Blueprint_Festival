@@ -38,7 +38,7 @@ VOICES = 16
 MOST_LATE_MS = 160
 LOUDNESS = -16
 CROWD_NOISE = Path(__file__).resolve().parent.parent / "game" / "Audio" / "crowd_large.ogg"
-NOISE_LEVEL = 0.35
+NOISE_LEVEL = 0.08
 
 
 def is_song(path):
@@ -80,11 +80,11 @@ def crowd_filter(seed, noise):
         parts.append(
             f"[v{i}]rubberband=pitch={2 ** (semitones / 12):.5f}:formant=preserved,"
             f"rubberband=pitch={formant:.4f},rubberband=pitch={1 / formant:.4f}:formant=shifted,"
-            f"adelay={late:.0f},lowpass=f={rng.uniform(2200, 4200):.0f},"
+            f"adelay={late:.0f},lowpass=f={rng.uniform(3200, 5500):.0f},"
             f"pan=stereo|c0={left:.3f}*c0|c1={right:.3f}*c0[c{i}]")
     parts.append("".join(f"[c{i}]" for i in range(VOICES)) + f"amix=inputs={VOICES}:normalize=0,"
-                 "highpass=f=150,lowpass=f=3200,"
-                 "aecho=0.8:0.5:90|180|290:0.3|0.2|0.12,"
+                 "highpass=f=150,lowpass=f=5000,"
+                 "aecho=0.8:0.6:90|180|290:0.22|0.14|0.08,"
                  "acompressor=threshold=-24dB:ratio=4:attack=30:release=300[sung]")
     if noise:
         parts.append(f"[1:a]aformat=sample_rates=44100:channel_layouts=stereo,volume={NOISE_LEVEL}[noise]")
