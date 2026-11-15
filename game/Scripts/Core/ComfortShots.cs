@@ -96,7 +96,7 @@ public partial class ComfortShots : Node
     }
 
     /// <summary>Builds the festival the pictures are taken of, through the game's own rules.</summary>
-    public static void Build(FestivalGame game)
+    public static void Build(FestivalGame game, bool signs = false)
     {
         var f = game.Field.Field;
         var gap = game.Field.Gap;
@@ -142,7 +142,12 @@ public partial class ComfortShots : Node
         game.BuildComfort(ComfortKind.HandGel, f.X + 60, f.Y + 10, Facing.South);
 
         // A marquee, a lawn with deckchairs and a sail, straw bales, and the charging tent.
-        game.BuildComfort(ComfortKind.SeatingMarquee, f.X + 46, f.Y + 24, Facing.South);
+        if (!signs)
+        {
+            // Left out of the sign pictures, to leave money for the signs.
+            game.BuildComfort(ComfortKind.SeatingMarquee, f.X + 46, f.Y + 24, Facing.South);
+        }
+
         for (var column = 2; column <= 7; column++)
         {
             for (var row = 11; row <= 13; row++)
