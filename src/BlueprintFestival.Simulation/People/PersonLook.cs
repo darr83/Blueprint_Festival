@@ -19,6 +19,12 @@ public enum HairStyle
     Bun,
     Afro,
     Curly,
+
+    /// <summary>A big mane past the shoulders, for metal and rock stars.</summary>
+    Mane,
+
+    /// <summary>Short at the sides with a swept-up front.</summary>
+    Quiff,
 }
 
 public enum TopStyle
@@ -29,6 +35,9 @@ public enum TopStyle
     Hoodie,
     Stripes,
     Dress,
+
+    /// <summary>A long-sleeved checked shirt; the check is <see cref="PersonLook.TopDetail"/>.</summary>
+    Check,
 }
 
 public enum LegStyle
@@ -53,6 +62,12 @@ public enum Hat
     Cowboy,
     Cap,
     Sunhat,
+
+    /// <summary>A woolly hat pulled down.</summary>
+    Beanie,
+
+    /// <summary>A cap worn with the peak at the back.</summary>
+    CapBackwards,
 }
 
 /// <summary>
@@ -102,6 +117,21 @@ public sealed record PersonLook
     public Hat Hat { get; init; } = Hat.None;
 
     public string HatColour { get; init; } = "#F6B93B";
+
+    /// <summary>The colour of an open jacket worn over the top, or null for none.</summary>
+    public string? Jacket { get; init; }
+
+    /// <summary>Little shining dots over the top or jacket (a stage outfit), or null for none.</summary>
+    public string? Sparkles { get; init; }
+
+    /// <summary>Dungarees: a bib and straps over the top, the colour of the trousers.</summary>
+    public bool Dungarees { get; init; }
+
+    /// <summary>The colour of a chain worn round the neck, or null for none.</summary>
+    public string? Chain { get; init; }
+
+    /// <summary>The colour of headphones worn over the head (a DJ's), or null for none.</summary>
+    public string? Headphones { get; init; }
 
     /// <summary>The colour of a rain poncho worn over everything, or null when not wearing one.</summary>
     public string? Poncho { get; init; }

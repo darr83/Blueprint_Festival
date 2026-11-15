@@ -41,9 +41,10 @@ public class LookGeneratorTests
     {
         Assert.True(Crowd.Select(p => p.Skin).Distinct().Count() >= 6);
         Assert.True(Crowd.Select(p => p.TopColour).Distinct().Count() >= 14);
-        Assert.Equal(Enum.GetValues<HairStyle>().Length, Crowd.Select(p => p.Hair).Distinct().Count());
-        Assert.Equal(Enum.GetValues<TopStyle>().Length, Crowd.Select(p => p.Top).Distinct().Count());
-        Assert.Equal(Enum.GetValues<Hat>().Length, Crowd.Select(p => p.Hat).Distinct().Count());
+        // Every style but the ones kept for the stars on stage (see StarLooks).
+        Assert.Equal(Enum.GetValues<HairStyle>().Length - 2, Crowd.Select(p => p.Hair).Distinct().Count());
+        Assert.Equal(Enum.GetValues<TopStyle>().Length - 1, Crowd.Select(p => p.Top).Distinct().Count());
+        Assert.Equal(Enum.GetValues<Hat>().Length - 2, Crowd.Select(p => p.Hat).Distinct().Count());
         Assert.Equal(Enum.GetValues<Footwear>().Length, Crowd.Select(p => p.Feet).Distinct().Count());
 
         // In any twenty people standing together, no two should be dressed exactly alike.
