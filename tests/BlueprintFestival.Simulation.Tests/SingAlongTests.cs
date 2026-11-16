@@ -96,6 +96,32 @@ public class SingAlongTests
     }
 
     [Fact]
+    public void Now_and_then_the_artist_stops_singing_and_leaves_a_chorus_to_the_crowd()
+    {
+        var chorus = new Chorus(60, 90);
+        var left = Enumerable.Range(0, 10_000).Select(roll => SingAlong.LeftToTheCrowd(roll, chorus)).ToList();
+        var taken = left.Where(l => l is not null).Select(l => l!.Value).ToList();
+
+        Assert.InRange(taken.Count, 1000, 2000);
+        Assert.All(taken, l => Assert.InRange(l.Length, SingAlong.LeftShortest, SingAlong.LeftLongest));
+        Assert.All(taken, l => Assert.True(l.Start >= 63 && l.End <= 89, "Once the crowd is all in, and done before the chorus ends."));
+        Assert.Equal(left[123], SingAlong.LeftToTheCrowd(123, chorus));
+        Assert.All(Enumerable.Range(0, 2000), roll => Assert.Null(SingAlong.LeftToTheCrowd(roll, new Chorus(60, 67))));
+    }
+
+    [Fact]
+    public void The_artists_voice_fades_out_for_the_crowd_and_back_in()
+    {
+        var left = new[] { new Chorus(70, 77) };
+
+        Assert.Equal(0, SingAlong.LeftLevel(left, 65));
+        Assert.InRange(SingAlong.LeftLevel(left, 70.3), 0.3, 0.7);
+        Assert.Equal(1, SingAlong.LeftLevel(left, 74));
+        Assert.Equal(0, SingAlong.LeftLevel(left, 78));
+        Assert.Equal(0, SingAlong.LeftLevel(Array.Empty<Chorus>(), 74));
+    }
+
+    [Fact]
     public void A_happy_crowd_sings_and_a_fed_up_one_does_not()
     {
         Assert.Equal(0, SingAlong.Share(30, 3_000_000));

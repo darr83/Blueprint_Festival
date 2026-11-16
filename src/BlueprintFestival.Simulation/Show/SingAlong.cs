@@ -68,6 +68,61 @@ public static class SingAlong
     /// <summary>How loud the crowd singing is, from 0 to 1, for this many people singing.</summary>
     public static double Loudness(int singers) => singers <= 0 ? 0 : Math.Clamp(Math.Sqrt(singers / 350.0), 0.12, 1);
 
+    /// <summary>How often a chorus is left to the crowd: the artist and the music stop for a few seconds and only the crowd sings.</summary>
+    public const double LeftToTheCrowdChance = 0.15;
+
+    /// <summary>The shortest and longest the artist leaves the singing to the crowd, in seconds.</summary>
+    public const double LeftShortest = 5;
+
+    /// <inheritdoc cref="LeftShortest"/>
+    public const double LeftLongest = 10;
+
+    /// <summary>How long the music takes to drop out, and to come back in, in seconds.</summary>
+    public const double LeftFadeSeconds = 0.6;
+
+    /// <summary>
+    /// Whether the artist and the band stop in this chorus and leave it to the crowd, and when: about one
+    /// chorus in seven, for five to ten seconds, once the whole crowd has come in and ending a second before
+    /// the chorus does. Null if not, or if the chorus is too short. The same roll always gives the same answer.
+    /// </summary>
+    /// <param name="roll">A number picked at random each time the song is played, so it is not always the same chorus.</param>
+    /// <param name="chorus">The chorus.</param>
+    public static Chorus? LeftToTheCrowd(int roll, Chorus chorus)
+    {
+        if ((Roll(roll, 5) % 1000) / 1000.0 >= LeftToTheCrowdChance)
+        {
+            return null;
+        }
+
+        var from = chorus.Start + SpreadSeconds;
+        var to = chorus.End - 1;
+        if (to - from < LeftShortest)
+        {
+            return null;
+        }
+
+        var length = Math.Min(LeftShortest + ((Roll(roll, 6) % 1000) / 1000.0 * (LeftLongest - LeftShortest)), to - from);
+        var start = from + ((Roll(roll, 7) % 1000) / 1000.0 * (to - from - length));
+        return new Chorus(start, start + length);
+    }
+
+    /// <summary>
+    /// How far the music has dropped out, from 0 (playing) to 1 (only the crowd), this many seconds into
+    /// the song, for the stretches left to the crowd. The song keeps going underneath, so it comes back in time.
+    /// </summary>
+    public static double LeftLevel(IEnumerable<Chorus> left, double seconds)
+    {
+        ArgumentNullException.ThrowIfNull(left);
+        var level = 0.0;
+        foreach (var stretch in left)
+        {
+            var into = Math.Min(seconds - stretch.Start, stretch.End - seconds);
+            level = Math.Max(level, Math.Clamp(into / LeftFadeSeconds, 0, 1));
+        }
+
+        return level;
+    }
+
     private static int Roll(int person, int question)
     {
         unchecked
