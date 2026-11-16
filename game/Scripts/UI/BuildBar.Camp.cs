@@ -37,13 +37,16 @@ public partial class BuildBar
             AddChoice(CampKey(zone), CampLayout.Name(zone), "Free", $"{CampLayout.About(zone)}\nDrag over camping ground to mark it. Start on ground marked this way to clear it.", () => _tool.PickCampZone(zone));
         }
 
-        foreach (var kind in new[] { StallKind.ShowerBlock, StallKind.CampInfo, StallKind.CampShop, StallKind.ToiletBlock, StallKind.WaterPoint })
+        foreach (var kind in new[] { StallKind.ShowerBlock, StallKind.CampInfo, StallKind.CampShop, StallKind.FirePit, StallKind.ToiletBlock, StallKind.WaterPoint })
         {
             var s = Catalogue.Of(kind);
             var menu = Catalogue.MenuOf(kind);
             var sells = menu.Count > 0 ? $"Sells {string.Join(", ", menu.Select(m => $"{m.Name.ToLowerInvariant()} £{m.UsualPrice}"))}. Click it once it is up to set its prices." : "Free to use.";
             AddChoice($"stall{kind}", s.Name, $"£{s.Cost:N0}", $"{s.About}\n{sells}\n{s.Width / 2f:0.#} m wide, {s.Depth / 2f:0.#} m deep. R turns it.", () => _tool.PickStall(kind));
         }
+
+        var steward = Catalogue.Of(StaffKind.CampSteward);
+        AddChoice($"staff{StaffKind.CampSteward}", steward.Name, $"£{steward.Wage:N0} a day", $"{steward.About}\nSecurity posted in a camping field walk the tents at night too, and stop thieves.", () => _tool.PickStaff(StaffKind.CampSteward));
     }
 
     /// <summary>Fills in the camp's checks while the Camping group is open, and hides them otherwise.</summary>

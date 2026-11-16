@@ -1109,9 +1109,21 @@ public sealed partial class Crowd
     /// <summary>How many campers have turned in for the night.</summary>
     public int InTents => _parties.Where(p => p.Camper && p.Ticketed == true && p.State == PartyState.Gone).Sum(p => p.Members.Count);
 
-    /// <summary>The tents that are up: where, and whose (for a colour that stays the same).</summary>
+    /// <summary>The tents that are up: where, and whose (for a colour that stays the same). A tent packed away in the morning is gone.</summary>
     public IEnumerable<(TilePoint Pitch, int Party)> Tents =>
+        _parties.Where(p => p.Camper && p.Ticketed == true && !_struck.Contains(p.Id)).Select(p => (p.Pitch!.Value, p.Id));
+
+    /// <summary>Every tent that was put up today, packed away since or not.</summary>
+    public IEnumerable<(TilePoint Pitch, int Party)> Pitched =>
         _parties.Where(p => p.Camper && p.Ticketed == true).Select(p => (p.Pitch!.Value, p.Id));
+
+    private readonly HashSet<int> _struck = new();
+
+    /// <summary>Takes a party's tent down: packed away in the morning, or cleared once it was left behind.</summary>
+    internal void StrikeTent(int party) => _struck.Add(party);
+
+    /// <summary>The parties whose tents have been taken down.</summary>
+    internal IReadOnlyCollection<int> Struck => _struck;
 
     /// <summary>A camper has come through the gate and paid for their pitch.</summary>
     public event Action<int>? CamperArrived;
@@ -1122,6 +1134,7 @@ public sealed partial class Crowd
     /// </summary>
     public void PitchCamp()
     {
+        _struck.Clear();
         foreach (var party in _parties)
         {
             party.Pitch = null;

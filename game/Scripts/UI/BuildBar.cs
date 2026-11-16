@@ -529,6 +529,8 @@ public partial class BuildBar : VBoxContainer
             : k == "stallshowerblock" ? ("shower", UiStyle.StagePink)
             : k is "stallcampinfo" or "stallcampshop" ? ("bag", UiStyle.StagePink)
             : k == "campfirelane" ? ("lane", UiStyle.StagePink)
+            : k == "stallfirepit" ? ("fire", UiStyle.StagePink)
+            : k == "staffcampsteward" ? ("torch", UiStyle.StagePink)
             : k.StartsWith("camp") ? ("tent", UiStyle.StagePink)
             : k.StartsWith("stage") ? ("stage", UiStyle.StagePink)
             : k.StartsWith("fence") ? ("fence", UiStyle.StagePink)

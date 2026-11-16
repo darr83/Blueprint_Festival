@@ -457,6 +457,7 @@ public sealed partial class FestivalGame
         SharePence = _sharePence,
         Fireworks = SaveFireworks(),
         DayLog = Planned ? SaveDayLog() : null,
+        CampLife = SaveCampLife(),
     };
 
     public static FestivalGame Load(SaveData data)
@@ -516,6 +517,7 @@ public sealed partial class FestivalGame
         game._sharePence = data.SharePence;
         game.RestoreFireworks(data.Fireworks);
         game.LoadDayLog(data.DayLog);
+        game.RestoreCampLife(data.CampLife);
 
         return game;
     }
@@ -549,6 +551,9 @@ public sealed record SaveData(int Version, string Name, ClockState Clock, int? S
 
     /// <summary>The day's log and happiness line for the event day panel; null in older saves.</summary>
     public DayLogSave? DayLog { get; init; }
+
+    /// <summary>The camping field's night and morning after; null when there was none, and in older saves.</summary>
+    public CampLifeSave? CampLife { get; init; }
 
     /// <summary>Where the festival is in its year. Missing from a festival with nothing to plan.</summary>
     public YearSave? Year { get; init; }

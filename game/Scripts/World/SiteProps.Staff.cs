@@ -13,12 +13,14 @@ public static partial class SiteProps
     private static readonly Color HiVis = new("#E4F03C");
     private static readonly Color Reflective = new("#D9DEE2");
     private static readonly Color CleanerOrange = new("#F28C28");
+    private static readonly Color CampLime = new("#A4D65E");
 
     /// <summary>
     /// One member of staff in uniform, facing south (+Z). Ticket staff wear the festival's pink
     /// with a sunflower cap and lanyard, security wear black under a hi-vis tabard, and first-aiders
     /// wear white and green with a green cross and carry a kit bag. Cleaners wear teal under an orange
-    /// tabard and a sun hat, with a litter picker in one hand and a black sack in the other.
+    /// tabard and a sun hat, with a litter picker in one hand and a black sack in the other. Camp
+    /// stewards wear forest green under a lime tabard, with a beanie, a head torch and a torch in hand.
     /// </summary>
     public static Node3D Staff(StaffKind kind, int seed)
     {
@@ -34,6 +36,10 @@ public static partial class SiteProps
             {
                 Top = TopStyle.LongSleeve, TopColour = "#26292E", LegColour = "#26292E", Feet = Footwear.Boots, FeetColour = "#1B1B1E", Hat = Hat.Cap, HatColour = "#26292E",
                 Build = System.Math.Max(1.1, look.Build), Height = System.Math.Max(1.0, look.Height),
+            },
+            StaffKind.CampSteward => look with
+            {
+                Top = TopStyle.LongSleeve, TopColour = "#2F5D46", LegColour = "#3B3F45", Feet = Footwear.Boots, FeetColour = "#5A4632", Hat = Hat.Beanie, HatColour = "#2F5D46",
             },
             StaffKind.Cleaner => look with
             {
@@ -67,6 +73,17 @@ public static partial class SiteProps
                 b.Box(new Vector3(0, 0.95f * h, 0), new Vector3(0.378f, 0.045f * h, 0.283f), Reflective);
                 b.Box(new Vector3(0.12f, 1.05f * h, 0.14f), new Vector3(0.05f, 0.09f * h, 0.03f), Black);
                 b.Tube(new Vector3(0.135f, 1.13f * h, 0.14f), new Vector3(0.012f, 0.08f * h, 0.012f), Black);
+                break;
+
+            case StaffKind.CampSteward:
+                // A lime tabard with a reflective band and "camp" on the back, a head torch, and a torch in hand.
+                b.Box(new Vector3(0, 0.9f * h, 0), new Vector3(0.37f, 0.42f * h, 0.275f), CampLime);
+                b.Box(new Vector3(0, 0.85f * h, 0), new Vector3(0.378f, 0.04f * h, 0.283f), Reflective);
+                b.Box(new Vector3(0, 0.98f * h, -0.142f), new Vector3(0.22f, 0.07f * h, 0.01f), new Color("#2F5D46"));
+                b.Box(new Vector3(0, 1.5f * h, 0.13f), new Vector3(0.06f, 0.04f * h, 0.03f), Black);
+                b.Ball(new Vector3(0, 1.5f * h, 0.15f), new Vector3(0.035f, 0.035f, 0.02f), new Color("#FFF6C8"));
+                b.Tube(new Vector3(0.27f, 0.62f * h, 0.12f), new Vector3(0.045f, 0.2f * h, 0.045f), Black, new Vector3(70, 0, 0));
+                b.Tube(new Vector3(0.27f, 0.6f * h, 0.22f), new Vector3(0.055f, 0.03f, 0.055f), new Color("#FFE58A"), new Vector3(70, 0, 0));
                 break;
 
             case StaffKind.Cleaner:

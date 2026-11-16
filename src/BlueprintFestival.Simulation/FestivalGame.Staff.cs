@@ -314,6 +314,10 @@ public sealed partial class FestivalGame
         {
             return new BuildCheck(false, wage, "They need a clear bit of the field to stand on.");
         }
+        else if (kind == StaffKind.CampSteward && !InCamp(tile))
+        {
+            return new BuildCheck(false, wage, "Camp stewards work in a camping field.");
+        }
         else if (_staff.Any(s => s.Tile == tile))
         {
             return new BuildCheck(false, wage, "Someone is posted here already.");

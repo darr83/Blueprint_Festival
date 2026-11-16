@@ -135,6 +135,10 @@ public partial class GameManager : Node
             {
                 AddChild(new LightShots(arg["--light-shots=".Length..]) { Name = "LightShots" });
             }
+            else if (arg.StartsWith("--camp-life-shots=", StringComparison.Ordinal))
+            {
+                AddChild(new CampLifeShots(arg["--camp-life-shots=".Length..]) { Name = "CampLifeShots" });
+            }
             else if (arg.StartsWith("--camp-layout-shots=", StringComparison.Ordinal))
             {
                 AddChild(new CampLayoutShots(arg["--camp-layout-shots=".Length..]) { Name = "CampLayoutShots" });

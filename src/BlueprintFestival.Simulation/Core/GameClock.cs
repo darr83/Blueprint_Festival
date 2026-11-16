@@ -105,6 +105,15 @@ public sealed class GameClock
         Ticked?.Invoke(this);
     }
 
+    /// <summary>Moves the clock on without a tick, for hours that pass quickly (the night in the camping field).</summary>
+    public void Jump(TimeSpan by)
+    {
+        if (by > TimeSpan.Zero)
+        {
+            Now = Now.Add(by);
+        }
+    }
+
     public ClockState CaptureState() => new(Now, TickCount, Speed);
 
     public void RestoreState(ClockState state)

@@ -96,12 +96,13 @@ public class SoundTests
     }
 
     [Fact]
-    public void Every_stall_but_the_first_aid_and_medical_tents_is_heard_serving()
+    public void Every_stall_but_the_first_aid_and_medical_tents_and_the_fire_pit_is_heard_serving()
     {
         foreach (var kind in Enum.GetValues<StallKind>())
         {
             var sound = SoundScript.ServedAt(kind);
-            if (kind is StallKind.FirstAidTent or StallKind.MedicalTent)
+            // Nobody is served at a fire pit: campers just sit round it at night.
+            if (kind is StallKind.FirstAidTent or StallKind.MedicalTent or StallKind.FirePit)
             {
                 Assert.Null(sound);
             }
