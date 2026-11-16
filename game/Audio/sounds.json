@@ -962,7 +962,7 @@
       "bus": "Ambience",
       "seconds": 18,
       "loop": true,
-      "volume": 0.4,
+      "volume": 0.3,
       "gap": 0.0,
       "prompt": "A travelling funfair on a summer afternoon: a fairground organ playing a cheerful waltz, rides whirring round, people laughing and squealing with delight. No announcer."
     },
@@ -980,7 +980,7 @@
       "bus": "Effects",
       "seconds": 1.5,
       "loop": false,
-      "volume": 0.4,
+      "volume": 0.3,
       "gap": 6,
       "prompt": "A fairground ride coming to a stop: a brass bell rung twice and a hiss of air brakes."
     },
@@ -989,7 +989,7 @@
       "bus": "Effects",
       "seconds": 1.5,
       "loop": false,
-      "volume": 0.45,
+      "volume": 0.3,
       "gap": 5,
       "prompt": "A plastic duck lifted out of water with a splash and a drip, then a rubber duck squeak."
     },
@@ -998,7 +998,7 @@
       "bus": "Effects",
       "seconds": 2,
       "loop": false,
-      "volume": 0.55,
+      "volume": 0.4,
       "gap": 3,
       "prompt": "A fairground prize win: a bright bell going ding ding ding and a small child cheering happily."
     }
