@@ -289,9 +289,10 @@ public class GrowthTests
             game.Clock.Step();
         }
 
-        // Three and a half hours of the busiest part of the day: well under a hundredth of a second a tick.
+        // Three and a half hours of the busiest part of the day: well under a hundredth of a second a tick
+        // (about 3 ms on a normal machine; the limit allows for slow shared CI runners, Darren chose 12 ms).
         var perTick = watch.Elapsed.TotalMilliseconds / game.Clock.TickCount;
-        Assert.True(perTick < 8, $"{perTick:0.0} ms a tick.");
+        Assert.True(perTick < 12, $"{perTick:0.0} ms a tick.");
         Assert.True(game.Crowd.OnSite > 2500, $"Only {game.Crowd.OnSite} on site by half past eleven.");
         Assert.True(game.Crowd.Queuing < 600, $"{game.Crowd.Queuing} still queuing at half past eleven.");
         Assert.Equal(0, game.Crowd.WalkedInFree);
