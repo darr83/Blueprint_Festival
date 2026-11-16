@@ -269,7 +269,7 @@ public partial class YearScreen : Control
         {
             var at = game.SetOf(a.Name);
             var kind = a.Kind switch { ActKind.Dj => "DJ", ActKind.Solo => "Solo guitarist", ActKind.Duo => "Duo", ActKind.FolkBand => "Folk band", _ => "Band" };
-            return new ArtistView(a.Name, $"{kind} · {Roster.NameOf(a.Genre)} · {Roster.FansText(a.Fans)} fans", a.Rating, game.FeeOf(a.Rating),
+            return new ArtistView(a.Name, $"{kind} · {Roster.NameOf(a.Genre)} · {Roster.FansText(a.Fans)} fans · pulls a {FanPull.Words(FanPull.Of(a))}", a.Rating, game.FeeOf(a.Rating),
                 at is { } set && set != picked ? $"Booked for the {StageName(set)} at {TimeOf(game, set)}" : "", at == picked);
         }).ToList(),
         game.TicketPrice, (int)System.Math.Round(game.FairPrice), (int)System.Math.Round(game.LineUpPull * 100), game.ActFees, game.LineUp.Count(), game.PlanCost,

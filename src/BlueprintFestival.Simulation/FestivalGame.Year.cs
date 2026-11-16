@@ -402,7 +402,7 @@ public sealed partial class FestivalGame
         stars.RemoveAt(1 + random.Next(3));
         foreach (var s in stars)
         {
-            var act = ActGenerator.MakeOffer(random, s, taken) with { Draw = 0.55 + (0.08 * s) };
+            var act = ActGenerator.MakeOffer(random, s, taken);
             _offers.Add(new HeadlinerOffer(act, s, FeeOf(s)));
         }
 
