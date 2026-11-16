@@ -597,6 +597,16 @@ public sealed partial class SiteLayout
                 return BuildCheck.No("The fairground cannot go in a camping field.");
             }
 
+            if (CampLayout.CampOnly(kind) && _map.UseAt(p) != FieldUse.Camping)
+            {
+                return BuildCheck.No($"The {Catalogue.Of(kind).Name.ToLowerInvariant()} goes in a camping field.");
+            }
+
+            if (IsFireLane(p))
+            {
+                return BuildCheck.No("Keep the fire lane clear.");
+            }
+
             if (!_map.Rented(p) || !IsBuildable(p))
             {
                 return BuildCheck.No(fair ? "It must stand on the grass inside the hedge." : "A stall must stand on the grass inside the hedge.");
@@ -1009,7 +1019,7 @@ public sealed partial class SiteLayout
     public SiteSave Save() => new(_stages.ToList(), _gates.ToList(), FenceRuns(), _stalls.ToList(),
         _lanes.Count == 0 ? null : _lanes.Select(l => l.ToList()).ToList(),
         _keepOut.Count == 0 ? null : RunsOf(_keepOut).Select(r => r.Vertical ? new TileRect(r.X, r.Y, 1, r.Length) : new TileRect(r.X, r.Y, r.Length, 1)).ToList(),
-        _lights.Count == 0 ? null : _lights.ToList(), _fairy.Count == 0 ? null : _fairy.ToList(), _screens.Count == 0 ? null : _screens.ToList(), _pad, _comforts.Count == 0 ? null : _comforts.ToList(), _signs.Count == 0 ? null : _signs.ToList(), _decor.Count == 0 ? null : _decor.ToList(), _bunting.Count == 0 ? null : _bunting.ToList(), SaveVipGround(), _areas.Count == 0 ? null : _areas.ToList());
+        _lights.Count == 0 ? null : _lights.ToList(), _fairy.Count == 0 ? null : _fairy.ToList(), _screens.Count == 0 ? null : _screens.ToList(), _pad, _comforts.Count == 0 ? null : _comforts.ToList(), _signs.Count == 0 ? null : _signs.ToList(), _decor.Count == 0 ? null : _decor.ToList(), _bunting.Count == 0 ? null : _bunting.ToList(), SaveVipGround(), _areas.Count == 0 ? null : _areas.ToList(), SaveCampZones());
 
     /// <summary>Puts back a saved layout, skipping anything that no longer fits.</summary>
     public void Restore(SiteSave save)
@@ -1028,6 +1038,7 @@ public sealed partial class SiteLayout
         _pad = null;
         _padFence.Clear();
         _areas.Clear();
+        _campZones.Clear();
         foreach (var s in save.Stages ?? new())
         {
             if (CheckStage(s.Kind, s.X, s.Y, s.Facing).Ok)
@@ -1100,6 +1111,7 @@ public sealed partial class SiteLayout
         RestoreDecor(save);
         RestoreVipGround(save);
         RestoreAreas(save);
+        RestoreCampZones(save);
         Refresh();
     }
 
@@ -1251,4 +1263,4 @@ public sealed partial class SiteLayout
 /// <summary>The layout as written to a save file.</summary>
 public sealed record SiteSave(List<PlacedStage>? Stages, List<PlacedGate>? Gates, List<FenceRun>? Fences, List<PlacedStall>? Stalls = null,
     List<List<TilePoint>>? Lanes = null, List<TileRect>? KeepOut = null,
-    List<PlacedLight>? Lights = null, List<FairyString>? FairyLights = null, List<PlacedScreen>? Screens = null, PlacedLaunchPad? LaunchPad = null, List<PlacedComfort>? Comforts = null, List<PlacedSign>? Signs = null, List<PlacedDecor>? Decor = null, List<BuntingRun>? Bunting = null, List<TileRect>? VipGround = null, List<PlacedArea>? Areas = null);
+    List<PlacedLight>? Lights = null, List<FairyString>? FairyLights = null, List<PlacedScreen>? Screens = null, PlacedLaunchPad? LaunchPad = null, List<PlacedComfort>? Comforts = null, List<PlacedSign>? Signs = null, List<PlacedDecor>? Decor = null, List<BuntingRun>? Bunting = null, List<TileRect>? VipGround = null, List<PlacedArea>? Areas = null, List<CampZoneRect>? CampZones = null);

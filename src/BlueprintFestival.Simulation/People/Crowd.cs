@@ -297,6 +297,13 @@ public sealed class Party
     /// <summary>True once they have paid to charge a phone today.</summary>
     public bool Charged { get; internal set; }
 
+    /// <summary>True once a camper has had a shower, been to the camp info point, and been to the camp shop.</summary>
+    public bool Showered { get; internal set; }
+
+    public bool Lockered { get; internal set; }
+
+    public bool CampShopped { get; internal set; }
+
     internal DateTime RetryAt { get; set; }
 
     public bool HasChild => Members.Any(m => m.Look.Age == AgeGroup.Child);
@@ -1069,17 +1076,14 @@ public sealed partial class Crowd
     /// </summary>
     public void PitchCamp()
     {
-        // A tent is not pitched where something has been built.
-        var pitches = _map.Pitches().Where(p => !Enumerable.Range(-3, 7).Any(dx => Enumerable.Range(-3, 7).Any(dy => _map.IsBlocked(new TilePoint(p.X + dx, p.Y + dy))))).ToList();
-        var next = 0;
         foreach (var party in _parties)
         {
             party.Pitch = null;
-            // The same parties camp every time the day is planned, whatever else changes.
-            if (next < pitches.Count && (uint)(party.Id * 2654435761u) % 100 < CamperShare * 100)
-            {
-                party.Pitch = pitches[next++];
-            }
+        }
+
+        foreach (var (party, pitch) in PlanPitches())
+        {
+            party.Pitch = pitch;
         }
     }
 
@@ -1955,6 +1959,8 @@ public sealed partial class Crowd
             TicketsSold?.Invoke(party.Members.Count);
             if (party.Camper)
             {
+                // The tent goes up: a good pitch cheers them, a poor one lets them down.
+                party.Mood = Math.Clamp(party.Mood + CampFeel(party), 0, 1);
                 CamperArrived?.Invoke(party.Members.Count);
             }
 
@@ -2496,6 +2502,8 @@ public sealed partial class Crowd
             case StallKind.PhoneCharging:
                 // Batteries run down as the day goes on.
                 return party.Charged ? 0 : hour < 12 ? 0.004 : hour < 16 ? 0.012 : 0.02;
+            case StallKind.ShowerBlock or StallKind.CampInfo or StallKind.CampShop:
+                return CampAppeal(party, stall.Kind, hour, hot, wet);
             case StallKind.VipLounge:
                 return !party.Vip || party.Thirst < 0.15 ? 0 : 0.05 * (hour >= 17 ? 1.5 : 1);
             case StallKind.BigWheel or StallKind.Waltzer or StallKind.Twister or StallKind.Carousel or StallKind.Skylark or StallKind.HookADuck:
@@ -3033,6 +3041,15 @@ public sealed partial class Crowd
             case StallKind.Merchandise:
                 party.BoughtMerch = true;
                 break;
+            case StallKind.ShowerBlock:
+                party.Showered = true;
+                break;
+            case StallKind.CampInfo:
+                party.Lockered = true;
+                break;
+            case StallKind.CampShop:
+                party.CampShopped = true;
+                break;
         }
 
         party.Spent += paid;
@@ -3113,6 +3130,12 @@ public sealed partial class Crowd
         if (stall.Kind == StallKind.PhoneCharging && member != party.Members[0] && Roll(member.Id, 55, party.Id) > 0.35)
         {
             // One phone between them is usually enough.
+            return -1;
+        }
+
+        if (stall.Kind is StallKind.CampInfo or StallKind.CampShop && member != party.Members[0] && Roll(member.Id, 57, party.Id) > 0.3)
+        {
+            // One locker, one bag of shopping, between them.
             return -1;
         }
 

@@ -135,9 +135,9 @@ public partial class YearScreen : Control
             return;
         }
 
-        var view = _scene.ViewButtons;
+        var view = (ViewButtons?)_scene.ViewButtons;
         var bottom = SideBottomForTest ?? SidePanelRoom.Bottom(GetViewportRect().Size.Y,
-            view.Visible ? view.GlobalPosition.Y : null, _scene.BuildBar.Visible ? _scene.BuildBar.Top : null);
+            view is { Visible: true } ? view.GlobalPosition.Y : null, _scene.BuildBar.Visible ? _scene.BuildBar.Top : null);
         var frame = _side.GetThemeStylebox("panel")?.GetMinimumSize().Y ?? 0;
         // The footer and the gap above it, which the scrolling lines must leave room for.
         var below = footer.GetCombinedMinimumSize().Y + 8;

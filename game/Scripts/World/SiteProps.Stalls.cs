@@ -27,6 +27,12 @@ public static partial class SiteProps
             return node;
         }
 
+        if (CampStall(b, node, kind))
+        {
+            node.AddChild(b.BuildNode("Shapes"));
+            return node;
+        }
+
         if (Shop(b, node, kind))
         {
             node.AddChild(b.BuildNode("Shapes"));
@@ -73,7 +79,7 @@ public static partial class SiteProps
     }
 
     /// <summary>Where the people serving stand, in metres from the stall's middle, the stall facing south.</summary>
-    public static Vector3[] StaffSpots(StallKind kind) => ShopStaff(kind) ?? RideStaff(kind) ?? kind switch
+    public static Vector3[] StaffSpots(StallKind kind) => ShopStaff(kind) ?? CampStaff(kind) ?? RideStaff(kind) ?? kind switch
     {
         StallKind.Bar => new[] { new Vector3(-1.4f, 0, 0.55f), new Vector3(1.3f, 0, 0.55f) },
         StallKind.VipLounge => new[] { new Vector3(-1.1f, 0, -2.35f), new Vector3(1.1f, 0, -2.35f) },
