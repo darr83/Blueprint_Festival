@@ -236,7 +236,7 @@ public static class ActGenerator
 
         // The bigger the pull, the bigger the name: support acts are one to three stars, a headliner four or five.
         var rating = headliner ? (draw < 0.9 ? 4 : 5) : 1 + Math.Min(2, (int)((draw - 0.4) / 0.1));
-        return From(Pick(kind, rating, headline: false, taken, name), draw, look, name);
+        return From(Pick(kind, rating, headline: false, taken, name), headliner, look, name);
     }
 
     /// <summary>One of the headline artists with exactly so many stars, to be offered for the last set of the night.</summary>
@@ -245,11 +245,11 @@ public static class ActGenerator
         ArgumentNullException.ThrowIfNull(taken);
         var rolled = Make(random, true, new HashSet<string>(taken));
         taken.Add(rolled.Stem);
-        return From(Pick(rolled.Kind, stars, headline: true, taken, rolled.Stem), rolled.Draw, rolled.LookSeed, rolled.Stem);
+        return From(Pick(rolled.Kind, stars, headline: true, taken, rolled.Stem), closing: true, rolled.LookSeed, rolled.Stem);
     }
 
-    private static Act From(Artist artist, double draw, int look, string stem) =>
-        new(artist.Name, artist.Kind, artist.Kind == ActKind.Solo ? new[] { BandRole.Guitarist } : LineUps[(int)artist.Kind], draw, look)
+    private static Act From(Artist artist, bool closing, int look, string stem) =>
+        new(artist.Name, artist.Kind, artist.Kind == ActKind.Solo ? new[] { BandRole.Guitarist } : LineUps[(int)artist.Kind], DrawOf(artist, closing), look)
         {
             Genre = artist.Genre,
             Rating = artist.Rating,
@@ -258,18 +258,18 @@ public static class ActGenerator
             Stem = stem,
         };
 
-    /// <summary>How much of the field an artist draws to the stage: more stars, more of it, and most of all as the last act of the night.</summary>
+    /// <summary>How much of the field an artist draws to the stage: the bigger their stars and following, the more, and most of all as the last act of the night.</summary>
     public static double DrawOf(Artist artist, bool closing)
     {
         ArgumentNullException.ThrowIfNull(artist);
-        return closing ? 0.55 + (0.08 * artist.Rating) : 0.35 + (0.1 * artist.Rating);
+        return FanPull.Draw(FanPull.Of(artist), closing);
     }
 
     /// <summary>An artist from the roster as an act ready to play.</summary>
     public static Act Of(Artist artist, bool closing = false)
     {
         ArgumentNullException.ThrowIfNull(artist);
-        return From(artist, DrawOf(artist, closing), Hash(artist.Name) % 100000, artist.Name);
+        return From(artist, closing, Hash(artist.Name) % 100000, artist.Name);
     }
 
     /// <summary>Marks an act as booked, so nobody is booked twice in one festival.</summary>

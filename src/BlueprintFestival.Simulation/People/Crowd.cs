@@ -1953,7 +1953,7 @@ public sealed partial class Crowd
                     // With a tent to go back to there is no reason to miss the end.
                     party.Leaves = headliner.End + TimeSpan.FromMinutes(party.Random.Between(1, 45));
                 }
-                else if (headliner is not null && now < headliner.End && now.TimeOfDay >= StayOnFrom && party.Mood >= 0.3 && party.Random.NextDouble() < headliner.Act.Draw)
+                else if (headliner is not null && now < headliner.End && now.TimeOfDay >= StayOnFrom && party.Mood >= 0.3 && party.Random.NextDouble() < FanPull.ChanceToWatch(party.Id, headliner.Act.Genre, headliner.Act.Draw))
                 {
                     // A big crowd takes longer to drift away at the end of the night.
                     party.Leaves = headliner.End + TimeSpan.FromMinutes(party.Random.Between(1, 14 + Math.Min(20, _parties.Count / 80.0)));
@@ -2195,7 +2195,9 @@ public sealed partial class Crowd
 
         // Waiting at the front for a big act to come on is not watching one yet.
         var waiting = party.State == PartyState.Watching && ShowOf(party.Watch)?.FillingUp(now)?.Index == party.Watch;
-        var change = party.State == PartyState.Watching && !waiting ? Enjoyed(ShowOf(party.Watch)?.Playing(now)?.Act.Rating ?? 3) * ShareOfTheAct(party) * perHour : 0;
+        var change = party.State == PartyState.Watching && !waiting && ShowOf(party.Watch)?.Playing(now)?.Act is { } act
+            ? Enjoyed(act.Rating) * FanPull.Enjoyment(party.Id, act.Genre) * ShareOfTheAct(party) * perHour
+            : 0;
         foreach (var need in new[] { party.Hunger, party.Thirst, party.Toilet })
         {
             if (need >= Pressing)
@@ -3143,7 +3145,8 @@ public sealed partial class Crowd
             }
         }
 
-        if (party.Random.NextDouble() >= slot.Act.Draw)
+        // Fans of the sort of music flock to it; those who cannot stand it mostly stay away.
+        if (party.Random.NextDouble() >= FanPull.ChanceToWatch(party.Id, slot.Act.Genre, slot.Act.Draw))
         {
             return false;
         }
