@@ -14,8 +14,8 @@ public partial class SalesShots : Node
 {
     private static readonly string[] Names =
     {
-        "1_january_book_the_line_up", "2_a_second_stage_and_a_big_name", "3_tickets_on_sale_choose_adverts", "4_a_month_running",
-        "5_june_nearly_sold_out", "6_build_week_day_by_day",
+        "1_january_book_the_line_up", "2_a_second_stage_and_a_big_name", "3_the_campaign_in_january", "4_a_month_running",
+        "5_news_and_releases", "6_book_another_act", "7_build_week_day_by_day",
     };
 
     private readonly string _directory;
@@ -68,31 +68,41 @@ public partial class SalesShots : Node
                 break;
             case 2:
                 year.BookEvent();
-                foreach (var advert in new[] { "posters", "flyers", "website", "paper", "social" })
-                {
-                    year.ToggleAdvert(advert);
-                }
-
+                year.DoJob("announce:The Copper Turnips");
+                year.DoJob("stunt:interview");
                 break;
             case 3:
                 year.RunMonth();
                 year.FinishRun();
-                year.RunMonth();
-                year.FinishRun();
-                year.ToggleAdvert("localradio");
+                year.DoJob("announce:Hedgerow Howl");
+                year.DoJob("advert:posters");
+                year.DoJob("advert:social");
                 year.RunMonth();
                 break;
             case 4:
                 year.FinishRun();
-                year.RunMonth();
-                year.FinishRun();
-                year.ToggleAdvert("bus");
-                year.RunMonth();
-                year.FinishRun();
+                while (game.PendingNews is null && game.SalesTurn < 4)
+                {
+                    year.DoJob("release");
+                    year.DoJob("stunt:launch");
+                    year.RunMonth();
+                    year.FinishRun();
+                }
+
+                year.DoJob("release");
                 break;
             case 5:
-                year.RunMonth();
-                year.FinishRun();
+                year.DoJob("book");
+                year.PickArtist("Tobias Pell");
+                break;
+            case 6:
+                year.StopBooking();
+                while (game.Phase == Phase.Sell)
+                {
+                    year.RunMonth();
+                    year.FinishRun();
+                }
+
                 year.NextDay();
                 year.NextDay();
                 f.Camera.Snap();

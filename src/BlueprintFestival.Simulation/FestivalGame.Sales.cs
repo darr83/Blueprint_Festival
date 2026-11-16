@@ -50,6 +50,9 @@ public sealed partial class FestivalGame
 
     public bool SoldOut => TicketsSold >= OnSale || (OrdinaryLeft == 0 && VipLeft == 0);
 
+    /// <summary>True when nothing can be bought just now: every ticket is sold, or the releases opened so far are.</summary>
+    public bool NothingOnSale => SoldOut || (Campaigning && ReleaseLeft == 0 && VipLeft == 0);
+
     public bool AdvertOn(string id) => _adverts.Contains(id);
 
     /// <summary>Switches an advert on or off for the turns to come.</summary>
@@ -84,27 +87,28 @@ public sealed partial class FestivalGame
     /// main stage counts most, by its pull (stars and following, see <see cref="FanPull"/>); every other act adds a little; and
     /// four or more kinds of music bring a wider crowd.
     /// </summary>
-    public double LineUpPull
+    public double LineUpPull => PullOf(LineUp.ToList());
+
+    /// <summary>The pull of some of the sets on the bill, as <see cref="LineUpPull"/> works it out for all of them.</summary>
+    private double PullOf(IReadOnlyList<Slot> sets)
     {
-        get
-        {
-            var head = Show.Slots.LastOrDefault()?.Act;
-            var others = LineUp.Where(s => s.Act != head).Sum(s => s.Act.Rating);
-            var genres = LineUp.Select(s => s.Act.Genre).Distinct().Count();
-            var headPull = head is null ? 0 : 0.15 + (0.85 * FanPull.Of(head));
-            return 0.3 + headPull + Math.Min(0.35, 0.03 * others) + (genres >= 4 ? 0.05 : 0);
-        }
+        var closing = Show.Slots.LastOrDefault()?.Act;
+        var head = closing is not null && sets.Any(s => s.Act == closing) ? closing : null;
+        var others = sets.Where(s => s.Act != head).Sum(s => s.Act.Rating);
+        var genres = sets.Select(s => s.Act.Genre).Distinct().Count();
+        var headPull = head is null ? 0 : 0.15 + (0.85 * FanPull.Of(head));
+        return 0.3 + headPull + Math.Min(0.35, 0.03 * others) + (genres >= 4 ? 0.05 : 0);
     }
 
     /// <summary>The ticket price this line-up is worth. Dearer than this sells slowly; cheaper sells fast.</summary>
-    public double FairPrice
+    public double FairPrice => FairOf(LineUp.ToList());
+
+    private double FairOf(IReadOnlyList<Slot> sets)
     {
-        get
-        {
-            var head = Show.Slots.LastOrDefault()?.Act;
-            var others = LineUp.Where(s => s.Act != head).Sum(s => s.Act.Rating);
-            return 2.5 + (1.2 * (head?.Rating ?? 0)) + (0.2 * Math.Min(12, others));
-        }
+        var closing = Show.Slots.LastOrDefault()?.Act;
+        var head = closing is not null && sets.Any(s => s.Act == closing) ? closing : null;
+        var others = sets.Where(s => s.Act != head).Sum(s => s.Act.Rating);
+        return 2.5 + (1.2 * (head?.Rating ?? 0)) + (0.2 * Math.Min(12, others));
     }
 
     /// <summary>How the price changes sales: 1 at the fair price, more below it, and falling away quickly above it.</summary>
@@ -161,9 +165,9 @@ public sealed partial class FestivalGame
     }
 
     /// <summary>About how many tickets the next turn would sell as things stand, before luck.</summary>
-    public int SalesForecast => NextSalesTurn is null ? 0 : Math.Min(OrdinaryLeft, (int)Math.Round(Demand(SalesTurn)));
+    public int SalesForecast => NextSalesTurn is null ? 0 : Math.Min(ReleaseLeft, (int)Math.Round(Demand(SalesTurn)));
 
-    private double Demand(int turn) => Interest(turn) * PricePull;
+    private double Demand(int turn) => Campaigning ? CampaignDemand(turn) : Interest(turn) * PricePull;
 
     /// <summary>How many would buy in a turn before the price is counted: who hears, the line-up, keenness and how near the day is.</summary>
     private double Interest(int turn)
@@ -178,12 +182,17 @@ public sealed partial class FestivalGame
     /// Books the acts and puts the tickets on sale in January. False if the bank cannot cover
     /// what has to be paid now.
     /// </summary>
-    public bool BookEvent()
+    public bool BookEvent(bool campaign = false)
     {
         Need(Phase.Plan);
         if (!PayForPlan())
         {
             return false;
+        }
+
+        if (campaign)
+        {
+            StartCampaign();
         }
 
         SoldAhead = true;
@@ -214,7 +223,8 @@ public sealed partial class FestivalGame
         }
 
         var luck = GameRandom.FromSeed(Seed, 40 + SalesTurn).Between(0.93, 1.07);
-        var tickets = Math.Clamp((int)Math.Round(Demand(SalesTurn) * luck), 0, OrdinaryLeft);
+        var wanted = Demand(SalesTurn) * luck;
+        var tickets = Math.Clamp((int)Math.Round(wanted), 0, ReleaseLeft);
         var vips = Math.Clamp((int)Math.Round(VipDemand(SalesTurn) * luck), 0, VipLeft);
         if (cost > 0)
         {
@@ -231,6 +241,11 @@ public sealed partial class FestivalGame
         VipTicketsSold += vips;
         var line = new SalesLine(when, tickets, TicketPrice, cost, vips, VipTicketsSold > 0 || vips > 0 ? VipTicketPrice : 0);
         _salesLog.Add(line);
+        if (Campaigning)
+        {
+            AfterCampaignTurn(SalesTurn, tickets, wanted);
+        }
+
         SalesTurn++;
         if (SalesTurn >= SalesMonths.Count)
         {
