@@ -72,9 +72,9 @@ public sealed partial class FestivalGame
     public bool CanOpenRelease => JobsLeft > 0 && ReleaseOpen < Campaign.Releases.Count - 1;
 
     /// <summary>The acts booked that nobody has been told about yet.</summary>
-    public IEnumerable<Slot> Secret => LineUp.Where(s => !_announced.Contains(s.Act.Name));
+    public IEnumerable<Slot> Secret => WholeBill.Where(s => !_announced.Contains(s.Act.Name));
 
-    private IEnumerable<Slot> Known => LineUp.Where(s => _announced.Contains(s.Act.Name));
+    private IEnumerable<Slot> Known => WholeBill.Where(s => _announced.Contains(s.Act.Name));
 
     /// <summary>How strongly the acts announced so far sell tickets to people who are not their fans.</summary>
     public double AnnouncedPull => PullOf(Known.ToList());
@@ -103,23 +103,20 @@ public sealed partial class FestivalGame
     public int FansOf(Act act)
     {
         ArgumentNullException.ThrowIfNull(act);
-        var second = Shows.Skip(1).Any(show => show.Slots.Any(s => s.Act.Name == act.Name));
+        var second = WholeBill.Any(s => s.Act.Name == act.Name && s.Index % DaySets >= RunningOrder.SecondBase);
         return (int)Math.Round(OrdinaryOnSale * Campaign.FanShare(FanPull.Of(act)) * (second ? 0.7 : 1));
     }
 
     /// <summary>About how many tickets announcing an act would sell in its first month, at today's price.</summary>
     public int AnnounceWorth(string artist) =>
-        LineUp.FirstOrDefault(s => s.Act.Name == artist)?.Act is { } act
+        WholeBill.FirstOrDefault(s => s.Act.Name == artist)?.Act is { } act
             ? (int)Math.Round(FansOf(act) * Math.Min(1, Campaign.FirstMonth(FanPull.Of(act)) * Campaign.BuzzHurry(Buzz) * PricePullAfter(act)))
             : 0;
 
     private double PricePullAfter(Act act)
     {
         var known = Known.ToList();
-        if (LineUp.FirstOrDefault(s => s.Act.Name == act.Name) is { } slot && !known.Contains(slot))
-        {
-            known.Add(slot);
-        }
+        known.AddRange(WholeBill.Where(s => s.Act.Name == act.Name && !known.Contains(s)).ToList());
 
         return PricePullAt(Math.Max(FairOf(known), PerceivedFairPrice) / TicketPrice);
     }
@@ -142,7 +139,7 @@ public sealed partial class FestivalGame
     /// <summary>Announces an act: its fans start buying, buzz goes up, and a job is used. False with no job left or nobody of that name still secret.</summary>
     public bool Announce(string artist)
     {
-        if (LineUp.FirstOrDefault(s => s.Act.Name == artist)?.Act is not { } act || _announced.Contains(artist) || !UseJob())
+        if (WholeBill.FirstOrDefault(s => s.Act.Name == artist)?.Act is not { } act || _announced.Contains(artist) || !UseJob())
         {
             return false;
         }
@@ -314,7 +311,7 @@ public sealed partial class FestivalGame
         var demand = new Dictionary<string, double>();
         foreach (var (name, left) in _fans)
         {
-            var pull = LineUp.FirstOrDefault(s => s.Act.Name == name)?.Act is { } act ? FanPull.Of(act) : 0;
+            var pull = WholeBill.FirstOrDefault(s => s.Act.Name == name)?.Act is { } act ? FanPull.Of(act) : 0;
             demand[name] = left * Math.Min(1, (week ? Campaign.EachBuildDay : _fresh.Contains(name) ? Campaign.FirstMonth(pull) : Campaign.LaterMonths) * Campaign.BuzzHurry(Buzz));
         }
 
@@ -382,7 +379,7 @@ public sealed partial class FestivalGame
         {
             // Build week: the posters are up with every name on them, and every ticket left is on sale.
             ReleaseOpen = Campaign.Releases.Count - 1;
-            foreach (var slot in Secret.ToList())
+            foreach (var slot in Secret.DistinctBy(s => s.Act.Name).ToList())
             {
                 Reveal(slot.Act);
             }

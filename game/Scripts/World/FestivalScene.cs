@@ -377,7 +377,7 @@ public partial class FestivalScene : Node3D
         Sky.Apply(Game, StageCam.Yaw);
         CrowdSafety.RightInset = Money.Visible ? Money.Size.X + 14 : DayBoard.Visible ? DayBoard.Size.X + 14 : 0;
         Areas.TopInset = CrowdSafety.WarningBottom;
-        DayButton.Visible = Game.Phase is Phase.Day or Phase.Tidy && !Year.HasCentrePanel;
+        DayButton.Visible = Game.Phase is Phase.Day or Phase.Tidy or Phase.Between && !Year.HasCentrePanel;
         PlaceDayButton();
         PlaceGapButton();
         DayBoard.BuildBarTop = BuildBar.Visible ? BuildBar.Top : null;

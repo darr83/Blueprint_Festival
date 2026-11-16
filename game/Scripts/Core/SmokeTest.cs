@@ -137,6 +137,16 @@ public partial class SmokeTest : Node
                     Check(BlueprintFestival.UI.YearPanels.Headline("A good festival and a tidy field. The council raises the licence to 400 people.") == ("A good festival and a tidy field", "The council raises the licence to 400 people."), "The results headline should be the verdict's first sentence.");
                     Check(BlueprintFestival.UI.YearPanels.Headline("Rained off") == ("Rained off", ""), "A verdict of one sentence should be all headline.");
 
+                    // The long weekend: a tab for each day over the line-up, and the panel between the days.
+                    var weekend = FestivalGame.StartYear("Larkmoor Festival", new YearSetup(5, 3000, 90000));
+                    var weekendPlan = BlueprintFestival.UI.YearPanels.Plan(BlueprintFestival.UI.YearScreen.PlanOf(weekend), new BlueprintFestival.UI.PlanActions { PickDay = weekend.ShowDayBill });
+                    Check(weekendPlan.FindChild("DayTabs", true, false) is Node tabs && tabs.FindChild("Day1", true, false) is Button, "A two-day festival should have a tab for each day over the line-up.");
+                    var between = BlueprintFestival.UI.YearPanels.Between(new BlueprintFestival.UI.BetweenView("Saturday", "Sunday", 2, 2, 80, 120, 60, false, 10, 120, false, 72, 2, 1, 0, 900, 40000, "The Lantern Hearts"));
+                    Check(between.FindChild("OpenNextDay", true, false) is Button && between.FindChild("LitterCrew", true, false) is Button && between.FindChild("Straw", true, false) is Button,
+                        "The panel between the days should offer the litter crew, straw and the button to open again.");
+                    weekendPlan.Free();
+                    between.Free();
+
                     // Build a first festival with the build bar: a bandstand, the gap fenced, a gate in it.
                     var site = opened.Game.Site;
                     var grass = opened.Game.Field.Field;

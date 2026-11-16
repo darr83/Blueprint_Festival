@@ -55,6 +55,15 @@ public sealed record PlanView(int Year, string Festival, string Date, int Licenc
     /// sets and what size of stage it needs. Empty with only the main stage.
     /// </summary>
     public IReadOnlyList<StageBillView> Extra { get; init; } = System.Array.Empty<StageBillView>();
+
+    /// <summary>The festival's days by name, for a festival of more than one day; empty for one day.</summary>
+    public IReadOnlyList<string> Days { get; init; } = System.Array.Empty<string>();
+
+    /// <summary>Which day's line-up is shown, counting from 0.</summary>
+    public int DayShown { get; init; }
+
+    /// <summary>The days with no act at the top of the main stage yet.</summary>
+    public IReadOnlyList<string> NoHeadliner { get; init; } = System.Array.Empty<string>();
 }
 
 /// <summary>One extra stage on the planning screen: its number (1 to 3), name, sets and what it needs.</summary>
@@ -79,6 +88,9 @@ public sealed record PlanActions(System.Action? Book = null, System.Action<int>?
 
     /// <summary>Takes an extra stage (1 to 3) off the bill.</summary>
     public System.Action<int>? RemoveStage { get; init; }
+
+    /// <summary>Shows another day's line-up, counting from 0.</summary>
+    public System.Action<int>? PickDay { get; init; }
 }
 
 /// <summary>One way of advertising, and whether it is switched on.</summary>
@@ -421,6 +433,40 @@ public static partial class YearPanels
     /// The January planning screen, laid out as the festival's programme: the running order down the
     /// left with the ticket under it, and on the right the artists to choose from and what is paid today.
     /// </summary>
+    /// <summary>
+    /// The row of days over the line-up of a festival of more than one day: a tab for each day,
+    /// and a word on which nights still have nobody at the top of the bill.
+    /// </summary>
+    private static Control DayTabs(PlanView view, PlanActions does)
+    {
+        var row = new HBoxContainer { Name = "DayTabs" };
+        row.AddThemeConstantOverride("separation", 8);
+        for (var d = 0; d < view.Days.Count; d++)
+        {
+            var day = d;
+            var tab = UiStyle.ChipButton(view.Days[d], does.PickDay is null ? () => { } : () => does.PickDay(day), Sounds.Tab);
+            tab.Name = $"Day{d}";
+            tab.ToggleMode = true;
+            tab.SetPressedNoSignal(d == view.DayShown);
+            tab.CustomMinimumSize = new Vector2(120, 36);
+            row.AddChild(tab);
+        }
+
+        var words = view.NoHeadliner.Count == 0
+            ? $"{view.Days.Count} days, one weekend ticket. Every day has its own acts on every stage."
+            : $"{view.Days.Count} days, one weekend ticket. No headliner yet on {string.Join(" or ", view.NoHeadliner)}.";
+        var said = UiStyle.Body(words, muted: view.NoHeadliner.Count == 0, size: 13, bold: view.NoHeadliner.Count > 0);
+        if (view.NoHeadliner.Count > 0)
+        {
+            said.AddThemeColorOverride("font_color", UiStyle.StagePink);
+        }
+
+        said.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
+        row.AddChild(new Control { CustomMinimumSize = new Vector2(8, 0) });
+        row.AddChild(said);
+        return row;
+    }
+
     public static Control Plan(PlanView view, PlanActions? does = null, float scroll = 0)
     {
         does ??= new PlanActions();
@@ -447,6 +493,10 @@ public static partial class YearPanels
         day.AddChild(where);
         var late = view.Late.Length > 0;
         Masthead(box, $"{(late ? view.Late : "January")}  ·  {view.Festival}  ·  Year {view.Year}", late ? "Book another act" : "The running order", day);
+        if (view.Days.Count > 1)
+        {
+            box.AddChild(DayTabs(view, does));
+        }
 
         var columns = new HBoxContainer();
         columns.AddThemeConstantOverride("separation", 40);
@@ -497,7 +547,7 @@ public static partial class YearPanels
             roster.AddChild(offerBox);
         }
 
-        var room = Math.Max(150, 438 - (view.Travel is null || late ? 0 : view.Travel.Pitch is null ? 150 : 170) - (extras ? 62 : 0) - (offerBox is null ? 0 : 118));
+        var room = Math.Max(150, 438 - (view.Travel is null || late ? 0 : view.Travel.Pitch is null ? 150 : 170) - (extras ? 62 : 0) - (offerBox is null ? 0 : 118) - (view.Days.Count > 1 ? 46 : 0));
         var scroller = new ScrollContainer { CustomMinimumSize = new Vector2(590, room), HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled, Name = "Artists" };
         roster.AddChild(scroller);
         var list = new GridContainer { Columns = 2, SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };

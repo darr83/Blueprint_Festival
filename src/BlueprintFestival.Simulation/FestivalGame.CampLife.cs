@@ -413,6 +413,16 @@ public sealed partial class FestivalGame
         var (word, tone) = night >= 0.8 ? ("A good night", DayTone.Good) : night >= 0.6 ? ("A fair night", DayTone.Plain) : ("A bad night", DayTone.Bad);
         Note(DayNoteKind.Camp, $"{word} in the camp", $"Quiet {night * 100:0}%: {_campLog.Count(l => l.Tone == DayTone.Bad):N0} things went wrong, {_campLog.Count(l => l.Tone == DayTone.Good):N0} sorted", tone);
         LogCamp(now, $"{word} in the camp. Campers wake up", "", tone);
+        _campNight = night;
+
+        if (MoreDaysToCome)
+        {
+            // Another day of music to come: the campers stay, and the morning is for getting ready.
+            CampTime = CampTime.None;
+            _sentTo.Clear();
+            BetweenDays(now);
+            return;
+        }
 
         CampTime = CampTime.Morning;
         foreach (var s in _staff)

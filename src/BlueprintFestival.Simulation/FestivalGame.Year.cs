@@ -29,6 +29,9 @@ public enum Phase
 
     /// <summary>January to June: the acts are booked and tickets are on sale, a month at a time. It comes between Plan and Build.</summary>
     Sell,
+
+    /// <summary>The morning between two days of a festival of more than one day. The clock is stopped until the gates open again.</summary>
+    Between,
 }
 
 /// <summary>What a year starts with, carried over from the one before.</summary>
@@ -37,6 +40,9 @@ public sealed record YearSetup(int Year = 1, int Licence = FestivalGame.FirstLic
 {
     /// <summary>True to start January with nobody booked, so the whole line-up is the player's to book.</summary>
     public bool EmptyBill { get; init; }
+
+    /// <summary>How many days the festival runs for, for tests and pictures; null for as many as the licence gives.</summary>
+    public int? Days { get; init; }
 }
 
 /// <summary>A headliner who could be booked: how well known (2 to 5 stars) and what they charge.</summary>
@@ -52,6 +58,10 @@ public sealed record YearResult(int Year, int Came, int Expected, int Happy, int
 {
     /// <summary>How many times the music was stopped for an announcement.</summary>
     public int Announcements { get; init; }
+
+    /// <summary>How many days the festival ran for.</summary>
+    public int Days { get; init; } = 1;
+
 
     /// <summary>How many times security were sent into a crush.</summary>
     public int SecuritySent { get; init; }
@@ -107,7 +117,7 @@ public sealed partial class FestivalGame
         Need(Phase.Plan);
         return plan.Problems(Licence, Year).Count > 0
             ? null
-            : StartYear(Name, new YearSetup(Year, Licence, Money, BailedOut, LastHappiness, plan.Save()) { EmptyBill = EmptyBill }).TravellingLike(this);
+            : StartYear(Name, new YearSetup(Year, Licence, Money, BailedOut, LastHappiness, plan.Save()) { EmptyBill = EmptyBill, Days = _daysSet }).TravellingLike(this);
     }
 
     /// <summary>
@@ -137,7 +147,7 @@ public sealed partial class FestivalGame
         }
 
         var bank = Math.Max(Money, TestMoneyFor(licence));
-        return StartYear(Name, new YearSetup(year, licence, bank, BailedOut, LastHappiness, plan.Save()) { EmptyBill = EmptyBill }).TravellingLike(this);
+        return StartYear(Name, new YearSetup(year, licence, bank, BailedOut, LastHappiness, plan.Save()) { EmptyBill = EmptyBill, Days = _daysSet }).TravellingLike(this);
     }
 
     /// <summary>Test mode: the next licence up the ladder, or down it with a negative step.</summary>
@@ -195,7 +205,7 @@ public sealed partial class FestivalGame
     public int? LastHappiness { get; }
 
     /// <summary>The date of the festival.</summary>
-    public DateTime Day { get; }
+    public DateTime Day { get; private set; }
 
     public int TicketPrice { get; private set; } = Catalogue.TicketPrice;
 
@@ -214,7 +224,7 @@ public sealed partial class FestivalGame
     public IEnumerable<Slot> LineUp => BookedShows.SelectMany(s => s.Slots);
 
     /// <summary>What all the acts booked cost.</summary>
-    public int ActFees => LineUp.Sum(s => FeeFor(s.Act));
+    public int ActFees => WholeBill.Sum(s => FeeFor(s.Act));
 
     /// <summary>What the second stage's acts cost, booked or not.</summary>
     public int SecondStageFee => SecondShow.Slots.Sum(s => FeeFor(s.Act));
@@ -272,6 +282,7 @@ public sealed partial class FestivalGame
 
         next.SetHours(RunningOrder.FirstHours);
         next.Booked = true;
+        ClearStageOtherDays(next.Number);
         Crowd.Replan(ExpectedAt(TicketPrice));
         return next.Number;
     }
@@ -308,6 +319,7 @@ public sealed partial class FestivalGame
             here.SetHours(after.Hours);
         }
 
+        RemoveStageOtherDays(stage);
         Crowd.Replan(ExpectedAt(TicketPrice));
         return true;
     }
@@ -470,7 +482,7 @@ public sealed partial class FestivalGame
         CampingBooked = book && CampingOffered;
     }
 
-    public bool CanBuild => Phase is Phase.Build or Phase.Day;
+    public bool CanBuild => Phase is Phase.Build or Phase.Day or Phase.Between;
 
     public IReadOnlyList<LitterPiece> Litter => _litter;
 
@@ -742,10 +754,17 @@ public sealed partial class FestivalGame
         // The day is over when the last person has gone home, or at half past midnight whatever.
         if (Planned && Phase == Phase.Day && clock.Now >= Day + People.Crowd.EveryoneOut && (Crowd.OnSite == 0 || clock.Now >= Day.AddHours(24.5)))
         {
-            // Campers stay the night and pack up in the morning before the tidy-up.
+            RecordDay();
+
+            // Campers stay the night and pack up in the morning before the tidy-up (or, with
+            // another day to come, get up for it).
             if (CampingBooked && Crowd.InTents > 0)
             {
                 StartCampNight(clock.Now);
+            }
+            else if (MoreDaysToCome)
+            {
+                BetweenDays(clock.Now);
             }
             else
             {
@@ -808,7 +827,11 @@ public sealed partial class FestivalGame
     /// <summary>Picks up the litter within reach of a spot. Returns how many pieces.</summary>
     public int PickLitter(double x, double y, double radius = 1.5)
     {
-        Need(Phase.Tidy);
+        if (Phase != Phase.Between)
+        {
+            Need(Phase.Tidy);
+        }
+
         _sick.RemoveAll(s => ((s.X - x) * (s.X - x)) + ((s.Y - y) * (s.Y - y)) <= radius * radius);
         return _litter.RemoveAll(l => ((l.X - x) * (l.X - x)) + ((l.Y - y) * (l.Y - y)) <= radius * radius);
     }
@@ -882,7 +905,7 @@ public sealed partial class FestivalGame
                 return null;
             }
 
-            var happy = Crowd.Happiness;
+            var happy = FestivalHappiness;
             var cleared = LitterCleared;
             var profit = TotalIncome - TotalSpending;
             var bigger = LicenceAfter(Licence);
@@ -902,7 +925,7 @@ public sealed partial class FestivalGame
                 next > Licence && moving && Plan is null ? $"A good festival and a tidy field. The council raises the licence to {next:N0} people, and next year moves to {FieldMap.SizeFor(next).Name}." :
                 next > Licence ? $"A good festival and a tidy field. The council raises the licence to {next:N0} people." :
                 "A good festival and a tidy field. This is as big as a licence gets.";
-            return new YearResult(Year, Crowd.Arrived, Crowd.Expected, happy, Crowd.WentHomeUnhappy, TotalIncome, TotalSpending, cleared, GrassWorn,
+            return new YearResult(Year, Days == 1 || _dayCame.Count == 0 ? Crowd.Arrived : _dayCame.Max(), Crowd.Expected, happy, Days == 1 ? Crowd.WentHomeUnhappy : _dayUnhappy, TotalIncome, TotalSpending, cleared, GrassWorn,
                 verdict, Licence, next, _loanThisYear, Phase == Phase.Closed, Treated, Untreated, TroubleSorted, TroubleIgnored,
                 CrushInjuries, PulledOut, SeriousIncident, _fieldRepair, Weather.Summary)
             {
@@ -910,6 +933,7 @@ public sealed partial class FestivalGame
                 SecuritySent = SecuritySent,
                 ActsCancelled = ActsCancelled,
                 HurtLeftAlone = HurtLeftAlone,
+                Days = Days,
             };
         }
     }
@@ -951,6 +975,8 @@ public sealed partial class FestivalGame
         EmptyBill = EmptyBill,
         GatesShut = Phase == Phase.Day && Crowd.GatesShut,
         GatesOpenedAt = GatesOpenedAt,
+        Days = SaveDays(),
+        DaysSet = _daysSet,
         MainHours = Show.Hours.ToList(),
         SecondHours = SecondShow.Hours.ToList(),
         MoreHours = Shows.Skip(2).Select(s => s.Hours.ToList()).ToList(),
@@ -958,7 +984,7 @@ public sealed partial class FestivalGame
 
     private void RestoreYear(YearSave year)
     {
-        TicketPrice = Math.Clamp(year.TicketPrice, 1, MaxTicketPrice);
+        TicketPrice = Math.Clamp(year.TicketPrice, 1, TopTicketPrice);
         HeadlinerPicked = Math.Clamp(year.Headliner, 0, _offers.Count - 1);
         Show.SetHeadliner(_offers[HeadlinerPicked].Act);
         var stages = Math.Clamp(year.Stages ?? (year.SecondStage ? 2 : 1), 1, Shows.Count);
@@ -997,6 +1023,7 @@ public sealed partial class FestivalGame
         }
 
         RestoreBooking(year.Booking);
+        RestoreDays(year.Days);
         RestoreCampaign(year.Campaign);
         ParkingCharge = Math.Clamp(year.Parking ?? ParkingCharge, 0, DearestParking);
         BusesHired = Math.Clamp(year.Buses, 0, MostBuses);
@@ -1089,4 +1116,10 @@ public sealed record YearSave(int Number, int Licence, Phase Phase, DateTime Day
 
     /// <summary>When the gates were opened on the day, once they had been.</summary>
     public DateTime? GatesOpenedAt { get; init; }
+
+    /// <summary>The days of a festival of more than one day, or null for one day.</summary>
+    public DaysSave? Days { get; init; }
+
+    /// <summary>The number of days set for a test, or null for as many as the licence gives.</summary>
+    public int? DaysSet { get; init; }
 }

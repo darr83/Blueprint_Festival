@@ -107,7 +107,8 @@ public partial class YearScreen : Control
         if (_shown != _game.Phase
             || (_game.Phase == Phase.Build && (_turnShown != _game.SalesTurn || _priceShown != _game.TicketPrice))
             || (_game.Phase == Phase.Tidy && _litterShown != _game.Litter.Count)
-            || (_game.Phase == Phase.Build && _moneyShown != _game.Money))
+            || (_game.Phase == Phase.Build && _moneyShown != _game.Money)
+            || (_game.Phase == Phase.Between && (_moneyShown != _game.Money || _litterShown != _game.Litter.Count)))
         {
             Rebuild();
         }
@@ -199,6 +200,7 @@ public partial class YearScreen : Control
                     PayAsk = PayAsk,
                     AddStage = AddStage,
                     RemoveStage = RemoveStage,
+                    PickDay = PickDay,
                 }, scroll));
                 break;
             case Phase.Sell when _game.Campaigning && _booking && !Running:
@@ -208,6 +210,7 @@ public partial class YearScreen : Control
                         ChangeOffer = ChangeOffer,
                         MakeOffer = MakeOffer,
                         PayAsk = PayAsk,
+                        PickDay = PickDay,
                     }, scroll));
                 break;
             case Phase.Sell when _game.Campaigning:
@@ -227,10 +230,14 @@ public partial class YearScreen : Control
 
                 break;
             case Phase.Build:
-                Side(YearPanels.BuildDay(_game.Crowd.Expected, _game.Money, StartDay, _game.Weather.Summary, WeekOf(_game), NextDay, ChangePrice, TravelOf(_game), ChangeParking, ChangeBuses, ChangeCamping, ChangeVipPrice, _game.StageProblems));
+                Side(YearPanels.BuildDay(_game.Crowd.Expected, _game.Money, StartDay, _game.Weather.Summary, WeekOf(_game), NextDay, ChangePrice, TravelOf(_game), ChangeParking, ChangeBuses, ChangeCamping, ChangeVipPrice, _game.StageProblems,
+                    _game.FirstDay.AddDays(-1).DayOfWeek.ToString(), _game.DayName(0), DaysText(_game)));
                 break;
             case Phase.Tidy:
-                Side(YearPanels.Tidy(_game.Litter.Count, _game.LitterAtStart, _game.ScoutsFee, () => PayScouts(), HandBack, _game.LitterPicked, _game.LitterBinned));
+                Side(YearPanels.Tidy(_game.Litter.Count, _game.LitterAtStart, _game.ScoutsFee, () => PayScouts(), HandBack, _game.LitterPicked, _game.LitterBinned, _game.Now.DayOfWeek.ToString()));
+                break;
+            case Phase.Between:
+                Side(YearPanels.Between(BetweenOf(_game), HireLitterCrew, LayStraw, OpenNextDay));
                 break;
             case Phase.Results:
                 Centre(YearPanels.Results(ResultsOf(_game), NextYear));
@@ -330,8 +337,9 @@ public partial class YearScreen : Control
     public static PlanView PlanOf(FestivalGame game, int picked = 3, string? offerFor = null, int offer = 0, string offerSaid = "")
     {
         var asked = offerFor is null ? null : Roster.Named(offerFor);
+        var dates = game.Days == 1 ? game.Day.ToString("dddd d MMMM yyyy") : $"{game.FirstDay:dddd d} to {game.FirstDay.AddDays(game.Days - 1):dddd d MMMM yyyy}";
         return new(
-        game.Year, game.Name, game.Day.ToString("dddd d MMMM yyyy"), game.Licence, game.Money,
+        game.Year, game.Name, dates, game.Licence, game.Money,
         SlotsOf(game, game.Show), game.SecondStageBooked ? SlotsOf(game, game.SecondShow) : null,
         picked, $"the {StageName(picked)} at {TimeOf(game, picked)}",
         Roster.Artists.Select(a =>
@@ -353,6 +361,9 @@ public partial class YearScreen : Control
         {
             MainNeeds = NeedsOf(game, false),
             SecondNeeds = NeedsOf(game, true),
+            Days = game.Days == 1 ? System.Array.Empty<string>() : Enumerable.Range(0, game.Days).Select(game.DayName).ToList(),
+            DayShown = game.BillDay,
+            NoHeadliner = game.Days == 1 ? System.Array.Empty<string>() : game.DaysWithNoHeadliner,
             Extra = game.Shows.Skip(1).Where(s => s.Booked)
                 .Select(s => new StageBillView(s.Number, FestivalGame.StageTitle(s.Number), SlotsOf(game, s), NeedsOf(game, s.Number))).ToList(),
             Offer = asked is null ? null : new OfferView(asked.Name, asked.Rating, game.FeeFor(asked.Name), System.Math.Min(offer, game.FeeFor(asked.Name)),
@@ -391,11 +402,11 @@ public partial class YearScreen : Control
         var sales = SalesOf(game, running) with { FairPrice = (int)System.Math.Round(game.PerceivedFairPrice) };
         var time = game.JobsLeft > 0;
         var jobs = new List<JobView>();
-        var closing = game.Show.Slots.LastOrDefault()?.Act.Name;
-        foreach (var slot in game.Secret.OrderByDescending(s => game.AnnounceWorth(s.Act.Name)))
+        var closing = Enumerable.Range(0, game.Days).Select(d => game.HeadlinerOf(d)?.Name).ToHashSet();
+        foreach (var slot in game.Secret.DistinctBy(s => s.Act.Name).OrderByDescending(s => game.AnnounceWorth(s.Act.Name)))
         {
             var act = slot.Act;
-            var head = act.Name == closing ? " Your headliner: extra buzz." : "";
+            var head = closing.Contains(act.Name) ? " Your headliner: extra buzz." : "";
             jobs.Add(new JobView($"announce:{act.Name}", "Announce an act", $"Announce {act.Name}",
                 $"{act.Rating} star{(act.Rating == 1 ? "" : "s")}, {Roster.FansText(act.Fans)} fans. About {game.AnnounceWorth(act.Name):N0} tickets this month.{head}", "Announce", time));
         }
@@ -936,6 +947,63 @@ public partial class YearScreen : Control
         SoundBoard.Cue(paid ? Sounds.Coins : Sounds.Refuse);
         Rebuild();
         return paid;
+    }
+
+    /// <summary>Shows another day's acts on the planning screen.</summary>
+    public void PickDay(int day)
+    {
+        _game.ShowDayBill(day);
+        _offerFor = null;
+        _offerSaid = "";
+        Rebuild();
+    }
+
+    /// <summary>Pays the overnight litter crew between the days.</summary>
+    public void HireLitterCrew()
+    {
+        if (_game.HireLitterCrew())
+        {
+            SoundBoard.Cue(Sounds.Coins);
+        }
+
+        Rebuild();
+    }
+
+    /// <summary>Lays straw on the mud between the days.</summary>
+    public void LayStraw()
+    {
+        if (_game.LayStraw())
+        {
+            SoundBoard.Cue(Sounds.Coins);
+        }
+
+        Rebuild();
+    }
+
+    /// <summary>Opens the gates on the next day of the festival.</summary>
+    public void OpenNextDay()
+    {
+        _game.OpenNextDay();
+        Rebuild();
+    }
+
+    /// <summary>A line on how long the festival runs, or nothing for one day.</summary>
+    public static string DaysText(FestivalGame game) => game.Days switch
+    {
+        1 => "",
+        2 => $"Two days: {game.DayName(0)} and {game.DayName(1)}. What you build stays up for both, and the staff are paid each day.",
+        _ => $"{game.Days} days: {game.DayName(0)} to {game.DayName(game.Days - 1)}. What you build stays up for them all, and the staff are paid each day.",
+    };
+
+    /// <summary>What the panel between two days of the festival shows.</summary>
+    public static BetweenView BetweenOf(FestivalGame game)
+    {
+        var next = game.DayNumber + 1;
+        return new BetweenView(game.DayName(game.DayNumber), game.DayName(next), next + 1, game.Days,
+            game.DayHappiness.Count > 0 ? game.DayHappiness[^1] : game.Crowd.Happiness,
+            game.Litter.Count, game.LitterCrewCost, game.LitterCrewHired, game.WornPatches, game.StrawCost, game.StrawLaid,
+            (int)System.Math.Round(game.NextDayMood * 100), (int)System.Math.Round(game.LitterMood * 100), (int)System.Math.Round(game.MudMood * 100),
+            (int)System.Math.Round(game.CampNightMood * 100), game.DayWages, game.Money, game.HeadlinerOf(next)?.Name ?? "Nobody booked");
     }
 
     public void HandBack()

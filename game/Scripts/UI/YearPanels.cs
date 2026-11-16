@@ -262,24 +262,30 @@ public static partial class YearPanels
     /// <summary>The small panel shown while building. In a year that sells ahead it is build week, and each day sells the last tickets.</summary>
     public static Control BuildDay(int expected, int bank, System.Action? open = null, string forecast = "", BuildWeekView? week = null,
         System.Action? nextDay = null, System.Action<int>? price = null, TravelView? travel = null, System.Action<int>? parking = null, System.Action<int>? buses = null,
-        System.Action<int>? camping = null, System.Action<int>? vipPrice = null, System.Collections.Generic.IReadOnlyList<string>? stageProblems = null)
+        System.Action<int>? camping = null, System.Action<int>? vipPrice = null, System.Collections.Generic.IReadOnlyList<string>? stageProblems = null,
+        string buildDay = "Friday", string firstDay = "Saturday", string days = "")
     {
         var panel = Card(360);
         var (box, footer) = Scrolling(panel);
-        box.AddChild(UiStyle.Caps(week is null ? "Friday" : "Build week", pink: true));
+        box.AddChild(UiStyle.Caps(week is null ? buildDay : "Build week", pink: true));
         box.AddChild(UiStyle.Heading(week is null ? "Build day" : week.Day ?? "Ready to open", 28));
         var words = UiStyle.Body(week is null
-            ? "Friday. Nobody is here yet and the clock is stopped. Put up what you need, then start the day. It starts at 8am with the gates shut: people queue outside until you open them."
+            ? $"{buildDay}. Nobody is here yet and the clock is stopped. Put up what you need, then start the day. It starts at 8am with the gates shut: people queue outside until you open them."
             : "Nobody is here yet and the clock is stopped. Put up what you need. Ending each day sells that day's tickets.", muted: true, size: 14);
         words.AutowrapMode = TextServer.AutowrapMode.WordSmart;
         words.CustomMinimumSize = new Vector2(300, 0);
         box.AddChild(words);
+        if (days.Length > 0)
+        {
+            box.AddChild(Wrapped(days, 300, size: 14));
+        }
+
         if (forecast.Length > 0)
         {
             var weather = new PanelContainer();
             weather.AddThemeStyleboxOverride("panel", UiStyle.Box(UiStyle.SunTint, 8, null, 12));
             var lines = new VBoxContainer();
-            lines.AddChild(Section(week is null ? "Tomorrow's weather" : "Saturday's weather"));
+            lines.AddChild(Section(week is null ? "Tomorrow's weather" : $"{firstDay}'s weather"));
             var said = UiStyle.Body(forecast, size: 15);
             said.AutowrapMode = TextServer.AutowrapMode.WordSmart;
             said.CustomMinimumSize = new Vector2(270, 0);
@@ -378,13 +384,13 @@ public static partial class YearPanels
     }
 
     /// <summary>The small panel shown the morning after, while the field is tidied.</summary>
-    public static Control Tidy(int litterLeft, int litterAtStart, int scoutsFee, System.Action? pay = null, System.Action? done = null, int picked = 0, int binned = 0)
+    public static Control Tidy(int litterLeft, int litterAtStart, int scoutsFee, System.Action? pay = null, System.Action? done = null, int picked = 0, int binned = 0, string morning = "Sunday")
     {
         var panel = Card(360);
         var box = new VBoxContainer();
         box.AddThemeConstantOverride("separation", 8);
         panel.AddChild(box);
-        box.AddChild(UiStyle.Caps("Sunday", pink: true));
+        box.AddChild(UiStyle.Caps(morning, pink: true));
         box.AddChild(UiStyle.Heading("The morning after", 28));
         var words = UiStyle.Body("The farmer wants his field back as he lent it. Click litter to pick it up, or pay for help.", muted: true, size: 14);
         words.AutowrapMode = TextServer.AutowrapMode.WordSmart;
@@ -414,4 +420,81 @@ public static partial class YearPanels
         box.AddChild(UiStyle.Button("Hand the field back", done ?? (() => { })));
         return panel;
     }
+
+    /// <summary>
+    /// The panel on the morning between two days of the festival: the overnight jobs, what carries
+    /// over from yesterday, and the button that opens the gates again.
+    /// </summary>
+    public static Control Between(BetweenView view, System.Action? crew = null, System.Action? straw = null, System.Action? open = null)
+    {
+        var panel = Card(360);
+        panel.Name = "Between";
+        var (box, footer) = Scrolling(panel);
+        box.AddChild(UiStyle.Caps($"Between the days  ·  day {view.DayOf} of {view.Days}", pink: true));
+        box.AddChild(UiStyle.Heading($"Ready for {view.Today}?", 28));
+        box.AddChild(Wrapped($"{view.Yesterday} is over. Day visitors have gone home and the campers are in their tents. The clock is stopped: choose the overnight jobs, change the site if you like, then open the gates.", 300, muted: true, size: 14));
+
+        box.AddChild(Section("Overnight jobs"));
+        if (view.CrewHired)
+        {
+            box.AddChild(MoneyRow("Litter crew", "Arena cleared"));
+        }
+        else if (view.Litter > 0)
+        {
+            var button = UiStyle.SecondaryButton($"Litter crew: clear the arena  ·  £{view.CrewCost:N0}", crew ?? (() => { }));
+            button.Name = "LitterCrew";
+            button.TooltipText = $"{view.Litter:N0} pieces of litter are lying about. Left there, people come back a little less happy.";
+            box.AddChild(button);
+        }
+        else
+        {
+            box.AddChild(MoneyRow("Litter", "None to clear", muted: true));
+        }
+
+        if (view.StrawLaid)
+        {
+            box.AddChild(MoneyRow("Straw on the mud", "Laid"));
+        }
+        else if (view.Worn > 0)
+        {
+            var button = UiStyle.SecondaryButton($"Straw on the worn ground  ·  £{view.StrawCost:N0}", straw ?? (() => { }));
+            button.Name = "Straw";
+            button.TooltipText = $"{view.Worn:N0} patches are worn through. Straw saves the grass under it, and people mind the mud less.";
+            box.AddChild(button);
+        }
+
+        box.AddChild(Section($"What carries over from {view.Yesterday}"));
+        box.AddChild(MoneyRow($"How {view.Yesterday} ended", $"{view.Happy}% happy"));
+        if (view.LitterMood > 0)
+        {
+            box.AddChild(MoneyRow("Litter about", $"down {view.LitterMood}%", muted: true));
+        }
+
+        if (view.MudMood > 0)
+        {
+            box.AddChild(MoneyRow("The mud", $"down {view.MudMood}%", muted: true));
+        }
+
+        if (view.CampMood != 0)
+        {
+            box.AddChild(MoneyRow("The night in the camp", view.CampMood > 0 ? $"up {view.CampMood}%" : $"down {-view.CampMood}%", muted: true));
+        }
+
+        box.AddChild(MoneyRow("People come back", $"about {view.NextMood}% happy", strong: true));
+
+        box.AddChild(Section(view.Today));
+        box.AddChild(MoneyRow("Top of the bill", view.Headliner));
+        box.AddChild(MoneyRow("Staff wages for the day", $"£{view.Wages:N0}"));
+
+        footer.AddChild(MoneyRow("In the bank", $"£{view.Bank:N0}"));
+        footer.AddChild(new Control { CustomMinimumSize = new Vector2(0, 4) });
+        var go = UiStyle.Button($"Open for {view.Today}", open ?? (() => { }));
+        go.Name = "OpenNextDay";
+        footer.AddChild(go);
+        return panel;
+    }
 }
+
+/// <summary>What the panel between two days of the festival shows.</summary>
+public sealed record BetweenView(string Yesterday, string Today, int DayOf, int Days, int Happy, int Litter, int CrewCost, bool CrewHired, int Worn, int StrawCost,
+    bool StrawLaid, int NextMood, int LitterMood, int MudMood, int CampMood, int Wages, int Bank, string Headliner);
