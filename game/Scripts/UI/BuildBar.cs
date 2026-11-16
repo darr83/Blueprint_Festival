@@ -271,16 +271,17 @@ public partial class BuildBar : VBoxContainer
         switch (mode)
         {
             case BuildMode.Stage:
-                foreach (var s in Catalogue.Stages)
+                // Small, then medium, then large: three styles of each, cheapest first.
+                foreach (var s in new[] { StageSize.Small, StageSize.Medium, StageSize.Large }.SelectMany(Catalogue.StagesOf))
                 {
-                    AddChoice($"stage{s.Kind}", s.Name, $"£{s.Cost:N0}", $"{s.About}\n{s.Width / 2f:0.#} m wide, {s.Depth / 2f:0.#} m deep.", () => _tool.PickStage(s.Kind));
+                    AddChoice($"stage{s.Kind}", s.Name, $"£{s.Cost:N0}", StageTip(s), () => _tool.PickStage(s.Kind), Catalogue.Name(s.Size), 118);
                 }
 
                 foreach (var b in BigScreens.All)
                 {
-                    AddChoice(ScreenKey(b.Kind), b.Name, $"£{b.Cost:N0}",
-                        $"{b.About}\nShows the nearest stage live. People up to {b.Reach:0} m in front of it get the whole act, however far back from the stage they are.\nWithout one, people more than {BigScreens.ClearMetres:0} m from a stage enjoy the act less and less.\nR turns it.",
-                        () => _tool.PickScreen(b.Kind));
+                    AddChoice(ScreenKey(b.Kind), b.Name, $"£{b.Cost:N0}", width: 118, tip:
+                        $"{b.About}\nShows the nearest stage live. People up to {b.Reach:0} m in front of it get the whole act, however far back from the stage they are.\nWithout one, people far back from a stage enjoy the act less and less. A bigger stage carries further.\nR turns it.",
+                        pick: () => _tool.PickScreen(b.Kind));
                 }
 
                 break;
@@ -532,19 +533,43 @@ public partial class BuildBar : VBoxContainer
             : ("stall", UiStyle.StagePink);
     }
 
-    private void AddChoice(string key, string name, string price, string tip, System.Action pick)
+    /// <summary>What the card of a stage says when the mouse rests on it: its size, who will play it and how far back it carries.</summary>
+    public static string StageTip(StageInfo s)
+    {
+        var acts = s.Size switch
+        {
+            StageSize.Small => "One and two star acts will play it.",
+            StageSize.Medium => "Acts of up to four stars will play it.",
+            _ => "Any act will play it, and five star acts will play nothing smaller.",
+        };
+        var far = s.OwnScreens
+            ? $"Its own screens let people see well up to {BigScreens.OwnScreenMetres:0} m back."
+            : $"People see and hear well up to {s.ClearMetres:0} m back.";
+        return $"{s.About}\n{Catalogue.Name(s.Size)} stage. Room for {s.Performers} on stage. {acts}\n{far}\n{s.Width / 2f:0.#} m wide, {s.Depth / 2f:0.#} m deep.";
+    }
+
+    private void AddChoice(string key, string name, string price, string tip, System.Action pick, string? tag = null, int width = 124)
     {
         // A card: the icon, the name, and the price in the poster font.
         var button = UiStyle.Button("", pick);
         button.ThemeTypeVariation = UiStyle.ChoiceCard;
         button.ToggleMode = true;
         button.TooltipText = tip;
-        button.CustomMinimumSize = new Vector2(124, 104);
+        button.CustomMinimumSize = new Vector2(width, 104);
         var column = new VBoxContainer { MouseFilter = MouseFilterEnum.Ignore, Alignment = AlignmentMode.Center };
         column.AddThemeConstantOverride("separation", 1);
         column.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect, LayoutPresetMode.Minsize, 6);
         var (icon, colour) = IconOf(key);
-        column.AddChild(UiStyle.IconView(icon, 30, colour));
+        column.AddChild(UiStyle.IconView(icon, tag is null ? 30 : 22, colour));
+        if (tag is not null)
+        {
+            // A word over the name, such as the size of a stage.
+            var word = UiStyle.Caps(tag);
+            word.HorizontalAlignment = HorizontalAlignment.Center;
+            word.MouseFilter = MouseFilterEnum.Ignore;
+            column.AddChild(word);
+        }
+
         var title = UiStyle.Body(name, size: 13, bold: true);
         title.HorizontalAlignment = HorizontalAlignment.Center;
         title.AutowrapMode = TextServer.AutowrapMode.WordSmart;

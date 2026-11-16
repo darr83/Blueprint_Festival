@@ -40,41 +40,58 @@ public static partial class SiteProps
 
     public static Node3D Stage(StageKind kind, string festivalName)
     {
-        var node = new Node3D { Name = Catalogue.Of(kind).Name };
-        if (kind == StageKind.MainStage)
+        var info = Catalogue.Of(kind);
+        var node = new Node3D { Name = info.Name };
+
+        // A large stage is built at the size of a medium one and then made two thirds bigger every way.
+        var holder = node;
+        if (info.Deck == StageKind.MainStage)
         {
-            // The hired stage's big sister: the same shape, two thirds bigger every way.
-            var scaled = new Node3D { Name = "Scaled", Scale = Vector3.One * MainStageScale };
-            var shapes = new MeshBuilder();
-            HiredStage(shapes, scaled, festivalName);
-            scaled.AddChild(shapes.BuildNode("Shapes"));
-            node.AddChild(scaled);
-            return node;
+            holder = new Node3D { Name = "Scaled", Scale = Vector3.One * MainStageScale };
+            node.AddChild(holder);
         }
 
         var b = new MeshBuilder();
         switch (kind)
         {
             case StageKind.FarmTrailer:
-                FarmTrailer(b, node, festivalName);
+                FarmTrailer(b, holder, festivalName);
                 break;
             case StageKind.Bandstand:
-                Bandstand(b, node, festivalName);
+                Bandstand(b, holder, festivalName);
+                break;
+            case StageKind.MarqueeStage:
+                MarqueeStage(b, holder, festivalName);
+                break;
+            case StageKind.BigTop:
+                BigTop(b, holder, festivalName);
+                break;
+            case StageKind.TruckStage:
+                TruckStage(b, holder, festivalName);
+                break;
+            case StageKind.ArchStage:
+                ArchStage(b, holder, festivalName);
+                break;
+            case StageKind.TowerStage:
+                TowerStage(b, holder, festivalName);
                 break;
             default:
-                HiredStage(b, node, festivalName);
+                HiredStage(b, holder, festivalName);
                 break;
         }
 
-        node.AddChild(b.BuildNode("Shapes"));
+        holder.AddChild(b.BuildNode("Shapes"));
 
         // Sit the model at the back of its ground, so steps and bales at the front are inside it.
-        var shift = kind switch { StageKind.FarmTrailer => -0.25f, StageKind.Bandstand => -0.5f, _ => 0f };
-        foreach (var child in node.GetChildren())
+        var shift = info.Deck switch { StageKind.FarmTrailer => -0.25f, StageKind.Bandstand => -0.5f, _ => 0f };
+        if (shift != 0)
         {
-            if (child is Node3D part)
+            foreach (var child in node.GetChildren())
             {
-                part.Position += new Vector3(0, 0, shift);
+                if (child is Node3D part)
+                {
+                    part.Position += new Vector3(0, 0, shift);
+                }
             }
         }
 
@@ -120,6 +137,69 @@ public static partial class SiteProps
         Bunting(b, new Vector3((-w / 2) + 0.1f, top + 2.3f, (-d / 2) + 0.16f), new Vector3((w / 2) - 0.1f, top + 2.3f, (-d / 2) + 0.16f), 0.3f);
         Speaker(b, new Vector3((-w / 2) + 0.7f, top, 0.5f), 0.9f, onStand: true);
         Speaker(b, new Vector3((w / 2) - 0.7f, top, 0.5f), 0.9f, onStand: true);
+    }
+
+    /// <summary>The small wooden deck the bandstand and the marquee stage share, with its steps.</summary>
+    private static void SmallDeck(MeshBuilder b, Color stripe)
+    {
+        const float w = 6f, d = 4.5f, top = 0.6f;
+        b.Box(new Vector3(0, top - 0.07f, 0), new Vector3(w, 0.14f, d), Deck);
+        b.Box(new Vector3(0, (top - 0.14f) / 2, 0), new Vector3(w - 0.1f, top - 0.14f, d - 0.1f), WoodDark);
+        for (var i = 0; i < 12; i++)
+        {
+            b.Box(new Vector3((-w / 2) + 0.25f + (i * 0.5f), (top - 0.14f) / 2, (d / 2) - 0.03f), new Vector3(0.42f, top - 0.18f, 0.05f), i % 2 == 0 ? Canvas : stripe);
+        }
+
+        b.Box(new Vector3(0, 0.15f, (d / 2) + 0.55f), new Vector3(1.6f, 0.3f, 0.5f), Deck);
+        b.Box(new Vector3(0, 0.22f, (d / 2) + 0.2f), new Vector3(1.6f, 0.44f, 0.4f), Deck);
+    }
+
+    /// <summary>A small stage under a white marquee with two peaks and a sunflower edge.</summary>
+    private static void MarqueeStage(MeshBuilder b, Node3D node, string name)
+    {
+        const float w = 6f, d = 4.5f, top = 0.6f, eaves = 3.1f, peak = 4.9f;
+        SmallDeck(b, Sunflower);
+        var hx = (w / 2) + 0.3f;
+        var hz = (d / 2) + 0.3f;
+        foreach (var x in new[] { -hx + 0.15f, 0f, hx - 0.15f })
+        {
+            foreach (var z in new[] { (-d / 2) + 0.1f, (d / 2) - 0.1f })
+            {
+                if (x != 0 || z < 0)
+                {
+                    // No pole in the middle of the front: the band is there.
+                    b.Tube(new Vector3(x, eaves / 2, z + (z > 0 ? 0.25f : -0.25f)), new Vector3(0.12f, eaves, 0.12f), Steel);
+                }
+            }
+        }
+
+        // Two peaks side by side, each a four-sided canvas tent.
+        var shade = new Color("#E7DFCC");
+        foreach (var side in new[] { -1f, 1f })
+        {
+            var x0 = side < 0 ? -hx : 0f;
+            var x1 = side < 0 ? 0f : hx;
+            var tip = new Vector3((x0 + x1) / 2, peak, 0);
+            var (a, c, e, g) = (new Vector3(x0, eaves, hz), new Vector3(x1, eaves, hz), new Vector3(x1, eaves, -hz), new Vector3(x0, eaves, -hz));
+            b.Triangle(a, c, tip, Canvas);
+            b.Triangle(c, e, tip, shade);
+            b.Triangle(e, g, tip, Canvas);
+            b.Triangle(g, a, tip, shade);
+            b.Tube(tip + new Vector3(0, 0.3f, 0), new Vector3(0.05f, 0.6f, 0.05f), SteelDark);
+            b.Box(tip + new Vector3(0.22f, 0.48f, 0), new Vector3(0.44f, 0.24f, 0.02f), side < 0 ? Pink : Sunflower);
+        }
+
+        // The edge all round, the back wall and the name over the front.
+        b.Box(new Vector3(0, eaves - 0.16f, hz), new Vector3(2 * hx, 0.34f, 0.05f), Sunflower);
+        b.Box(new Vector3(0, eaves - 0.16f, -hz), new Vector3(2 * hx, 0.34f, 0.05f), Sunflower);
+        b.Box(new Vector3(-hx, eaves - 0.16f, 0), new Vector3(0.05f, 0.34f, 2 * hz), Sunflower);
+        b.Box(new Vector3(hx, eaves - 0.16f, 0), new Vector3(0.05f, 0.34f, 2 * hz), Sunflower);
+        b.Box(new Vector3(0, top + ((eaves - top) / 2), (-d / 2) - 0.1f), new Vector3(w + 0.3f, eaves - top, 0.05f), Canvas);
+        Painted(node, name, new Vector3(0, eaves - 0.16f, hz + 0.04f), 5.4f, 0.24f, new Color("#1D2B36"));
+
+        Bunting(b, new Vector3(-hx + 0.15f, eaves - 0.45f, (d / 2) + 0.1f), new Vector3(hx - 0.15f, eaves - 0.45f, (d / 2) + 0.1f), 0.35f);
+        Speaker(b, new Vector3((-w / 2) + 0.6f, top, (d / 2) - 0.6f), 0.8f, onStand: true);
+        Speaker(b, new Vector3((w / 2) - 0.6f, top, (d / 2) - 0.6f), 0.8f, onStand: true);
     }
 
     private static void Bandstand(MeshBuilder b, Node3D node, string name)
@@ -181,9 +261,11 @@ public static partial class SiteProps
         Speaker(b, new Vector3((w / 2) - 0.6f, top, (d / 2) - 0.6f), 0.8f, onStand: true);
     }
 
-    private static void HiredStage(MeshBuilder b, Node3D node, string name)
+    /// <summary>The steel deck every medium and large stage stands on: black skirt, side steps, the band's kit, and speaker stacks on wings.</summary>
+    private static void BigDeck(MeshBuilder b, bool stacks = true)
     {
-        const float w = 9f, d = 6f, top = 1.3f, front = 6.6f, back = 5.2f;
+        const float w = 9f, d = 6f, top = 1.3f;
+        var tz = (d / 2) - 0.2f;
         // Deck with a black skirt, and steps at the east side.
         b.Box(new Vector3(0, top - 0.06f, 0), new Vector3(w, 0.12f, d), new Color("#70757C"));
         b.Box(new Vector3(0, (top - 0.12f) / 2, 0), new Vector3(w - 0.06f, top - 0.12f, d - 0.06f), Black);
@@ -192,6 +274,30 @@ public static partial class SiteProps
             b.Box(new Vector3((w / 2) + 0.2f + (i * 0.32f), (top * (4 - i) / 5f) / 2, (-d / 2) + 1f), new Vector3(0.32f, top * (4 - i) / 5f, 1.1f), SteelDark);
         }
 
+        // Speaker stacks on wings either side, and kit on the stage.
+        foreach (var side in stacks ? new[] { -1f, 1f } : System.Array.Empty<float>())
+        {
+            var x = side * ((w / 2) + 0.75f);
+            b.Box(new Vector3(x, top / 2, tz - 0.6f), new Vector3(1.3f, top, 1.3f), Black);
+            Speaker(b, new Vector3(x, top, tz - 0.6f), 1.1f, onStand: false);
+            Speaker(b, new Vector3(x, top + 1.1f, tz - 0.6f), 1.1f, onStand: false);
+        }
+
+        b.Box(new Vector3(-0.2f, top + 0.35f, -1.4f), new Vector3(1.9f, 0.3f, 1.5f), Charcoal);
+        b.Box(new Vector3(-2.9f, top + 0.4f, -1.7f), new Vector3(0.8f, 0.8f, 0.5f), Black);
+        b.Box(new Vector3(2.9f, top + 0.4f, -1.7f), new Vector3(0.8f, 0.8f, 0.5f), Black);
+        MicStand(b, new Vector3(-2.2f, top, 1.2f));
+        MicStand(b, new Vector3(2.2f, top, 1.2f));
+        foreach (var x in new[] { -1.1f, 1.1f })
+        {
+            b.Box(new Vector3(x, top + 0.16f, 2.3f), new Vector3(0.7f, 0.3f, 0.45f), Black, new Vector3(-25, 0, 0));
+        }
+    }
+
+    private static void HiredStage(MeshBuilder b, Node3D node, string name)
+    {
+        const float w = 9f, d = 6f, top = 1.3f, front = 6.6f, back = 5.2f;
+        BigDeck(b);
         // Four truss towers and the roof beams.
         var tx = (w / 2) - 0.2f;
         var tz = (d / 2) - 0.2f;
@@ -228,24 +334,223 @@ public static partial class SiteProps
             b.Tube(new Vector3(x, front - 0.62f, tz - 0.05f), new Vector3(0.3f, 0.36f, 0.3f), Black, new Vector3(55, 0, 0));
             b.Tube(new Vector3(x, front - 0.73f, tz + 0.11f), new Vector3(0.24f, 0.03f, 0.24f), cans[i], new Vector3(55, 0, 0));
         }
+    }
 
-        // Speaker stacks on wings either side, and kit on the stage.
-        foreach (var side in new[] { -1f, 1f })
+    /// <summary>A row of coloured stage lights along a line, pointing forward and down.</summary>
+    private static void Cans(MeshBuilder b, Vector3 from, Vector3 to, int count)
+    {
+        var colours = new[] { new Color("#FFE08A"), new Color("#F29BBB"), new Color("#8FD3F0"), new Color("#B9F0A8") };
+        for (var i = 0; i < count; i++)
         {
-            var x = side * ((w / 2) + 0.75f);
-            b.Box(new Vector3(x, top / 2, tz - 0.6f), new Vector3(1.3f, top, 1.3f), Black);
-            Speaker(b, new Vector3(x, top, tz - 0.6f), 1.1f, onStand: false);
-            Speaker(b, new Vector3(x, top + 1.1f, tz - 0.6f), 1.1f, onStand: false);
+            var at = from.Lerp(to, count == 1 ? 0.5f : i / (float)(count - 1));
+            b.Tube(at, new Vector3(0.3f, 0.36f, 0.3f), Black, new Vector3(55, 0, 0));
+            b.Tube(at + new Vector3(0, -0.11f, 0.16f), new Vector3(0.24f, 0.03f, 0.24f), colours[i % colours.Length], new Vector3(55, 0, 0));
+        }
+    }
+
+    /// <summary>A medium stage under a striped circus tent on two king poles.</summary>
+    private static void BigTop(MeshBuilder b, Node3D node, string name)
+    {
+        const float w = 9f, d = 6f, top = 1.3f, eaves = 5.6f, peak = 9.2f, saddle = 7.6f;
+        BigDeck(b);
+        var hx = (w / 2) + 0.9f;
+        var hz = (d / 2) + 0.5f;
+        var left = new Vector3(-2.7f, peak, 0);
+        var right = new Vector3(2.7f, peak, 0);
+        var mid = new Vector3(0, saddle, 0);
+
+        // Round the edge of the roof in short runs, each a stripe up to the nearest pole.
+        const int across = 8, deep = 4;
+        var edge = new System.Collections.Generic.List<Vector3>();
+        for (var i = 0; i < across; i++) { edge.Add(new Vector3(-hx + (2 * hx * i / across), eaves, hz)); }
+        for (var i = 0; i < deep; i++) { edge.Add(new Vector3(hx, eaves, hz - (2 * hz * i / deep))); }
+        for (var i = 0; i < across; i++) { edge.Add(new Vector3(hx - (2 * hx * i / across), eaves, -hz)); }
+        for (var i = 0; i < deep; i++) { edge.Add(new Vector3(-hx, eaves, -hz + (2 * hz * i / deep))); }
+        for (var i = 0; i < edge.Count; i++)
+        {
+            var (p, q) = (edge[i], edge[(i + 1) % edge.Count]);
+            var middleX = (p.X + q.X) / 2;
+            var colour = i % 2 == 0 ? Pink : Canvas;
+            b.Triangle(p, q, middleX < 0 ? left : right, colour);
+            b.Box((p + q) / 2 + new Vector3(0, -0.2f, 0), new Vector3(MathF.Abs(q.X - p.X) + 0.06f, 0.4f, MathF.Abs(q.Z - p.Z) + 0.06f), Sunflower);
         }
 
-        b.Box(new Vector3(-0.2f, top + 0.35f, -1.4f), new Vector3(1.9f, 0.3f, 1.5f), Charcoal);
-        b.Box(new Vector3(-2.9f, top + 0.4f, -1.7f), new Vector3(0.8f, 0.8f, 0.5f), Black);
-        b.Box(new Vector3(2.9f, top + 0.4f, -1.7f), new Vector3(0.8f, 0.8f, 0.5f), Black);
-        MicStand(b, new Vector3(-2.2f, top, 1.2f));
-        MicStand(b, new Vector3(2.2f, top, 1.2f));
-        foreach (var x in new[] { -1.1f, 1.1f })
+        // The dip between the two poles, front and back.
+        foreach (var z in new[] { hz, -hz })
         {
-            b.Box(new Vector3(x, top + 0.16f, 2.3f), new Vector3(0.7f, 0.3f, 0.45f), Black, new Vector3(-25, 0, 0));
+            var at = new Vector3(0, eaves, z);
+            b.Triangle(left, mid, at, Canvas);
+            b.Triangle(mid, right, at, Canvas);
+        }
+
+        // King poles through the canvas with a flag each, and side poles round the edge.
+        foreach (var tip in new[] { left, right })
+        {
+            b.Tube(tip + new Vector3(0, 0.5f, 0), new Vector3(0.08f, 1.0f, 0.08f), SteelDark);
+            b.Box(tip + new Vector3(0.35f, 0.82f, 0), new Vector3(0.7f, 0.34f, 0.02f), Sunflower);
+        }
+
+        foreach (var x in new[] { -hx + 0.1f, hx - 0.1f })
+        {
+            foreach (var z in new[] { hz - 0.1f, 0f, -hz + 0.1f })
+            {
+                b.Tube(new Vector3(x, eaves / 2, z), new Vector3(0.14f, eaves, 0.14f), Canvas);
+            }
+        }
+
+        // Backdrop and a painted board over the front.
+        b.Box(new Vector3(0, (top + eaves) / 2, (-d / 2) - 0.1f), new Vector3(w + 1.2f, eaves - top, 0.06f), Backdrop);
+        b.Box(new Vector3(0, top + 2.3f, (-d / 2) - 0.04f), new Vector3(4.6f, 1.5f, 0.05f), Sunflower);
+        b.Box(new Vector3(0, top + 2.3f, (-d / 2) - 0.01f), new Vector3(4.3f, 1.2f, 0.05f), Pink);
+        b.Box(new Vector3(0, eaves + 0.3f, hz + 0.05f), new Vector3(6.6f, 0.62f, 0.08f), Pink);
+        Painted(node, name, new Vector3(0, eaves + 0.3f, hz + 0.1f), 6.2f, 0.42f, Colors.White);
+        Truss(b, new Vector3(-hx + 0.3f, eaves - 0.5f, hz - 0.5f), new Vector3(hx - 0.3f, eaves - 0.5f, hz - 0.5f));
+        Cans(b, new Vector3(-3.5f, eaves - 0.95f, hz - 0.45f), new Vector3(3.5f, eaves - 0.95f, hz - 0.45f), 8);
+    }
+
+    /// <summary>A medium stage that folds out of a lorry: the side drops to make the deck and the roof lifts on rams.</summary>
+    private static void TruckStage(MeshBuilder b, Node3D node, string name)
+    {
+        const float w = 9f, d = 6f, top = 1.3f, roofBack = 5.0f, roofFront = 6.4f;
+        var teal = new Color("#1C9C9A");
+        var tealDark = new Color("#167C7A");
+        BigDeck(b);
+
+        // The lorry body along the back: floor, back wall and ends.
+        var bz = (-d / 2) + 0.15f;
+        b.Box(new Vector3(0, (top + roofBack) / 2, bz), new Vector3(w, roofBack - top, 0.14f), teal);
+        b.Box(new Vector3(0, top + 2.3f, bz + 0.1f), new Vector3(4.6f, 1.5f, 0.05f), Sunflower);
+        b.Box(new Vector3(0, top + 2.3f, bz + 0.13f), new Vector3(4.3f, 1.2f, 0.05f), Pink);
+        foreach (var side in new[] { -1f, 1f })
+        {
+            b.Box(new Vector3(side * ((w / 2) - 0.07f), (top + roofBack) / 2, -1.7f), new Vector3(0.14f, roofBack - top, 2.5f), tealDark);
+        }
+
+        // The roof, hinged at the back and pushed up at the front by four rams.
+        var run = d + 0.6f;
+        var tilt = MathF.Atan2(roofFront - roofBack, run);
+        b.Box(new Vector3(0, (roofFront + roofBack) / 2, 0.15f), new Vector3(w + 0.3f, 0.16f, run / MathF.Cos(tilt)), teal, new Vector3(-Mathf.RadToDeg(tilt), 0, 0));
+        b.Box(new Vector3(0, roofFront - 0.12f, (d / 2) + 0.42f), new Vector3(w + 0.3f, 0.55f, 0.08f), Sunflower);
+        Painted(node, name, new Vector3(0, roofFront - 0.12f, (d / 2) + 0.47f), 6.2f, 0.4f, new Color("#1D2B36"));
+        foreach (var side in new[] { -1f, 1f })
+        {
+            var x = side * ((w / 2) - 0.25f);
+            b.Tube(new Vector3(x, (top + roofFront - 0.25f) / 2, (d / 2) - 0.3f), new Vector3(0.14f, roofFront - 0.25f - top, 0.14f), Steel);
+            b.Tube(new Vector3(x, (top + 5.6f) / 2, 0), new Vector3(0.1f, 5.6f - top, 0.1f), SteelDark);
+        }
+
+        Cans(b, new Vector3(-3.5f, roofFront - 0.6f, (d / 2) - 0.1f), new Vector3(3.5f, roofFront - 0.6f, (d / 2) - 0.1f), 8);
+
+        // The cab at the west end, behind the speakers, and wheels along the front.
+        var cx = (-w / 2) - 0.85f;
+        b.Box(new Vector3(cx, 1.75f, -1.8f), new Vector3(1.6f, 2.5f, 2.3f), teal);
+        b.Box(new Vector3(cx, 2.35f, -0.63f), new Vector3(1.4f, 0.9f, 0.06f), new Color("#BFE7E6"));
+        b.Box(new Vector3(cx, 0.75f, -0.6f), new Vector3(1.6f, 0.35f, 0.14f), SteelDark);
+        foreach (var z in new[] { -0.85f, -2.75f })
+        {
+            b.Tube(new Vector3(cx, 0.5f, z), new Vector3(1f, 1.64f, 1f), Rubber, new Vector3(0, 0, 90));
+        }
+
+        foreach (var x in new[] { -3.3f, -2.2f, 2.6f, 3.7f })
+        {
+            b.Tube(new Vector3(x, 0.5f, (d / 2) - 0.02f), new Vector3(1f, 0.12f, 1f), Rubber, new Vector3(90, 0, 0));
+            b.Tube(new Vector3(x, 0.5f, (d / 2) + 0.05f), new Vector3(0.45f, 0.04f, 0.45f), Sunflower, new Vector3(90, 0, 0));
+        }
+    }
+
+    /// <summary>A large stage under a great curved roof, sunflower outside and dark within.</summary>
+    private static void ArchStage(MeshBuilder b, Node3D node, string name)
+    {
+        const float w = 9f, d = 6f, top = 1.3f, rise = 6.4f;
+        BigDeck(b);
+        var half = (w / 2) + 0.45f;
+        var hz = (d / 2) + 0.25f;
+        const int pieces = 18;
+        Vector3 On(int i, float grow, float z)
+        {
+            var angle = MathF.PI * i / pieces;
+            return new Vector3(-MathF.Cos(angle) * (half + grow), top + (MathF.Sin(angle) * (rise + grow)), z);
+        }
+
+        for (var i = 0; i < pieces; i++)
+        {
+            // The skin, from the back edge to the front, and a pink rim round the mouth of the arch.
+            var (p, q) = (On(i, 0, 0), On(i + 1, 0, 0));
+            var along = q - p;
+            var turn = Mathf.RadToDeg(MathF.Atan2(along.Y, along.X));
+            b.Box((p + q) / 2, new Vector3(along.Length() + 0.05f, 0.12f, 2 * hz), i % 2 == 0 ? Sunflower : new Color("#EDAA2C"), new Vector3(0, 0, turn));
+            b.Box(((p + q) / 2) + new Vector3(0, 0, hz + 0.06f), new Vector3(along.Length() + 0.08f, 0.5f, 0.14f), Pink, new Vector3(0, 0, turn));
+            if (i is > 1 and < pieces - 1 && i % 2 == 0)
+            {
+                var lamp = On(i, -0.45f, hz - 0.2f);
+                b.Ball(lamp, 0.3f, i % 4 == 0 ? new Color("#FFE08A") : new Color("#F29BBB"));
+            }
+        }
+
+        // The back wall, in upright strips that follow the curve.
+        const int strips = 16;
+        for (var i = 0; i < strips; i++)
+        {
+            var x = -half + ((i + 0.5f) * 2 * half / strips);
+            var high = rise * MathF.Sqrt(MathF.Max(0.02f, 1 - ((x / half) * (x / half))));
+            b.Box(new Vector3(x, top + (high / 2), -hz + 0.1f), new Vector3((2 * half / strips) + 0.01f, high, 0.06f), Backdrop);
+        }
+
+        b.Box(new Vector3(0, top + 2.5f, -hz + 0.16f), new Vector3(4.6f, 1.5f, 0.05f), Sunflower);
+        b.Box(new Vector3(0, top + 2.5f, -hz + 0.19f), new Vector3(4.3f, 1.2f, 0.05f), Pink);
+        b.Box(new Vector3(0, top + rise + 0.75f, hz + 0.1f), new Vector3(5.2f, 0.6f, 0.1f), Pink);
+        Painted(node, name, new Vector3(0, top + rise + 0.75f, hz + 0.16f), 4.9f, 0.4f, Colors.White);
+        Truss(b, new Vector3(-3.6f, top + 4.5f, hz - 0.6f), new Vector3(3.6f, top + 4.5f, hz - 0.6f));
+        Cans(b, new Vector3(-3.2f, top + 4.1f, hz - 0.55f), new Vector3(3.2f, top + 4.1f, hz - 0.55f), 8);
+    }
+
+    /// <summary>A large stage between two tall towers, each with a screen and a hanging line of speakers.</summary>
+    private static void TowerStage(MeshBuilder b, Node3D node, string name)
+    {
+        const float w = 9f, d = 6f, top = 1.3f, front = 6.2f, back = 5.4f, tall = 8.4f;
+        var teal = new Color("#1C9C9A");
+        BigDeck(b, stacks: false);
+        var tx = (w / 2) - 0.2f;
+        var tz = (d / 2) - 0.2f;
+        Truss(b, new Vector3(-tx, top, tz), new Vector3(-tx, front, tz));
+        Truss(b, new Vector3(tx, top, tz), new Vector3(tx, front, tz));
+        Truss(b, new Vector3(-tx, top, -tz), new Vector3(-tx, back, -tz));
+        Truss(b, new Vector3(tx, top, -tz), new Vector3(tx, back, -tz));
+        Truss(b, new Vector3(-tx, front, tz), new Vector3(tx, front, tz));
+        Truss(b, new Vector3(-tx, back, -tz), new Vector3(tx, back, -tz));
+        var tilt = MathF.Atan2(front - back, d - 0.4f);
+        b.Box(new Vector3(0, ((front + back) / 2) + 0.3f, 0), new Vector3(w + 0.5f, 0.12f, (d + 0.5f) / MathF.Cos(tilt)), teal, new Vector3(-Mathf.RadToDeg(tilt), 0, 0));
+        b.Box(new Vector3(0, front - 0.1f, tz + 0.34f), new Vector3(w + 0.1f, 0.6f, 0.08f), Sunflower);
+        Painted(node, name, new Vector3(0, front - 0.1f, tz + 0.39f), 6.2f, 0.42f, new Color("#1D2B36"));
+        b.Box(new Vector3(0, (top + back) / 2, -tz - 0.05f), new Vector3(w - 0.5f, back - top, 0.06f), Backdrop);
+        b.Box(new Vector3(0, top + 2.3f, -tz + 0.02f), new Vector3(4.6f, 1.5f, 0.05f), Sunflower);
+        b.Box(new Vector3(0, top + 2.3f, -tz + 0.05f), new Vector3(4.3f, 1.2f, 0.05f), Pink);
+        Cans(b, new Vector3(-3.5f, front - 0.62f, tz - 0.05f), new Vector3(3.5f, front - 0.62f, tz - 0.05f), 8);
+
+        foreach (var side in new[] { -1f, 1f })
+        {
+            // A tower of truss on a black base, a screen near the top and speakers hung below it.
+            var x = side * ((w / 2) + 0.75f);
+            var z = tz - 0.6f;
+            b.Box(new Vector3(x, top / 2, z), new Vector3(1.3f, top, 1.3f), Black);
+            foreach (var cx in new[] { -0.5f, 0.5f })
+            {
+                foreach (var cz in new[] { -0.5f, 0.5f })
+                {
+                    Truss(b, new Vector3(x + cx, top, z + cz), new Vector3(x + cx, tall, z + cz));
+                }
+            }
+
+            b.Box(new Vector3(x, tall + 0.08f, z), new Vector3(1.5f, 0.16f, 1.5f), SteelDark);
+            b.Box(new Vector3(x, tall - 1.5f, z + 0.72f), new Vector3(1.5f, 2.5f, 0.1f), Pink);
+            b.Box(new Vector3(x, tall - 1.5f, z + 0.78f), new Vector3(1.3f, 2.3f, 0.04f), new Color("#22303C"));
+            b.Ball(new Vector3(x, tall - 1.1f, z + 0.8f), new Vector3(0.5f, 0.5f, 0.04f), new Color("#E9B48C"));
+            b.Box(new Vector3(x, tall - 1.95f, z + 0.8f), new Vector3(0.7f, 0.9f, 0.03f), Sunflower);
+            for (var i = 0; i < 4; i++)
+            {
+                b.Box(new Vector3(x, tall - 3.2f - (i * 0.55f), z + 0.55f + (i * 0.04f)), new Vector3(1.1f, 0.5f, 0.6f), Black, new Vector3(4 * i, 0, 0));
+                b.Box(new Vector3(x, tall - 3.2f - (i * 0.55f), z + 0.87f + (i * 0.04f)), new Vector3(0.9f, 0.3f, 0.02f), Charcoal, new Vector3(4 * i, 0, 0));
+            }
         }
     }
 

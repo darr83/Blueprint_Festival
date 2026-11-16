@@ -62,10 +62,16 @@ public static class BigScreens
     public const string Line = "Big screens";
 
     /// <summary>How much of an act someone this far from the front of the stage gets, with no screen to help.</summary>
-    public static double Enjoyment(double metresFromStage) =>
-        metresFromStage <= ClearMetres ? 1
-        : metresFromStage >= FarMetres ? FarEnjoyment
-        : 1 - ((1 - FarEnjoyment) * (metresFromStage - ClearMetres) / (FarMetres - ClearMetres));
+    public static double Enjoyment(double metresFromStage) => Enjoyment(metresFromStage, ClearMetres);
+
+    /// <summary>The same for a stage that is clear out to its own distance: the fall-off starts there and is as long.</summary>
+    public static double Enjoyment(double metresFromStage, double clearMetres) =>
+        metresFromStage <= clearMetres ? 1
+        : metresFromStage >= clearMetres + (FarMetres - ClearMetres) ? FarEnjoyment
+        : 1 - ((1 - FarEnjoyment) * (metresFromStage - clearMetres) / (FarMetres - ClearMetres));
+
+    /// <summary>How far in front of a stage with screens of its own people still see well.</summary>
+    public const double OwnScreenMetres = 55;
 
     /// <summary>True if a place, in metres, is in front of a screen and close enough to see and hear it well.</summary>
     public static bool Covers(PlacedScreen screen, double x, double y)

@@ -575,9 +575,24 @@ public sealed partial class Crowd
     /// back, unless they are in front of a big screen.
     /// </summary>
     public double ShareOfTheAct(Party party) =>
-        FromTheStage(party) is not { } metres || metres <= BigScreens.ClearMetres || (OnScreen?.Invoke(party.X, party.Y) ?? false)
+        FromTheStage(party) is not { } metres || metres <= ClearFor(party) || (OnScreen?.Invoke(party.X, party.Y) ?? false)
             ? 1
-            : BigScreens.Enjoyment(metres);
+            : BigScreens.Enjoyment(metres, ClearFor(party));
+
+    /// <summary>
+    /// How far back from the stage a party is watching people see and hear well: further for a
+    /// bigger stage, and further still for one with screens of its own.
+    /// </summary>
+    public double ClearFor(Party party)
+    {
+        if (ShowOf(party.Watch)?.Stage is not { } stage)
+        {
+            return BigScreens.ClearMetres;
+        }
+
+        var info = Catalogue.Of(stage.Kind);
+        return info.OwnScreens ? Math.Max(info.ClearMetres, BigScreens.OwnScreenMetres) : info.ClearMetres;
+    }
 
     /// <summary>Mood lost in an hour of being somewhere pitch dark. Nobody minds the dark while watching an act.</summary>
     public const double DarkPerHour = 0.05;

@@ -143,7 +143,8 @@ public partial class SmokeTest : Node
                     var gap = opened.Game.Field.Gap;
                     Check(opened.TopBar.MoneyText == "£2,000", $"A new festival should have £2,000, not {opened.TopBar.MoneyText}.");
                     opened.BuildBar.Toggle(BuildMode.Stage);
-                    Check(opened.BuildBar.ChoiceCount == 7, "The build bar should offer four stages and three big screens.");
+                    Check(opened.BuildBar.ChoiceCount == 12, "The build bar should offer nine stages and three big screens.");
+                    Check(opened.BuildBar.Choose("stageBigTop") && opened.BuildBar.Choose("stageTowerStage"), "The new stages should be on the build bar.");
                     Check(opened.BuildBar.Choose("stageBandstand"), "The bandstand should be on the build bar.");
                     Check(opened.Build.Mode == BuildMode.Stage, "Choosing a stage should hand it to the mouse.");
                     opened.Build.ShowGhost(new TilePoint(grass.X + 70, grass.Y + 18));

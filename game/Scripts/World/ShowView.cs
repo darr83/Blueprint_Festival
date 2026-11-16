@@ -100,6 +100,8 @@ public partial class ShowView : Node3D
     /// <summary>Where each member of an act stands on a stage, in metres from its middle, the stage facing south.</summary>
     public static List<Vector3> Spots(StageKind kind, IReadOnlyList<BandRole> roles)
     {
+        // Every style of a size shares a deck, so the band stands in the same places on each.
+        kind = Catalogue.DeckOf(kind);
         var (deck, shift) = kind switch { StageKind.FarmTrailer => (1.1f, -0.25f), StageKind.Bandstand => (0.6f, -0.5f), _ => (1.3f, 0f) };
         Vector2[] front = kind switch
         {
@@ -235,11 +237,12 @@ public partial class ShowView : Node3D
 
         _rig.Position = SiteView.Middle(stage.Rect);
         _rig.RotationDegrees = new Vector3(0, SiteView.Turn(stage.Facing), 0);
-        var k = stage.Kind == StageKind.MainStage ? SiteProps.MainStageScale : 1f;
-        if (stage.Kind is not (StageKind.HiredStage or StageKind.MainStage))
+        var deck = Catalogue.DeckOf(stage.Kind);
+        var k = deck == StageKind.MainStage ? SiteProps.MainStageScale : 1f;
+        if (deck is not (StageKind.HiredStage or StageKind.MainStage))
         {
             // Small stages get a string of warm bulbs' worth of light, no more.
-            var high = stage.Kind == StageKind.Bandstand ? 3.2f : 3.6f;
+            var high = deck == StageKind.Bandstand ? 3.2f : 3.6f;
             Add(new OmniLight3D { LightColor = new Color("#FFD9A0"), OmniRange = 9f, Position = new Vector3(0, high, 0.6f) }, 3.5f);
             Add(new OmniLight3D { LightColor = new Color("#FFE8C0"), OmniRange = 8f, Position = new Vector3(0, 2.6f, 5f) }, 1.4f);
             return;
