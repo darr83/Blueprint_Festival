@@ -8,10 +8,10 @@ using Godot;
 namespace BlueprintFestival.UI;
 
 /// <summary>What the field choosing screen shows.</summary>
-public sealed record FieldsView(int Year, string Festival, int Licence, int Bank, FieldPlan Plan, string Selected, IReadOnlyList<string> Problems, bool Changed);
+public sealed record FieldsView(int Year, string Festival, int Licence, int Bank, FieldPlan Plan, string Selected, IReadOnlyList<string> Problems, bool Changed, bool TestMode = false);
 
 /// <summary>What the buttons on the field choosing screen do.</summary>
-public sealed record FieldsActions(Action<string>? Select = null, Action<FieldUse?>? Use = null, Action? Confirm = null);
+public sealed record FieldsActions(Action<string>? Select = null, Action<FieldUse?>? Use = null, Action? Confirm = null, Action<int>? TestSize = null);
 
 /// <summary>
 /// The Larkmoor estate drawn as a map: every field with its name, the lane, the farm track, the
@@ -165,6 +165,32 @@ public partial class EstateMap : Control
 
 public static partial class YearPanels
 {
+    /// <summary>Test mode (F9): minus and plus to move the licence down or up the ladder, with the bank topped up.</summary>
+    private static Control TestSizeRow(FieldsView view, FieldsActions does)
+    {
+        var row = new HBoxContainer { Name = "TestSize" };
+        row.AddThemeConstantOverride("separation", 8);
+        var label = UiStyle.Caps("Test mode  ·  festival size");
+        label.AddThemeColorOverride("font_color", UiStyle.StagePink);
+        row.AddChild(label);
+        var down = UiStyle.SecondaryButton("−", () => does.TestSize?.Invoke(-1));
+        down.Name = "Smaller";
+        down.Disabled = view.Licence <= FestivalGame.FirstLicence;
+        down.CustomMinimumSize = new Vector2(44, 34);
+        row.AddChild(down);
+        var size = UiStyle.Body($"{view.Licence:N0}", size: 16);
+        size.CustomMinimumSize = new Vector2(70, 0);
+        size.HorizontalAlignment = HorizontalAlignment.Center;
+        row.AddChild(size);
+        var up = UiStyle.SecondaryButton("+", () => does.TestSize?.Invoke(1));
+        up.Name = "Bigger";
+        up.Disabled = view.Licence >= FestivalGame.BiggestLicence;
+        up.CustomMinimumSize = new Vector2(44, 34);
+        row.AddChild(up);
+        row.AddChild(UiStyle.Body($"The bank is topped up to at least £{FestivalGame.TestMoneyFor(view.Licence):N0}. Camping opens at {FieldPlan.CampingFrom:N0}. F9 hides this.", muted: true, size: 13));
+        return row;
+    }
+
     /// <summary>January, before the line-up: the estate map, the field picked, and what the plan adds up to.</summary>
     public static Control Fields(FieldsView view, FieldsActions? does = null)
     {
@@ -175,6 +201,11 @@ public static partial class YearPanels
         panel.AddChild(box);
         Masthead(box, $"January  ·  {view.Festival}  ·  Year {view.Year}", "Choose your fields",
             UiStyle.Body($"Licence for up to {view.Licence:N0} people  ·  £{view.Bank:N0} in the bank  ·  Click a field, then say what it is for", muted: true, size: 14), 36);
+
+        if (view.TestMode)
+        {
+            box.AddChild(TestSizeRow(view, does));
+        }
 
         var columns = new HBoxContainer();
         columns.AddThemeConstantOverride("separation", 16);

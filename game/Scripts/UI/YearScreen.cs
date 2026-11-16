@@ -187,7 +187,7 @@ public partial class YearScreen : Control
             case Phase.Plan:
                 if (ChoosingFields)
                 {
-                    Centre(YearPanels.Fields(FieldsOf(_game, Draft, _fieldPicked), new FieldsActions(SelectField, UseField, ConfirmFields)));
+                    Centre(YearPanels.Fields(FieldsOf(_game, Draft, _fieldPicked), new FieldsActions(SelectField, UseField, ConfirmFields, TestSize)));
                     break;
                 }
 
@@ -831,7 +831,26 @@ public partial class YearScreen : Control
     /// <summary>What the field choosing screen shows for a plan being drawn up.</summary>
     public static FieldsView FieldsOf(FestivalGame game, FieldPlan draft, string picked) => new(
         game.Year, game.Name, game.Licence, game.Money, draft, picked, draft.Problems(game.Licence, game.Year),
-        game.Plan is null || !draft.Save().SequenceEqual(game.Plan.Save()));
+        game.Plan is null || !draft.Save().SequenceEqual(game.Plan.Save()), TestMode.On);
+
+    /// <summary>Test mode: the same January one step up (1) or down (-1) the licence ladder.</summary>
+    public void TestSize(int step)
+    {
+        if (!ChoosingFields)
+        {
+            return;
+        }
+
+        var licence = FestivalGame.TestLicenceStep(_game.Licence, step);
+        if (licence == _game.Licence)
+        {
+            SoundBoard.Cue(Sounds.Refuse);
+            return;
+        }
+
+        SoundBoard.Cue(Sounds.Click);
+        GameManager.Instance.Open(_game.AtTestSize(licence));
+    }
 
     public void SelectField(string id)
     {
@@ -932,6 +951,16 @@ public partial class YearScreen : Control
 
     public override void _UnhandledInput(InputEvent @event)
     {
+        if (@event is InputEventKey { Pressed: true, Echo: false, Keycode: Key.F9 } && _game.Phase == Phase.Plan)
+        {
+            // Test mode: the size buttons on the January field screen.
+            TestMode.Toggle();
+            GetViewport()?.SetInputAsHandled();
+            SoundBoard.Cue(Sounds.Click);
+            Rebuild();
+            return;
+        }
+
         if (_game.Phase != Phase.Tidy)
         {
             return;
