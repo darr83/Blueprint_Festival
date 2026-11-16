@@ -21,6 +21,9 @@ public enum DayNoteKind
 
     /// <summary>Someone has been sick on the ground.</summary>
     Sick,
+
+    /// <summary>News from the camping field, such as the fire officer's visit.</summary>
+    Camp,
 }
 
 /// <summary>How a line in the day's log stands: still going on, ended well, ended badly, or just news.</summary>

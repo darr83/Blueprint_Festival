@@ -109,6 +109,11 @@ public sealed class FieldMap
 
     private readonly List<(TileRect Camp, TilePoint Door, bool AlongX)> _campDoors = new();
 
+    /// <summary>The grass of every camping field on the map.</summary>
+    public IEnumerable<TileRect> CampFields => FromPlan
+        ? Fields.Where(f => f.Use == FieldUse.Camping).Select(f => f.Grass)
+        : HasCamp ? new[] { Camp } : Array.Empty<TileRect>();
+
     /// <summary>
     /// For a tile in a gap through a hedge (the way in, a gateway between fields or the way into
     /// the camping field): true if the gap runs north to south, so a gate across it stands

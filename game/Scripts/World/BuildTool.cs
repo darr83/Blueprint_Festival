@@ -62,6 +62,9 @@ public enum BuildMode
 
     /// <summary>Drawing a crowd area in front of a stage, opening its gaps and setting its limit. Also the Areas group on the build bar.</summary>
     Area,
+
+    /// <summary>Marking camping ground for quiet, family or accessible camping, or a fire lane. Also the Camping group on the build bar.</summary>
+    Camp,
 }
 
 /// <summary>
@@ -192,9 +195,14 @@ public partial class BuildTool : Node3D
 
         game.Site.Changed += DrawKeepOut;
         DrawKeepOut();
+        StartCampMarks();
     }
 
-    public override void _ExitTree() => _game.Site.Changed -= DrawKeepOut;
+    public override void _ExitTree()
+    {
+        _game.Site.Changed -= DrawKeepOut;
+        StopCampMarks();
+    }
 
     /// <summary>The colour each kind of crowd area is tinted: pink for a front pen, teal for standing, gold for VIPs.</summary>
     public static Color AreaColour(AreaKind kind, float alpha) => kind switch
@@ -375,6 +383,7 @@ public partial class BuildTool : Node3D
             BuildMode.Lane => "Hold the mouse button and drag out a queue from the front of a gate, stall or toilets. Drag again from its end to turn a corner.",
             BuildMode.KeepOut => "Hold the mouse button and drag over ground customers must keep off. Start on marked ground to clear it.",
             BuildMode.VipGround => "Hold the mouse button and drag over ground for VIP guests only. Start on VIP ground to clear it.",
+            BuildMode.Camp => $"Hold the mouse button and drag over camping ground to mark it for {CampLayout.Name(CampZone).ToLowerInvariant()}. Start on ground marked that way to clear it.",
             BuildMode.Area => $"Hold the mouse button and drag out a {CrowdAreas.Name(Area).ToLowerInvariant()}. Click an area's barrier to open or close a gap; click inside to set how many it lets in.",
             BuildMode.Light => "Click on the grass to put the light up.",
             BuildMode.LaunchPad => "Click on the grass to put the launch pad down. Its safe zone must be clear. Fence it off from the firework mixer.",
@@ -398,6 +407,8 @@ public partial class BuildTool : Node3D
         {
             _areaMarks.Visible = mode == BuildMode.Area;
         }
+
+        ShowCampMarks();
 
         if (mode != BuildMode.Area && SelectedArea >= 0)
         {
@@ -1064,6 +1075,19 @@ public partial class BuildTool : Node3D
                 return;
             }
 
+            case BuildMode.Camp:
+            {
+                var from = _dragFrom ?? at;
+                var zone = MarkingZone(from);
+                check = _game.CheckCampZone(from, at, zone);
+                pad = new TileRect(Math.Min(from.X, at.X), Math.Min(from.Y, at.Y), Math.Abs(at.X - from.X) + 1, Math.Abs(at.Y - from.Y) + 1);
+                ClearGhostOnly();
+                ShowPad(pad, check.Ok);
+                Refused = !check.Ok;
+                Status = !check.Ok ? check.Problem ?? "" : zone == CampZone.General ? "Clear the marks: general camping again" : $"{CampLayout.Name(zone)}: free";
+                return;
+            }
+
             case BuildMode.VipGround:
             {
                 var from = _dragFrom ?? at;
@@ -1203,7 +1227,7 @@ public partial class BuildTool : Node3D
                 break;
 
             case InputEventMouseButton { ButtonIndex: MouseButton.Left } click when _hovering:
-                if (Mode is BuildMode.Fence or BuildMode.Ground or BuildMode.Lane or BuildMode.KeepOut or BuildMode.VipGround or BuildMode.Fairy or BuildMode.Bunting or BuildMode.Area)
+                if (Mode is BuildMode.Fence or BuildMode.Ground or BuildMode.Lane or BuildMode.KeepOut or BuildMode.VipGround or BuildMode.Fairy or BuildMode.Bunting or BuildMode.Area or BuildMode.Camp)
                 {
                     if (click.Pressed)
                     {
@@ -1238,6 +1262,10 @@ public partial class BuildTool : Node3D
                         else if (Mode == BuildMode.VipGround)
                         {
                             DragVipGround(from, _hover);
+                        }
+                        else if (Mode == BuildMode.Camp)
+                        {
+                            DragCampZone(from, _hover);
                         }
                         else if (Mode == BuildMode.Fairy)
                         {

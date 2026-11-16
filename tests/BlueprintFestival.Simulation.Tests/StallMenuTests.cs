@@ -16,6 +16,7 @@ public class StallMenuTests
         StallKind.Bar, StallKind.Coffee, StallKind.Slush, StallKind.Cocktails,
         StallKind.Ponchos, StallKind.BucketHats, StallKind.Merchandise, StallKind.PhoneCharging,
         StallKind.VipLounge,
+        StallKind.ShowerBlock, StallKind.CampInfo, StallKind.CampShop,
     };
 
     private static void RunUntil(FestivalGame game, double hour)
@@ -106,7 +107,7 @@ public class StallMenuTests
         Assert.All(Catalogue.MenuOf(StallKind.Merchandise), m => Assert.Equal(Carried.Bag, m.Gives));
         Assert.All(Catalogue.MenuOf(StallKind.Ponchos), m => Assert.Equal(Worn.Poncho, m.Wears));
         Assert.All(Catalogue.MenuOf(StallKind.BucketHats), m => Assert.Equal(Worn.BucketHat, m.Wears));
-        Assert.All(Selling.Where(k => Catalogue.GroupOf(k) != StallGroup.Other), k => Assert.All(Catalogue.MenuOf(k), m => Assert.NotEqual(Carried.None, m.Gives)));
+        Assert.All(Selling.Where(k => Catalogue.GroupOf(k) is not (StallGroup.Other or StallGroup.Camping)), k => Assert.All(Catalogue.MenuOf(k), m => Assert.NotEqual(Carried.None, m.Gives)));
     }
 
     [Fact]

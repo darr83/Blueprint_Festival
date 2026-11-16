@@ -623,10 +623,11 @@ public sealed partial class FestivalGame
         SendHomeActsWithNoStage();
         PayForBuses();
         ApplyTravel();
-        if (CampingBooked && Plan is not null)
+        if (CampingBooked)
         {
-            // Tents go up round whatever was built in the camping field during the week.
+            // Tents go up round whatever was built and marked out in the camping field during the week.
             Crowd.PitchCamp();
+            FireOfficerCalls();
         }
 
         if (SoldAhead)

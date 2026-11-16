@@ -195,6 +195,20 @@ public partial class SmokeTest : Node
 
                     opened.BuildBar.ShowShelf(StallGroup.Services);
                     Check(opened.BuildBar.ChoiceCount == 4, "The last shelf should offer two sizes of toilets, the water point and the litter bin.");
+                    opened.BuildBar.ShowShelf(StallGroup.Camping);
+                    Check(opened.BuildBar.ChoiceCount == 3, "The camping shelf should offer the showers, the info point and the camp shop.");
+                    foreach (var camp in Catalogue.StallsIn(StallGroup.Camping))
+                    {
+                        var model = World.SiteProps.Stall(camp.Kind);
+                        Check(model.GetChildCount() > 0, $"The {camp.Name} should be drawn.");
+                        model.Free();
+                    }
+
+                    opened.BuildBar.Toggle(BuildMode.Camp);
+                    Check(opened.BuildBar.ChoiceCount == 9 && opened.BuildBar.CampCheckLines.Count == 1, "The Camping tab should offer four kinds of ground and five things to put down, and say there is no camping field.");
+                    Check(opened.BuildBar.Choose(UI.BuildBar.CampKey(CampZone.FireLane)) && opened.Build.Mode == BuildMode.Camp && opened.Build.CampZone == CampZone.FireLane, "The fire lane should be on the Camping tab.");
+                    Check(!opened.Build.DragCampZone(new TilePoint(grass.X + 10, grass.Y + 10), new TilePoint(grass.X + 20, grass.Y + 20)).Ok, "The village field is not camping ground.");
+                    opened.BuildBar.Toggle(BuildMode.Stall);
                     Check(opened.BuildBar.Choose("stallBurgers") && opened.Build.Mode == BuildMode.Stall && opened.BuildBar.Shelf == StallGroup.Food, "The burger van should be on the build bar, on the food shelf.");
                     opened.Build.ShowGhost(new TilePoint(grass.X + 20, grass.Y + 18));
                     Check(opened.Build.Status.Contains("£120"), $"The bar should show the hire price, not '{opened.Build.Status}'.");

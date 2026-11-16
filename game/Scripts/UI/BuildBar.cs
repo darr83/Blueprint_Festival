@@ -38,6 +38,7 @@ public partial class BuildBar : VBoxContainer
         StallGroup.Other => "Ponchos, hats and merchandise",
         StallGroup.Vip => "VIP",
         StallGroup.Fair => "Fairground",
+        StallGroup.Camping => "Camping",
         _ => "Toilets, water and bins",
     };
 
@@ -166,7 +167,7 @@ public partial class BuildBar : VBoxContainer
         _choicePanel.AddChild(shelves);
         _shelfRow = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center, Visible = false };
         _shelfRow.AddThemeConstantOverride("separation", 6);
-        foreach (var group in new[] { StallGroup.Food, StallGroup.Drink, StallGroup.Other, StallGroup.Fair, StallGroup.Services, StallGroup.Vip })
+        foreach (var group in new[] { StallGroup.Food, StallGroup.Drink, StallGroup.Other, StallGroup.Fair, StallGroup.Services, StallGroup.Vip, StallGroup.Camping })
         {
             var chip = UiStyle.ChipButton(ShelfName(group), () => ShowShelf(group), Sounds.Tab);
             chip.ToggleMode = true;
@@ -200,6 +201,9 @@ public partial class BuildBar : VBoxContainer
         }
 
         shelves.AddChild(_widthRow);
+        _checks = new VBoxContainer { Visible = false };
+        _checks.AddThemeConstantOverride("separation", 2);
+        shelves.AddChild(_checks);
         _choiceRow = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
         _choiceRow.AddThemeConstantOverride("separation", 8);
         shelves.AddChild(_choiceRow);
@@ -219,6 +223,7 @@ public partial class BuildBar : VBoxContainer
         AddTab(row, BuildMode.Ground, "ground", "Ground", "Straw, trackway, pallets, mats, sand and artificial grass");
         AddTab(row, BuildMode.Path, "path", "Paths", "Mown, bark, gravel and boardwalk paths, up to 6 m wide");
         AddTab(row, BuildMode.Comfort, "bench", "Comforts", "Seats, tables, hand washing and shade");
+        AddTab(row, BuildMode.Camp, "tent", "Camping", "Lay out the camping field: quiet, family and accessible camping, fire lanes, showers, lockers and a camp shop");
         AddTab(row, BuildMode.Area, "area", "Areas", "Pens and areas in front of the stages, each with its own limit on how many people get in");
         AddTab(row, BuildMode.Sign, "sign", "Decor", "Signs with your own words on, and decorations: bunting, flags, flowers, a fire pit and giant letters");
         AddTab(row, BuildMode.Light, "light", "Lights", "Path lights, floodlights and fairy lights for after dark");
@@ -382,6 +387,9 @@ public partial class BuildBar : VBoxContainer
                         OpenMixer?.Invoke();
                     });
                 break;
+            case BuildMode.Camp:
+                AddCampChoices();
+                break;
             case BuildMode.Area:
                 foreach (var kind in new[] { AreaKind.FrontPen, AreaKind.Standing, AreaKind.Vip })
                 {
@@ -397,6 +405,7 @@ public partial class BuildBar : VBoxContainer
         }
 
         _choicePanel.Visible = _choiceRow.GetChildCount() > 0;
+        ShowCampChecks();
         if (mode != BuildMode.Remove)
         {
             _tool.Stop();
@@ -466,6 +475,7 @@ public partial class BuildBar : VBoxContainer
     {
         _open = BuildMode.None;
         _choicePanel.Visible = false;
+        ShowCampChecks();
         _tool.Stop();
     }
 
@@ -516,6 +526,10 @@ public partial class BuildBar : VBoxContainer
             : k == "staffdrummer" ? ("drum", UiStyle.StagePink)
             : k == "staffdj" ? ("decks", UiStyle.StagePink)
             : booth && k.Contains("ticket") ? ("ticket", UiStyle.StagePink)
+            : k == "stallshowerblock" ? ("shower", UiStyle.StagePink)
+            : k is "stallcampinfo" or "stallcampshop" ? ("bag", UiStyle.StagePink)
+            : k == "campfirelane" ? ("lane", UiStyle.StagePink)
+            : k.StartsWith("camp") ? ("tent", UiStyle.StagePink)
             : k.StartsWith("stage") ? ("stage", UiStyle.StagePink)
             : k.StartsWith("fence") ? ("fence", UiStyle.StagePink)
             : k.StartsWith("area") ? ("area", UiStyle.StagePink)
@@ -606,6 +620,7 @@ public partial class BuildBar : VBoxContainer
             BuildMode.KeepOut => KeepOutKey,
             BuildMode.VipGround => VipGroundKey,
             BuildMode.Area => AreaKey(_tool.Area),
+            BuildMode.Camp => CampKey(_tool.CampZone),
             BuildMode.Gate => $"gate{_tool.Gate}",
             BuildMode.Stall => $"stall{_tool.Stall}",
             BuildMode.Ground => $"ground{_tool.Ground}",

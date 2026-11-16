@@ -1,5 +1,6 @@
 using System.Linq;
 using BlueprintFestival.Simulation;
+using BlueprintFestival.Simulation.Site;
 using BlueprintFestival.Simulation.World;
 using Godot;
 
@@ -49,6 +50,8 @@ public partial class CampView : Node3D
             MaterialOverride = new StandardMaterial3D { VertexColorUseAsAlbedo = true, Roughness = 0.9f, CullMode = BaseMaterial3D.CullModeEnum.Disabled },
         };
         AddChild(_tents);
+        game.Site.CampZonesChanged += DrawFireLanes;
+        DrawFireLanes();
         if (!map.HasCamp)
         {
             return;
@@ -71,6 +74,32 @@ public partial class CampView : Node3D
         }
 
         Refresh();
+    }
+
+    private MeshInstance3D? _fireLanes;
+
+    /// <summary>How many straight runs of fire lane are mown.</summary>
+    public int FireLaneRuns { get; private set; }
+
+    public override void _ExitTree() => _game.Site.CampZonesChanged -= DrawFireLanes;
+
+    /// <summary>Fire lanes are mown short, a paler stripe through the camping field, so they show whatever tool is in hand.</summary>
+    private void DrawFireLanes()
+    {
+        _fireLanes?.QueueFree();
+        var tiles = new System.Collections.Generic.HashSet<TilePoint>(_game.Site.CampZones.Where(z => z.Value == CampZone.FireLane).Select(z => z.Key));
+        var runs = SiteLayout.RunsOf(tiles);
+        FireLaneRuns = runs.Count;
+        var b = new MeshBuilder();
+        foreach (var (x, y, length, vertical) in runs)
+        {
+            var rect = vertical ? new TileRect(x, y, 1, length) : new TileRect(x, y, length, 1);
+            b.Box(SiteView.Middle(rect) + new Vector3(0, 0.012f, 0), new Vector3(rect.Width * T, 0.01f, rect.Height * T), new Color("#A8D47E"));
+        }
+
+        _fireLanes = b.IsEmpty ? new MeshInstance3D { Name = "FireLanes" } : b.BuildNode("FireLanes");
+        _fireLanes.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
+        AddChild(_fireLanes);
     }
 
     /// <summary>

@@ -152,6 +152,15 @@ public enum StallKind
 
     /// <summary>A round stall with ducks to hook from the water, and big teddies to win.</summary>
     HookADuck,
+
+    /// <summary>A row of six hot showers in a cabin, for campers. Only in a camping field.</summary>
+    ShowerBlock,
+
+    /// <summary>A little tent with a wall of lockers: lost property, information and somewhere safe for valuables. Only in a camping field.</summary>
+    CampInfo,
+
+    /// <summary>A hut selling what campers forget: gas, tent pegs, chairs and breakfast. Only in a camping field.</summary>
+    CampShop,
 }
 
 /// <summary>Which shelf of the build bar a stall is on.</summary>
@@ -167,6 +176,9 @@ public enum StallGroup
 
     /// <summary>The fairground rides and hook a duck.</summary>
     Fair,
+
+    /// <summary>The showers, the camp info point and the camp shop: things only for a camping field.</summary>
+    Camping,
 }
 
 /// <summary>What someone has in their hand after buying something.</summary>
@@ -356,6 +368,9 @@ public static class Catalogue
         new StallInfo(StallKind.Carousel, "Carousel", 22, 22, 250, null, 0, 0, 4, "Galloping horses under a striped roof. The children's favourite."),
         new StallInfo(StallKind.Skylark, "Skylark", 26, 16, 600, null, 0, 0, 2, "A tall tower with a long arm that swings right over the top, four seats at each end. Not for little ones."),
         new StallInfo(StallKind.HookADuck, "Hook a duck", 14, 14, 80, null, 0, 40, 4, "Hook a duck from the water. About one go in four wins a big teddy to carry round."),
+        new StallInfo(StallKind.ShowerBlock, "Shower block", 16, 5, 600, null, 0, 300, 6, "Six hot showers in a cabin. Campers want a wash, more on a hot or muddy day. Aim for one shower for every 50 campers."),
+        new StallInfo(StallKind.CampInfo, "Camp info and lockers", 10, 8, 250, null, 0, 45, 2, "Information, lost property and a wall of lockers where campers leave their valuables for the night."),
+        new StallInfo(StallKind.CampShop, "Camp shop", 10, 6, 150, null, 0, 40, 2, "Everything campers forget: gas, tent pegs, a camping chair, and breakfast for the morning."),
     };
 
     private static readonly IReadOnlyList<StallItem> NothingToSell = Array.Empty<StallItem>();
@@ -454,6 +469,25 @@ public static class Catalogue
         [StallKind.Carousel] = new[] { new StallItem("A ride", 2, Carried.None, 0) },
         [StallKind.Skylark] = new[] { new StallItem("A ride", 4, Carried.None, 0) },
         [StallKind.HookADuck] = new[] { new StallItem("A go", 3, Carried.None, 0) },
+        [StallKind.ShowerBlock] = new[]
+        {
+            new StallItem("Quick shower", 2, Carried.None, 0),
+            new StallItem("Hot shower", 3, Carried.None, 0),
+            new StallItem("Shower and towel", 5, Carried.None, 0),
+        },
+        [StallKind.CampInfo] = new[]
+        {
+            new StallItem("Locker for the night", 6, Carried.None, 0, AdultsOnly: true),
+            new StallItem("Small locker", 3, Carried.None, 0, AdultsOnly: true),
+            new StallItem("Festival map", 2, Carried.None, 0),
+        },
+        [StallKind.CampShop] = new[]
+        {
+            new StallItem("Gas canister", 5, Carried.Bag, 0, AdultsOnly: true),
+            new StallItem("Tent pegs", 3, Carried.Bag, 0),
+            new StallItem("Camping chair", 12, Carried.Bag, 0, AdultsOnly: true),
+            new StallItem("Breakfast pack", 6, Carried.Bag, 0),
+        },
         [StallKind.VipLounge] = new[]
         {
             new StallItem("Glass of fizz", 9, Carried.Cocktail, AdultsOnly: true),
@@ -491,6 +525,7 @@ public static class Catalogue
         StallKind.Ponchos or StallKind.BucketHats or StallKind.Merchandise or StallKind.PhoneCharging => StallGroup.Other,
         StallKind.VipLounge or StallKind.VipPlatform => StallGroup.Vip,
         StallKind.BigWheel or StallKind.Waltzer or StallKind.Twister or StallKind.Carousel or StallKind.Skylark or StallKind.HookADuck => StallGroup.Fair,
+        StallKind.ShowerBlock or StallKind.CampInfo or StallKind.CampShop => StallGroup.Camping,
         _ => StallGroup.Services,
     };
 
@@ -505,6 +540,7 @@ public static class Catalogue
         StallKind.Toilets, StallKind.ToiletBlock, StallKind.WaterPoint, StallKind.Bin,
         StallKind.VipLounge, StallKind.VipPlatform,
         StallKind.Carousel, StallKind.BigWheel, StallKind.Waltzer, StallKind.Twister, StallKind.Skylark, StallKind.HookADuck,
+        StallKind.ShowerBlock, StallKind.CampInfo, StallKind.CampShop,
     };
 
     /// <summary>True for the things only VIP guests may use, whatever the player sets.</summary>
