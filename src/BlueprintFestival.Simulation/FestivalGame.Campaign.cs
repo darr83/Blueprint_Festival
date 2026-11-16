@@ -103,7 +103,7 @@ public sealed partial class FestivalGame
     public int FansOf(Act act)
     {
         ArgumentNullException.ThrowIfNull(act);
-        var second = SecondShow.Slots.Any(s => s.Act.Name == act.Name);
+        var second = Shows.Skip(1).Any(show => show.Slots.Any(s => s.Act.Name == act.Name));
         return (int)Math.Round(OrdinaryOnSale * Campaign.FanShare(FanPull.Of(act)) * (second ? 0.7 : 1));
     }
 

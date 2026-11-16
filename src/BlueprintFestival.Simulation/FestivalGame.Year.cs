@@ -173,7 +173,7 @@ public sealed partial class FestivalGame
     public int FeeOf(int stars) => Scaled(BaseFee(stars));
 
     /// <summary>Every set that has an act booked, on the stages in use.</summary>
-    public IEnumerable<Slot> LineUp => SecondShow.Booked ? Show.Slots.Concat(SecondShow.Slots) : Show.Slots;
+    public IEnumerable<Slot> LineUp => BookedShows.SelectMany(s => s.Slots);
 
     /// <summary>What all the acts booked cost.</summary>
     public int ActFees => LineUp.Sum(s => FeeFor(s.Act));
@@ -188,6 +188,13 @@ public sealed partial class FestivalGame
     public void BookSecondStage(bool book)
     {
         Need(Phase.Plan);
+        if (!book && Shows[2].Booked)
+        {
+            // The stages after it move up, so the booked stages are always the first ones.
+            RemoveStage(1);
+            return;
+        }
+
         SecondShow.Booked = book;
     }
 
@@ -195,15 +202,79 @@ public sealed partial class FestivalGame
     public void AddEmptySecondStage()
     {
         Need(Phase.Plan);
-        for (var i = 0; i < RunningOrder.SetsAStage; i++)
+        if (!SecondShow.Booked)
         {
-            SecondShow.Book(RunningOrder.SecondBase + i, null);
+            AddEmptyStage();
         }
-
-        SecondShow.Booked = true;
     }
 
-    private RunningOrder StageOf(int set) => set >= RunningOrder.SecondBase ? SecondShow : Show;
+    /// <summary>How many stages have acts booked, the main stage included (1 to 4).</summary>
+    public int StagesBooked => Shows.Count(s => s.Booked);
+
+    /// <summary>What a stage's acts cost, by its number (0 for the main stage).</summary>
+    public int StageFee(int stage) => Shows[stage].Slots.Sum(s => FeeFor(s.Act));
+
+    /// <summary>
+    /// Adds the next stage (the second, third or fourth) with every set empty, for the player to
+    /// fill. Returns its number, or -1 if four stages are booked already.
+    /// </summary>
+    public int AddEmptyStage()
+    {
+        Need(Phase.Plan);
+        var next = Shows.FirstOrDefault(s => !s.Booked);
+        if (next is null)
+        {
+            return -1;
+        }
+
+        for (var i = 0; i < RunningOrder.SetsAStage; i++)
+        {
+            next.Book(next.Base + i, null);
+        }
+
+        next.SetHours(RunningOrder.FirstHours);
+        next.Booked = true;
+        Crowd.Replan(ExpectedAt(TicketPrice));
+        return next.Number;
+    }
+
+    /// <summary>
+    /// Takes an extra stage (1 to 3) off the bill, with its acts. The stages after it move up a
+    /// place, acts, set times and all, so the stages booked are always the first ones. False for
+    /// the main stage or a stage not booked.
+    /// </summary>
+    public bool RemoveStage(int stage)
+    {
+        Need(Phase.Plan);
+        if (stage < 1 || stage >= Shows.Count || !Shows[stage].Booked)
+        {
+            return false;
+        }
+
+        for (var k = stage; k < Shows.Count; k++)
+        {
+            var here = Shows[k];
+            var after = k + 1 < Shows.Count && Shows[k + 1].Booked ? Shows[k + 1] : null;
+            for (var i = 0; i < RunningOrder.SetsAStage; i++)
+            {
+                here.Book(here.Base + i, after?.At(after.Base + i));
+            }
+
+            if (after is null)
+            {
+                here.Booked = false;
+                here.SetHours(RunningOrder.FirstHours);
+                break;
+            }
+
+            here.SetHours(after.Hours);
+        }
+
+        Crowd.Replan(ExpectedAt(TicketPrice));
+        return true;
+    }
+
+    private RunningOrder StageOf(int set) => ShowOf(set);
 
     /// <summary>The set an artist is booked for, or null if they are not playing.</summary>
     public int? SetOf(string artist) => LineUp.FirstOrDefault(s => s.Act.Name == artist)?.Index;
@@ -217,7 +288,7 @@ public sealed partial class FestivalGame
     {
         Need(Phase.Plan);
         var place = set - StageOf(set).Base;
-        if (place < 0 || place >= RunningOrder.SetsAStage || (set >= RunningOrder.SecondBase && !SecondShow.Booked))
+        if (place < 0 || place >= RunningOrder.SetsAStage || !StageOf(set).Booked)
         {
             return false;
         }
@@ -247,7 +318,7 @@ public sealed partial class FestivalGame
             else
             {
                 // Whoever the seed booked for the stage not in use must not be booked twice.
-                foreach (var show in new[] { Show, SecondShow })
+                foreach (var show in Shows)
                 {
                     foreach (var slot in show.Slots.Where(s => s.Act.Name == artist && s.Index != set).ToList())
                     {
@@ -274,7 +345,7 @@ public sealed partial class FestivalGame
     public bool MoveSet(int set, int hours)
     {
         Need(Phase.Plan);
-        if (set >= RunningOrder.SecondBase && !SecondShow.Booked)
+        if (!StageOf(set).Booked)
         {
             return false;
         }
@@ -290,7 +361,7 @@ public sealed partial class FestivalGame
 
     /// <summary>True if a set can be moved some hours earlier or later.</summary>
     public bool CanMoveSet(int set, int hours) =>
-        Phase == Phase.Plan && (set < RunningOrder.SecondBase || SecondShow.Booked)
+        Phase == Phase.Plan && StageOf(set).Booked
         && RunningOrder.Moved(StageOf(set).Hours, set - StageOf(set).Base, hours) is not null;
 
     private void Place(int set, Artist? artist)
@@ -410,7 +481,7 @@ public sealed partial class FestivalGame
     {
         var random = GameRandom.FromSeed(Seed, 21);
         var taken = new HashSet<string>();
-        foreach (var slot in Show.Slots.Concat(SecondShow.Slots))
+        foreach (var slot in Shows.SelectMany(s => s.Slots))
         {
             ActGenerator.Take(taken, slot.Act);
         }
@@ -805,10 +876,10 @@ public sealed partial class FestivalGame
         Parking = ParkingCharge,
         Buses = BusesHired,
         SecondStage = SecondStageBooked,
+        Stages = StagesBooked,
         Camping = CampingBooked,
         CampingPrice = CampingPrice,
-        LineUp = Enumerable.Range(0, RunningOrder.SetsAStage).Select(i => Show.At(i)?.Name)
-            .Concat(Enumerable.Range(0, RunningOrder.SetsAStage).Select(i => SecondShow.At(RunningOrder.SecondBase + i)?.Name)).ToList(),
+        LineUp = Shows.SelectMany(show => Enumerable.Range(0, RunningOrder.SetsAStage).Select(i => show.At(show.Base + i)?.Name)).ToList(),
         Sales = SaveSales(),
         Booking = SaveBooking(),
         Campaign = SaveCampaign(),
@@ -817,6 +888,7 @@ public sealed partial class FestivalGame
         GatesOpenedAt = GatesOpenedAt,
         MainHours = Show.Hours.ToList(),
         SecondHours = SecondShow.Hours.ToList(),
+        MoreHours = Shows.Skip(2).Select(s => s.Hours.ToList()).ToList(),
     };
 
     private void RestoreYear(YearSave year)
@@ -824,7 +896,12 @@ public sealed partial class FestivalGame
         TicketPrice = Math.Clamp(year.TicketPrice, 1, MaxTicketPrice);
         HeadlinerPicked = Math.Clamp(year.Headliner, 0, _offers.Count - 1);
         Show.SetHeadliner(_offers[HeadlinerPicked].Act);
-        SecondShow.Booked = year.SecondStage;
+        var stages = Math.Clamp(year.Stages ?? (year.SecondStage ? 2 : 1), 1, Shows.Count);
+        for (var n = 1; n < Shows.Count; n++)
+        {
+            Shows[n].Booked = n < stages;
+        }
+
         if (year.MainHours is { } mainHours)
         {
             Show.SetHours(mainHours);
@@ -835,11 +912,17 @@ public sealed partial class FestivalGame
             SecondShow.SetHours(secondHours);
         }
 
-        if (year.LineUp is { } names && names.Count == 2 * RunningOrder.SetsAStage)
+        for (var n = 2; n < Shows.Count && year.MoreHours is { } more && n - 2 < more.Count; n++)
+        {
+            Shows[n].SetHours(more[n - 2]);
+        }
+
+        // Older saves list two stages' sets; newer ones all four.
+        if (year.LineUp is { } names && names.Count % RunningOrder.SetsAStage == 0 && names.Count <= Shows.Count * RunningOrder.SetsAStage)
         {
             for (var i = 0; i < names.Count; i++)
             {
-                var set = i < RunningOrder.SetsAStage ? i : RunningOrder.SecondBase + i - RunningOrder.SetsAStage;
+                var set = RunningOrder.BaseOf(i / RunningOrder.SetsAStage) + (i % RunningOrder.SetsAStage);
                 // An act already in its set is left as it is, so it plays out the same after a load.
                 if (StageOf(set).At(set)?.Name != names[i])
                 {
@@ -904,6 +987,12 @@ public sealed record YearSave(int Number, int Licence, Phase Phase, DateTime Day
 
     /// <summary>The hour each set starts on the second stage, or null in an older save.</summary>
     public List<int>? SecondHours { get; init; }
+
+    /// <summary>How many stages had acts booked (1 to 4), or null in an older save (then <see cref="SecondStage"/> says).</summary>
+    public int? Stages { get; init; }
+
+    /// <summary>The hour each set starts on the third and fourth stages, or null in an older save.</summary>
+    public List<List<int>>? MoreHours { get; init; }
 
     /// <summary>True if the camping field was taken.</summary>
     public bool Camping { get; init; }

@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Linq;
 using BlueprintFestival.Audio;
 using BlueprintFestival.Core;
 using BlueprintFestival.Simulation;
@@ -53,6 +55,11 @@ public partial class FestivalScene : Node3D
 
     /// <summary>The acts on the second stage.</summary>
     public ShowView SecondActs { get; private set; } = null!;
+
+    private readonly List<ShowView> _moreActs = new();
+
+    /// <summary>Every stage's acts, main stage first.</summary>
+    public IEnumerable<ShowView> AllActs => new[] { Acts, SecondActs }.Concat(_moreActs);
 
     public MoneyPanel Money { get; private set; } = null!;
     public StallPanel StallMenu { get; private set; } = null!;
@@ -160,6 +167,13 @@ public partial class FestivalScene : Node3D
         SecondActs = new ShowView { Name = "SecondShow" };
         AddChild(SecondActs);
         SecondActs.Initialise(Game, second: true);
+        for (var n = 2; n < Game.Shows.Count; n++)
+        {
+            var more = new ShowView { Name = $"Show{n + 1}" };
+            AddChild(more);
+            more.Initialise(Game, n);
+            _moreActs.Add(more);
+        }
 
         Litter = new LitterView { Name = "Litter" };
         AddChild(Litter);
@@ -187,6 +201,10 @@ public partial class FestivalScene : Node3D
         Crowd.Music = Music;
         Acts.Music = Music;
         SecondActs.Music = Music;
+        foreach (var more in _moreActs)
+        {
+            more.Music = Music;
+        }
 
         Staff = new StaffView { Name = "Staff", Buskers = Music.Buskers };
         AddChild(Staff);

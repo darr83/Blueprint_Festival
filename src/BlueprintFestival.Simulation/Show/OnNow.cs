@@ -33,10 +33,7 @@ public static class OnNow
     {
         ArgumentNullException.ThrowIfNull(game);
         var shows = new List<RunningOrder> { game.Show };
-        if (game.SecondShow.Stage is not null)
-        {
-            shows.Add(game.SecondShow);
-        }
+        shows.AddRange(game.Shows.Skip(1).Where(s => s.Stage is not null));
 
         var lines = new List<StageLine>(shows.Count);
         for (var i = 0; i < shows.Count; i++)

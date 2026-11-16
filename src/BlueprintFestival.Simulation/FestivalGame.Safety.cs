@@ -320,7 +320,7 @@ public sealed partial class FestivalGame
         var heard = AnnouncementHeard;
         _pausedUntil = Now.AddMinutes(PauseMinutes);
         Crowd.Ease(heard);
-        foreach (var show in new[] { Show, SecondShow })
+        foreach (var show in Shows)
         {
             if (show.Drawing(Now) is not null && show.Stage is { } stage)
             {
@@ -376,7 +376,7 @@ public sealed partial class FestivalGame
     private RunningOrder? ShowAtCrush()
     {
         var (x, y) = CrushSpot;
-        return new[] { Show, SecondShow }
+        return Shows
             .Where(show => show.Drawing(Now) is not null && show.Stage is not null)
             .OrderBy(show =>
             {
@@ -599,8 +599,11 @@ public sealed partial class FestivalGame
             // Too many people hurt: the music stops and everyone is sent home.
             SeriousIncident = true;
             Note(DayNoteKind.CalledOff, "The day was called off", $"{CrushInjuries} hurt in crushes: everyone sent home", DayTone.Bad);
-            Show.CallOff(now);
-            SecondShow.CallOff(now);
+            foreach (var show in Shows)
+            {
+                show.CallOff(now);
+            }
+
             Crowd.SendEveryoneHome(now, 0.25);
         }
     }
@@ -634,7 +637,7 @@ public sealed partial class FestivalGame
 
         foreach (var (set, at) in save.CutShort ?? new())
         {
-            (set >= RunningOrder.SecondBase ? SecondShow : Show).CutShort(set, at);
+            ShowOf(set).CutShort(set, at);
             _cutShort[set] = at;
         }
         Crowd.RestorePlaces(save.Places);
@@ -646,8 +649,10 @@ public sealed partial class FestivalGame
 
         if (save.CalledOff is { } when)
         {
-            Show.CallOff(when);
-            SecondShow.CallOff(when);
+            foreach (var show in Shows)
+            {
+                show.CallOff(when);
+            }
         }
     }
 }

@@ -14,7 +14,7 @@ public sealed record Slot(int Index, Act Act, DateTime Start, DateTime End, bool
 /// <summary>
 /// The music on one stage. A stage has four sets, at two, four, six and eight o'clock to begin
 /// with, and any of them may be left empty. The player can move each set to start at any hour from
-/// midday to nine in the evening, so two stages can start and finish at different times (or
+/// midday to nine in the evening, so the stages (up to four) can start and finish at different times (or
 /// overlap; that is up to the player). An act plays for an hour and a half, and the next set on
 /// the same stage can start on the next hour after that at the earliest, so the stage stands empty
 /// for at least half an hour while the next act sets up and people go for a drink, some food or the toilet. It starts with acts made up from the festival's seed, and
@@ -49,7 +49,7 @@ public sealed class RunningOrder
 
     private readonly int[] _hours = FirstHours.ToArray();
 
-    /// <summary>Sets on the second stage are numbered from here, so a set's number says which stage it is on.</summary>
+    /// <summary>Sets on the second stage are numbered from here (the third from 200, the fourth from 300), so a set's number says which stage it is on.</summary>
     public const int SecondBase = 100;
 
     /// <summary>How much of the crowd a second stage act draws beside the same act on the main stage.</summary>
@@ -74,15 +74,29 @@ public sealed class RunningOrder
 
     /// <summary>The line-up for a second stage: four smaller local acts, none of them already on the main stage. It plays only once it is booked.</summary>
     public RunningOrder(SiteLayout site, int seed, DateTime festivalDay, RunningOrder main)
+        : this(site, seed, festivalDay, new[] { main }, 1)
     {
-        ArgumentNullException.ThrowIfNull(main);
+    }
+
+    /// <summary>
+    /// The line-up for an extra stage (numbered 1 to 3 after the main stage): four smaller local
+    /// acts, none of them already on an earlier stage. It plays only once it is booked.
+    /// </summary>
+    public RunningOrder(SiteLayout site, int seed, DateTime festivalDay, IEnumerable<RunningOrder> before, int number)
+    {
+        ArgumentNullException.ThrowIfNull(before);
+        if (number < 1 || number >= MaxStages)
+        {
+            throw new ArgumentOutOfRangeException(nameof(number), number, "Extra stages are numbered 1 to 3.");
+        }
+
         _site = site;
         _day = festivalDay.Date;
-        Second = true;
+        Number = number;
         Booked = false;
-        var random = GameRandom.FromSeed(seed, 8);
+        var random = GameRandom.FromSeed(seed, number == 1 ? 8 : 40 + number);
         var taken = new HashSet<string>();
-        foreach (var slot in main.Slots)
+        foreach (var slot in before.SelectMany(b => b.Slots))
         {
             ActGenerator.Take(taken, slot.Act);
         }
@@ -90,12 +104,24 @@ public sealed class RunningOrder
         for (var i = 0; i < SetsAStage; i++)
         {
             var act = ActGenerator.Make(random, false, taken);
-            Put(SecondBase + i, act with { Draw = act.Draw * SecondDraw });
+            Put(Base + i, act with { Draw = act.Draw * SecondDraw });
         }
     }
 
+    /// <summary>The most stages that can have music on them in a day: the main stage and three more.</summary>
+    public const int MaxStages = 4;
+
+    /// <summary>Which stage a set is on (0 for the main stage, 1 to 3 for the others), from the set's number.</summary>
+    public static int StageOf(int set) => Math.Clamp(set / SecondBase, 0, MaxStages - 1);
+
+    /// <summary>The number of a stage's first set, by the stage (0 for the main stage).</summary>
+    public static int BaseOf(int stage) => stage * SecondBase;
+
+    /// <summary>The stage's place in the day's order: 0 for the main stage, then 1, 2 and 3.</summary>
+    public int Number { get; }
+
     /// <summary>The number of this stage's first set.</summary>
-    public int Base => Second ? SecondBase : 0;
+    public int Base => BaseOf(Number);
 
     /// <summary>When a set starts and ends, by its place in the day (0 to 3).</summary>
     public (DateTime Start, DateTime End) TimeOf(int place)
@@ -205,15 +231,15 @@ public sealed class RunningOrder
     /// <summary>Who is booked for a set, or null if it is empty.</summary>
     public Act? At(int index) => _slots.FirstOrDefault(s => s.Index == index)?.Act;
 
-    /// <summary>True for the second stage's line-up.</summary>
-    public bool Second { get; }
+    /// <summary>True for any stage but the main stage (the second, third or fourth).</summary>
+    public bool Second => Number > 0;
 
     /// <summary>True if the acts have been booked. The main stage's always are; the second stage's are a choice at planning.</summary>
     public bool Booked { get; set; } = true;
 
     /// <summary>
     /// The stages in the order the acts use them: the biggest is the main stage, the next biggest
-    /// the second stage, and of two the same the one put up first.
+    /// the second stage, and so on, and of two the same the one put up first.
     /// </summary>
     public static IReadOnlyList<PlacedStage> InOrder(SiteLayout site)
     {
@@ -236,7 +262,7 @@ public sealed class RunningOrder
     {
         get
         {
-            var place = Second ? 1 : 0;
+            var place = Number;
             if (!Booked || _site.Stages.Count <= place)
             {
                 return null;

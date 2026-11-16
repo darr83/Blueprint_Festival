@@ -78,13 +78,18 @@ public partial class ShowView : Node3D
     /// <summary>How bright the stage lights are, from 0 (off, by day) to 1 (a set at night).</summary>
     public float LightStrength { get; private set; }
 
-    /// <summary>True for the view of the second stage's acts.</summary>
-    public bool Second { get; private set; }
+    /// <summary>True for the view of an extra stage's acts (the second, third or fourth).</summary>
+    public bool Second => Number > 0;
 
-    public void Initialise(FestivalGame game, bool second = false)
+    /// <summary>Which stage's acts this draws: 0 for the main stage, then 1 to 3.</summary>
+    public int Number { get; private set; }
+
+    public void Initialise(FestivalGame game, bool second = false) => Initialise(game, second ? 1 : 0);
+
+    public void Initialise(FestivalGame game, int number)
     {
         _game = game;
-        Second = second;
+        Number = number;
         _acts = new Node3D { Name = "Acts" };
         AddChild(_acts);
         _rig = new Node3D { Name = "Lights" };
@@ -145,7 +150,7 @@ public partial class ShowView : Node3D
     private void Sync(double delta)
     {
         var now = _game.Now;
-        var show = Second ? _game.SecondShow : _game.Show;
+        var show = _game.Shows[Number];
         var stage = show.Stage;
         var speed = (int)_game.Clock.Speed;
         _beat.Update(_game, show, Music, _game.ActPaused || speed == 0, delta);

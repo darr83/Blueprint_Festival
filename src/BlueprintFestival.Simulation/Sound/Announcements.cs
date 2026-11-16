@@ -20,6 +20,12 @@ public static class Announcements
     /// </summary>
     public const int SecondStageMinutes = 9;
 
+    /// <summary>
+    /// How many minutes before a set each stage's act is announced, by the stage (main stage
+    /// first). Each stage gets its own moment so the announcements do not talk over each other.
+    /// </summary>
+    public static readonly IReadOnlyList<int> StageMinutes = new[] { MainStageMinutes, SecondStageMinutes, 14, 19 };
+
     /// <summary>The name of an artist's announcement, take 1 or 2.</summary>
     public static string IdFor(string artist, int take) => $"intro_{Slug(artist)}_{take}";
 

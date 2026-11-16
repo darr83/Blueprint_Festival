@@ -149,8 +149,7 @@ public sealed class SoundScript : IDisposable
     private readonly Dictionary<string, double> _levels = Sounds.Loops.Where(id => !Sounds.SetByTheGame(id)).ToDictionary(id => id, _ => 0.0);
     private Phase _phase;
     private bool _shut;
-    private int _playing = -1;
-    private int _playingSecond = -1;
+    private readonly int[] _playingOn = { -1, -1, -1, -1 };
     private bool _paused;
     private bool _calledOff;
     private bool _raining;
@@ -322,8 +321,11 @@ public sealed class SoundScript : IDisposable
         var game = _game;
         _phase = game.Phase;
         _shut = game.GatesShut;
-        _playing = game.Show.Playing(game.Now)?.Index ?? -1;
-        _playingSecond = game.SecondShow.Playing(game.Now)?.Index ?? -1;
+        for (var i = 0; i < game.Shows.Count; i++)
+        {
+            _playingOn[i] = game.Shows[i].Playing(game.Now)?.Index ?? -1;
+        }
+
         _paused = game.ActPaused;
         _calledOff = game.Show.CalledOff is not null;
         _raining = game.RainNow > 0.05;
@@ -380,13 +382,17 @@ public sealed class SoundScript : IDisposable
             }
         }
 
-        Announce(game.Show, 0, Announcements.MainStageMinutes);
-        Announce(game.SecondShow, 1, Announcements.SecondStageMinutes);
+        for (var i = 0; i < game.Shows.Count; i++)
+        {
+            Announce(game.Shows[i], i, Announcements.StageMinutes[i]);
+        }
 
         // People are still walking over as an act comes on, so count some of the field as well as those already watching.
         var crowd = Math.Max(game.Crowd.Watching, game.Crowd.InField / 4);
-        Stage(game.Show.Playing(game.Now), _playing, game.Show, crowd);
-        Stage(game.SecondShow.Playing(game.Now), _playingSecond, game.SecondShow, crowd / 3);
+        for (var i = 0; i < game.Shows.Count; i++)
+        {
+            Stage(game.Shows[i].Playing(game.Now), _playingOn[i], game.Shows[i], i == 0 ? crowd : crowd / 3);
+        }
     }
 
     private void Stage(Show.Slot? now, int before, Show.RunningOrder show, int watching)

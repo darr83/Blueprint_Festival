@@ -87,9 +87,9 @@ public sealed partial class FestivalGame
     /// </summary>
     public OfferOutcome Offer(int set, string artist, int pounds)
     {
-        var place = set >= RunningOrder.SecondBase ? set - RunningOrder.SecondBase : set;
-        if (!CanBookNow || Roster.Named(artist) is not { } found || place < 0 || place >= RunningOrder.SetsAStage
-            || (set >= RunningOrder.SecondBase && !SecondShow.Booked) || pounds < 0)
+        var place = set - RunningOrder.BaseOf(RunningOrder.StageOf(set));
+        if (!CanBookNow || Roster.Named(artist) is not { } found || set < 0 || place < 0 || place >= RunningOrder.SetsAStage
+            || !StageOf(set).Booked || pounds < 0)
         {
             return OfferOutcome.NotPossible;
         }
@@ -140,11 +140,11 @@ public sealed partial class FestivalGame
         return OfferOutcome.Accepted;
     }
 
-    /// <summary>Empties every set on both stages, so the whole line-up is the player's to book. Only in January.</summary>
+    /// <summary>Empties every set on every stage, so the whole line-up is the player's to book. Only in January.</summary>
     public void ClearBill()
     {
         Need(Phase.Plan);
-        foreach (var show in new[] { Show, SecondShow })
+        foreach (var show in Shows)
         {
             for (var i = 0; i < RunningOrder.SetsAStage; i++)
             {
@@ -152,14 +152,21 @@ public sealed partial class FestivalGame
             }
         }
 
-        SecondShow.Booked = false;
+        foreach (var show in Shows.Skip(1))
+        {
+            show.Booked = false;
+        }
+
         Crowd.Replan(ExpectedAt(TicketPrice));
     }
 
     /// <summary>The size of stage a stage's line-up needs: the size its biggest name will play. Null with nobody booked.</summary>
-    public StageSize? StageNeeded(bool second)
+    public StageSize? StageNeeded(bool second) => StageNeeded(second ? 1 : 0);
+
+    /// <summary>The size of stage a stage's line-up needs, by the stage's number (0 for the main stage). Null with nobody booked.</summary>
+    public StageSize? StageNeeded(int stage)
     {
-        var show = second ? SecondShow : Show;
+        var show = Shows[stage];
         return !show.Booked || show.Slots.Count == 0 ? null : Booking.StageFor(show.Slots.Max(s => s.Act.Rating));
     }
 
@@ -177,18 +184,18 @@ public sealed partial class FestivalGame
                 return problems;
             }
 
-            foreach (var show in new[] { Show, SecondShow })
+            foreach (var show in Shows)
             {
                 if (!show.Booked || show.Slots.Count == 0)
                 {
                     continue;
                 }
 
-                var which = show.Second ? "second stage" : "main stage";
+                var which = StageTitle(show.Number).ToLowerInvariant();
                 if (show.Stage is not { } stage)
                 {
-                    problems.Add(show.Second && Site.Stages.Count == 1
-                        ? $"The second stage's acts have no stage. They play the next biggest stage you put up."
+                    problems.Add(show.Second && Site.Stages.Count >= 1
+                        ? $"The {which}'s acts have no stage. They play the {Ordinal(show.Number + 1)} biggest stage you put up."
                         : $"The {which}'s acts have no stage yet.");
                     continue;
                 }
@@ -214,7 +221,7 @@ public sealed partial class FestivalGame
             return;
         }
 
-        foreach (var show in new[] { Show, SecondShow })
+        foreach (var show in Shows)
         {
             if (!show.Booked || show.Stage is not { } stage)
             {
@@ -229,6 +236,11 @@ public sealed partial class FestivalGame
             }
         }
     }
+
+    /// <summary>A stage's name by its number: "Main stage", "Second stage", "Third stage", "Fourth stage".</summary>
+    public static string StageTitle(int stage) => stage switch { 0 => "Main stage", 1 => "Second stage", 2 => "Third stage", _ => "Fourth stage" };
+
+    private static string Ordinal(int n) => n switch { 1 => "first", 2 => "second", 3 => "third", _ => "fourth" };
 
     /// <summary>The mood lost by everyone arriving for each star of an act that will not be playing after all.</summary>
     public const double NoShowMoodAStar = 0.012;

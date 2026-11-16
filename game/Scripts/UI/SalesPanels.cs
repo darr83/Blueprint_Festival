@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using BlueprintFestival.Simulation.Sound;
 using Godot;
 
@@ -48,7 +49,16 @@ public sealed record PlanView(int Year, string Festival, string Date, int Licenc
 
     /// <summary>What size of stage the second stage's acts need in build week, or empty.</summary>
     public string SecondNeeds { get; init; } = "";
+
+    /// <summary>
+    /// Every extra stage that is booked (the second, third and fourth, in order), each with its
+    /// sets and what size of stage it needs. Empty with only the main stage.
+    /// </summary>
+    public IReadOnlyList<StageBillView> Extra { get; init; } = System.Array.Empty<StageBillView>();
 }
+
+/// <summary>One extra stage on the planning screen: its number (1 to 3), name, sets and what it needs.</summary>
+public sealed record StageBillView(int Number, string Name, IReadOnlyList<SlotView> Sets, string Needs);
 
 /// <summary>What the planning screen can do.</summary>
 public sealed record PlanActions(System.Action? Book = null, System.Action<int>? PickSlot = null, System.Action<string?>? PickArtist = null,
@@ -63,6 +73,12 @@ public sealed record PlanActions(System.Action? Book = null, System.Action<int>?
 
     /// <summary>Pays what the artist asks.</summary>
     public System.Action? PayAsk { get; init; }
+
+    /// <summary>Adds another stage (up to four in all) with every set empty.</summary>
+    public System.Action? AddStage { get; init; }
+
+    /// <summary>Takes an extra stage (1 to 3) off the bill.</summary>
+    public System.Action<int>? RemoveStage { get; init; }
 }
 
 /// <summary>One way of advertising, and whether it is switched on.</summary>
@@ -331,6 +347,76 @@ public static partial class YearPanels
         return tile;
     }
 
+    /// <summary>The most stages the planning screen offers: the main stage and three more.</summary>
+    public const int MostStages = 4;
+
+    /// <summary>
+    /// The stages after the main one on the planning screen. One tab for each extra stage that is
+    /// booked and one to add another (up to four stages in all); under them the sets of the stage
+    /// whose set is picked (or the first), so the bill stays the same height however many stages there are.
+    /// </summary>
+    private static void OtherStages(VBoxContainer bill, PlanView view, PlanActions does, bool late)
+    {
+        var add = does.AddStage ?? does.ToggleSecond;
+        if (view.Extra.Count == 0)
+        {
+            var header = new HBoxContainer();
+            var heading = Section("More stages");
+            heading.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+            header.AddChild(heading);
+            var toggle = UiStyle.ChipButton("+  Add a second stage", add ?? (() => { }));
+            toggle.Name = "Add a stage";
+            toggle.Visible = !late;
+            header.AddChild(toggle);
+            bill.AddChild(header);
+            bill.AddChild(Wrapped(late ? "No other stage was booked in January." : "Up to three more stages, each with four sets, on stages you put up in build week. Each one splits the crowd between more fronts.", 500, muted: true, size: 13));
+            return;
+        }
+
+        var shown = view.Extra.FirstOrDefault(e => e.Sets.Any(s => s.Set == view.Picked)) ?? view.Extra[0];
+        var tabs = new HBoxContainer { Name = "Stage tabs" };
+        tabs.AddThemeConstantOverride("separation", 6);
+        foreach (var extra in view.Extra)
+        {
+            var acts = extra.Sets.Count(s => s.Name is not null);
+            var first = extra.Sets[0].Set;
+            var tab = UiStyle.ChipButton($"{extra.Name}  ·  {acts}", does.PickSlot is null ? () => { } : () => does.PickSlot(first));
+            tab.Name = extra.Name;
+            tab.TooltipText = $"{extra.Name}: {acts} of {extra.Sets.Count} sets booked. Click to see its sets.";
+            if (extra == shown)
+            {
+                tab.AddThemeStyleboxOverride("normal", UiStyle.Box(UiStyle.SunTint, 6));
+            }
+
+            tabs.AddChild(tab);
+        }
+
+        if (!late && view.Extra.Count < MostStages - 1)
+        {
+            var more = UiStyle.ChipButton("+  Add a stage", add ?? (() => { }));
+            more.Name = "Add a stage";
+            more.TooltipText = $"Another stage with four empty sets. Up to {MostStages} stages in all.";
+            tabs.AddChild(more);
+        }
+
+        bill.AddChild(tabs);
+        var top = new HBoxContainer();
+        var title = Section(shown.Needs.Length > 0 ? $"{shown.Name}  ·  {shown.Needs}" : shown.Name);
+        title.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        top.AddChild(title);
+        var number = shown.Number;
+        var remove = UiStyle.ChipButton("Remove", does.RemoveStage is { } r ? () => r(number) : does.ToggleSecond ?? (() => { }));
+        remove.Name = "Remove stage";
+        remove.TooltipText = $"Take the {shown.Name.ToLowerInvariant()} and its acts off the bill. Any stages after it move up a place.";
+        remove.Visible = !late;
+        top.AddChild(remove);
+        bill.AddChild(top);
+        foreach (var slot in shown.Sets)
+        {
+            bill.AddChild(SlotTile(slot, slot.Set == view.Picked, does.PickSlot, does.MoveSet));
+        }
+    }
+
     /// <summary>
     /// The January planning screen, laid out as the festival's programme: the running order down the
     /// left with the ticket under it, and on the right the artists to choose from and what is paid today.
@@ -376,26 +462,7 @@ public static partial class YearPanels
         }
 
         bill.AddChild(new Control { CustomMinimumSize = new Vector2(0, 8) });
-        var second = new HBoxContainer();
-        var heading = Section(view.SecondNeeds.Length > 0 && view.Second is not null ? $"Second stage  ·  {view.SecondNeeds}" : "Second stage");
-        heading.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
-        second.AddChild(heading);
-        var toggle = UiStyle.ChipButton(view.Second is null ? "+  Add a second stage" : "Remove", does.ToggleSecond ?? (() => { }));
-        toggle.Visible = !late;
-        second.AddChild(toggle);
-        bill.AddChild(second);
-        if (view.Second is null)
-        {
-            bill.AddChild(Wrapped(late ? "No second stage was booked in January." : "Four more sets, on a stage you put up in build week. It splits the crowd between two fronts.", 500, muted: true, size: 13));
-        }
-        else
-        {
-            foreach (var slot in view.Second)
-            {
-                bill.AddChild(SlotTile(slot, slot.Set == view.Picked, does.PickSlot, does.MoveSet));
-            }
-        }
-
+        OtherStages(bill, view, does, late);
         bill.AddChild(new Control { CustomMinimumSize = new Vector2(0, 6), SizeFlagsVertical = Control.SizeFlags.ExpandFill });
         if (late)
         {
@@ -407,7 +474,7 @@ public static partial class YearPanels
         }
 
         var summary = UiStyle.Body($"{view.Acts} acts  ·  fees £{view.Fees:N0}  ·  line-up pull {view.Pull}%", muted: true, size: 13);
-        summary.TooltipText = "Sets are an hour and a half and can start on any hour from 12:00 to 21:00 (the arrows by each time), with the next set on that stage on the next hour after it ends at the earliest. Any can be left empty, and the two stages can start and finish at different times. Every act helps sell tickets by its stars and fans, the last act on the main stage most of all. Four kinds of music or more bring a wider crowd.";
+        summary.TooltipText = "Sets are an hour and a half and can start on any hour from 12:00 to 21:00 (the arrows by each time), with the next set on that stage on the next hour after it ends at the earliest. Any can be left empty, and each stage (up to four) can start and finish at different times. Every act helps sell tickets by its stars and fans, the last act on the main stage most of all. Four kinds of music or more bring a wider crowd.";
         summary.MouseFilter = Control.MouseFilterEnum.Stop;
         bill.AddChild(summary);
 

@@ -105,8 +105,12 @@ public partial class MusicPlayer : Node
         _game = game;
         _beats = new BeatLibrary { Name = "Beats" };
         AddChild(_beats);
-        AddStage(() => _game.Show, "Music 1");
-        AddStage(() => _game.SecondShow, "Music 2");
+        for (var i = 0; i < game.Shows.Count; i++)
+        {
+            var stage = i;
+            AddStage(() => _game.Shows[stage], $"Music {i + 1}");
+        }
+
         Buskers = new BuskerMusic { Name = "Buskers" };
         AddChild(Buskers);
         Buskers.Initialise(game, _beats);
