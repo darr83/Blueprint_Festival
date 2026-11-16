@@ -243,7 +243,7 @@ public sealed class SoundScript : IDisposable
         StallKind.BucketHats or StallKind.Merchandise => Sounds.MerchBag,
         StallKind.PhoneCharging => Sounds.ChargePlug,
         StallKind.VipLounge or StallKind.VipPlatform => Sounds.ChampagnePop,
-        StallKind.WaterPoint or StallKind.ShowerBlock => Sounds.WaterTap,
+        StallKind.WaterPoint or StallKind.ShowerBlock or StallKind.UrinalStand or StallKind.UrinalTrough => Sounds.WaterTap,
         StallKind.CampInfo or StallKind.CampShop => Sounds.MerchBag,
         StallKind.Bin => Sounds.BinDrop,
         StallKind.Toilets or StallKind.ToiletBlock or StallKind.BackToBackToilets or StallKind.AccessibleToilet => Sounds.ToiletDoor,
