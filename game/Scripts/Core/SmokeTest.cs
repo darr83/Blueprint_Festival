@@ -749,6 +749,16 @@ public partial class SmokeTest : Node
                     Check(game.BuildStall(StallKind.Toilets, grass.X + 26, grass.Y + 5, Facing.South).Ok, "Toilets should go up.");
                     Check(game.BuildStall(StallKind.Toilets, grass.X + 36, grass.Y + 5, Facing.South).Ok, "More toilets should go up.");
 
+                    // Putting one thing down draws just that one thing, not the whole site again.
+                    build.Site.Rebuild();
+                    var stallsDrawn = build.Site.StallCount;
+                    Check(game.BuildComfort(ComfortKind.Bench, grass.X + 30, grass.Y + 44, Facing.South).Ok, "A bench should go down.");
+                    build.Site.Rebuild();
+                    Check(build.Site.MadeLastTime == 1 && build.Site.ComfortCount == 1 && build.Site.StallCount == stallsDrawn, $"Putting a bench down should draw only the bench, not {build.Site.MadeLastTime} models.");
+                    Check(game.Remove(new TilePoint(grass.X + 30, grass.Y + 44)) > 0, "The bench should come up again.");
+                    build.Site.Rebuild();
+                    Check(build.Site.MadeLastTime == 0 && build.Site.ComfortCount == 0, $"Taking the bench away should draw nothing new, not {build.Site.MadeLastTime} models.");
+
                     // Staff from the build bar: someone on the gate, a first-aider, security, and a first aid tent.
                     build.BuildBar.Toggle(BuildMode.Staff);
                     Check(build.BuildBar.ChoiceCount == 12, "The Staff tab should offer five kinds of staff, four entertainers, the first aid tent, the medical tent and the litter bin.");

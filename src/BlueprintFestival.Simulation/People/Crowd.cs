@@ -1229,7 +1229,8 @@ public sealed partial class Crowd
             for (var x = f.X + inset; x < f.Right - inset; x++)
             {
                 var p = new TilePoint(x, y);
-                if (_site.SideOf(p) == wanted && HasRoom(p) && _map.InFestival(p))
+                // Room all round: the route finder has just worked out how far every tile is from anything in the way.
+                if (_site.SideOf(p) == wanted && _paths.ClearanceAt(x, y) >= 2 && _map.InFestival(p))
                 {
                     _standable.Add(p);
                 }
@@ -1308,23 +1309,6 @@ public sealed partial class Crowd
                     break;
             }
         }
-    }
-
-    /// <summary>True if a tile and all eight round it can be walked on, so a party is not standing in a fence.</summary>
-    private bool HasRoom(TilePoint p)
-    {
-        for (var dy = -1; dy <= 1; dy++)
-        {
-            for (var dx = -1; dx <= 1; dx++)
-            {
-                if (!_map.IsWalkable(p.X + dx, p.Y + dy))
-                {
-                    return false;
-                }
-            }
-        }
-
-        return true;
     }
 
     private TilePoint NearestWalkable(TilePoint from)

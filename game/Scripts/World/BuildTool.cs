@@ -708,13 +708,7 @@ public partial class BuildTool : Node3D
         var result = CheckGround(from, to);
         if (result.Ok && (IsPathLine ? PathPatches(from, to) : Patches(from, to)) is var (c0, r0, c1, r1))
         {
-            for (var r = r0; r <= r1; r++)
-            {
-                for (var c = c0; c <= c1; c++)
-                {
-                    _game.LayGround(Ground, c, r);
-                }
-            }
+            _game.LayGround(Ground, c0, r0, c1, r1);
         }
 
         Said(result, $"{FestivalGame.NameOf(Ground)} laid");
