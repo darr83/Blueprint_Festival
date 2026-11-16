@@ -313,12 +313,12 @@ public partial class SiteView : Node3D
                 _bins.Add((stall, node.GetNode<Node3D>("Rubbish")));
             }
 
-            if (Catalogue.Of(stall.Kind).Serves == Need.Toilet)
+            if (Catalogue.HasCabins(stall.Kind))
             {
                 var doors = new Node3D[Catalogue.Of(stall.Kind).Servers];
                 for (var d = 0; d < doors.Length; d++)
                 {
-                    doors[d] = node.GetNode<Node3D>($"Door{d}");
+                    doors[d] = node.FindChild($"Door{d}", true, false) as Node3D ?? throw new System.InvalidOperationException($"No Door{d} on the {stall.Kind}.");
                 }
 
                 _toilets.Add((i, doors));

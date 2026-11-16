@@ -84,7 +84,7 @@ public partial class BuildBar
             return;
         }
 
-        foreach (var kind in new[] { StallKind.ShowerBlock, StallKind.CampInfo, StallKind.CampShop, StallKind.FirePit, StallKind.ToiletBlock, StallKind.WaterPoint })
+        foreach (var kind in new[] { StallKind.ShowerBlock, StallKind.CampInfo, StallKind.CampShop, StallKind.FirePit, StallKind.ToiletBlock, StallKind.BackToBackToilets, StallKind.AccessibleToilet, StallKind.UrinalTrough, StallKind.WaterPoint })
         {
             var s = Catalogue.Of(kind);
             var menu = Catalogue.MenuOf(kind);
