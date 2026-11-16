@@ -38,6 +38,12 @@ public partial class StageMusic : Node
     private AudioStreamPlayer _vocals = null!;
     private Choruses _marks = Choruses.None;
     private float _singLevel;
+    private List<Chorus> _left = [];
+    private float _crowdAlone;
+    private readonly System.Random _rolls = new();
+
+    /// <summary>How loud the crowd sings, at least, when the artist leaves the chorus to them.</summary>
+    private const float AloneLevel = 0.8f;
 
     /// <summary>How loud the crowd singing is under the song at its loudest, against the song itself.</summary>
     public const float CrowdLevel = 1f;
@@ -98,6 +104,12 @@ public partial class StageMusic : Node
 
     /// <summary>True when the song that is on has its singing on its own beside it, for the crowd to sing the words.</summary>
     public bool HasVocals => _vocals.Stream is not null;
+
+    /// <summary>
+    /// How far the artist and the band have stopped to leave the chorus to the crowd, from 0 (playing) to 1
+    /// (only the crowd sings). Only for songs with a crowd file, and only while someone sings.
+    /// </summary>
+    public float CrowdAlone => _crowdAlone;
 
     /// <summary>
     /// How loud the crowd is singing this stage's song, from 0 to 1. Set every frame by the crowd,
@@ -256,9 +268,17 @@ public partial class StageMusic : Node
         // Where the player is looking: the first frame takes it as it is, then it eases along.
         _place = _place < 0 ? Wanted : Mathf.Lerp(_place, Wanted, Mathf.Min(1f, PlaceFollow * (float)delta));
         _level = Mathf.MoveToward(_level, _slot >= 0 && !held ? 1 : 0, FadePerSecond * (float)delta);
-        _player.VolumeDb = Mathf.LinearToDb(Mathf.Max(_level * _fade * Place, 0.0001f));
-        // The song's own singing, sung back by the crowd: only in the choruses, and as loud as the crowd is singing.
-        _vocals.VolumeDb = Mathf.LinearToDb(Mathf.Max(_level * _fade * Place * (float)Chorus * _singLevel * CrowdLevel, 0.0001f));
+        // Now and then the artist and the band stop and leave a few seconds of a chorus to the crowd. The song
+        // goes on without being heard, so when they come back in they are in time; the crowd comes up to fill it.
+        var alone = HasVocals && _vocals.Playing && _singLevel > 0.01f && SongPlaying && !_player.StreamPaused
+            ? (float)SingAlong.LeftLevel(_left, SongSeconds) : 0f;
+        _crowdAlone = held ? _crowdAlone : alone;
+        var music = _level * _fade * Place;
+        _player.VolumeDb = Mathf.LinearToDb(Mathf.Max(music * (1 - _crowdAlone), 0.0001f));
+        // The song's own singing, sung back by the crowd: only in the choruses, and as loud as the crowd is singing
+        // (louder when it is left to them).
+        var sung = Mathf.Lerp(_singLevel, Mathf.Max(_singLevel, AloneLevel), _crowdAlone);
+        _vocals.VolumeDb = Mathf.LinearToDb(Mathf.Max(music * (float)Chorus * sung * CrowdLevel, 0.0001f));
         if (_vocals.Playing && !_player.Playing)
         {
             _vocals.Stop();
@@ -351,6 +371,15 @@ public partial class StageMusic : Node
         _marks = ChorusLibrary.Of(Artist, song);
         _vocals.Stop();
         _vocals.Stream = ChorusLibrary.VocalsOf(Artist, song) is { } vocals && ResourceLoader.Load(vocals) is AudioStream sung ? sung : null;
+        // Which choruses the artist leaves to the crowd this time round: different each time the song is played.
+        _left = [];
+        foreach (var chorus in _marks.All)
+        {
+            if (SingAlong.LeftToTheCrowd(_rolls.Next(), chorus) is { } left)
+            {
+                _left.Add(left);
+            }
+        }
         if (ResourceLoader.Load($"{MusicPlayer.Folder}/{Artist}/{song.File}") is AudioStream stream)
         {
             _player.Stream = stream;
