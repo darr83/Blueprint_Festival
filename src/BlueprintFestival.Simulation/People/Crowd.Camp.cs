@@ -31,6 +31,40 @@ public sealed partial class Crowd
 
     public const double NoWaterNear = 0.02;
 
+    /// <summary>What each extra way to camp gets from the guests who like it most: a better start than a pitch of your own.</summary>
+    public const double ExtraWishMet = 0.04;
+
+    private readonly double[] _kindShares = { 0, CampLayout.UsualShare(CampKind.ReadyPitched), CampLayout.UsualShare(CampKind.Campervan), CampLayout.UsualShare(CampKind.Glamping) };
+
+    /// <summary>Sets the share of campers who buy each dearer way to camp, from its price.</summary>
+    public void SetKindShare(CampKind kind, double share) => _kindShares[(int)kind] = Math.Clamp(share, 0, 0.5);
+
+    /// <summary>The share of campers who buy a way to camp at today's prices.</summary>
+    public double KindShare(CampKind kind) => _kindShares[(int)kind];
+
+    /// <summary>
+    /// The way to camp a party would buy at today's prices: most bring their own tent, a few pay
+    /// for glamping, a campervan pitch or a tent ready pitched. The same parties every time.
+    /// </summary>
+    public CampKind BoughtKind(Party party)
+    {
+        var roll = (uint)((party.Id * 2654435769u) ^ 0x5bd1e995u) % 10000 / 10000.0;
+        var upTo = 0.0;
+        foreach (var kind in new[] { CampKind.Glamping, CampKind.Campervan, CampKind.ReadyPitched })
+        {
+            upTo += _kindShares[(int)kind];
+            if (roll < upTo)
+            {
+                return kind;
+            }
+        }
+
+        return CampKind.OwnTent;
+    }
+
+    /// <summary>The way a party is camping: by the ground their pitch is on.</summary>
+    public CampKind KindOf(Party party) => party.Pitch is { } pitch ? CampLayout.KindOn(_site.CampZoneAt(pitch)) : CampKind.OwnTent;
+
     /// <summary>True if this party will bring a tent at today's pitch price. The same parties camp every time the day is planned.</summary>
     public bool WouldCamp(Party party) => (uint)(party.Id * 2654435761u) % 100 < CamperShare * 100;
 
@@ -68,9 +102,10 @@ public sealed partial class Crowd
             }
 
             var zone = _site.CampZoneAt(p);
-            if (zone == CampZone.Accessible)
+            var spacing = CampLayout.SpacingOn(zone);
+            if (spacing > 0)
             {
-                if (roomy.Any(r => ((r.X - p.X) * (r.X - p.X)) + ((r.Y - p.Y) * (r.Y - p.Y)) < CampLayout.AccessibleSpacing * CampLayout.AccessibleSpacing))
+                if (roomy.Any(r => _site.CampZoneAt(r) == zone && ((r.X - p.X) * (r.X - p.X)) + ((r.Y - p.Y) * (r.Y - p.Y)) < spacing * spacing))
                 {
                     continue;
                 }
@@ -104,7 +139,18 @@ public sealed partial class Crowd
 
         var campers = _parties.Where(WouldCamp).ToList();
         var given = new Dictionary<Party, TilePoint>();
+
+        // First those who bought one of the dearer ways to camp, on the ground kept for it.
         foreach (var party in campers)
+        {
+            var bought = BoughtKind(party);
+            if (bought != CampKind.OwnTent && pools.TryGetValue(CampLayout.ZoneFor(bought), out var kept) && kept.Count > 0)
+            {
+                given[party] = kept.Dequeue();
+            }
+        }
+
+        foreach (var party in campers.Where(c => !given.ContainsKey(c)))
         {
             var wish = WishOf(party);
             if (wish != CampZone.General && pools.TryGetValue(wish, out var pool) && pool.Count > 0)
@@ -145,7 +191,11 @@ public sealed partial class Crowd
         var wish = WishOf(party);
         var zone = _site.CampZoneAt(pitch);
         var feel = 0.0;
-        if (wish != CampZone.General && zone == wish)
+        if (CampLayout.IsExtra(zone))
+        {
+            feel += ExtraWishMet;
+        }
+        else if (wish != CampZone.General && zone == wish)
         {
             feel += WishMet;
         }

@@ -26,13 +26,16 @@ public partial class BuildTool
     /// <summary>How many kinds of mark are drawn on the camping ground.</summary>
     public int CampMarkKinds => _campMarks?.GetChildCount() ?? 0;
 
-    /// <summary>The colour each kind of camping ground is tinted: blue for quiet, lilac for families, gold for accessible, pale for a fire lane.</summary>
+    /// <summary>The colour each kind of camping ground is tinted: blue for quiet, lilac for families, gold for accessible, pale for a fire lane, teal for ready pitched, grey for campervans and cream for glamping.</summary>
     public static Color CampColour(CampZone zone, float alpha) => zone switch
     {
         CampZone.Quiet => new Color(0.24f, 0.49f, 0.69f, alpha),
         CampZone.Family => new Color(0.56f, 0.42f, 0.75f, alpha),
         CampZone.Accessible => new Color(0.88f, 0.63f, 0.12f, alpha),
         CampZone.FireLane => new Color(0.92f, 0.96f, 0.85f, alpha),
+        CampZone.ReadyPitched => new Color(0.16f, 0.55f, 0.55f, alpha),
+        CampZone.Campervan => new Color(0.55f, 0.52f, 0.48f, alpha),
+        CampZone.Glamping => new Color(0.93f, 0.85f, 0.62f, alpha),
         _ => new Color(1, 1, 1, alpha),
     };
 

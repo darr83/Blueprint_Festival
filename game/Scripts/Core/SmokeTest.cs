@@ -204,8 +204,10 @@ public partial class SmokeTest : Node
                         model.Free();
                     }
 
+                    opened.BuildBar.ShowCampThings(false);
                     opened.BuildBar.Toggle(BuildMode.Camp);
-                    Check(opened.BuildBar.ChoiceCount == 11 && opened.BuildBar.CampCheckLines.Count == 1, "The Camping tab should offer four kinds of ground, six things to put down and camp stewards, and say there is no camping field.");
+                    Check(opened.BuildBar.ChoiceCount == 7 && opened.BuildBar.CampCheckLines.Count == 1, "The Camping tab should offer seven kinds of ground, and say there is no camping field.");
+                    Check(opened.BuildBar.Choose("staffCampSteward") && opened.BuildBar.CampThings && opened.BuildBar.ChoiceCount == 7, "The Camping tab's other half should offer six things to put up and camp stewards.");
                     Check(opened.BuildBar.Choose(UI.BuildBar.CampKey(CampZone.FireLane)) && opened.Build.Mode == BuildMode.Camp && opened.Build.CampZone == CampZone.FireLane, "The fire lane should be on the Camping tab.");
                     Check(!opened.Build.DragCampZone(new TilePoint(grass.X + 10, grass.Y + 10), new TilePoint(grass.X + 20, grass.Y + 20)).Ok, "The village field is not camping ground.");
                     opened.BuildBar.Toggle(BuildMode.Stall);

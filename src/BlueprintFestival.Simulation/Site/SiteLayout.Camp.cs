@@ -19,6 +19,31 @@ public enum CampZone : byte
 
     /// <summary>A strip mown short and kept clear of tents, so a fire engine can get through.</summary>
     FireLane,
+
+    /// <summary>Tents put up before the gates open, for campers who would rather not bring one.</summary>
+    ReadyPitched,
+
+    /// <summary>Gravel hardstanding for campervans.</summary>
+    Campervan,
+
+    /// <summary>Bell tents with real beds, for guests who pay a lot and expect a lot.</summary>
+    Glamping,
+}
+
+/// <summary>The ways to camp: each is its own ticket, with its own price, its own buyers and its own ground.</summary>
+public enum CampKind : byte
+{
+    /// <summary>Bring your own tent: a pitch and nothing else.</summary>
+    OwnTent,
+
+    /// <summary>A tent up and waiting when you arrive.</summary>
+    ReadyPitched,
+
+    /// <summary>A van and awning on hardstanding.</summary>
+    Campervan,
+
+    /// <summary>A bell tent with beds made up.</summary>
+    Glamping,
 }
 
 /// <summary>A run of camping ground marked for one use, as it is saved.</summary>
@@ -43,7 +68,88 @@ public static class CampLayout
     public const int FireFine = 500;
 
     /// <summary>The marked kinds of camping ground, in the order they are offered.</summary>
-    public static readonly CampZone[] Zones = { CampZone.Quiet, CampZone.Family, CampZone.Accessible, CampZone.FireLane };
+    public static readonly CampZone[] Zones = { CampZone.Quiet, CampZone.Family, CampZone.Accessible, CampZone.FireLane, CampZone.ReadyPitched, CampZone.Campervan, CampZone.Glamping };
+
+    /// <summary>The ways to camp that cost more than a pitch, each on its own marked ground.</summary>
+    public static readonly CampKind[] Extras = { CampKind.ReadyPitched, CampKind.Campervan, CampKind.Glamping };
+
+    /// <summary>The ground a way to camp needs, or <see cref="CampZone.General"/> for your own tent.</summary>
+    public static CampZone ZoneFor(CampKind kind) => kind switch
+    {
+        CampKind.ReadyPitched => CampZone.ReadyPitched,
+        CampKind.Campervan => CampZone.Campervan,
+        CampKind.Glamping => CampZone.Glamping,
+        _ => CampZone.General,
+    };
+
+    /// <summary>The way to camp a pitch on this ground is sold as.</summary>
+    public static CampKind KindOn(CampZone zone) => zone switch
+    {
+        CampZone.ReadyPitched => CampKind.ReadyPitched,
+        CampZone.Campervan => CampKind.Campervan,
+        CampZone.Glamping => CampKind.Glamping,
+        _ => CampKind.OwnTent,
+    };
+
+    /// <summary>True for ground kept for one of the dearer ways to camp, where nobody else pitches.</summary>
+    public static bool IsExtra(CampZone zone) => zone is CampZone.ReadyPitched or CampZone.Campervan or CampZone.Glamping;
+
+    public static string KindName(CampKind kind) => kind switch
+    {
+        CampKind.ReadyPitched => "Ready pitched",
+        CampKind.Campervan => "Campervan",
+        CampKind.Glamping => "Glamping",
+        _ => "Bring your own tent",
+    };
+
+    /// <summary>What a pitch of this kind usually sells for, for the whole party.</summary>
+    public static int UsualPrice(CampKind kind) => kind switch
+    {
+        CampKind.ReadyPitched => 55,
+        CampKind.Campervan => 40,
+        CampKind.Glamping => 180,
+        _ => 4,
+    };
+
+    /// <summary>The dearest it can be.</summary>
+    public static int DearestPrice(CampKind kind) => kind switch
+    {
+        CampKind.ReadyPitched => 150,
+        CampKind.Campervan => 120,
+        CampKind.Glamping => 500,
+        _ => 30,
+    };
+
+    /// <summary>What each pitch of this kind costs to set up on the day: the tent, the gravel, the bell tent and its beds.</summary>
+    public static int SetUpCost(CampKind kind) => kind switch
+    {
+        CampKind.ReadyPitched => 35,
+        CampKind.Campervan => 40,
+        CampKind.Glamping => 150,
+        _ => 0,
+    };
+
+    /// <summary>The share of campers who want this kind at its usual price.</summary>
+    public static double UsualShare(CampKind kind) => kind switch
+    {
+        CampKind.ReadyPitched => 0.10,
+        CampKind.Campervan => 0.05,
+        CampKind.Glamping => 0.03,
+        _ => 0,
+    };
+
+    /// <summary>The share of campers who buy this kind at a price: twice as many when it is very cheap, fewer as it gets dearer.</summary>
+    public static double ShareAt(CampKind kind, int pounds) =>
+        kind == CampKind.OwnTent ? 0 : UsualShare(kind) * 2 / (1 + Math.Pow(Math.Max(0, pounds) / (double)UsualPrice(kind), 2));
+
+    /// <summary>How far apart, centre to centre in tiles, pitches stand on this ground, or 0 for the usual spacing.</summary>
+    public static double SpacingOn(CampZone zone) => zone switch
+    {
+        CampZone.Accessible => AccessibleSpacing,
+        CampZone.Campervan => 12,
+        CampZone.Glamping => 13,
+        _ => 0,
+    };
 
     public static string Name(CampZone zone) => zone switch
     {
@@ -51,6 +157,9 @@ public static class CampLayout
         CampZone.Family => "Family camping",
         CampZone.Accessible => "Accessible camping",
         CampZone.FireLane => "Fire lane",
+        CampZone.ReadyPitched => "Ready pitched",
+        CampZone.Campervan => "Campervans",
+        CampZone.Glamping => "Glamping",
         _ => "General camping",
     };
 
@@ -60,6 +169,9 @@ public static class CampLayout
         CampZone.Family => "For parties with children. Families pitched here are happier; families pitched among everyone else less so.",
         CampZone.Accessible => $"Bigger pitches, at least {AccessibleSpacing / 2:0} m apart, for the campers who need room to get round. Without one they have a hard time.",
         CampZone.FireLane => $"A strip mown short and kept clear. Nothing can be built on it and no tent goes up on it. The fire officer wants every tent within {FireLaneReach:0} m of one, or of the hedge.",
+        CampZone.ReadyPitched => $"Tents put up for campers before they arrive. They pay £{UsualPrice(CampKind.ReadyPitched)} a tent, and each tent costs £{SetUpCost(CampKind.ReadyPitched)} to put up. Nobody else pitches here.",
+        CampZone.Campervan => $"Gravel hardstanding for campervans, £{SetUpCost(CampKind.Campervan)} a pitch to lay. Vans pay about £{UsualPrice(CampKind.Campervan)} each. Pitches are bigger.",
+        CampZone.Glamping => $"Bell tents with beds made up, £{SetUpCost(CampKind.Glamping)} each to hire. Guests pay about £{UsualPrice(CampKind.Glamping)} and get cross fast if the showers queue.",
         _ => "Everywhere in a camping field that is not marked for something else.",
     };
 

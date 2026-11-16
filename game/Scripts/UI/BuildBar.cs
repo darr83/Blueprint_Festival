@@ -188,6 +188,7 @@ public partial class BuildBar : VBoxContainer
         }
 
         shelves.AddChild(_decorRow);
+        AddCampRow(shelves);
         _widthRow = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center, Visible = false };
         _widthRow.AddThemeConstantOverride("separation", 6);
         for (var patches = 1; patches <= FestivalGame.WidestPath; patches++)
@@ -272,6 +273,7 @@ public partial class BuildBar : VBoxContainer
         ClearChoices();
         _shelfRow.Visible = mode == BuildMode.Stall;
         _decorRow.Visible = mode == BuildMode.Sign;
+        _campRow.Visible = mode == BuildMode.Camp;
         _widthRow.Visible = mode == BuildMode.Path;
         switch (mode)
         {
@@ -493,6 +495,12 @@ public partial class BuildBar : VBoxContainer
         {
             // It is on the other shelf of the Decor group.
             ShowDecorShelf(!DecorShelf);
+        }
+
+        if (!_choices.ContainsKey(key) && _open == BuildMode.Camp && key.StartsWith("camp", System.StringComparison.Ordinal) == CampThings)
+        {
+            // It is on the other half of the Camping group.
+            ShowCampThings(!CampThings);
         }
 
         if (!_choices.TryGetValue(key, out var button))

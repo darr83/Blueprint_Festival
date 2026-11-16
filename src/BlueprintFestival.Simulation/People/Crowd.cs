@@ -1113,6 +1113,14 @@ public sealed partial class Crowd
     public IEnumerable<(TilePoint Pitch, int Party)> Tents =>
         _parties.Where(p => p.Camper && p.Ticketed == true && !_struck.Contains(p.Id)).Select(p => (p.Pitch!.Value, p.Id));
 
+    /// <summary>
+    /// The tents to draw: those up because their campers are here, and the tents ready pitched and
+    /// bell tents put up before anyone arrives. Packed-away tents are gone.
+    /// </summary>
+    public IEnumerable<(TilePoint Pitch, int Party, CampKind Kind)> TentsUp =>
+        _parties.Where(p => p.Pitch is not null && !_struck.Contains(p.Id) && (p.Ticketed == true || KindOf(p) is CampKind.ReadyPitched or CampKind.Glamping))
+            .Select(p => (p.Pitch!.Value, p.Id, KindOf(p)));
+
     /// <summary>Every tent that was put up today, packed away since or not.</summary>
     public IEnumerable<(TilePoint Pitch, int Party)> Pitched =>
         _parties.Where(p => p.Camper && p.Ticketed == true).Select(p => (p.Pitch!.Value, p.Id));
@@ -1126,7 +1134,7 @@ public sealed partial class Crowd
     internal IReadOnlyCollection<int> Struck => _struck;
 
     /// <summary>A camper has come through the gate and paid for their pitch.</summary>
-    public event Action<int>? CamperArrived;
+    public event Action<Party>? CamperArrived;
 
     /// <summary>
     /// Gives a share of the crowd a pitch in the camping field. They come like anyone else, stay for
@@ -2020,7 +2028,7 @@ public sealed partial class Crowd
             {
                 // The tent goes up: a good pitch cheers them, a poor one lets them down.
                 party.Mood = Math.Clamp(party.Mood + CampFeel(party), 0, 1);
-                CamperArrived?.Invoke(party.Members.Count);
+                CamperArrived?.Invoke(party);
             }
 
             Send(party, SomewhereInField(party.Random), PartyState.WalkingIn);
