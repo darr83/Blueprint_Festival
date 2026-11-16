@@ -337,7 +337,7 @@ public partial class TopBar : PanelContainer
         _queueCell.Visible = QueueText.Length > 0;
 
         // On the day itself the weather takes the date's place: the date does not change, and the weather does.
-        _date.Visible = _game.Phase != Phase.Day;
+        _date.Visible = _game.Phase != Phase.Day || _game.Days > 1;
         _time.TooltipText = _date.TooltipText;
         _money.Text = $"£{_game.Money:N0}";
         MoodText = $"Happy {_game.Crowd.Happiness}%";

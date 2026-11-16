@@ -13,7 +13,7 @@ public class CampingTests
 
     private static FestivalGame Night()
     {
-        var game = GrowthTests.Built(5000, 90000, camping: true);
+        var game = GrowthTests.Built(5000, 90000, camping: true, days: 1);
         game.OpenGates();
         var guard = 0;
         while (game.Phase == Phase.Day)

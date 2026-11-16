@@ -58,7 +58,7 @@ public sealed class RunningOrder
     private readonly SiteLayout _site;
     private readonly List<Slot> _slots = new();
 
-    private readonly DateTime _day;
+    private DateTime _day;
 
     public RunningOrder(SiteLayout site, int seed, DateTime festivalDay)
     {
@@ -216,6 +216,24 @@ public sealed class RunningOrder
             _slots[i] = _slots[i] with { Headliner = !Second && i == _slots.Count - 1 };
         }
     }
+
+    /// <summary>
+    /// Moves the line-up on to another day of a festival of more than one day: every set keeps its
+    /// hour, the stage is no longer called off, and nothing has been cut short yet.
+    /// </summary>
+    public void MoveTo(DateTime day)
+    {
+        _day = day.Date;
+        CalledOff = null;
+        for (var i = 0; i < _slots.Count; i++)
+        {
+            var (start, end) = TimeOf(_slots[i].Index - Base);
+            _slots[i] = _slots[i] with { Start = start, End = end, CutShort = false };
+        }
+    }
+
+    /// <summary>The day the line-up plays on.</summary>
+    public DateTime Date => _day;
 
     /// <summary>Books an act for a set, or with null leaves the set empty.</summary>
     public void Book(int index, Act? act)

@@ -462,7 +462,7 @@ public sealed partial class Crowd
     private readonly List<CubicleUse?[]> _cubicles = new();
     private readonly List<TilePoint> _standable = new();
     private readonly HashSet<TilePoint> _standableSet = new();
-    private readonly DateTime _day;
+    private DateTime _day;
     private DateTime _now;
 
     /// <summary>
@@ -964,6 +964,29 @@ public sealed partial class Crowd
         Replanned?.Invoke();
     }
 
+    /// <summary>
+    /// The next day of a festival of more than one day: the same people come again, a day later.
+    /// Everyone planned so far is forgotten, as with <see cref="Replan"/>. With tents staying up,
+    /// the campers' tents stay pitched overnight and they do not pay or settle in again at the gate.
+    /// </summary>
+    public void NewDay(DateTime day, int people, bool tentsStayUp)
+    {
+        _day = day.Date;
+        TentsStayUp = tentsStayUp;
+        _measuredMinute = -1;
+        _turnedAway = -1;
+        for (var i = 0; i < _claimSlot.Length; i++)
+        {
+            _claimSlot[i] = -1;
+            Array.Clear(_claims[i]);
+        }
+
+        Replan(people);
+    }
+
+    /// <summary>True on the second or third day of a festival, when the campers' tents are up from the night before.</summary>
+    public bool TentsStayUp { get; set; }
+
     /// <summary>Raised when the crowd has been planned afresh, so how they travel can be worked out again.</summary>
     public event Action? Replanned;
 
@@ -1125,14 +1148,14 @@ public sealed partial class Crowd
 
     /// <summary>The tents that are up: where, and whose (for a colour that stays the same). A tent packed away in the morning is gone.</summary>
     public IEnumerable<(TilePoint Pitch, int Party)> Tents =>
-        _parties.Where(p => p.Camper && p.Ticketed == true && !_struck.Contains(p.Id)).Select(p => (p.Pitch!.Value, p.Id));
+        _parties.Where(p => p.Camper && p.Pitch is not null && (p.Ticketed == true || TentsStayUp) && !_struck.Contains(p.Id)).Select(p => (p.Pitch!.Value, p.Id));
 
     /// <summary>
     /// The tents to draw: those up because their campers are here, and the tents ready pitched and
     /// bell tents put up before anyone arrives. Packed-away tents are gone.
     /// </summary>
     public IEnumerable<(TilePoint Pitch, int Party, CampKind Kind)> TentsUp =>
-        _parties.Where(p => p.Pitch is not null && !_struck.Contains(p.Id) && (p.Ticketed == true || KindOf(p) is CampKind.ReadyPitched or CampKind.Glamping))
+        _parties.Where(p => p.Pitch is not null && !_struck.Contains(p.Id) && (p.Ticketed == true || TentsStayUp || KindOf(p) is CampKind.ReadyPitched or CampKind.Glamping))
             .Select(p => (p.Pitch!.Value, p.Id, KindOf(p)));
 
     /// <summary>Every tent that was put up today, packed away since or not.</summary>
@@ -2022,7 +2045,7 @@ public sealed partial class Crowd
 
             party.Ticketed = true;
             TicketsSold?.Invoke(party.Members.Count);
-            if (party.Camper)
+            if (party.Camper && !TentsStayUp)
             {
                 // The tent goes up: a good pitch cheers them, a poor one lets them down.
                 party.Mood = Math.Clamp(party.Mood + CampFeel(party), 0, 1);

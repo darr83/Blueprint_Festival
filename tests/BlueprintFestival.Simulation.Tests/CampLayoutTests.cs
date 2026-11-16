@@ -10,7 +10,8 @@ public class CampLayoutTests
     internal static FestivalGame BuildDay()
     {
         var plan = new FieldPlan(new[] { new FieldChoice("home", FieldUse.Music), new FieldChoice("ten", FieldUse.Food), new FieldChoice("show", FieldUse.Camping), new FieldChoice("glebe", FieldUse.CarPark) });
-        var game = FestivalGame.StartYear("Larkmoor Festival", new YearSetup(6, 5000, 90000)).WithFields(plan)!;
+        // One day, so the campers pack up the morning after; DaysTests runs the long weekend.
+        var game = FestivalGame.StartYear("Larkmoor Festival", new YearSetup(6, 5000, 90000) { Days = 1 }).WithFields(plan)!;
         game.HireBuses(FestivalGame.MostBuses);
         Assert.True(game.CampingBooked);
         Assert.True(game.ConfirmPlan());

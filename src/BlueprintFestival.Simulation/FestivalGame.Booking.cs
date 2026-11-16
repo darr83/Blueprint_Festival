@@ -157,6 +157,8 @@ public sealed partial class FestivalGame
             show.Booked = false;
         }
 
+        EveryOtherBill(bill => Array.Clear(bill));
+
         Crowd.Replan(ExpectedAt(TicketPrice));
     }
 

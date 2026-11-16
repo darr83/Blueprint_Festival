@@ -87,12 +87,14 @@ public sealed partial class FestivalGame
     /// main stage counts most, by its pull (stars and following, see <see cref="FanPull"/>); every other act adds a little; and
     /// four or more kinds of music bring a wider crowd.
     /// </summary>
-    public double LineUpPull => PullOf(LineUp.ToList());
+    public double LineUpPull => PullOf(WholeBill.ToList());
 
     /// <summary>The pull of some of the sets on the bill, as <see cref="LineUpPull"/> works it out for all of them.</summary>
-    private double PullOf(IReadOnlyList<Slot> sets)
+    private double PullOf(IReadOnlyList<Slot> sets) => Days == 1 ? PullOfDay(sets, Show.Slots.LastOrDefault()?.Act) : PullOfDays(sets);
+
+    /// <summary>The pull of one day's sets, with that day's last act on the main stage.</summary>
+    private static double PullOfDay(IReadOnlyList<Slot> sets, Act? closing)
     {
-        var closing = Show.Slots.LastOrDefault()?.Act;
         var head = closing is not null && sets.Any(s => s.Act == closing) ? closing : null;
         var others = sets.Where(s => s.Act != head).Sum(s => s.Act.Rating);
         var genres = sets.Select(s => s.Act.Genre).Distinct().Count();
@@ -101,11 +103,13 @@ public sealed partial class FestivalGame
     }
 
     /// <summary>The ticket price this line-up is worth. Dearer than this sells slowly; cheaper sells fast.</summary>
-    public double FairPrice => FairOf(LineUp.ToList());
+    public double FairPrice => FairOf(WholeBill.ToList());
 
-    private double FairOf(IReadOnlyList<Slot> sets)
+    private double FairOf(IReadOnlyList<Slot> sets) => Days == 1 ? FairOfDay(sets, Show.Slots.LastOrDefault()?.Act) : FairOfDays(sets);
+
+    /// <summary>What one day's sets are worth, with that day's last act on the main stage.</summary>
+    private static double FairOfDay(IReadOnlyList<Slot> sets, Act? closing)
     {
-        var closing = Show.Slots.LastOrDefault()?.Act;
         var head = closing is not null && sets.Any(s => s.Act == closing) ? closing : null;
         var others = sets.Where(s => s.Act != head).Sum(s => s.Act.Rating);
         return 2.5 + (1.2 * (head?.Rating ?? 0)) + (0.2 * Math.Min(12, others));
@@ -157,7 +161,7 @@ public sealed partial class FestivalGame
             throw new InvalidOperationException("The ticket price is set before the gates open.");
         }
 
-        TicketPrice = Math.Clamp(pounds, 1, MaxTicketPrice);
+        TicketPrice = Math.Clamp(pounds, 1, TopTicketPrice);
         if (Phase == Phase.Plan)
         {
             Crowd.Replan(ExpectedAt(TicketPrice));

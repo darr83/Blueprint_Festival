@@ -35,9 +35,11 @@ public sealed partial class FestivalGame
             BailedOut = setup.BailedOut;
             LastHappiness = setup.LastHappiness;
             EmptyBill = setup.EmptyBill;
+            _daysSet = setup.Days is { } days ? Math.Clamp(days, 1, 3) : null;
             Planned = true;
             Phase = Phase.Plan;
-            start ??= FestivalDay(Year) + GameClock.DefaultStart.TimeOfDay;
+            // A three-day festival starts on the Friday, the day before the usual Saturday.
+            start ??= FestivalDay(Year).AddDays(Days == 3 ? -1 : 0) + GameClock.DefaultStart.TimeOfDay;
             seed ??= (StableHash(Name) + ((Year - 1) * 7919)) & 0x7FFFFFFF;
         }
 
@@ -66,7 +68,7 @@ public sealed partial class FestivalGame
         Crowd.TicketsSold += people =>
         {
             // Tickets sold ahead were paid for when they were bought.
-            if (!SoldAhead)
+            if (!SoldAhead && DayNumber == 0)
             {
                 Earn("Tickets", people * TicketPrice);
             }
@@ -109,6 +111,8 @@ public sealed partial class FestivalGame
             {
                 ClearBill();
             }
+
+            StartDays();
         }
     }
 
@@ -470,7 +474,7 @@ public sealed partial class FestivalGame
 
         // The crowd's plan is for the day the festival is on, whatever time it was saved at.
         var game = data.Year is { } year
-            ? new FestivalGame(data.Name, year.Day.Date + GameClock.DefaultStart.TimeOfDay, data.Seed, new YearSetup(year.Number, year.Licence, 0, year.BailedOut, year.LastHappiness, year.Fields) { EmptyBill = year.EmptyBill })
+            ? new FestivalGame(data.Name, year.Day.Date + GameClock.DefaultStart.TimeOfDay, data.Seed, new YearSetup(year.Number, year.Licence, 0, year.BailedOut, year.LastHappiness, year.Fields) { EmptyBill = year.EmptyBill, Days = year.DaysSet })
             : new FestivalGame(data.Name, data.Clock.Now.Date + GameClock.DefaultStart.TimeOfDay, data.Seed);
         // The clock comes back first so the rain is right, and the weather before the crowd is planned again.
         game.Clock.RestoreState(data.Clock);
