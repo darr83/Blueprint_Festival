@@ -1,5 +1,6 @@
 using BlueprintFestival.Simulation.Core;
 using BlueprintFestival.Simulation.Sales;
+using BlueprintFestival.Simulation.Show;
 
 namespace BlueprintFestival.Simulation;
 
@@ -80,7 +81,7 @@ public sealed partial class FestivalGame
 
     /// <summary>
     /// How strongly the line-up sells tickets, where 1 is an ordinary bill. The last act on the
-    /// main stage counts most, by its stars and its following; every other act adds a little; and
+    /// main stage counts most, by its pull (stars and following, see <see cref="FanPull"/>); every other act adds a little; and
     /// four or more kinds of music bring a wider crowd.
     /// </summary>
     public double LineUpPull
@@ -90,8 +91,8 @@ public sealed partial class FestivalGame
             var head = Show.Slots.LastOrDefault()?.Act;
             var others = LineUp.Where(s => s.Act != head).Sum(s => s.Act.Rating);
             var genres = LineUp.Select(s => s.Act.Genre).Distinct().Count();
-            var fame = head is null ? 0 : Math.Min(0.25, Math.Log10(Math.Max(100, head.Fans)) / 28);
-            return 0.3 + (0.15 * (head?.Rating ?? 0)) + fame + Math.Min(0.35, 0.03 * others) + (genres >= 4 ? 0.05 : 0);
+            var headPull = head is null ? 0 : 0.15 + (0.85 * FanPull.Of(head));
+            return 0.3 + headPull + Math.Min(0.35, 0.03 * others) + (genres >= 4 ? 0.05 : 0);
         }
     }
 

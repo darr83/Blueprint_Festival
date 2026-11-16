@@ -68,8 +68,6 @@ public static class Sounds
     public const string SongEndBig = "song_end_big";
     public const string SetEndOvation = "set_end_ovation";
     public const string ApplauseLoop = "applause_loop";
-    public const string CrowdSingWhoa = "crowd_sing_whoa";
-    public const string CrowdSingLa = "crowd_sing_la";
     public const string FireworkLaunch = "firework_launch";
     public const string FireworkWhistle = "firework_whistle";
     public const string FireworkBurst = "firework_burst";
@@ -84,9 +82,6 @@ public static class Sounds
 
     /// <summary>One clap of the crowd clapping along, each a little different; one plays on each clap of the beat.</summary>
     public static readonly IReadOnlyList<string> Claps = [Clap1, Clap2, Clap3];
-
-    /// <summary>The crowd singing along in a chorus, wordless; each song always gets the same one.</summary>
-    public static readonly IReadOnlyList<string> Singing = new[] { CrowdSingWhoa, CrowdSingLa };
 
     /// <summary>The PA announcements asking a packed crowd to step back, in a different voice each; they take turns.</summary>
     public static readonly IReadOnlyList<string> StepBack = new[] { StepBack1, StepBack2, StepBack3 };
@@ -129,14 +124,14 @@ public static class Sounds
 
     /// <summary>The sounds that play round and round for as long as they are wanted.</summary>
     public static readonly IReadOnlyList<string> Loops =
-        [Day, Night, RainLight, RainHeavy, CrowdSmall, CrowdMedium, CrowdLarge, CrowdQueue, ApplauseLoop, FireCrackle, CrowdSingWhoa, CrowdSingLa, Fairground];
+        [Day, Night, RainLight, RainHeavy, CrowdSmall, CrowdMedium, CrowdLarge, CrowdQueue, ApplauseLoop, FireCrackle, Fairground];
 
     /// <summary>
     /// The clapping that goes on under the cheers between songs and at the end of a set. The game
     /// sets how loud it is from how many people are clapping, so it is not one of the levels the
     /// sound script works out.
     /// </summary>
-    public static bool SetByTheGame(string loop) => loop == ApplauseLoop || Singing.Contains(loop);
+    public static bool SetByTheGame(string loop) => loop == ApplauseLoop;
 
     /// <summary>The cheer when a song ends, for this many people watching.</summary>
     public static string SongEndFor(int watching) => watching < 400 ? SongEndSmall : SongEndBig;

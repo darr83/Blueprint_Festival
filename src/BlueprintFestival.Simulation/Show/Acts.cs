@@ -144,18 +144,27 @@ public sealed record SongFile(string File, int Order, string Title)
     public static readonly IReadOnlyList<string> Endings = new[] { ".mp3", ".ogg", ".wav" };
 
     /// <summary>
-    /// What goes before the ending of a song's singing on its own (a vocal stem), which the crowd
-    /// sings along with in the choruses: "01 Hay Fever.vocals.mp3" for "01 Hay Fever.mp3".
-    /// It is not a song in itself.
+    /// What goes before the ending of the crowd's singing of a song, made from the song's own singing
+    /// by tools/make_crowd_singing.py once its choruses are marked: "01 Hay Fever.crowd.ogg" for
+    /// "01 Hay Fever.mp3". Played quietly under the song in the choruses. It is not a song in itself.
+    /// </summary>
+    public const string CrowdMark = ".crowd";
+
+    /// <summary>
+    /// What goes before the ending of a song's singing on its own (a vocal stem), used for the crowd
+    /// when there is no crowd file: "01 Hay Fever.vocals.mp3". It is not a song in itself.
     /// </summary>
     public const string VocalsMark = ".vocals";
 
-    /// <summary>The names a song's singing on its own could have, one for each sort of sound file.</summary>
+    /// <summary>
+    /// The names the crowd's singing of this song could have, best first: the crowd file made for it,
+    /// then the song's singing on its own; one for each sort of sound file.
+    /// </summary>
     public IEnumerable<string> VocalsFiles()
     {
         var ending = Endings.First(e => File.EndsWith(e, StringComparison.OrdinalIgnoreCase));
         var name = File[..^ending.Length];
-        return Endings.Select(e => name + VocalsMark + e);
+        return new[] { CrowdMark, VocalsMark }.SelectMany(mark => Endings.Select(e => name + mark + e));
     }
 
     /// <summary>Reads a file name. Null if it is not a sound file, or is only the singing of another song.</summary>
@@ -163,7 +172,8 @@ public sealed record SongFile(string File, int Order, string Title)
     {
         ArgumentNullException.ThrowIfNull(file);
         var ending = Endings.FirstOrDefault(e => file.EndsWith(e, StringComparison.OrdinalIgnoreCase));
-        if (ending is null || file[..^ending.Length].EndsWith(VocalsMark, StringComparison.OrdinalIgnoreCase))
+        if (ending is null || file[..^ending.Length].EndsWith(VocalsMark, StringComparison.OrdinalIgnoreCase)
+            || file[..^ending.Length].EndsWith(CrowdMark, StringComparison.OrdinalIgnoreCase))
         {
             return null;
         }
@@ -236,7 +246,7 @@ public static class ActGenerator
 
         // The bigger the pull, the bigger the name: support acts are one to three stars, a headliner four or five.
         var rating = headliner ? (draw < 0.9 ? 4 : 5) : 1 + Math.Min(2, (int)((draw - 0.4) / 0.1));
-        return From(Pick(kind, rating, headline: false, taken, name), draw, look, name);
+        return From(Pick(kind, rating, headline: false, taken, name), headliner, look, name);
     }
 
     /// <summary>One of the headline artists with exactly so many stars, to be offered for the last set of the night.</summary>
@@ -245,11 +255,11 @@ public static class ActGenerator
         ArgumentNullException.ThrowIfNull(taken);
         var rolled = Make(random, true, new HashSet<string>(taken));
         taken.Add(rolled.Stem);
-        return From(Pick(rolled.Kind, stars, headline: true, taken, rolled.Stem), rolled.Draw, rolled.LookSeed, rolled.Stem);
+        return From(Pick(rolled.Kind, stars, headline: true, taken, rolled.Stem), closing: true, rolled.LookSeed, rolled.Stem);
     }
 
-    private static Act From(Artist artist, double draw, int look, string stem) =>
-        new(artist.Name, artist.Kind, artist.Kind == ActKind.Solo ? new[] { BandRole.Guitarist } : LineUps[(int)artist.Kind], draw, look)
+    private static Act From(Artist artist, bool closing, int look, string stem) =>
+        new(artist.Name, artist.Kind, artist.Kind == ActKind.Solo ? new[] { BandRole.Guitarist } : LineUps[(int)artist.Kind], DrawOf(artist, closing), look)
         {
             Genre = artist.Genre,
             Rating = artist.Rating,
@@ -258,18 +268,18 @@ public static class ActGenerator
             Stem = stem,
         };
 
-    /// <summary>How much of the field an artist draws to the stage: more stars, more of it, and most of all as the last act of the night.</summary>
+    /// <summary>How much of the field an artist draws to the stage: the bigger their stars and following, the more, and most of all as the last act of the night.</summary>
     public static double DrawOf(Artist artist, bool closing)
     {
         ArgumentNullException.ThrowIfNull(artist);
-        return closing ? 0.55 + (0.08 * artist.Rating) : 0.35 + (0.1 * artist.Rating);
+        return FanPull.Draw(FanPull.Of(artist), closing);
     }
 
     /// <summary>An artist from the roster as an act ready to play.</summary>
     public static Act Of(Artist artist, bool closing = false)
     {
         ArgumentNullException.ThrowIfNull(artist);
-        return From(artist, DrawOf(artist, closing), Hash(artist.Name) % 100000, artist.Name);
+        return From(artist, closing, Hash(artist.Name) % 100000, artist.Name);
     }
 
     /// <summary>Marks an act as booked, so nobody is booked twice in one festival.</summary>
