@@ -103,7 +103,8 @@ public static class StageCameras
         // Distances along the stage's facing from the middle of its ground (out towards the crowd is
         // positive), heights above the ground, for each kind of stage. They follow the stage models:
         // the band stands round the middle of the deck and the backdrop is at the back edge.
-        var (eye, eyeUp, look, lookUp, fov) = (stage.Kind, shot) switch
+        var deck = Catalogue.DeckOf(stage.Kind);
+        var (eye, eyeUp, look, lookUp, fov) = (deck, shot) switch
         {
             (StageKind.FarmTrailer, StageShot.Front) => (7.0, 3.0, -0.1, 1.8, 40.0),
             (StageKind.FarmTrailer, _) => (-1.1, 3.0, 16.0, 0.6, 62.0),
@@ -113,7 +114,7 @@ public static class StageCameras
             _ => (-2.3, 3.6, 18.0, 0.4, 62.0),
         };
 
-        if (stage.Kind == StageKind.MainStage)
+        if (deck == StageKind.MainStage)
         {
             eye *= MainStageScale;
             eyeUp *= MainStageScale;

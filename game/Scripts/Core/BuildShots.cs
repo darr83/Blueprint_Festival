@@ -1,3 +1,4 @@
+using System.Linq;
 using System;
 using BlueprintFestival.Simulation.People;
 using BlueprintFestival.Simulation.Site;
@@ -80,7 +81,7 @@ public partial class BuildShots : Node
         _scene++;
         _ready = false;
         _frame = 0;
-        if (_scene >= Names.Length)
+        if (_scene >= Names.Length || (_scene > 0 && System.Environment.GetEnvironmentVariable("STAGE_SIZE") is not null))
         {
             GD.Print("[build] Done.");
             GetTree().Quit(0);
@@ -151,19 +152,22 @@ public partial class BuildShots : Node
                 // A stand turned to face the camera.
                 _set!.Position = centre;
                 _set.RotationDegrees = new Vector3(0, 45, 0);
-                var x = -13.5f;
-                foreach (var info in Catalogue.Stages)
+                // Three styles of one size: STAGE_SIZE=Medium or Large picks another size than small.
+                var size = System.Enum.TryParse<StageSize>(System.Environment.GetEnvironmentVariable("STAGE_SIZE"), out var asked) ? asked : StageSize.Small;
+                var styles = Catalogue.StagesOf(size).ToList();
+                var x = -(styles.Sum(i => (i.Width / 2f) + 2.2f) - 2.2f) / 2;
+                foreach (var info in styles)
                 {
                     var w = info.Width / 2f;
                     var stage = SiteProps.Stage(info.Kind, name);
                     stage.Position = new Vector3(x + (w / 2), 0, -info.Depth / 4f);
                     _set.AddChild(stage);
-                    Label($"{info.Name}  £{info.Cost:N0}", new Vector3(x + (w / 2), 0, 4.4f), 0.011f);
-                    People(3, new Vector3(x + (w / 2) - 1.2f, 0, 2.4f), 1.2f, 0, 180, 40 + (int)info.Kind);
+                    Label($"{info.Name}  £{info.Cost:N0}", new Vector3(x + (w / 2), 0, (info.Depth / 4f) + 1.4f), size == StageSize.Small ? 0.011f : 0.02f);
+                    People(3, new Vector3(x + (w / 2) - 1.2f, 0, (info.Depth / 4f) + 0.6f), 1.2f, 0, 180, 40 + (int)info.Kind);
                     x += w + 2.2f;
                 }
 
-                festival.Camera.LookAt(centre.X + 0.6f, centre.Z + 0.6f, 22f);
+                festival.Camera.LookAt(centre.X + 0.6f, centre.Z + 0.6f, size switch { StageSize.Small => 22f, StageSize.Medium => 34f, _ => 52f });
                 break;
             }
 

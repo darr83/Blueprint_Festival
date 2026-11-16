@@ -13,6 +13,29 @@ public enum StageKind
     HiredStage,
 
     MainStage,
+
+    /// <summary>A small stage under a white twin-peaked marquee.</summary>
+    MarqueeStage,
+
+    /// <summary>A medium stage under a striped circus big top.</summary>
+    BigTop,
+
+    /// <summary>A medium stage that folds out of the side of a lorry.</summary>
+    TruckStage,
+
+    /// <summary>A large stage under a great curved roof.</summary>
+    ArchStage,
+
+    /// <summary>A large stage between two towers with screens built in.</summary>
+    TowerStage,
+}
+
+/// <summary>How big a stage is: it settles who will play it and how far back people see and hear well.</summary>
+public enum StageSize
+{
+    Small,
+    Medium,
+    Large,
 }
 
 /// <summary>The kinds of fence.</summary>
@@ -202,7 +225,26 @@ public enum Facing
 }
 
 /// <summary>What there is to know about a kind of stage. Sizes are in half-metre tiles.</summary>
-public sealed record StageInfo(StageKind Kind, string Name, int Width, int Depth, int Cost, int Performers, string About);
+public sealed record StageInfo(StageKind Kind, string Name, int Width, int Depth, int Cost, int Performers, string About)
+{
+    /// <summary>Small, medium or large.</summary>
+    public StageSize Size { get; init; }
+
+    /// <summary>
+    /// The stage whose deck this one stands on: every style of a size shares a deck, so the band
+    /// stands in the same places and the cameras film from the same spots.
+    /// </summary>
+    public StageKind Deck { get; init; }
+
+    /// <summary>Out to here from the front, in metres, people see and hear the act well without a big screen.</summary>
+    public double ClearMetres { get; init; } = 20;
+
+    /// <summary>True for a stage with screens of its own, so people far back still see well.</summary>
+    public bool OwnScreens { get; init; }
+
+    /// <summary>The most stars an act can have and still agree to play here. A five-star act needs a large stage.</summary>
+    public int TopRating => Size switch { StageSize.Small => 2, StageSize.Medium => 4, _ => 5 };
+}
 
 /// <summary>What there is to know about a kind of fence. The cost is for each metre.</summary>
 public sealed record FenceInfo(FenceKind Kind, string Name, int CostPerMetre, string About);
@@ -246,13 +288,28 @@ public sealed record StaffInfo(StaffKind Kind, string Name, int Wage, string Abo
 
 public static class Catalogue
 {
+    /// <summary>The nine stages, in the order of <see cref="StageKind"/>. Three sizes, three styles of each.</summary>
     public static readonly IReadOnlyList<StageInfo> Stages = new[]
     {
-        new StageInfo(StageKind.FarmTrailer, "Farm trailer", 16, 6, 50, 2, "Lent by the farmer for the price of the diesel. Room for a duo."),
-        new StageInfo(StageKind.Bandstand, "Bandstand", 12, 11, 400, 4, "A deck under a striped roof. Room for a small band."),
-        new StageInfo(StageKind.HiredStage, "Hired stage", 24, 12, 1500, 5, "A proper stage with a roof, lights and big speakers."),
-        new StageInfo(StageKind.MainStage, "Main stage", 40, 20, 6000, 6, "A festival main stage: a big roof, a wall of speakers and room for any band."),
+        new StageInfo(StageKind.FarmTrailer, "Farm trailer", 16, 6, 50, 2, "Lent by the farmer for the price of the diesel. Room for a duo.") { Size = StageSize.Small, Deck = StageKind.FarmTrailer, ClearMetres = 10 },
+        new StageInfo(StageKind.Bandstand, "Bandstand", 12, 11, 400, 4, "A deck under a striped roof. Room for a small band.") { Size = StageSize.Small, Deck = StageKind.Bandstand, ClearMetres = 12 },
+        new StageInfo(StageKind.HiredStage, "Hired stage", 24, 12, 1500, 5, "A proper stage with a roof, lights and big speakers.") { Size = StageSize.Medium, Deck = StageKind.HiredStage, ClearMetres = 20 },
+        new StageInfo(StageKind.MainStage, "Main stage", 40, 20, 6000, 6, "A festival main stage: a big roof, a wall of speakers and room for any band.") { Size = StageSize.Large, Deck = StageKind.MainStage, ClearMetres = 30 },
+        new StageInfo(StageKind.MarqueeStage, "Marquee stage", 12, 11, 600, 4, "A deck under a white twin-peaked marquee. The canvas throws the sound a little further.") { Size = StageSize.Small, Deck = StageKind.Bandstand, ClearMetres = 14 },
+        new StageInfo(StageKind.BigTop, "Big top", 24, 12, 2200, 5, "A stage under a striped circus tent. The best sound of the medium stages.") { Size = StageSize.Medium, Deck = StageKind.HiredStage, ClearMetres = 24 },
+        new StageInfo(StageKind.TruckStage, "Truck stage", 24, 12, 1800, 5, "A lorry whose side folds out into a stage, with its own speaker wings.") { Size = StageSize.Medium, Deck = StageKind.HiredStage, ClearMetres = 22 },
+        new StageInfo(StageKind.ArchStage, "Arch stage", 40, 20, 8000, 6, "A large stage under a great curved roof that carries the sound furthest back.") { Size = StageSize.Large, Deck = StageKind.MainStage, ClearMetres = 36 },
+        new StageInfo(StageKind.TowerStage, "Tower stage", 40, 20, 9500, 6, "A large stage between two towers with screens built in, so the back of the crowd still sees.") { Size = StageSize.Large, Deck = StageKind.MainStage, ClearMetres = 30, OwnScreens = true },
     };
+
+    /// <summary>The stages of one size, cheapest first.</summary>
+    public static IEnumerable<StageInfo> StagesOf(StageSize size) => Stages.Where(s => s.Size == size).OrderBy(s => s.Cost);
+
+    /// <summary>The stage whose deck a kind of stage stands on.</summary>
+    public static StageKind DeckOf(StageKind kind) => Of(kind).Deck;
+
+    /// <summary>What a size of stage is called.</summary>
+    public static string Name(StageSize size) => size switch { StageSize.Small => "Small", StageSize.Medium => "Medium", _ => "Large" };
 
     public static readonly IReadOnlyList<FenceInfo> Fences = new[]
     {

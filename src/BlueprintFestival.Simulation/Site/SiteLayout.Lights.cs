@@ -330,7 +330,7 @@ public sealed partial class SiteLayout
 
         foreach (var s in _stages)
         {
-            if (s.Kind is StageKind.HiredStage or StageKind.MainStage)
+            if (Catalogue.Of(s.Kind).Size != StageSize.Small)
             {
                 Shine(s.Rect, Lighting.StageGlowMetres);
             }
