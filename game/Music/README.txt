@@ -71,4 +71,7 @@ the song in the marked choruses, louder the more people sing. Moving choruses la
 nothing made again. A song's singing on its own, saved as "01 Long Way Home.vocals.mp3", is
 used instead when there is no crowd file.
 
+When a song has its crowd made, now and then (about one chorus in seven) the artist and the band
+drop out for five to ten seconds and only the crowd sings, then they come back in, in time.
+
 Every artist is made up. None is a real act.
