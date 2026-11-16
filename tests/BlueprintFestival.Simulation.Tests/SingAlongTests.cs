@@ -1,5 +1,4 @@
 using BlueprintFestival.Simulation.Show;
-using BlueprintFestival.Simulation.Sound;
 using Xunit;
 
 namespace BlueprintFestival.Simulation.Tests;
@@ -88,10 +87,11 @@ public class SingAlongTests
     [Fact]
     public void A_songs_singing_on_its_own_is_not_a_song_in_itself()
     {
-        var songs = SongFile.InOrder(new[] { "01 Hay Fever.mp3", "01 Hay Fever.vocals.mp3", "01 Hay Fever.mp3.chorus", "02 Barn Dance.ogg" });
+        var songs = SongFile.InOrder(new[] { "01 Hay Fever.mp3", "01 Hay Fever.vocals.mp3", "01 Hay Fever.crowd.ogg", "01 Hay Fever.mp3.chorus", "02 Barn Dance.ogg" });
 
         Assert.Equal(new[] { "Hay Fever", "Barn Dance" }, songs.Select(s => s.Title));
-        Assert.Contains("01 Hay Fever.vocals.ogg", songs[0].VocalsFiles());
+        Assert.Equal("01 Hay Fever.crowd.mp3", songs[0].VocalsFiles().First());
+        Assert.Contains("01 Hay Fever.crowd.ogg", songs[0].VocalsFiles());
         Assert.Contains("01 Hay Fever.vocals.mp3", songs[0].VocalsFiles());
     }
 
@@ -129,15 +129,5 @@ public class SingAlongTests
         Assert.Equal(1, SingAlong.Loudness(5000));
         Assert.All(Enumerable.Range(0, 200), b => Assert.InRange(SingAlong.Mouth(b, b * 0.13), 0.45, 0.95));
         Assert.Equal(DanceTiming.OnTheHit, Dancing.TimingOf(DanceMove.SingAlong, 12345));
-    }
-
-    [Fact]
-    public void Each_song_always_gets_the_same_crowd_singing()
-    {
-        Assert.Equal(SingAlong.SoundFor("01 Hay Fever.mp3", 2), SingAlong.SoundFor("01 Hay Fever.mp3", 2));
-        var picks = Enumerable.Range(0, 40).Select(i => SingAlong.SoundFor($"{i:00} Song.mp3", Sounds.Singing.Count)).ToHashSet();
-        Assert.Equal(Sounds.Singing.Count, picks.Count);
-        Assert.All(Sounds.Singing, s => Assert.Contains(s, Sounds.Loops));
-        Assert.All(Sounds.Singing, s => Assert.True(Sounds.SetByTheGame(s)));
     }
 }

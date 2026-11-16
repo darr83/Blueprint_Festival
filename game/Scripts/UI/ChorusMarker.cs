@@ -31,6 +31,7 @@ public partial class ChorusMarker : Control
     private VBoxContainer _chorusRows = null!;
     private Timeline _timeline = null!;
     private AudioStreamPlayer _player = null!;
+    private AudioStreamPlayer _crowdPlayer = null!;
     private string _artist = "";
     private SongFile? _song;
     private ChorusMarking? _marking;
@@ -53,6 +54,8 @@ public partial class ChorusMarker : Control
         _player = new AudioStreamPlayer { Name = "Song", Bus = AudioServer.GetBusIndex(MusicPlayer.Bus) >= 0 ? MusicPlayer.Bus : "Master" };
         AddChild(_player);
         _player.Finished += () => _pausedAt = 0;
+        _crowdPlayer = new AudioStreamPlayer { Name = "Crowd", Bus = _player.Bus, VolumeDb = -80 };
+        AddChild(_crowdPlayer);
 
         var margin = new MarginContainer { AnchorRight = 1, AnchorBottom = 1 };
         foreach (var side in new[] { "left", "right" })
@@ -72,7 +75,7 @@ public partial class ChorusMarker : Control
         page.AddChild(UiStyle.Heading("Mark the choruses", 44));
         var how = UiStyle.Body(
             "Pick a song and press Play. Tap C (or the pink button) as a chorus starts, and again as it ends. "
-            + "Each chorus is saved beside the song straight away, and at the festival the crowd sings along with it. "
+            + "Each chorus is saved beside the song straight away. Once a song's crowd has been made from its singing, the crowd sings along in those choruses. "
             + "Space plays and pauses, the arrow keys skip 5 seconds, Z takes back the last tap.",
             muted: true,
             size: 15);
@@ -226,7 +229,7 @@ public partial class ChorusMarker : Control
     private string SongLine(SongFile song)
     {
         var count = ChorusLibrary.Of(_artist, song).All.Count;
-        var vocals = ChorusLibrary.VocalsOf(_artist, song) is not null ? "  ·  has its singing" : "";
+        var vocals = ChorusLibrary.VocalsOf(_artist, song) is not null ? "  ·  crowd ready" : count > 0 ? "  ·  crowd not made yet" : "";
         return $"{song.Title}  ·  {(count == 0 ? "no choruses" : count == 1 ? "1 chorus" : $"{count} choruses")}{vocals}";
     }
 
@@ -239,10 +242,12 @@ public partial class ChorusMarker : Control
         }
 
         _player.Stop();
+        _crowdPlayer.Stop();
         _pausedAt = 0;
         _song = songs[index];
         _marking = new ChorusMarking(ChorusLibrary.Of(_artist, _song));
         _player.Stream = ResourceLoader.Load($"{MusicPlayer.Folder}/{_artist}/{_song.File}") as AudioStream;
+        _crowdPlayer.Stream = ChorusLibrary.VocalsOf(_artist, _song) is { } crowd ? ResourceLoader.Load(crowd) as AudioStream : null;
         _songTitle.Text = _song.Title;
         _saved.Text = _player.Stream is null ? "This song could not be opened." : "";
         Refresh();
@@ -263,10 +268,15 @@ public partial class ChorusMarker : Control
         {
             _pausedAt = _player.GetPlaybackPosition();
             _player.Stop();
+            _crowdPlayer.Stop();
         }
         else
         {
             _player.Play(_pausedAt);
+            if (_crowdPlayer.Stream is not null)
+            {
+                _crowdPlayer.Play(_pausedAt);
+            }
         }
 
         Refresh();
@@ -285,6 +295,10 @@ public partial class ChorusMarker : Control
         if (_player.Playing)
         {
             _player.Seek(at);
+            if (_crowdPlayer.Playing)
+            {
+                _crowdPlayer.Seek(at);
+            }
         }
         else
         {
@@ -419,12 +433,12 @@ public partial class ChorusMarker : Control
             Refresh();
         }
 
-        // A taste of how it will sound: the crowd singing in the marked choruses.
-        var level = _player.Playing && _crowd.ButtonPressed && _marking is not null ? _marking.Marks.SingingAt(now) * 0.7 : 0;
-        var pick = _song is null ? -1 : SingAlong.SoundFor(_song.File, Sounds.Singing.Count);
-        for (var i = 0; i < Sounds.Singing.Count; i++)
+        // A taste of how it will sound: the song's crowd file under it in the marked choruses, as loud as a full field.
+        var level = _player.Playing && _crowd.ButtonPressed && _marking is not null ? _marking.Marks.SingingAt(now) * StageMusic.CrowdLevel : 0;
+        _crowdPlayer.VolumeDb = Mathf.LinearToDb(Mathf.Max((float)level, 0.0001f));
+        if (_crowdPlayer.Playing && !_player.Playing)
         {
-            SoundBoard.Instance?.SetLoop(Sounds.Singing[i], i == pick ? level : 0);
+            _crowdPlayer.Stop();
         }
     }
 
@@ -466,10 +480,7 @@ public partial class ChorusMarker : Control
     private void Close()
     {
         _player.Stop();
-        foreach (var id in Sounds.Singing)
-        {
-            SoundBoard.Instance?.SetLoop(id, 0);
-        }
+        _crowdPlayer.Stop();
 
         Closed?.Invoke();
         QueueFree();

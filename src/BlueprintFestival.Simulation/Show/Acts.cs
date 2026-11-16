@@ -144,18 +144,27 @@ public sealed record SongFile(string File, int Order, string Title)
     public static readonly IReadOnlyList<string> Endings = new[] { ".mp3", ".ogg", ".wav" };
 
     /// <summary>
-    /// What goes before the ending of a song's singing on its own (a vocal stem), which the crowd
-    /// sings along with in the choruses: "01 Hay Fever.vocals.mp3" for "01 Hay Fever.mp3".
-    /// It is not a song in itself.
+    /// What goes before the ending of the crowd's singing of a song, made from the song's own singing
+    /// by tools/make_crowd_singing.py once its choruses are marked: "01 Hay Fever.crowd.ogg" for
+    /// "01 Hay Fever.mp3". Played quietly under the song in the choruses. It is not a song in itself.
+    /// </summary>
+    public const string CrowdMark = ".crowd";
+
+    /// <summary>
+    /// What goes before the ending of a song's singing on its own (a vocal stem), used for the crowd
+    /// when there is no crowd file: "01 Hay Fever.vocals.mp3". It is not a song in itself.
     /// </summary>
     public const string VocalsMark = ".vocals";
 
-    /// <summary>The names a song's singing on its own could have, one for each sort of sound file.</summary>
+    /// <summary>
+    /// The names the crowd's singing of this song could have, best first: the crowd file made for it,
+    /// then the song's singing on its own; one for each sort of sound file.
+    /// </summary>
     public IEnumerable<string> VocalsFiles()
     {
         var ending = Endings.First(e => File.EndsWith(e, StringComparison.OrdinalIgnoreCase));
         var name = File[..^ending.Length];
-        return Endings.Select(e => name + VocalsMark + e);
+        return new[] { CrowdMark, VocalsMark }.SelectMany(mark => Endings.Select(e => name + mark + e));
     }
 
     /// <summary>Reads a file name. Null if it is not a sound file, or is only the singing of another song.</summary>
@@ -163,7 +172,8 @@ public sealed record SongFile(string File, int Order, string Title)
     {
         ArgumentNullException.ThrowIfNull(file);
         var ending = Endings.FirstOrDefault(e => file.EndsWith(e, StringComparison.OrdinalIgnoreCase));
-        if (ending is null || file[..^ending.Length].EndsWith(VocalsMark, StringComparison.OrdinalIgnoreCase))
+        if (ending is null || file[..^ending.Length].EndsWith(VocalsMark, StringComparison.OrdinalIgnoreCase)
+            || file[..^ending.Length].EndsWith(CrowdMark, StringComparison.OrdinalIgnoreCase))
         {
             return null;
         }
