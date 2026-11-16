@@ -110,6 +110,44 @@ public sealed partial class FestivalGame
             : StartYear(Name, new YearSetup(Year, Licence, Money, BailedOut, LastHappiness, plan.Save()) { EmptyBill = EmptyBill }).TravellingLike(this);
     }
 
+    /// <summary>
+    /// Test mode: the same January at another licence, so any size of festival can be tried
+    /// without playing up to it. A licence bigger than the village field moves on to year two (in
+    /// year one only the village green may be rented), the bank is topped up to
+    /// <see cref="TestMoneyFor"/>, and the fields already chosen are kept if they still work at
+    /// the new size (camping is given up below <see cref="FieldPlan.CampingFrom"/>).
+    /// </summary>
+    public FestivalGame AtTestSize(int licence)
+    {
+        Need(Phase.Plan);
+        licence = Math.Clamp(licence, FirstLicence, BiggestLicence);
+        var year = licence > FieldMap.Sizes[0].Holds ? Math.Max(Year, 2) : Year;
+        var plan = (Plan ?? FieldPlan.FirstYear()).Copy();
+        if (licence < FieldPlan.CampingFrom)
+        {
+            foreach (var camp in plan.Of(FieldUse.Camping).ToList())
+            {
+                plan.Set(camp.Id, null);
+            }
+        }
+
+        if (plan.Problems(licence, year).Count > 0)
+        {
+            plan = FieldPlan.FirstYear();
+        }
+
+        var bank = Math.Max(Money, TestMoneyFor(licence));
+        return StartYear(Name, new YearSetup(year, licence, bank, BailedOut, LastHappiness, plan.Save()) { EmptyBill = EmptyBill }).TravellingLike(this);
+    }
+
+    /// <summary>Test mode: the next licence up the ladder, or down it with a negative step.</summary>
+    public static int TestLicenceStep(int licence, int step) => step >= 0
+        ? LicenceAfter(licence)
+        : Licences.LastOrDefault(l => l < licence, FirstLicence);
+
+    /// <summary>Test mode: the least the bank holds at a licence, plenty to rent, book and build with.</summary>
+    public static int TestMoneyFor(int licence) => (4 * NeedsToGrowTo(licence)) + 10000;
+
     /// <summary>Rent and licence fee for a year at a licence: nothing on the village field, then £1 a head.</summary>
     public static int RentFor(int licence) => licence <= FieldMap.Sizes[0].Holds ? 0 : licence;
 
