@@ -1315,35 +1315,102 @@ public sealed partial class SiteLayout
     private void Flood(IEnumerable<TilePoint> from, Side side, HashSet<TilePoint> gateTiles)
     {
         var width = _map.Width;
-        var queue = new Queue<TilePoint>();
+        var height = _map.Height;
+
+        // The gate tiles as a map, so the flood over a big site never has to look them up one by one.
+        if (_gateMask.Length != _sides.Length)
+        {
+            _gateMask = new bool[_sides.Length];
+        }
+        else
+        {
+            Array.Clear(_gateMask);
+        }
+
+        foreach (var g in gateTiles)
+        {
+            if (_map.InBounds(g.X, g.Y))
+            {
+                _gateMask[(g.Y * width) + g.X] = true;
+            }
+        }
+
+        if (_floodOpen.Length != _sides.Length)
+        {
+            _floodOpen = new bool[_sides.Length];
+        }
+
+        var open = _floodOpen;
+        _map.FillWalkable(open, vip: true);
+        var sides = _sides;
+        var gates = _gateMask;
+        var queue = _floodQueue;
+        queue.Clear();
         foreach (var p in from)
         {
-            if (_map.IsWalkableForVip(p.X, p.Y) && _sides[(p.Y * width) + p.X] == Side.Nowhere && !gateTiles.Contains(p))
+            if (_map.IsWalkableForVip(p.X, p.Y) && _sides[(p.Y * width) + p.X] == Side.Nowhere && !_gateMask[(p.Y * width) + p.X])
             {
                 _sides[(p.Y * width) + p.X] = side;
-                queue.Enqueue(p);
+                queue.Enqueue((p.Y * width) + p.X);
             }
         }
 
         while (queue.TryDequeue(out var at))
         {
-            foreach (var (dx, dy) in new[] { (1, 0), (-1, 0), (0, 1), (0, -1) })
+            var x = at % width;
+            var y = at / width;
+            for (var k = 0; k < 4; k++)
             {
-                var next = new TilePoint(at.X + dx, at.Y + dy);
-                if (!_map.IsWalkableForVip(next.X, next.Y) || gateTiles.Contains(next))
+                int index;
+                if (k == 0)
                 {
-                    continue;
+                    if (x + 1 >= width)
+                    {
+                        continue;
+                    }
+
+                    index = at + 1;
+                }
+                else if (k == 1)
+                {
+                    if (x == 0)
+                    {
+                        continue;
+                    }
+
+                    index = at - 1;
+                }
+                else if (k == 2)
+                {
+                    if (y + 1 >= height)
+                    {
+                        continue;
+                    }
+
+                    index = at + width;
+                }
+                else
+                {
+                    if (y == 0)
+                    {
+                        continue;
+                    }
+
+                    index = at - width;
                 }
 
-                var index = (next.Y * width) + next.X;
-                if (_sides[index] == Side.Nowhere)
+                if (open[index] && !gates[index] && sides[index] == Side.Nowhere)
                 {
-                    _sides[index] = side;
-                    queue.Enqueue(next);
+                    sides[index] = side;
+                    queue.Enqueue(index);
                 }
             }
         }
     }
+
+    private bool[] _gateMask = Array.Empty<bool>();
+    private readonly Queue<int> _floodQueue = new();
+    private bool[] _floodOpen = Array.Empty<bool>();
 }
 
 /// <summary>The layout as written to a save file.</summary>

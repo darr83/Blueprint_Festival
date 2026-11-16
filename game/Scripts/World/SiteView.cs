@@ -257,14 +257,43 @@ public partial class SiteView : Node3D
         SiteProps.AddFence(builder, FenceKind.CrowdBarrier, from, to);
     }
 
+    /// <summary>
+    /// Everything drawn at the last rebuild, by what it shows. A model is kept while the thing it
+    /// shows is still there, so putting one thing down on a big site only builds that one model
+    /// instead of every stage, stall, seat and sign again.
+    /// </summary>
+    private Dictionary<object, Node3D> _drawn = new();
+    private Dictionary<object, Node3D> _drawing = new();
+
+    /// <summary>How many models were made at the last rebuild, rather than kept: for the tests.</summary>
+    public int MadeLastTime { get; private set; }
+
+    /// <summary>The model drawn for something at the last rebuild if it is unchanged, otherwise a new one.</summary>
+    private Node3D Keep(object key, System.Func<Node3D> make)
+    {
+        if (_drawing.ContainsKey(key))
+        {
+            // Two of the very same thing in the very same place cannot happen, but draw both if it does.
+            key = (key, _drawing.Count);
+        }
+
+        if (!_drawn.Remove(key, out var node) || !IsInstanceValid(node))
+        {
+            node = make();
+            AddChild(node);
+            MadeLastTime++;
+        }
+
+        _drawing[key] = node;
+        return node;
+    }
+
+    /// <summary>Redraws the site, keeping the models of everything that has not changed.</summary>
     public void Rebuild()
     {
         _stale = false;
-        foreach (var child in GetChildren())
-        {
-            child.QueueFree();
-        }
-
+        MadeLastTime = 0;
+        _drawing.Clear();
         _toilets.Clear();
         _rides.Clear();
         _bins.Clear();
@@ -273,33 +302,38 @@ public partial class SiteView : Node3D
         var site = _game.Site;
         foreach (var stage in site.Stages)
         {
-            var node = SiteProps.Stage(stage.Kind, _game.Name);
+            var node = Keep(("stage", stage), () => SiteProps.Stage(stage.Kind, _game.Name));
             node.Position = Middle(stage.Rect);
             node.RotationDegrees = new Vector3(0, Turn(stage.Facing), 0);
-            AddChild(node);
         }
 
         for (var i = 0; i < site.Stalls.Count; i++)
         {
             var stall = site.Stalls[i];
-            var node = SiteProps.Stall(stall.Kind);
+
+            // Only what shows matters: a new price on the menu board does not need a new model.
+            var key = ("stall", stall.Kind, stall.X, stall.Y, stall.Facing, stall.VipOnly);
+            var node = Keep(key, () =>
+            {
+                var made = SiteProps.Stall(stall.Kind);
+                var spots = SiteProps.StaffSpots(stall.Kind);
+                for (var j = 0; j < spots.Length; j++)
+                {
+                    var person = SiteProps.Stallholder((stall.X * 31) + (stall.Y * 7) + j);
+                    person.Position = spots[j];
+                    made.AddChild(person);
+                }
+
+                if (stall.VipOnly && !Catalogue.AlwaysVip(stall.Kind))
+                {
+                    var info = Catalogue.Of(stall.Kind);
+                    made.AddChild(SiteProps.VipSign(info.Width * T, info.Depth * T));
+                }
+
+                return made;
+            });
             node.Position = Middle(stall.Rect);
             node.RotationDegrees = new Vector3(0, Turn(stall.Facing), 0);
-            var spots = SiteProps.StaffSpots(stall.Kind);
-            for (var j = 0; j < spots.Length; j++)
-            {
-                var person = SiteProps.Stallholder((stall.X * 31) + (stall.Y * 7) + j);
-                person.Position = spots[j];
-                node.AddChild(person);
-            }
-
-            if (stall.VipOnly && !Catalogue.AlwaysVip(stall.Kind))
-            {
-                var info = Catalogue.Of(stall.Kind);
-                node.AddChild(SiteProps.VipSign(info.Width * T, info.Depth * T));
-            }
-
-            AddChild(node);
             if (Rides.IsRide(stall.Kind))
             {
                 var seats = new System.Collections.Generic.List<Node3D>();
@@ -327,29 +361,29 @@ public partial class SiteView : Node3D
 
         foreach (var comfort in site.Comforts)
         {
-            var node = SiteProps.Comfort(comfort.Kind);
+            var node = Keep(("comfort", comfort), () => SiteProps.Comfort(comfort.Kind));
             node.Position = Middle(comfort.Rect);
             node.RotationDegrees = new Vector3(0, Turn(comfort.Facing), 0);
-            AddChild(node);
         }
 
         ComfortCount = site.Comforts.Count;
         foreach (var sign in site.Signs)
         {
-            var node = SiteProps.Sign(sign, site);
+            // A sign is drawn again when its words change. The site map board shows the whole
+            // site, so it is drawn again whenever anything changes.
+            var key = sign.Kind == SignKind.MapBoard ? (object)("map", _drawing.Count) : ("sign", sign.Kind, sign.X, sign.Y, sign.Facing, sign.Colour, sign.Points, string.Join("\n", sign.Lines ?? new List<string>()));
+            var node = Keep(key, () => SiteProps.Sign(sign, site));
             node.Position = Middle(sign.Rect);
             node.RotationDegrees = new Vector3(0, Turn(sign.Facing), 0);
-            AddChild(node);
         }
 
         SignCount = site.Signs.Count;
         _glows.Clear();
         foreach (var decor in site.Decorations)
         {
-            var node = SiteProps.Decoration(decor);
+            var node = Keep(("decor", decor), () => SiteProps.Decoration(decor));
             node.Position = Middle(decor.Rect);
             node.RotationDegrees = new Vector3(0, Turn(decor.Facing), 0);
-            AddChild(node);
             if (node.GetNodeOrNull<OmniLight3D>("Glow") is { } glow)
             {
                 _glows.Add(glow);
@@ -358,55 +392,80 @@ public partial class SiteView : Node3D
 
         foreach (var run in site.Bunting)
         {
-            AddChild(SiteProps.BuntingBetween(run));
+            Keep(("bunting", run), () => SiteProps.BuntingBetween(run));
         }
 
         DecorCount = site.Decorations.Count + site.Bunting.Count;
         for (var i = 0; i < site.Gates.Count; i++)
         {
-            var node = SiteProps.Gate(site.Gates[i].Kind, _game.Name);
-            node.Position = Middle(site.Gates[i].Rect);
-            node.RotationDegrees = new Vector3(0, Turn(site, site.Gates[i]), 0);
-            AddChild(node);
+            var gate = site.Gates[i];
+            var node = Keep(("gate", gate), () => SiteProps.Gate(gate.Kind, _game.Name));
+            node.Position = Middle(gate.Rect);
+
+            // Which way a gate faces depends on the fences round it, so it is turned again every time.
+            node.RotationDegrees = new Vector3(0, Turn(site, gate), 0);
             _shutBars.Add(node.GetNode<Node3D>("Shut"));
         }
 
         var runs = site.FenceRuns();
         if (runs.Count > 0)
         {
-            var builder = new MeshBuilder();
-            foreach (var run in runs)
+            Keep(("fences", Signature(runs.Select(r => (r.X, r.Y, r.Length, r.Vertical, (int)r.Kind)))), () =>
             {
-                AddRun(builder, run);
-            }
+                var builder = new MeshBuilder();
+                foreach (var run in runs)
+                {
+                    AddRun(builder, run);
+                }
 
-            AddChild(builder.BuildNode("Fences"));
+                return builder.BuildNode("Fences");
+            });
         }
 
         // The barriers down both sides of every queue lane.
         var barriers = site.LaneBarriers;
         if (barriers.Count > 0)
         {
-            var builder = new MeshBuilder();
-            foreach (var (x, y, length, vertical) in SiteLayout.RunsOf(barriers))
+            var laneRuns = SiteLayout.RunsOf(barriers).ToList();
+            Keep(("lane barriers", Signature(laneRuns.Select(r => (r.X, r.Y, r.Length, r.Vertical, 0)))), () =>
             {
-                AddBarrier(builder, site, x, y, length, vertical);
-            }
+                var builder = new MeshBuilder();
+                foreach (var (x, y, length, vertical) in laneRuns)
+                {
+                    AddBarrier(builder, site, x, y, length, vertical);
+                }
 
-            AddChild(builder.BuildNode("QueueBarriers"));
+                return builder.BuildNode("QueueBarriers");
+            });
         }
 
         // The barriers round the crowd areas, gaps left open.
         if (site.AreaBarriers.Count > 0)
         {
-            var builder = new MeshBuilder();
-            foreach (var (x, y, length, vertical) in SiteLayout.RunsOf(site.AreaBarriers))
+            var areaRuns = SiteLayout.RunsOf(site.AreaBarriers).ToList();
+            Keep(("area barriers", Signature(areaRuns.Select(r => (r.X, r.Y, r.Length, r.Vertical, 0)))), () =>
             {
-                AddBarrier(builder, site, x, y, length, vertical, area: true);
-            }
+                var builder = new MeshBuilder();
+                foreach (var (x, y, length, vertical) in areaRuns)
+                {
+                    AddBarrier(builder, site, x, y, length, vertical, area: true);
+                }
 
-            AddChild(builder.BuildNode("AreaBarriers"));
+                return builder.BuildNode("AreaBarriers");
+            });
         }
+
+        // Whatever was drawn last time and is not there now has been taken away.
+        foreach (var gone in _drawn.Values)
+        {
+            if (IsInstanceValid(gone))
+            {
+                gone.QueueFree();
+            }
+        }
+
+        _drawn.Clear();
+        (_drawn, _drawing) = (_drawing, _drawn);
 
         AreaCount = site.Areas.Count;
 
@@ -418,5 +477,17 @@ public partial class SiteView : Node3D
         GateCount = site.Gates.Count;
         StallCount = site.Stalls.Count;
         FenceRunCount = runs.Count;
+    }
+
+    /// <summary>A string that is the same for two lists of runs only if they are the same runs, to tell whether a joined-up mesh needs building again.</summary>
+    private static string Signature(IEnumerable<(int X, int Y, int Length, bool Vertical, int Kind)> runs)
+    {
+        var text = new System.Text.StringBuilder();
+        foreach (var (x, y, length, vertical, kind) in runs)
+        {
+            text.Append(x).Append(',').Append(y).Append(',').Append(length).Append(vertical ? 'v' : 'h').Append(kind).Append(';');
+        }
+
+        return text.ToString();
     }
 }
