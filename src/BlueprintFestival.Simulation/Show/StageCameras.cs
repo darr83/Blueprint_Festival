@@ -26,7 +26,7 @@ public static class StageCameras
     public const double MainStageScale = 20.0 / 12.0;
 
     /// <summary>
-    /// The stage to film: the one with an act on, the main stage first if both are playing; between
+    /// The stage to film: the one with an act on, the main stage first if more than one is playing; between
     /// sets the main stage; and with no music booked, the first stage that was put up. Null with no stage.
     /// </summary>
     public static PlacedStage? Pick(FestivalGame game) => Pick(game, game.Now);
@@ -34,17 +34,15 @@ public static class StageCameras
     /// <summary>The stage to film at a given time of day.</summary>
     public static PlacedStage? Pick(FestivalGame game, DateTime now)
     {
-        if (game.Show.Stage is { } main && game.Show.Playing(now) is not null)
+        foreach (var show in game.Shows)
         {
-            return main;
+            if (show.Stage is { } stage && show.Playing(now) is not null)
+            {
+                return stage;
+            }
         }
 
-        if (game.SecondShow.Stage is { } second && game.SecondShow.Playing(now) is not null)
-        {
-            return second;
-        }
-
-        return game.Show.Stage ?? game.SecondShow.Stage ?? (game.Site.Stages.Count > 0 ? game.Site.Stages[0] : null);
+        return game.Shows.Select(s => s.Stage).FirstOrDefault(s => s is not null) ?? (game.Site.Stages.Count > 0 ? game.Site.Stages[0] : null);
     }
 
     /// <summary>Every stage on the site, the main stage first, in the order the cameras go round them.</summary>

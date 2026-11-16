@@ -197,6 +197,8 @@ public partial class YearScreen : Control
                     ChangeOffer = ChangeOffer,
                     MakeOffer = MakeOffer,
                     PayAsk = PayAsk,
+                    AddStage = AddStage,
+                    RemoveStage = RemoveStage,
                 }, scroll));
                 break;
             case Phase.Sell when _game.Campaigning && _booking && !Running:
@@ -271,11 +273,11 @@ public partial class YearScreen : Control
 
     private static string TimeOf(FestivalGame game, int set)
     {
-        var show = set >= RunningOrder.SecondBase ? game.SecondShow : game.Show;
+        var show = game.ShowOf(set);
         return show.TimeOf(set - show.Base).Start.ToString("HH:mm");
     }
 
-    private static string StageName(int set) => set >= RunningOrder.SecondBase ? "second stage" : "main stage";
+    private static string StageName(int set) => FestivalGame.StageTitle(RunningOrder.StageOf(set)).ToLowerInvariant();
 
     private static IReadOnlyList<SlotView> SlotsOf(FestivalGame game, RunningOrder show) => Enumerable.Range(0, RunningOrder.SetsAStage).Select(i =>
     {
@@ -289,7 +291,9 @@ public partial class YearScreen : Control
     }).ToList();
 
     /// <summary>What a stage's line-up needs in build week, in a few words, or nothing with nobody booked.</summary>
-    private static string NeedsOf(FestivalGame game, bool second) => game.StageNeeded(second) is { } size
+    private static string NeedsOf(FestivalGame game, bool second) => NeedsOf(game, second ? 1 : 0);
+
+    private static string NeedsOf(FestivalGame game, int stage) => game.StageNeeded(stage) is { } size
         ? $"needs a {Catalogue.Name(size).ToLowerInvariant()} stage, from £{Booking.CheapestOf(size).Cost:N0}"
         : "";
 
@@ -349,6 +353,8 @@ public partial class YearScreen : Control
         {
             MainNeeds = NeedsOf(game, false),
             SecondNeeds = NeedsOf(game, true),
+            Extra = game.Shows.Skip(1).Where(s => s.Booked)
+                .Select(s => new StageBillView(s.Number, FestivalGame.StageTitle(s.Number), SlotsOf(game, s), NeedsOf(game, s.Number))).ToList(),
             Offer = asked is null ? null : new OfferView(asked.Name, asked.Rating, game.FeeFor(asked.Name), System.Math.Min(offer, game.FeeFor(asked.Name)),
                 Booking.ChanceWords(game.ChanceOfYes(asked, offer)), WantsText(asked), offerSaid,
                 game.AvailabilityOf(asked) == Availability.Free && FestivalGame.WouldPlaySet(asked.Rating, picked)),
@@ -376,13 +382,7 @@ public partial class YearScreen : Control
     /// <summary>The sets nobody is booked for, on the stages that are booked.</summary>
     public static IReadOnlyList<int> EmptySets(FestivalGame game)
     {
-        var sets = Enumerable.Range(0, RunningOrder.SetsAStage).Where(s => game.Show.At(s) is null).ToList();
-        if (game.SecondStageBooked)
-        {
-            sets.AddRange(Enumerable.Range(RunningOrder.SecondBase, RunningOrder.SetsAStage).Where(s => game.SecondShow.At(s) is null));
-        }
-
-        return sets;
+        return game.BookedShows.SelectMany(show => Enumerable.Range(show.Base, RunningOrder.SetsAStage).Where(s => show.At(s) is null)).ToList();
     }
 
     /// <summary>What the campaign screen shows: the sales, and the month's jobs, buzz, releases and news.</summary>
@@ -654,13 +654,44 @@ public partial class YearScreen : Control
         Rebuild();
     }
 
+    /// <summary>Adds the next stage (up to four in all) with empty sets to fill, and picks its first set.</summary>
+    public void AddStage()
+    {
+        if (_game.AddEmptyStage() is var added and > 0)
+        {
+            _slot = RunningOrder.BaseOf(added);
+            SoundBoard.Cue(Sounds.Click);
+        }
+        else
+        {
+            SoundBoard.Cue(Sounds.Refuse);
+        }
+
+        Rebuild();
+    }
+
+    /// <summary>Takes an extra stage and its acts off the bill; the stages after it move up a place.</summary>
+    public void RemoveStage(int stage)
+    {
+        if (_game.RemoveStage(stage))
+        {
+            var left = _game.StagesBooked;
+            // Stay on the same tab if a stage moved up into it, otherwise the one before.
+            var showing = System.Math.Min(stage, left - 1);
+            _slot = showing <= 0 ? RunningOrder.SetsAStage - 1 : RunningOrder.BaseOf(showing);
+            SoundBoard.Cue(Sounds.Click);
+        }
+
+        Rebuild();
+    }
+
     /// <summary>Adds a second stage with empty sets to fill, or takes it away again.</summary>
     public void ToggleStage()
     {
         if (_game.SecondStageBooked)
         {
-            _game.BookSecondStage(false);
-            _slot = RunningOrder.SetsAStage - 1;
+            _game.RemoveStage(1);
+            _slot = _game.SecondStageBooked ? RunningOrder.SecondBase : RunningOrder.SetsAStage - 1;
         }
         else
         {

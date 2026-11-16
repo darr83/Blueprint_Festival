@@ -951,7 +951,7 @@ public partial class SmokeTest : Node
         Check(show.StageCam.Showing == StageShot.Front && show.StageCam.Camera.Current, "The front stage cam should take over the view.");
         Check(show.StageCam.Camera.GlobalPosition.Y > 1.5f, "The front stage cam should be up above the crowd's heads.");
         Check(show.StageCam.Filming?.Kind == show.Game.Show.Stage?.Kind, "The stage cam should be on the stage that is playing.");
-        Check(show.Music.Stages.Count == 2 && show.Music.For(show.Game.Show) is not null && show.Music.For(show.Game.SecondShow) is not null, "Each stage should have its own music player.");
+        Check(show.Music.Stages.Count == RunningOrder.MaxStages && show.Music.For(show.Game.Show) is not null && show.Music.For(show.Game.SecondShow) is not null, "Each stage should have its own music player.");
         var stages = show.StageCam.StageCount;
         Check(buttons.NextStageButton is { } next && next.Visible == (stages > 1), "The next-stage button should show only when there is another stage to go to.");
         var filmed = show.StageCam.FilmingStage;

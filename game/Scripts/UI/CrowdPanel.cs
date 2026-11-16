@@ -192,12 +192,15 @@ public partial class CrowdPanel : Control
             }
         }
 
-        if (_game.SecondShow.Stage is { } other)
+        foreach (var show in _game.Shows.Skip(1))
         {
-            var (fx, fy, _, _) = RunningOrder.Front(other);
-            if (Math.Abs(x - fx) < 14 && Math.Abs(y - fy) < 14)
+            if (show.Stage is { } other)
             {
-                return "at the second stage";
+                var (fx, fy, _, _) = RunningOrder.Front(other);
+                if (Math.Abs(x - fx) < 14 && Math.Abs(y - fy) < 14)
+                {
+                    return $"at the {FestivalGame.StageTitle(show.Number).ToLowerInvariant()}";
+                }
             }
         }
 

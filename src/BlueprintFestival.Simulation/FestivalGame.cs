@@ -55,8 +55,14 @@ public sealed partial class FestivalGame
         Crowd = new Crowd(Field, Site, Seed, Clock.Now);
         Show = new RunningOrder(Site, Seed, Clock.Now);
         Crowd.Show = Show;
-        SecondShow = new RunningOrder(Site, Seed, Clock.Now, Show);
-        Crowd.Second = SecondShow;
+        var shows = new List<RunningOrder> { Show };
+        for (var n = 1; n < RunningOrder.MaxStages; n++)
+        {
+            shows.Add(new RunningOrder(Site, Seed, Clock.Now, shows, n));
+        }
+
+        Shows = shows;
+        Crowd.Shows = Shows;
         Crowd.TicketsSold += people =>
         {
             // Tickets sold ahead were paid for when they were bought.
@@ -117,13 +123,25 @@ public sealed partial class FestivalGame
     public RunningOrder Show { get; }
 
     /// <summary>The second stage's music. It plays only if its acts were booked at planning and a second stage is put up.</summary>
-    public RunningOrder SecondShow { get; }
+    public RunningOrder SecondShow => Shows[1];
 
-    /// <summary>True while an act is on, on either stage.</summary>
-    public bool MusicOn => Show.Playing(Now) is not null || SecondShow.Playing(Now) is not null;
+    /// <summary>
+    /// Every stage's music, main stage first, always <see cref="RunningOrder.MaxStages"/> long. The
+    /// extra stages play only if their acts were booked at planning and that many stages are put up.
+    /// </summary>
+    public IReadOnlyList<RunningOrder> Shows { get; }
+
+    /// <summary>The stages' music that is booked, main stage first.</summary>
+    public IEnumerable<RunningOrder> BookedShows => Shows.Where(s => s.Booked);
+
+    /// <summary>True while an act is on, on any stage.</summary>
+    public bool MusicOn => Shows.Any(s => s.Playing(Now) is not null);
 
     /// <summary>True while a crowd is gathering at the front for a big act that has not come on yet.</summary>
-    public bool CrowdWaiting => Show.FillingUp(Now) is not null || SecondShow.FillingUp(Now) is not null;
+    public bool CrowdWaiting => Shows.Any(s => s.FillingUp(Now) is not null);
+
+    /// <summary>The line-up a set belongs to, by the set's number.</summary>
+    public RunningOrder ShowOf(int set) => Shows[RunningOrder.StageOf(set)];
 
     /// <summary>What the player has built on the field.</summary>
     public SiteLayout Site { get; }
@@ -344,12 +362,12 @@ public sealed partial class FestivalGame
 
     private static readonly TimeSpan SkipFrameBudget = TimeSpan.FromMilliseconds(14);
 
-    /// <summary>The start of the next set on either stage, or null once the last has begun or with no music to come.</summary>
+    /// <summary>The start of the next set on any stage, or null once the last has begun or with no music to come.</summary>
     public Slot? NextAct
     {
         get
         {
-            var next = new[] { Show, SecondShow }.Where(s => s.Stage is not null).Select(s => s.Next(Now)).Where(s => s is not null).ToList();
+            var next = Shows.Where(s => s.Stage is not null).Select(s => s.Next(Now)).Where(s => s is not null).ToList();
             return next.Count == 0 ? null : next.MinBy(s => s!.Start);
         }
     }

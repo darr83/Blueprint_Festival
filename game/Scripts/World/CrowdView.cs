@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Collections.Generic;
 using BlueprintFestival.Audio;
 using BlueprintFestival.Simulation;
@@ -52,13 +53,15 @@ public partial class CrowdView : Node3D
     private FestivalGame _game = null!;
     private double _time;
     private int _cheerOutOfTen = 3;
-    private readonly StageBeat _mainBeat = new();
-    private readonly StageBeat _secondBeat = new();
+    /// <summary>Each stage's beat, main stage first.</summary>
+    private readonly StageBeat[] _beats = { new(), new(), new(), new() };
+
+    private StageBeat MainBeat => _beats[0];
     private readonly CrowdClap _clap = new();
     private int _clappers;
     private int _applauding;
-    private int _singersMain;
-    private int _singersSecond;
+    /// <summary>How many people are singing along at each stage, main stage first.</summary>
+    private readonly int[] _singers = new int[4];
 
     /// <summary>The music being played, which the crowd dances in time to. Null dances to a steady beat.</summary>
     public MusicPlayer? Music { get; set; }
@@ -194,14 +197,7 @@ public partial class CrowdView : Node3D
     /// <summary>The stage someone watching dances to: the one nearer to them that has an act on.</summary>
     private StageBeat? StageFor(Simulation.People.PersonOnSite person)
     {
-        var main = _mainBeat.On ? _mainBeat : null;
-        var second = _secondBeat.On ? _secondBeat : null;
-        if (main is null || second is null)
-        {
-            return main ?? second;
-        }
-
-        return main.DistanceSquared(person.X, person.Y) <= second.DistanceSquared(person.X, person.Y) ? main : second;
+        return Nearest(person, b => b.On);
     }
 
     /// <summary>
@@ -210,17 +206,42 @@ public partial class CrowdView : Node3D
     /// </summary>
     private StageBeat? ApplauseFor(Simulation.People.PersonOnSite person)
     {
-        var main = _mainBeat.Slot is not null ? _mainBeat : null;
-        var second = _secondBeat.Slot is not null ? _secondBeat : null;
-        var stage = main is null || second is null ? main ?? second
-            : main.DistanceSquared(person.X, person.Y) <= second.DistanceSquared(person.X, person.Y) ? main : second;
+        var stage = Nearest(person, b => b.Slot is not null);
         return stage?.Moment is StageMoment.BetweenSongs or StageMoment.Applause ? stage : null;
     }
+
+    /// <summary>The stage nearest someone of those that pass a test (main stage first of two the same), or null.</summary>
+    private StageBeat? Nearest(Simulation.People.PersonOnSite person, System.Func<StageBeat, bool> wanted)
+    {
+        StageBeat? best = null;
+        var bestDistance = double.MaxValue;
+        foreach (var beat in _beats)
+        {
+            if (!wanted(beat))
+            {
+                continue;
+            }
+
+            var d = beat.DistanceSquared(person.X, person.Y);
+            if (best is null || d < bestDistance)
+            {
+                (best, bestDistance) = (beat, d);
+            }
+        }
+
+        return best;
+    }
+
+    /// <summary>The beat of a stage's line-up.</summary>
+    private StageBeat BeatOf(RunningOrder show) => _beats[Mathf.Clamp(show.Number, 0, _beats.Length - 1)];
+
+    /// <summary>The line-up of a stage's beat.</summary>
+    private RunningOrder ShowOf(StageBeat beat) => _game.Shows[System.Array.IndexOf(_beats, beat)];
 
     /// <summary>The stage whose music is being heard, while an act is on there.</summary>
     private StageBeat? HeardStage()
     {
-        var heard = Music?.Heard is { } show ? (show == _game.SecondShow ? _secondBeat : _mainBeat) : _mainBeat.On ? _mainBeat : _secondBeat;
+        var heard = Music?.Heard is { } show ? BeatOf(show) : _beats.FirstOrDefault(b => b.On) ?? MainBeat;
         return heard.On ? heard : null;
     }
 
@@ -241,14 +262,7 @@ public partial class CrowdView : Node3D
             return null;
         }
 
-        if (stage == _secondBeat)
-        {
-            _singersSecond++;
-        }
-        else
-        {
-            _singersMain++;
-        }
+        _singers[System.Array.IndexOf(_beats, stage)]++;
 
         return stage;
     }
@@ -298,8 +312,10 @@ public partial class CrowdView : Node3D
 
         _cheerOutOfTen = _game.Show.Playing(_game.Now) is { Headliner: true } ? 5 : 3;
         var held = _game.ActPaused || speed == 0;
-        _mainBeat.Update(_game, _game.Show, Music, held, delta);
-        _secondBeat.Update(_game, _game.SecondShow, Music, held, delta);
+        for (var i = 0; i < _beats.Length && i < _game.Shows.Count; i++)
+        {
+            _beats[i].Update(_game, _game.Shows[i], Music, held, delta);
+        }
         var camera = GetViewport()?.GetCamera3D();
         var cameraYaw = camera?.GlobalRotation.Y ?? 0f;
         _people.Clear();
@@ -356,8 +372,7 @@ public partial class CrowdView : Node3D
         var heard = HeardStage();
         _clappers = 0;
         _applauding = 0;
-        _singersMain = 0;
-        _singersSecond = 0;
+        System.Array.Clear(_singers);
         foreach (var person in _people)
         {
             // Someone unwell lies on the ground, or on a bed if they have been taken to the first aid tent.
@@ -515,12 +530,12 @@ public partial class CrowdView : Node3D
         Sitters = sitters;
         Clappers = _clappers;
         // The clapping is as near or far as the stage's music.
-        var loud = heard is not null && Music?.For(heard == _secondBeat ? _game.SecondShow : _game.Show) is { } stage ? stage.Place : 1f;
+        var loud = heard is not null && Music?.For(ShowOf(heard)) is { } stage ? stage.Place : 1f;
         _clap.Update(heard, _clappers, held, delta, loud);
         Applauding = _applauding;
         Sing(heard, held);
         // The clapping under the cheers: louder at the end of a set than between songs, and louder the more people clap.
-        var loudest = _mainBeat.Moment == StageMoment.Applause || _secondBeat.Moment == StageMoment.Applause ? 1f : 0.6f;
+        var loudest = _beats.Any(b => b.Moment == StageMoment.Applause) ? 1f : 0.6f;
         var want = held || _applauding == 0 ? 0f : Mathf.Clamp(Mathf.Sqrt(_applauding / 250f), 0.25f, 1f) * loudest;
         ApplauseLevel = want;
         SoundBoard.Instance?.SetLoop(Sounds.ApplauseLoop, want);
@@ -570,22 +585,20 @@ public partial class CrowdView
     /// </summary>
     private void Sing(StageBeat? heard, bool held)
     {
-        Singers = _singersMain + _singersSecond;
+        Singers = _singers.Sum();
         if (Music is not null)
         {
-            if (Music.For(_game.Show) is { } main)
+            for (var i = 0; i < _beats.Length && i < _game.Shows.Count; i++)
             {
-                main.SingLevel = (float)SingAlong.Loudness(_singersMain);
-            }
-
-            if (Music.For(_game.SecondShow) is { } second)
-            {
-                second.SingLevel = (float)SingAlong.Loudness(_singersSecond);
+                if (Music.For(_game.Shows[i]) is { } music)
+                {
+                    music.SingLevel = (float)SingAlong.Loudness(_singers[i]);
+                }
             }
         }
 
-        var singers = heard == _secondBeat ? _singersSecond : heard == _mainBeat ? _singersMain : 0;
-        var stage = heard is null ? null : Music?.For(heard == _secondBeat ? _game.SecondShow : _game.Show);
+        var singers = heard is null ? 0 : _singers[System.Array.IndexOf(_beats, heard)];
+        var stage = heard is null ? null : Music?.For(ShowOf(heard));
         SingingLevel = held || heard is null || stage?.HasVocals != true ? 0f
             : (float)(SingAlong.Loudness(singers) * heard.Chorus) * Mathf.Clamp(stage.Place * 1.4f, 0f, 1f);
     }

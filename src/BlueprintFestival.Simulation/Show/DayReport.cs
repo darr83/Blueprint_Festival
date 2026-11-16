@@ -189,7 +189,7 @@ public sealed class DayReport
     private static List<StageDay> StagesOf(FestivalGame game)
     {
         var now = game.Now;
-        var shows = new[] { game.Show, game.SecondShow }.Where(s => s.Stage is not null && s.Booked && s.Slots.Count > 0).ToList();
+        var shows = game.Shows.Where(s => s.Stage is not null && s.Booked && s.Slots.Count > 0).ToList();
         var lines = new List<StageDay>();
         for (var i = 0; i < shows.Count; i++)
         {
