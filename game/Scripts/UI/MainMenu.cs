@@ -74,7 +74,7 @@ public partial class MainMenu : Control
         return marker;
     }
 
-    private void StartNew() => GameManager.Instance.StartNewFestival(_name.Text);
+    private void StartNew() => GameManager.Instance.StartNewFestival(_name.Text, emptyBill: true);
 
     private void Continue()
     {

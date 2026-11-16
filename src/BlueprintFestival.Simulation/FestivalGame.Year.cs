@@ -33,7 +33,11 @@ public enum Phase
 
 /// <summary>What a year starts with, carried over from the one before.</summary>
 public sealed record YearSetup(int Year = 1, int Licence = FestivalGame.FirstLicence, int Bank = FestivalGame.StartingMoney, bool BailedOut = false, int? LastHappiness = null,
-    IReadOnlyList<FieldChoice>? Fields = null);
+    IReadOnlyList<FieldChoice>? Fields = null)
+{
+    /// <summary>True to start January with nobody booked, so the whole line-up is the player's to book.</summary>
+    public bool EmptyBill { get; init; }
+}
 
 /// <summary>A headliner who could be booked: how well known (2 to 5 stars) and what they charge.</summary>
 public sealed record HeadlinerOffer(Act Act, int Stars, int Fee);
@@ -103,7 +107,7 @@ public sealed partial class FestivalGame
         Need(Phase.Plan);
         return plan.Problems(Licence, Year).Count > 0
             ? null
-            : StartYear(Name, new YearSetup(Year, Licence, Money, BailedOut, LastHappiness, plan.Save())).TravellingLike(this);
+            : StartYear(Name, new YearSetup(Year, Licence, Money, BailedOut, LastHappiness, plan.Save()) { EmptyBill = EmptyBill }).TravellingLike(this);
     }
 
     /// <summary>Rent and licence fee for a year at a licence: nothing on the village field, then £1 a head.</summary>
@@ -172,10 +176,10 @@ public sealed partial class FestivalGame
     public IEnumerable<Slot> LineUp => SecondShow.Booked ? Show.Slots.Concat(SecondShow.Slots) : Show.Slots;
 
     /// <summary>What all the acts booked cost.</summary>
-    public int ActFees => LineUp.Sum(s => FeeOf(s.Act.Rating));
+    public int ActFees => LineUp.Sum(s => FeeFor(s.Act));
 
     /// <summary>What the second stage's acts cost, booked or not.</summary>
-    public int SecondStageFee => SecondShow.Slots.Sum(s => FeeOf(s.Act.Rating));
+    public int SecondStageFee => SecondShow.Slots.Sum(s => FeeFor(s.Act));
 
     /// <summary>True if acts are booked for a second stage.</summary>
     public bool SecondStageBooked => SecondShow.Booked;
@@ -224,7 +228,18 @@ public sealed partial class FestivalGame
         }
         else if (Roster.Named(artist) is { } found)
         {
+            // An artist who has signed elsewhere or walked away cannot be booked, and a big name wants a late set.
+            if (AvailabilityOf(found) is Availability.Gone or Availability.WalkedAway || !WouldPlaySet(found.Rating, set))
+            {
+                return false;
+            }
+
             var here = StageOf(set).At(set);
+            if (here is not null && SetOf(artist) is { } swapWith && swapWith != set && !WouldPlaySet(here.Rating, swapWith))
+            {
+                return false;
+            }
+
             if (SetOf(artist) is { } other && other != set)
             {
                 Place(other, here is null ? null : Roster.Named(here.Name));
@@ -370,7 +385,10 @@ public sealed partial class FestivalGame
     public int GrassWorn => _wear.Length == 0 ? 0 : (int)Math.Round(100.0 * _wear.Sum(w => Math.Min(1.0, (double)w / WornOut)) / _wear.Length);
 
     /// <summary>The first year of a festival, opening on the planning screen.</summary>
-    public static FestivalGame NewFestival(string? name = null) => new(name, null, null, new YearSetup());
+    public static FestivalGame NewFestival(string? name = null, bool emptyBill = false) => new(name, null, null, new YearSetup { EmptyBill = emptyBill });
+
+    /// <summary>True if every January of this festival starts with nobody booked.</summary>
+    public bool EmptyBill { get; }
 
     /// <summary>A year of a festival from what the year before left behind.</summary>
     public static FestivalGame StartYear(string? name, YearSetup setup)
@@ -531,6 +549,7 @@ public sealed partial class FestivalGame
     {
         Need(Phase.Build);
         FinishSales();
+        SendHomeActsWithNoStage();
         PayForBuses();
         ApplyTravel();
         if (CampingBooked && Plan is not null)
@@ -775,7 +794,7 @@ public sealed partial class FestivalGame
     {
         Need(Phase.Results);
         var result = Result!;
-        return StartYear(Name, new YearSetup(Year + 1, result.LicenceNext, Money, BailedOut, WordOfMouth(result), Plan?.Save())).TravellingLike(this);
+        return StartYear(Name, new YearSetup(Year + 1, result.LicenceNext, Money, BailedOut, WordOfMouth(result), Plan?.Save()) { EmptyBill = EmptyBill }).TravellingLike(this);
     }
 
     private YearSave SaveYear() => new(Year, Licence, Phase, Day, TicketPrice, HeadlinerPicked, Crowd.Expected, BailedOut, _loanThisYear, LastHappiness,
@@ -791,6 +810,8 @@ public sealed partial class FestivalGame
         LineUp = Enumerable.Range(0, RunningOrder.SetsAStage).Select(i => Show.At(i)?.Name)
             .Concat(Enumerable.Range(0, RunningOrder.SetsAStage).Select(i => SecondShow.At(RunningOrder.SecondBase + i)?.Name)).ToList(),
         Sales = SaveSales(),
+        Booking = SaveBooking(),
+        EmptyBill = EmptyBill,
         GatesShut = Phase == Phase.Day && Crowd.GatesShut,
         GatesOpenedAt = GatesOpenedAt,
         MainHours = Show.Hours.ToList(),
@@ -826,6 +847,7 @@ public sealed partial class FestivalGame
             }
         }
 
+        RestoreBooking(year.Booking);
         ParkingCharge = Math.Clamp(year.Parking ?? ParkingCharge, 0, DearestParking);
         BusesHired = Math.Clamp(year.Buses, 0, MostBuses);
         RestoreSales(year.Sales);
@@ -892,6 +914,12 @@ public sealed record YearSave(int Number, int Licence, Phase Phase, DateTime Day
 
     /// <summary>How ticket selling is going, for a year that sells its tickets ahead.</summary>
     public SalesSave? Sales { get; init; }
+
+    /// <summary>True if every January of this festival starts with nobody booked.</summary>
+    public bool EmptyBill { get; init; }
+
+    /// <summary>The fees agreed with artists and who has said no, or null in an old save.</summary>
+    public Show.BookingSave? Booking { get; init; }
 
     /// <summary>True if the day was saved with the gates still shut and people queuing outside.</summary>
     public bool GatesShut { get; init; }

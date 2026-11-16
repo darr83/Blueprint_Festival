@@ -7,6 +7,7 @@ using BlueprintFestival.Simulation;
 using BlueprintFestival.Simulation.Core;
 using BlueprintFestival.Simulation.Sales;
 using BlueprintFestival.Simulation.Show;
+using BlueprintFestival.Simulation.Site;
 using BlueprintFestival.Simulation.World;
 using BlueprintFestival.World;
 using Godot;
@@ -31,6 +32,9 @@ public partial class YearScreen : Control
     private int _sideScrollWanted;
     private int _sideScrollTries;
     private int _slot = RunningOrder.SetsAStage - 1;
+    private string? _offerFor;
+    private int _offer;
+    private string _offerSaid = "";
     private float _run = -1;
     private int _turnShown = -1;
     private int _priceShown = -1;
@@ -185,8 +189,13 @@ public partial class YearScreen : Control
                     break;
                 }
 
-                Centre(YearPanels.Plan(PlanOf(_game, _slot), new PlanActions(BookEvent, PickSlot, PickArtist, ToggleStage, ChangePrice, ToggleCamping,
-                    _game.Plan is null ? null : ChangeFields, ChangeParking, ChangeBuses, MoveSet, ChangeCamping), scroll));
+                Centre(YearPanels.Plan(PlanOf(_game, _slot, _offerFor, _offer, _offerSaid), new PlanActions(BookEvent, PickSlot, PickArtist, ToggleStage, ChangePrice, ToggleCamping,
+                    _game.Plan is null ? null : ChangeFields, ChangeParking, ChangeBuses, MoveSet, ChangeCamping)
+                {
+                    ChangeOffer = ChangeOffer,
+                    MakeOffer = MakeOffer,
+                    PayAsk = PayAsk,
+                }, scroll));
                 break;
             case Phase.Sell:
                 Centre(YearPanels.Sales(SalesOf(_game, Running), RunMonth, ToggleAdvert, ChangePrice, Running, ChangeParking, ChangeBuses, ChangeCamping, ChangeVipPrice));
@@ -197,7 +206,7 @@ public partial class YearScreen : Control
 
                 break;
             case Phase.Build:
-                Side(YearPanels.BuildDay(_game.Crowd.Expected, _game.Money, StartDay, _game.Weather.Summary, WeekOf(_game), NextDay, ChangePrice, TravelOf(_game), ChangeParking, ChangeBuses, ChangeCamping, ChangeVipPrice));
+                Side(YearPanels.BuildDay(_game.Crowd.Expected, _game.Money, StartDay, _game.Weather.Summary, WeekOf(_game), NextDay, ChangePrice, TravelOf(_game), ChangeParking, ChangeBuses, ChangeCamping, ChangeVipPrice, _game.StageProblems));
                 break;
             case Phase.Tidy:
                 Side(YearPanels.Tidy(_game.Litter.Count, _game.LitterAtStart, _game.ScoutsFee, () => PayScouts(), HandBack, _game.LitterPicked, _game.LitterBinned));
@@ -253,15 +262,52 @@ public partial class YearScreen : Control
     {
         var set = show.Base + i;
         var act = show.At(set);
-        return new SlotView(set, TimeOf(game, set), act?.Name, act is null ? "" : Roster.NameOf(act.Genre), act?.Rating ?? 0, act is null ? 0 : game.FeeOf(act.Rating))
+        return new SlotView(set, TimeOf(game, set), act?.Name, act is null ? "" : Roster.NameOf(act.Genre), act?.Rating ?? 0, act is null ? 0 : game.FeeFor(act))
         {
             CanEarlier = game.CanMoveSet(set, -1),
             CanLater = game.CanMoveSet(set, 1),
         };
     }).ToList();
 
-    /// <summary>What the planning screen shows, with one set picked to book an artist for.</summary>
-    public static PlanView PlanOf(FestivalGame game, int picked = 3) => new(
+    /// <summary>What a stage's line-up needs in build week, in a few words, or nothing with nobody booked.</summary>
+    private static string NeedsOf(FestivalGame game, bool second) => game.StageNeeded(second) is { } size
+        ? $"needs a {Catalogue.Name(size).ToLowerInvariant()} stage, from £{Booking.CheapestOf(size).Cost:N0}"
+        : "";
+
+    /// <summary>Why an artist cannot be booked for a set, or nothing if they can.</summary>
+    public static string BlockedFor(FestivalGame game, Artist artist, int set) => game.AvailabilityOf(artist) switch
+    {
+        Availability.Gone => "Signed for another festival",
+        Availability.WalkedAway => "Turned you down twice",
+        _ => FestivalGame.WouldPlaySet(artist.Rating, set) ? "" : "Only plays one of the last two sets",
+    };
+
+    /// <summary>Who else is after an artist and how long they will stay free.</summary>
+    public static string RivalsText(FestivalGame game, Artist artist)
+    {
+        var rivals = game.RivalsFor(artist);
+        if (rivals == 0 || game.GoneAfter(artist) is not { } last)
+        {
+            return "";
+        }
+
+        var month = last + 1 < FestivalGame.SalesMonths.Count ? FestivalGame.SalesMonths[last + 1] : "July";
+        return $"{rivals} asking · gone by {month}";
+    }
+
+    /// <summary>What an artist wants, for the offer box: the size of stage and how late a set.</summary>
+    public static string WantsText(Artist artist)
+    {
+        var size = Booking.StageFor(artist.Rating);
+        var stage = size == StageSize.Small ? "Will play any stage" : $"Wants a {Catalogue.Name(size).ToLowerInvariant()} stage or bigger (from £{Booking.CheapestOf(size).Cost:N0} in build week)";
+        return artist.Rating >= 4 ? $"{stage}, and one of the last two sets." : $"{stage}.";
+    }
+
+    /// <summary>What the planning screen shows, with one set picked to book an artist for and perhaps an offer being made.</summary>
+    public static PlanView PlanOf(FestivalGame game, int picked = 3, string? offerFor = null, int offer = 0, string offerSaid = "")
+    {
+        var asked = offerFor is null ? null : Roster.Named(offerFor);
+        return new(
         game.Year, game.Name, game.Day.ToString("dddd d MMMM yyyy"), game.Licence, game.Money,
         SlotsOf(game, game.Show), game.SecondStageBooked ? SlotsOf(game, game.SecondShow) : null,
         picked, $"the {StageName(picked)} at {TimeOf(game, picked)}",
@@ -269,13 +315,26 @@ public partial class YearScreen : Control
         {
             var at = game.SetOf(a.Name);
             var kind = a.Kind switch { ActKind.Dj => "DJ", ActKind.Solo => "Solo guitarist", ActKind.Duo => "Duo", ActKind.FolkBand => "Folk band", _ => "Band" };
-            return new ArtistView(a.Name, $"{kind} · {Roster.NameOf(a.Genre)} · {Roster.FansText(a.Fans)} fans · pulls a {FanPull.Words(FanPull.Of(a))}", a.Rating, game.FeeOf(a.Rating),
-                at is { } set && set != picked ? $"Booked for the {StageName(set)} at {TimeOf(game, set)}" : "", at == picked);
+            return new ArtistView(a.Name, $"{kind} · {Roster.NameOf(a.Genre)} · {Roster.FansText(a.Fans)} fans · pulls a {FanPull.Words(FanPull.Of(a))}", a.Rating, game.FeeFor(a.Name),
+                at is { } set && set != picked ? $"Booked for the {StageName(set)} at {TimeOf(game, set)}" : "", at == picked)
+            {
+                Blocked = at is null ? BlockedFor(game, a, picked) : "",
+                Rivals = at is null ? RivalsText(game, a) : "",
+                Asked = a.Name == offerFor,
+            };
         }).ToList(),
         game.TicketPrice, (int)System.Math.Round(game.FairPrice), (int)System.Math.Round(game.LineUpPull * 100), game.ActFees, game.LineUp.Count(), game.PlanCost,
         game.EarlyForecast,
         game.Plan is { } fields ? string.Join(" and ", fields.Festival.Select(f => f.Name)) : game.Ground.Name, game.FieldRent,
-        game.CampingBooked, game.CampingOffered ? FestivalGame.CampingCost : 0, game.CampersExpected, game.CampingPrice, TravelOf(game));
+        game.CampingBooked, game.CampingOffered ? FestivalGame.CampingCost : 0, game.CampersExpected, game.CampingPrice, TravelOf(game))
+        {
+            MainNeeds = NeedsOf(game, false),
+            SecondNeeds = NeedsOf(game, true),
+            Offer = asked is null ? null : new OfferView(asked.Name, asked.Rating, game.FeeFor(asked.Name), System.Math.Min(offer, game.FeeFor(asked.Name)),
+                Booking.ChanceWords(game.ChanceOfYes(asked, offer)), WantsText(asked), offerSaid,
+                game.AvailabilityOf(asked) == Availability.Free && FestivalGame.WouldPlaySet(asked.Rating, picked)),
+        };
+    }
 
     /// <summary>What the ticket sales screen shows.</summary>
     public static SalesView SalesOf(FestivalGame game, bool running = false)
@@ -327,6 +386,7 @@ public partial class YearScreen : Control
     public void PickSlot(int set)
     {
         _slot = set;
+        _offerSaid = "";
         SoundBoard.Cue(Sounds.Click);
         Rebuild();
     }
@@ -340,10 +400,89 @@ public partial class YearScreen : Control
         Rebuild();
     }
 
-    /// <summary>Books an artist for the set picked, or with null leaves it empty.</summary>
+    /// <summary>The artist an offer is being made to, or null.</summary>
+    public string? OfferFor => _offerFor;
+
+    /// <summary>The offer as it stands, in pounds.</summary>
+    public int OfferNow => _offer;
+
+    /// <summary>
+    /// Picks an artist for the set picked. Someone already on the bill moves straight to it; anyone
+    /// else has to be made an offer first. With null the set is left empty.
+    /// </summary>
     public void PickArtist(string? artist)
     {
-        SoundBoard.Cue(_game.BookAct(_slot, artist) ? Sounds.Click : Sounds.Refuse);
+        _offerSaid = "";
+        if (artist is null || _game.SetOf(artist) is not null)
+        {
+            _offerFor = null;
+            SoundBoard.Cue(_game.BookAct(_slot, artist) ? Sounds.Click : Sounds.Refuse);
+            Rebuild();
+            return;
+        }
+
+        if (Roster.Named(artist) is not { } found || BlockedFor(_game, found, _slot).Length > 0)
+        {
+            SoundBoard.Cue(Sounds.Refuse);
+            return;
+        }
+
+        _offerFor = artist;
+        _offer = _game.FeeFor(artist);
+        SoundBoard.Cue(Sounds.Click);
+        Rebuild();
+    }
+
+    /// <summary>Puts the offer up or down a step of about a twentieth of what the artist asks.</summary>
+    public void ChangeOffer(int steps)
+    {
+        if (_offerFor is null)
+        {
+            return;
+        }
+
+        var ask = _game.FeeFor(_offerFor);
+        var step = System.Math.Max(1, ask / 20);
+        _offer = System.Math.Clamp(_offer + (steps * step), System.Math.Max(1, ask / 2), ask);
+        SoundBoard.Cue(Sounds.Click);
+        Rebuild();
+    }
+
+    /// <summary>Makes the offer as it stands to the artist.</summary>
+    public void MakeOffer() => Offer(_offer);
+
+    /// <summary>Pays the artist what they ask.</summary>
+    public void PayAsk() => Offer(int.MaxValue);
+
+    private void Offer(int pounds)
+    {
+        if (_offerFor is not { } artist)
+        {
+            return;
+        }
+
+        var outcome = _game.Offer(_slot, artist, pounds);
+        switch (outcome)
+        {
+            case OfferOutcome.Accepted:
+                _offerFor = null;
+                _offerSaid = "";
+                SoundBoard.Cue(Sounds.Coins);
+                break;
+            case OfferOutcome.Refused:
+                _offerSaid = "They said no. You can try once more.";
+                SoundBoard.Cue(Sounds.Refuse);
+                break;
+            case OfferOutcome.WalkedAway:
+                _offerSaid = "They said no again and have signed for another festival.";
+                SoundBoard.Cue(Sounds.Refuse);
+                break;
+            default:
+                _offerSaid = outcome == OfferOutcome.WantsLaterSet ? "They only play one of the last two sets." : "They cannot be booked for this set.";
+                SoundBoard.Cue(Sounds.Refuse);
+                break;
+        }
+
         Rebuild();
     }
 

@@ -262,7 +262,7 @@ public static partial class YearPanels
     /// <summary>The small panel shown while building. In a year that sells ahead it is build week, and each day sells the last tickets.</summary>
     public static Control BuildDay(int expected, int bank, System.Action? open = null, string forecast = "", BuildWeekView? week = null,
         System.Action? nextDay = null, System.Action<int>? price = null, TravelView? travel = null, System.Action<int>? parking = null, System.Action<int>? buses = null,
-        System.Action<int>? camping = null, System.Action<int>? vipPrice = null)
+        System.Action<int>? camping = null, System.Action<int>? vipPrice = null, System.Collections.Generic.IReadOnlyList<string>? stageProblems = null)
     {
         var panel = Card(360);
         var (box, footer) = Scrolling(panel);
@@ -286,6 +286,25 @@ public static partial class YearPanels
             lines.AddChild(said);
             weather.AddChild(lines);
             box.AddChild(weather);
+        }
+
+        if (stageProblems is { Count: > 0 })
+        {
+            // Acts who will go home unless a bigger stage goes up.
+            var warning = new PanelContainer { Name = "StageProblems" };
+            warning.AddThemeStyleboxOverride("panel", UiStyle.Box(new Color("#FBE4E5"), 8, null, 12));
+            var lines = new VBoxContainer();
+            lines.AddChild(Section("The acts and their stages"));
+            foreach (var problem in stageProblems)
+            {
+                var line = UiStyle.Body(problem, size: 14);
+                line.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+                line.CustomMinimumSize = new Vector2(270, 0);
+                lines.AddChild(line);
+            }
+
+            warning.AddChild(lines);
+            box.AddChild(warning);
         }
 
         if (week is null)

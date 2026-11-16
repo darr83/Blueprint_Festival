@@ -51,13 +51,19 @@ public partial class SalesShots : Node
             case 1:
                 year.PickSlot(3);
                 year.PickArtist("Hedgerow Howl");
+                year.PayAsk();
                 year.PickSlot(2);
                 year.PickArtist("The Copper Turnips");
+                year.PayAsk();
                 year.ToggleStage();
                 year.PickArtist("DJ Haybale");
+                year.PayAsk();
                 year.PickSlot(RunningOrder.SecondBase + 2);
                 year.PickArtist("Crooked Lantern");
+                year.PayAsk();
                 year.PickSlot(RunningOrder.SecondBase + 3);
+                year.PickArtist("DJ Magpie");
+                year.ChangeOffer(-3);
                 year.ChangePrice(11 - game.TicketPrice);
                 break;
             case 2:

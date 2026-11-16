@@ -190,10 +190,11 @@ public partial class GameManager : Node
     }
 
     /// <summary>A new festival that runs through whole years, opening on the planning screen.</summary>
-    public void StartNewFestival(string? name)
+    public void StartNewFestival(string? name, bool emptyBill = false)
     {
         // The first year is on the village green; the fields are chosen on the map every January.
-        var first = FestivalGame.NewFestival(name);
+        // A festival started from the menu has nobody booked: the whole line-up is the player's to book.
+        var first = FestivalGame.NewFestival(name, emptyBill);
         Game = first.WithFields(FieldPlan.FirstYear()) ?? first;
         FieldsChosen = false;
         GetTree().Paused = false;

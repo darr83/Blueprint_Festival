@@ -39,19 +39,23 @@ public class TicketSalesTests
         Assert.Equal(4, game.Show.Slots.Count);
         Assert.Equal(4, game.LineUp.Count());
 
-        Assert.True(game.BookAct(0, "The Velvet Otters"));
-        Assert.Equal("The Velvet Otters", game.Show.At(0)!.Name);
-        Assert.Equal(0, game.SetOf("The Velvet Otters"));
+        // A five star act wants one of the last two sets of a stage.
+        Assert.False(game.BookAct(0, "The Velvet Otters"));
+        Assert.True(game.BookAct(2, "The Velvet Otters"));
+        Assert.Equal("The Velvet Otters", game.Show.At(2)!.Name);
+        Assert.Equal(2, game.SetOf("The Velvet Otters"));
         Assert.Equal(game.LineUp.Sum(s => game.FeeOf(s.Act.Rating)), game.ActFees);
         Assert.Equal(game.FeeOf(5), 750 * 1500 / 200);
         Assert.True(game.FeeOf(5) > game.FeeOf(4) && game.FeeOf(4) > game.FeeOf(3) && game.FeeOf(2) > game.FeeOf(1));
 
         // Nobody plays twice: booking someone who is already on swaps the two sets over.
-        var third = game.Show.At(2)!.Name;
-        Assert.True(game.BookAct(2, "The Velvet Otters"));
-        Assert.Equal("The Velvet Otters", game.Show.At(2)!.Name);
-        Assert.Equal(third, game.Show.At(0)!.Name);
+        var last = game.Show.At(3)!.Name;
+        Assert.True(game.BookAct(3, "The Velvet Otters"));
+        Assert.Equal("The Velvet Otters", game.Show.At(3)!.Name);
+        Assert.Equal(last, game.Show.At(2)!.Name);
         Assert.Equal(game.LineUp.Count(), game.LineUp.Select(s => s.Act.Name).Distinct().Count());
+        Assert.True(game.BookAct(2, "The Velvet Otters"));
+        Assert.Equal(last, game.Show.At(3)!.Name);
 
         // An empty set costs nothing, and the last act booked on the main stage closes the night.
         var before = game.ActFees;
