@@ -160,6 +160,19 @@ public sealed partial class SiteLayout
         return true;
     }
 
+    /// <summary>Tells a bar to stop serving people who are drunk, or to serve everyone again. False if it is not a bar.</summary>
+    public bool SetNoDrunks(int stall, bool noDrunks)
+    {
+        if (stall < 0 || stall >= _stalls.Count || !Catalogue.SellsAlcohol(_stalls[stall].Kind))
+        {
+            return false;
+        }
+
+        // Nothing about the ground changes, so the site is not laid out again.
+        _stalls[stall] = _stalls[stall] with { NoDrunks = noDrunks };
+        return true;
+    }
+
     /// <summary>VIP ground goes on clear grass, or under seats and tables, which then become VIP seats.</summary>
     private bool CanMarkVip(TilePoint p) => _map[p] == Ground.Grass && (IsEmpty(p) || ((ComfortAt(p) is not null || SignAt(p) is not null || DecorAt(p) is not null || IsBuntingPole(p)) && !_keepOut.Contains(p)));
 

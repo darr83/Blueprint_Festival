@@ -18,6 +18,9 @@ public enum DayNoteKind
     Weather,
     Fireworks,
     CalledOff,
+
+    /// <summary>Someone has been sick on the ground.</summary>
+    Sick,
 }
 
 /// <summary>How a line in the day's log stands: still going on, ended well, ended badly, or just news.</summary>

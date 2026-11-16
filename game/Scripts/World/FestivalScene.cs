@@ -66,6 +66,8 @@ public partial class FestivalScene : Node3D
 
     public LitterView Litter { get; private set; } = null!;
 
+    public SickView Sick { get; private set; } = null!;
+
     public StaffView Staff { get; private set; } = null!;
 
     public YearScreen Year { get; private set; } = null!;
@@ -162,6 +164,9 @@ public partial class FestivalScene : Node3D
         Litter = new LitterView { Name = "Litter" };
         AddChild(Litter);
         Litter.Initialise(Game);
+        Sick = new SickView { Name = "Sick" };
+        AddChild(Sick);
+        Sick.Initialise(Game);
 
         Music = new MusicPlayer { Name = "Music" };
         AddChild(Music);

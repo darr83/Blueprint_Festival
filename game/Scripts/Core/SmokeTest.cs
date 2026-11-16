@@ -752,6 +752,13 @@ public partial class SmokeTest : Node
                     build.SetCrowdView(false);
                     Check(!build.Density.Showing && !build.CrowdSafety.KeyShown, "The crowd view should switch off again.");
 
+                    // Someone is sick in the field, and the mess is drawn where it lands.
+                    var middle = game.Field.Field;
+                    Check(game.BeSickAt((middle.X + (middle.Width / 2)) * 0.5, (middle.Y + (middle.Height / 2)) * 0.5), "Someone should be able to be sick.");
+                    build.Sick.Refresh();
+                    Check(game.Sick.Count >= 1 && build.Sick.Count == game.Sick.Count, $"The sick should be drawn: {build.Sick.Count} drawn, {game.Sick.Count} on the ground.");
+                    Check(game.DayLog.Any(n => n.Kind == DayNoteKind.Sick), "Being sick should be in the day's log.");
+
                     // Then the rest of the day in one go.
                     while (game.Phase == Phase.Day && guard++ < 70000)
                     {

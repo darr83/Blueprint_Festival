@@ -445,7 +445,9 @@ public partial class CrowdView : Node3D
                     riders++;
                 }
 
-                view.Pose = person.Ticket ? Pose.ShowingTicket : person.Seat is not null || riding is not null ? Pose.Sitting : person.Walking && speed > 0 ? Pose.Walking : dance is not null ? Pose.Dancing
+                view.Wobble = (float)person.Wobble;
+                view.Pose = person.Fighting ? Pose.Fighting : person.BeingSick ? Pose.BeingSick
+                    : person.Ticket ? Pose.ShowingTicket : person.Seat is not null || riding is not null ? Pose.Sitting : person.Walking && speed > 0 ? Pose.Walking : dance is not null ? Pose.Dancing
                     : applause is not null ? Applause(person.Id, applause) : cheering ? Pose.Cheering : Pose.Standing;
                 dancers += view.Pose == Pose.Dancing ? 1 : 0;
                 carrying += view.Holding != Simulation.Site.Carried.None ? 1 : 0;

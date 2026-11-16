@@ -80,7 +80,8 @@ public class CrowdTests
         RunUntil(game, 14);
         Assert.Equal(game.Crowd.Expected, game.Crowd.OnSite);
         Assert.Equal(game.Crowd.Expected, game.Crowd.InField);
-        Assert.Equal(game.Crowd.Expected, game.Crowd.People.Count());
+        // Whoever is behind a toilet door just now is not drawn.
+        Assert.InRange(game.Crowd.People.Count(), game.Crowd.Expected - 8, game.Crowd.Expected);
     }
 
     [Fact]

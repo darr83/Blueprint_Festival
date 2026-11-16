@@ -41,6 +41,12 @@ public enum StaffState
 
     /// <summary>A cleaner picking litter up, or emptying a bin.</summary>
     Picking,
+
+    /// <summary>A cleaner mopping up where someone has been sick.</summary>
+    Mopping,
+
+    /// <summary>Security walking someone they have thrown out to the gate.</summary>
+    SeeingOut,
 }
 
 /// <summary>Something that needs a member of staff.</summary>
@@ -54,6 +60,9 @@ public enum IncidentKind
 
     /// <summary>A lost child. Security's job.</summary>
     LostChild,
+
+    /// <summary>Two people fighting. Security break it up and throw both out.</summary>
+    Fight,
 }
 
 /// <summary>One person hired for the day.</summary>
@@ -94,7 +103,7 @@ public sealed class StaffMember
     /// <summary>The number of the incident they are dealing with, or -1.</summary>
     public int Incident { get; internal set; } = -1;
 
-    public bool IsWalking => State is StaffState.Going or StaffState.Escorting or StaffState.Returning or StaffState.Sent or StaffState.Patrolling or StaffState.Cleaning;
+    public bool IsWalking => State is StaffState.Going or StaffState.Escorting or StaffState.Returning or StaffState.Sent or StaffState.Patrolling or StaffState.Cleaning or StaffState.SeeingOut;
 
     /// <summary>Where the player sent them into a crush, in metres.</summary>
     public double HoldX { get; internal set; }
@@ -108,6 +117,9 @@ public sealed class StaffMember
 
     /// <summary>Ticks until they next set off along their beat.</summary>
     public int Wait { get; internal set; }
+
+    /// <summary>The party security are walking to the gate, or -1.</summary>
+    public int Seeing { get; internal set; } = -1;
 
     /// <summary>For an entertainer, the hours their sets start, in order. Each set lasts 45 minutes.</summary>
     public IReadOnlyList<int> Sets => SetHours;
@@ -161,6 +173,9 @@ public sealed class Incident
 
     /// <summary>True for someone hurt in a crush. They always need more than a sit down.</summary>
     public bool Crush { get; internal init; }
+
+    /// <summary>In a fight, the party the first one is fighting, or -1.</summary>
+    public int Other { get; internal init; } = -1;
 
     /// <summary>True while it is waiting for someone to come.</summary>
     public bool Waiting => Staff < 0 && !Resting;
@@ -440,7 +455,7 @@ public sealed partial class FestivalGame
                 Crowd.GoHome(party!, unhappy: true);
                 Close(incident);
             }
-            else if (incident.Kind != IncidentKind.Ill && now - incident.Started > TimeSpan.FromMinutes(TroublePatienceMinutes))
+            else if (incident.Kind is IncidentKind.Scuffle or IncidentKind.LostChild && now - incident.Started > TimeSpan.FromMinutes(TroublePatienceMinutes))
             {
                 TroubleIgnored++;
                 Settle(incident, incident.Kind == IncidentKind.LostChild ? "Nobody came: found by the family in the end" : "Nobody came to sort it", DayTone.Bad);
@@ -489,6 +504,7 @@ public sealed partial class FestivalGame
             var party = about[(int)(whoIll * about.Count)];
             Crowd.TakeIll(party);
             Raise(new Incident(_nextIncident++, IncidentKind.Ill, party.X, party.Y, party.Id, now), DayNoteKind.Ill, "Someone taken ill");
+            SickWhereTheyFell(party);
         }
 
         // Trouble is rare by day and less rare once the bar has been open a while.
@@ -496,7 +512,7 @@ public sealed partial class FestivalGame
         if (troubleRoll < troubleChance)
         {
             var party = about[(int)(whoTrouble * about.Count)];
-            if (party.State != PartyState.Unwell)
+            if (party.State != PartyState.Unwell && (party.HasChild || !StartFight(party, now, sober: true)))
             {
                 Raise(new Incident(_nextIncident++, party.HasChild ? IncidentKind.LostChild : IncidentKind.Scuffle, party.X, party.Y, -1, now),
                     party.HasChild ? DayNoteKind.LostChild : DayNoteKind.Trouble, party.HasChild ? "A child lost" : "Trouble");
@@ -583,7 +599,7 @@ public sealed partial class FestivalGame
                 {
                     member.State = StaffState.Busy;
                     member.Heading = Math.Atan2(incident.X - member.X, incident.Y - member.Y);
-                    incident.Left = incident.Kind == IncidentKind.Ill ? TreatTicks : SortTicks;
+                    incident.Left = incident.Kind == IncidentKind.Ill ? TreatTicks : incident.Kind == IncidentKind.Fight ? BreakUpTicks : SortTicks;
                 }
 
                 break;
@@ -647,6 +663,10 @@ public sealed partial class FestivalGame
                     Walk(member, member.PostX, member.PostY, StaffState.Returning);
                 }
 
+                break;
+
+            case StaffState.SeeingOut:
+                SeeOut(member);
                 break;
 
             case StaffState.Returning:
@@ -717,6 +737,12 @@ public sealed partial class FestivalGame
 
     private void Finish(StaffMember member, Incident incident)
     {
+        if (incident.Kind == IncidentKind.Fight)
+        {
+            BreakUp(member, incident);
+            return;
+        }
+
         if (incident.Kind != IncidentKind.Ill)
         {
             TroubleSorted++;
@@ -756,9 +782,9 @@ public sealed partial class FestivalGame
     }
 
     private StaffSave SaveStaff() => new(
-        _staff.Select(s => new StaffMemberSave(s.Id, s.Kind, s.Tile, s.PostX, s.PostY, s.PostHeading, s.X, s.Y, s.Heading, s.State, s.Incident) { Path = s.Path?.Skip(s.PathIndex).ToList(), HoldX = s.HoldX, HoldY = s.HoldY, HoldLeft = s.HoldLeft, Wait = s.Wait, Sets = Busking.IsEntertainer(s.Kind) ? s.SetHours.ToList() : null }).ToList(),
-        _incidents.Select(i => new IncidentSave(i.Id, i.Kind, i.X, i.Y, i.Party, i.Started, i.Staff, i.Left, i.Resting, i.Crush) { Tent = i.Tent, Bed = i.Bed }).ToList(),
-        _chance.State, _nextStaff, _nextIncident, Treated, Untreated, TroubleSorted, TroubleIgnored) { Rounds = SaveRounds(), BuskListeners = BuskListeners };
+        _staff.Select(s => new StaffMemberSave(s.Id, s.Kind, s.Tile, s.PostX, s.PostY, s.PostHeading, s.X, s.Y, s.Heading, s.State, s.Incident) { Path = s.Path?.Skip(s.PathIndex).ToList(), HoldX = s.HoldX, HoldY = s.HoldY, HoldLeft = s.HoldLeft, Wait = s.Wait, Seeing = s.Seeing < 0 ? null : s.Seeing, Sets = Busking.IsEntertainer(s.Kind) ? s.SetHours.ToList() : null }).ToList(),
+        _incidents.Select(i => new IncidentSave(i.Id, i.Kind, i.X, i.Y, i.Party, i.Started, i.Staff, i.Left, i.Resting, i.Crush) { Tent = i.Tent, Bed = i.Bed, Other = i.Other < 0 ? null : i.Other }).ToList(),
+        _chance.State, _nextStaff, _nextIncident, Treated, Untreated, TroubleSorted, TroubleIgnored) { Rounds = SaveRounds(), BuskListeners = BuskListeners, Trouble = SaveTrouble() };
 
     private void RestoreStaff(StaffSave save)
     {
@@ -769,7 +795,7 @@ public sealed partial class FestivalGame
                 continue;
             }
 
-            var member = new StaffMember(s.Id, s.Kind, s.Tile, s.PostX, s.PostY, s.PostHeading) { X = s.X, Y = s.Y, Heading = s.Heading, State = Enum.IsDefined(s.State) ? s.State : StaffState.AtPost, Incident = s.Incident, HoldX = s.HoldX, HoldY = s.HoldY, HoldLeft = s.HoldLeft, Wait = s.Wait };
+            var member = new StaffMember(s.Id, s.Kind, s.Tile, s.PostX, s.PostY, s.PostHeading) { X = s.X, Y = s.Y, Heading = s.Heading, State = Enum.IsDefined(s.State) ? s.State : StaffState.AtPost, Incident = s.Incident, HoldX = s.HoldX, HoldY = s.HoldY, HoldLeft = s.HoldLeft, Wait = s.Wait, Seeing = s.Seeing ?? -1 };
             if (Busking.IsEntertainer(s.Kind))
             {
                 member.SetHours.AddRange((s.Sets ?? Busking.UsualHours.ToList()).Where(h => h is >= Busking.FirstHour and <= Busking.LastHour).Distinct().Order());
@@ -780,7 +806,7 @@ public sealed partial class FestivalGame
 
         foreach (var i in save.Incidents ?? new())
         {
-            _incidents.Add(new Incident(i.Id, i.Kind, i.X, i.Y, i.Party, i.Started) { Staff = i.Staff, Left = i.Left, Resting = i.Resting, Crush = i.Crush, Tent = i.Tent, Bed = i.Bed });
+            _incidents.Add(new Incident(i.Id, i.Kind, i.X, i.Y, i.Party, i.Started) { Staff = i.Staff, Left = i.Left, Resting = i.Resting, Crush = i.Crush, Tent = i.Tent, Bed = i.Bed, Other = i.Other ?? -1 });
         }
 
         // Anyone who was walking somewhere carries on along the way they were going, or works it out again if the save does not say.
@@ -821,6 +847,7 @@ public sealed partial class FestivalGame
         _nextIncident = Math.Max(save.NextIncident, _incidents.Count == 0 ? 0 : _incidents.Max(i => i.Id) + 1);
         (Treated, Untreated, TroubleSorted, TroubleIgnored) = (save.Treated, save.Untreated, save.TroubleSorted, save.TroubleIgnored);
         RestoreRounds(save.Rounds);
+        RestoreTrouble(save.Trouble);
         BuskListeners = save.BuskListeners;
         UpdatePitches();
     }
@@ -844,6 +871,9 @@ public sealed record StaffMemberSave(int Id, StaffKind Kind, TilePoint Tile, dou
 
     /// <summary>For an entertainer, the hours their sets start.</summary>
     public List<int>? Sets { get; init; }
+
+    /// <summary>The party security are walking to the gate.</summary>
+    public int? Seeing { get; init; }
 }
 
 /// <summary>One incident as written to a save file.</summary>
@@ -854,6 +884,9 @@ public sealed record IncidentSave(int Id, IncidentKind Kind, double X, double Y,
 
     /// <summary>Which of that tent's beds.</summary>
     public int Bed { get; init; }
+
+    /// <summary>In a fight, the other party.</summary>
+    public int? Other { get; init; }
 }
 
 /// <summary>The staff and what they are dealing with, as written to a save file.</summary>
@@ -861,6 +894,8 @@ public sealed record StaffSave(List<StaffMemberSave>? Staff, List<IncidentSave>?
 {
     /// <summary>The beats, the bins and the litter picked up.</summary>
     public RoundsSave? Rounds { get; init; }
+
+    public TroubleSave? Trouble { get; init; }
 
     /// <summary>How many people have stopped to listen to the entertainers today.</summary>
     public int BuskListeners { get; init; }

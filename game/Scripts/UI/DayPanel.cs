@@ -191,7 +191,7 @@ public partial class DayPanel : Paper
         // Only lay the tab out again when something on it has changed, so it does not flicker.
         var key = string.Join("|", Showing, report.Now.ToString("HH:mm"), report.OnSite, report.Happy, report.Fed, report.Watered, report.Toilets, report.MoodLine.Count,
             string.Join(",", report.Log.Select(n => $"{n.Id}{n.Tone}{n.Outcome}")), string.Join(",", report.Stages.Select(s => s.Watching + string.Concat(s.Sets.Select(x => (int)x.State)))),
-            report.TotalIn, report.TotalOut, report.Bank, report.BedsUsed, string.Join(",", report.WorthALook));
+            report.TotalIn, report.TotalOut, report.Bank, report.BedsUsed, string.Join(",", report.WorthALook), report.Drinkers, report.SickWaiting, report.ThrownOut, report.DrinksRefused);
         if (key == _shown)
         {
             return;
@@ -367,6 +367,18 @@ public partial class DayPanel : Paper
         Line("Treated", $"{report.Treated}");
         Line("Left untreated", $"{report.Untreated}", report.Untreated > 0 ? Bad : null);
         Line("Trouble sorted", $"{report.TroubleSorted}");
+
+        Section("Drink, fights and mess");
+        Line("Merry, tipsy, drunk just now", $"{report.Drinkers.Merry}, {report.Drinkers.Tipsy}, {report.Drinkers.Drunk}", report.Drinkers.Drunk >= 8 ? Bad : null);
+        Line("Fights", $"{report.Fights}");
+        Line("Thrown out by security", $"{report.ThrownOut}");
+        Line("Hurt in a fight", $"{report.HurtInFights}", report.HurtInFights > 0 ? Bad : null);
+        Line("Passed out from drink", $"{report.PassedOut}");
+        Line("Times someone was sick", report.SickWaiting > 0 ? $"{report.TimesSick} ({report.SickWaiting} not mopped up)" : $"{report.TimesSick}", report.SickWaiting > 0 ? Bad : null);
+        if (report.DrinksRefused > 0)
+        {
+            Line("Drinks refused at the bar", $"{report.DrinksRefused}");
+        }
         Line("First aid beds in use", report.Beds > 0 ? $"{report.BedsUsed} of {report.Beds}" : "no tent");
 
         Section("Everything today");
@@ -489,6 +501,7 @@ public partial class DayPanel : Paper
             DayNoteKind.Ill or DayNoteKind.Hurt => (GoodTint, "+", UiStyle.FirstAidGreen),
             DayNoteKind.Crush or DayNoteKind.Choice or DayNoteKind.CalledOff => (AmberTint, "!", new Color("#A35F00")),
             DayNoteKind.Trouble or DayNoteKind.LostChild => (new Color("#EEEAF6"), "!", new Color("#5A4A9A")),
+            DayNoteKind.Sick => (new Color("#F1F3D8"), "~", new Color("#6E7A1E")),
             DayNoteKind.Weather => (RainTint, "~", new Color("#5B7894")),
             DayNoteKind.Fireworks => (UiStyle.SunTint, "*", new Color("#8A6200")),
             _ => (UiStyle.Ground, "·", UiStyle.TextMuted),

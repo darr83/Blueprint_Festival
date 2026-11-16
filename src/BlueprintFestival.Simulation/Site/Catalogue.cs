@@ -412,6 +412,12 @@ public static class Catalogue
     /// <summary>True for a stall that sells things and so has prices to set.</summary>
     public static bool Sells(StallKind kind) => Menus.ContainsKey(kind);
 
+    /// <summary>True for a stall with alcohol on the menu: the bar tent, the cocktail bar and the VIP lounge.</summary>
+    public static bool SellsAlcohol(StallKind kind) => kind is StallKind.Bar or StallKind.Cocktails or StallKind.VipLounge;
+
+    /// <summary>True for a drink with alcohol in it.</summary>
+    public static bool IsAlcohol(StallKind kind, StallItem item) => item is not null && item.AdultsOnly && SellsAlcohol(kind);
+
     /// <summary>True for a stall people queue at: anything that sells, the toilets and the taps.</summary>
     public static bool HasQueue(StallKind kind) => Of(kind).Serves is not null || Sells(kind);
 

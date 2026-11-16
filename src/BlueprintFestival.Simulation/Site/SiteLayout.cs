@@ -56,6 +56,12 @@ public sealed record PlacedStall(StallKind Kind, int X, int Y, Facing Facing)
     /// </summary>
     public bool VipOnly { get; init; }
 
+    /// <summary>
+    /// True when this bar will not sell alcohol to anyone who is already drunk: set by the player
+    /// on the menu board. Fewer drunks, and fewer sales.
+    /// </summary>
+    public bool NoDrunks { get; init; }
+
     /// <summary>True when only VIP guests use it, whether the player chose that or it is a VIP building.</summary>
     public bool ForVips => VipOnly || Catalogue.AlwaysVip(Kind);
 

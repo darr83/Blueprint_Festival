@@ -220,6 +220,25 @@ three minutes to wave and bow while the crowd cheers and claps, louder than betw
 those watching hold on for the end of a set unless a need is desperate, and stay to clap for one
 to three minutes before they drift off to the stalls or home.
 
+## Drink, fights and people being sick
+
+What the grown-ups buy at the bar tent, the cocktail bar and the VIP lounge adds up through the
+day and wears off at one drink an hour, quicker with a meal or water. People who are merry are a
+little happier; tipsy people sway; drunk people stagger, and it is the drunk who start fights, are
+sick and pass out. Some parties like a drink more than others, families take it easy, and the
+drinking gets going in the evening. Each bar has a "Don't serve drunk people" switch on its menu
+board: fewer drunks, fewer sales, and the odd grumble from someone refused.
+
+A fight is two people squaring up while everyone near steps back and watches. Security break it
+up and both are thrown out, one of them walked to the gate. If nobody gets there within a few
+minutes someone is hurt and needs a first aider, and everyone who saw it thinks less of the day.
+Security standing near make fights less likely; a packed crowd makes them more likely.
+
+Someone being sick bends double for a minute or two and leaves a mess on the grass. It puts off
+everyone who stands near it until a cleaner mops it up (cleaners go to sick before litter), or
+until it has been trodden in two hours later. One person in ten who is taken ill is sick first.
+The day panel counts fights, people thrown out, people hurt, and sick still on the ground.
+
 ## Checks
 
 - `dotnet test tests/BlueprintFestival.Simulation.Tests` runs the unit tests.
@@ -233,6 +252,7 @@ to three minutes before they drift off to the stalls or home.
 - `godot --path game -- --path-shots=DIR` writes pictures of paths and the camping field.
 - `godot --path game -- --queue-shots=DIR` writes pictures of the queues at gates, stalls and toilets, of queue lanes, and of ground marked "no customers".
 - `godot --path game -- --light-shots=DIR` writes pictures of the lights by day, at dusk and at night.
+- `godot --path game -- --trouble-mock=DIR` writes posed pictures of drunk people, a fight, being sick and a cleaner mopping up.
 - `godot --path game -- --vip-shots=DIR` writes pictures of the lanyards, VIP ground, the lounge, the platform and a stall kept for VIPs.
 
 The tests and the launch test run on every pull request.

@@ -83,6 +83,20 @@ public partial class StallPanel : PanelContainer
     /// <summary>The "VIP guests only" switch on the board showing, or null.</summary>
     public CheckButton? VipSwitch { get; private set; }
 
+    /// <summary>The "Don't serve drunk people" switch on the board showing, or null if it is not a bar.</summary>
+    public CheckButton? DrunkSwitch { get; private set; }
+
+    /// <summary>Tells the bar showing to stop serving drunk people, or to serve everyone, as the switch on the board does.</summary>
+    public bool SetNoDrunks(bool on)
+    {
+        var stall = Stall;
+        var done = stall >= 0 && _game.SetNoDrunks(stall, on);
+        SoundBoard.Cue(done ? Sounds.Click : Sounds.Refuse);
+        _shown = "";
+        Refresh();
+        return done;
+    }
+
     /// <summary>Keeps the stall showing for VIP guests only, or opens it to everyone, as the switch on the board does.</summary>
     public bool SetVipOnly(bool on)
     {
@@ -166,7 +180,7 @@ public partial class StallPanel : PanelContainer
         var menu = Catalogue.MenuOf(placed.Kind);
         var sales = _game.SalesOf(Stall);
         var open = _game.CanSetPrices;
-        var key = $"{Stall}|{placed.Kind}|{placed.VipOnly}|{string.Join(",", Enumerable.Range(0, menu.Count).Select(placed.PriceOf))}|{string.Join(",", sales.Sold)}|{sales.Takings}|{open}|{_game.Phase}";
+        var key = $"{Stall}|{placed.Kind}|{placed.VipOnly}|{placed.NoDrunks}|{string.Join(",", Enumerable.Range(0, menu.Count).Select(placed.PriceOf))}|{string.Join(",", sales.Sold)}|{sales.Takings}|{open}|{_game.Phase}";
         if (key == _shown)
         {
             return;
@@ -208,6 +222,22 @@ public partial class StallPanel : PanelContainer
             _box.AddChild(vip);
             var why = UiStyle.Body(placed.VipOnly ? "A VIP sign stands outside, and nobody without a lanyard is served."
                 : "Keep it for VIP guests: a VIP sign goes up outside and only people with a lanyard use it.", muted: true, size: 13);
+            why.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+            why.CustomMinimumSize = new Vector2(360, 0);
+            _box.AddChild(why);
+        }
+
+        // A bar can turn away anyone who has already had too many.
+        DrunkSwitch = null;
+        if (Catalogue.SellsAlcohol(placed.Kind))
+        {
+            var sober = new CheckButton { Text = "Don't serve drunk people", ButtonPressed = placed.NoDrunks, Disabled = _game.Phase is not (Phase.Build or Phase.Day), FocusMode = FocusModeEnum.None };
+            sober.AddThemeFontSizeOverride("font_size", 16);
+            sober.Toggled += on => Callable.From(() => SetNoDrunks(on)).CallDeferred();
+            DrunkSwitch = sober;
+            _box.AddChild(sober);
+            var why = UiStyle.Body(placed.NoDrunks ? "Anyone who is drunk is refused. Fewer fights and less mess, but fewer drinks sold and the odd grumble."
+                : "Everyone is served. More drinks sold, but drunk people start fights, are sick and pass out.", muted: true, size: 13);
             why.AutowrapMode = TextServer.AutowrapMode.WordSmart;
             why.CustomMinimumSize = new Vector2(360, 0);
             _box.AddChild(why);
