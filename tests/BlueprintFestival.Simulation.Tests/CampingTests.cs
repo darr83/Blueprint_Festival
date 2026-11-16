@@ -8,6 +8,9 @@ public class CampingTests
     /// <summary>A well built festival of 5,000 with the camping field taken, played to the morning after.</summary>
     private static readonly Lazy<FestivalGame> Camped = new(Night);
 
+    /// <summary>How many campers were in their tents, and how happy everyone was, when the music stopped and the camp settled for the night.</summary>
+    private static (int InTents, int Happiness) AtNightfall;
+
     private static FestivalGame Night()
     {
         var game = GrowthTests.Built(5000, 90000, camping: true);
@@ -16,6 +19,11 @@ public class CampingTests
         while (game.Phase == Phase.Day)
         {
             game.Clock.Step();
+            if (game.CampTime == CampTime.Night && AtNightfall == default)
+            {
+                AtNightfall = (game.Crowd.InTents, game.Crowd.Happiness);
+            }
+
             Assert.True(++guard < 70000, "The day never ended.");
         }
 
@@ -88,9 +96,9 @@ public class CampingTests
 
         Assert.True(crowd.CampersIn > 1000, $"Only {crowd.CampersIn} campers came.");
         Assert.Equal(crowd.CampersIn * game.CampingPrice, game.Income.Where(l => l.What == "Camping").Sum(l => l.Amount));
-        Assert.True(crowd.InTents >= crowd.CampersIn * 0.97, $"{crowd.InTents} of {crowd.CampersIn} campers got to their tents.");
+        Assert.True(AtNightfall.InTents >= crowd.CampersIn * 0.97, $"{AtNightfall.InTents} of {crowd.CampersIn} campers got to their tents.");
         Assert.Equal(0, game.CrushInjuries);
-        Assert.True(crowd.Happiness >= 70, $"Only {crowd.Happiness}% happy.");
+        Assert.True(AtNightfall.Happiness >= 70, $"Only {AtNightfall.Happiness}% happy.");
     }
 
     [Fact]
@@ -101,7 +109,7 @@ public class CampingTests
         var inCamp = game.Litter.Count(l => camp.Contains(FieldMap.TileAt(l.X, l.Y)));
 
         Assert.Equal(Phase.Tidy, game.Phase);
-        Assert.InRange(inCamp, game.Crowd.Tents.Count() / 2, game.Crowd.Tents.Count() * 2);
+        Assert.InRange(inCamp, game.Crowd.Pitched.Count() / 2, game.Crowd.Pitched.Count() * 2);
         Assert.Equal(game.Litter.Count, game.LitterAtStart);
     }
 

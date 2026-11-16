@@ -443,7 +443,7 @@ public sealed partial class FestivalGame
     public int LitterCleared => LitterAtStart == 0 ? 100 : (int)Math.Floor(100.0 * (LitterAtStart - _litter.Count) / LitterAtStart);
 
     /// <summary>What the scouts ask to clear what is left.</summary>
-    public int ScoutsFee => _litter.Count == 0 ? 0 : Math.Max(10, (int)Math.Ceiling(_litter.Count / 10.0) * 5);
+    public int ScoutsFee => (_litter.Count == 0 ? 0 : Math.Max(10, (int)Math.Ceiling(_litter.Count / 10.0) * 5)) + (TentsLeft * TentLeftCost);
 
     public int WearColumns => Field.Field.Width / WearTiles;
 
@@ -623,6 +623,7 @@ public sealed partial class FestivalGame
         SendHomeActsWithNoStage();
         PayForBuses();
         ApplyTravel();
+        ResetCampLife();
         if (CampingBooked)
         {
             // Tents go up round whatever was built and marked out in the camping field during the week.
@@ -678,6 +679,14 @@ public sealed partial class FestivalGame
 
     private void Tick(GameClock clock)
     {
+        if (CampTime != CampTime.None)
+        {
+            // The night and the morning after in the camping field run a minute a tick.
+            clock.Jump(TimeSpan.FromSeconds(CampSecondsATick) - GameClock.TickLength);
+            TickCampLife(clock.Now);
+            return;
+        }
+
         Crowd.Tick(clock.Now);
         TickStaff(clock.Now);
         TickBusking(clock.Now);
@@ -694,7 +703,15 @@ public sealed partial class FestivalGame
         // The day is over when the last person has gone home, or at half past midnight whatever.
         if (Planned && Phase == Phase.Day && clock.Now >= Day + People.Crowd.EveryoneOut && (Crowd.OnSite == 0 || clock.Now >= Day.AddHours(24.5)))
         {
-            EndDay();
+            // Campers stay the night and pack up in the morning before the tidy-up.
+            if (CampingBooked && Crowd.InTents > 0)
+            {
+                StartCampNight(clock.Now);
+            }
+            else
+            {
+                EndDay();
+            }
         }
     }
 
@@ -725,7 +742,7 @@ public sealed partial class FestivalGame
 
         // A day that ended with the gates never opened leaves nothing shut for the tidy-up or next year.
         Crowd.GatesShut = false;
-        foreach (var (pitch, party) in Crowd.Tents)
+        foreach (var (pitch, party) in Crowd.Pitched)
         {
             // Most campers take everything home. Some leave a bag of rubbish, and a few leave the tent.
             var mess = (uint)(party * 40503u) % 10;
@@ -745,7 +762,8 @@ public sealed partial class FestivalGame
             (member.X, member.Y, member.Heading, member.State, member.Incident, member.Path) = (member.PostX, member.PostY, member.PostHeading, StaffState.AtPost, -1, null);
         }
 
-        Clock.RestoreState(new ClockState(Day.AddDays(1).AddHours(6), Clock.TickCount, GameSpeed.Normal));
+        var tidy = Day.AddDays(1).AddHours(6);
+        Clock.RestoreState(new ClockState(Clock.Now > tidy ? Clock.Now : tidy, Clock.TickCount, GameSpeed.Normal));
     }
 
     /// <summary>Picks up the litter within reach of a spot. Returns how many pieces.</summary>
@@ -767,6 +785,7 @@ public sealed partial class FestivalGame
         }
 
         Spend("Scouts' litter pick", fee);
+        ClearLeftTents();
         _litter.Clear();
         _sick.Clear();
         return true;
@@ -777,6 +796,11 @@ public sealed partial class FestivalGame
     {
         Need(Phase.Tidy);
         Phase = Phase.Results;
+        if (TentsLeft > 0)
+        {
+            Spend("Tents left behind, cleared by the farmer", ClearLeftTents());
+        }
+
         _fieldRepair = FieldRepair;
         if (_fieldRepair > 0)
         {

@@ -196,7 +196,7 @@ public partial class SmokeTest : Node
                     opened.BuildBar.ShowShelf(StallGroup.Services);
                     Check(opened.BuildBar.ChoiceCount == 4, "The last shelf should offer two sizes of toilets, the water point and the litter bin.");
                     opened.BuildBar.ShowShelf(StallGroup.Camping);
-                    Check(opened.BuildBar.ChoiceCount == 3, "The camping shelf should offer the showers, the info point and the camp shop.");
+                    Check(opened.BuildBar.ChoiceCount == 4, "The camping shelf should offer the showers, the info point, the camp shop and the fire pit.");
                     foreach (var camp in Catalogue.StallsIn(StallGroup.Camping))
                     {
                         var model = World.SiteProps.Stall(camp.Kind);
@@ -205,7 +205,7 @@ public partial class SmokeTest : Node
                     }
 
                     opened.BuildBar.Toggle(BuildMode.Camp);
-                    Check(opened.BuildBar.ChoiceCount == 9 && opened.BuildBar.CampCheckLines.Count == 1, "The Camping tab should offer four kinds of ground and five things to put down, and say there is no camping field.");
+                    Check(opened.BuildBar.ChoiceCount == 11 && opened.BuildBar.CampCheckLines.Count == 1, "The Camping tab should offer four kinds of ground, six things to put down and camp stewards, and say there is no camping field.");
                     Check(opened.BuildBar.Choose(UI.BuildBar.CampKey(CampZone.FireLane)) && opened.Build.Mode == BuildMode.Camp && opened.Build.CampZone == CampZone.FireLane, "The fire lane should be on the Camping tab.");
                     Check(!opened.Build.DragCampZone(new TilePoint(grass.X + 10, grass.Y + 10), new TilePoint(grass.X + 20, grass.Y + 20)).Ok, "The village field is not camping ground.");
                     opened.BuildBar.Toggle(BuildMode.Stall);
@@ -749,7 +749,7 @@ public partial class SmokeTest : Node
 
                     // Staff from the build bar: someone on the gate, a first-aider, security, and a first aid tent.
                     build.BuildBar.Toggle(BuildMode.Staff);
-                    Check(build.BuildBar.ChoiceCount == 11, "The Staff tab should offer four kinds of staff, four entertainers, the first aid tent, the medical tent and the litter bin.");
+                    Check(build.BuildBar.ChoiceCount == 12, "The Staff tab should offer five kinds of staff, four entertainers, the first aid tent, the medical tent and the litter bin.");
                     Check(build.BuildBar.Choose("staffCleaner") && build.BuildBar.Choose("stallBin"), "Cleaners and litter bins should be on the staff tab.");
                     Check(build.BuildBar.Choose("staffTicketStaff") && build.Build.Mode == BuildMode.Staff, "Ticket staff should be on the build bar.");
                     Check(!build.Build.ClickAt(new TilePoint(grass.X + 40, grass.Y + 40)).Ok && build.Build.Refused, "Ticket staff should only go on a gate.");

@@ -161,6 +161,9 @@ public enum StallKind
 
     /// <summary>A hut selling what campers forget: gas, tent pegs, chairs and breakfast. Only in a camping field.</summary>
     CampShop,
+
+    /// <summary>A ring of stones with a steel bowl, where campers sit round a fire at night.</summary>
+    FirePit,
 }
 
 /// <summary>Which shelf of the build bar a stall is on.</summary>
@@ -293,6 +296,9 @@ public enum StaffKind
 
     /// <summary>An entertainer: plays records from a little DJ booth.</summary>
     Dj,
+
+    /// <summary>Walks the camping field at night: puts out fires left burning and asks loud parties for quiet.</summary>
+    CampSteward,
 }
 
 /// <summary>One kind of staff: what they are called, what they cost for the day, and what they do.</summary>
@@ -371,6 +377,7 @@ public static class Catalogue
         new StallInfo(StallKind.ShowerBlock, "Shower block", 16, 5, 600, null, 0, 300, 6, "Six hot showers in a cabin. Campers want a wash, more on a hot or muddy day. Aim for one shower for every 50 campers."),
         new StallInfo(StallKind.CampInfo, "Camp info and lockers", 10, 8, 250, null, 0, 45, 2, "Information, lost property and a wall of lockers where campers leave their valuables for the night."),
         new StallInfo(StallKind.CampShop, "Camp shop", 10, 6, 150, null, 0, 40, 2, "Everything campers forget: gas, tent pegs, a camping chair, and breakfast for the morning."),
+        new StallInfo(StallKind.FirePit, "Fire pit", 4, 4, 80, null, 0, 60, 1, "A steel fire bowl in a ring of stones and logs. Campers sit round it at night instead of lighting fires by their tents. A camp steward nearby makes sure it is put out."),
     };
 
     private static readonly IReadOnlyList<StallItem> NothingToSell = Array.Empty<StallItem>();
@@ -525,7 +532,7 @@ public static class Catalogue
         StallKind.Ponchos or StallKind.BucketHats or StallKind.Merchandise or StallKind.PhoneCharging => StallGroup.Other,
         StallKind.VipLounge or StallKind.VipPlatform => StallGroup.Vip,
         StallKind.BigWheel or StallKind.Waltzer or StallKind.Twister or StallKind.Carousel or StallKind.Skylark or StallKind.HookADuck => StallGroup.Fair,
-        StallKind.ShowerBlock or StallKind.CampInfo or StallKind.CampShop => StallGroup.Camping,
+        StallKind.ShowerBlock or StallKind.CampInfo or StallKind.CampShop or StallKind.FirePit => StallGroup.Camping,
         _ => StallGroup.Services,
     };
 
@@ -540,7 +547,7 @@ public static class Catalogue
         StallKind.Toilets, StallKind.ToiletBlock, StallKind.WaterPoint, StallKind.Bin,
         StallKind.VipLounge, StallKind.VipPlatform,
         StallKind.Carousel, StallKind.BigWheel, StallKind.Waltzer, StallKind.Twister, StallKind.Skylark, StallKind.HookADuck,
-        StallKind.ShowerBlock, StallKind.CampInfo, StallKind.CampShop,
+        StallKind.ShowerBlock, StallKind.CampInfo, StallKind.CampShop, StallKind.FirePit,
     };
 
     /// <summary>True for the things only VIP guests may use, whatever the player sets.</summary>
@@ -564,6 +571,7 @@ public static class Catalogue
         new StaffInfo(StaffKind.Pianist, "Pianist", 60, "An entertainer at a painted street piano. Plays in a camping or food field at the times you set, and people passing stop to listen."),
         new StaffInfo(StaffKind.Drummer, "Drummer", 50, "An entertainer with a little drum kit. Plays in a camping or food field at the times you set, and people passing stop to listen."),
         new StaffInfo(StaffKind.Dj, "DJ", 55, "An entertainer with a small DJ booth. Plays in a camping or food field at the times you set, and people passing stop to listen."),
+        new StaffInfo(StaffKind.CampSteward, "Camp steward", 45, "Works in a camping field. Walks the tents at night, puts out fires left burning and asks loud parties to keep it down."),
     };
 
     public static StaffInfo Of(StaffKind kind) => Staff[(int)kind];

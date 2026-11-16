@@ -64,7 +64,7 @@ public static class CampLayout
     };
 
     /// <summary>The stalls that only go in a camping field: the showers, the camp info point and the camp shop.</summary>
-    public static bool CampOnly(StallKind kind) => kind is StallKind.ShowerBlock or StallKind.CampInfo or StallKind.CampShop;
+    public static bool CampOnly(StallKind kind) => kind is StallKind.ShowerBlock or StallKind.CampInfo or StallKind.CampShop or StallKind.FirePit;
 }
 
 /// <summary>

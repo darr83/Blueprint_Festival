@@ -26,6 +26,9 @@ public static partial class SiteProps
             case StallKind.CampShop:
                 CampShopHut(b, node);
                 return true;
+            case StallKind.FirePit:
+                FirePit(b);
+                return true;
             default:
                 return false;
         }
@@ -39,6 +42,29 @@ public static partial class SiteProps
         StallKind.CampShop => new[] { new Vector3(-0.7f, 0, -0.2f), new Vector3(0.7f, 0, -0.2f) },
         _ => null,
     };
+
+    /// <summary>A steel fire bowl in a ring of stones, with a few logs stacked by it. The flames are drawn at night while campers sit round it.</summary>
+    private static void FirePit(MeshBuilder b)
+    {
+        var stone = new Color("#9C9890");
+        var stoneDark = new Color("#7E7A73");
+        for (var i = 0; i < 10; i++)
+        {
+            var a = i * Mathf.Tau / 10;
+            b.Ball(new Vector3(0.72f * Mathf.Cos(a), 0.1f, 0.72f * Mathf.Sin(a)), new Vector3(0.3f, 0.22f, 0.26f), i % 2 == 0 ? stone : stoneDark, new Vector3(0, i * 37, 0));
+        }
+
+        b.Tube(new Vector3(0, 0.03f, 0), new Vector3(1.3f, 0.04f, 1.3f), new Color("#3B3430"));
+        b.Cone(new Vector3(0, 0.22f, 0), new Vector3(0.95f, 0.3f, 0.95f), new Color("#2F2F33"), new Vector3(180, 0, 0));
+        b.Tube(new Vector3(0, 0.37f, 0), new Vector3(0.98f, 0.03f, 0.98f), new Color("#45454B"));
+        // A little stack of logs to one side, and charred wood in the bowl.
+        var log = new Color("#8A5A34");
+        for (var i = 0; i < 3; i++)
+        {
+            b.Tube(new Vector3(-0.05f + (i * 0.16f) - 0.1f, 0.36f, 0), new Vector3(0.1f, 0.5f, 0.1f), new Color("#3A2A20"), new Vector3(0, i * 50, 90));
+            b.Tube(new Vector3(0.62f + ((i % 2) * 0.12f), 0.07f + ((i / 2) * 0.11f), -0.75f), new Vector3(0.12f, 0.55f, 0.12f), log, new Vector3(90, 0, 0));
+        }
+    }
 
     /// <summary>A long pale blue cabin with six shower doors along the front and a water tank on the roof.</summary>
     private static void ShowerBlock(MeshBuilder b, Node3D node)

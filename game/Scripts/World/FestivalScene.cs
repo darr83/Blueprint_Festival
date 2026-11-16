@@ -94,6 +94,9 @@ public partial class FestivalScene : Node3D
     /// <summary>The event day panel, "The day so far".</summary>
     public DayPanel DayBoard { get; private set; } = null!;
 
+    /// <summary>The camping field's night and morning after, shown while they run.</summary>
+    public CampLifePanel CampLife { get; private set; } = null!;
+
     /// <summary>The button under the festival's name that opens the event day panel.</summary>
     public Button DayButton { get; private set; } = null!;
 
@@ -106,6 +109,9 @@ public partial class FestivalScene : Node3D
     public FestivalSounds Sounds { get; private set; } = null!;
 
     public CampView Camp { get; private set; } = null!;
+
+    /// <summary>The fires in the camping field at night, with campers round them.</summary>
+    public CampFiresView CampFires { get; private set; } = null!;
 
     public ParkingView Parking { get; private set; } = null!;
 
@@ -190,6 +196,10 @@ public partial class FestivalScene : Node3D
         AddChild(Camp);
         Camp.Initialise(Game);
 
+        CampFires = new CampFiresView { Name = "CampFires" };
+        AddChild(CampFires);
+        CampFires.Initialise(Game);
+
         Parking = new ParkingView { Name = "Parking" };
         AddChild(Parking);
         Parking.Initialise(Game);
@@ -265,6 +275,9 @@ public partial class FestivalScene : Node3D
         DayBoard = new DayPanel();
         _hud.AddChild(DayBoard);
         DayBoard.Initialise(Game);
+        CampLife = new CampLifePanel();
+        _hud.AddChild(CampLife);
+        CampLife.Initialise(Game);
         DayButton = UiStyle.SecondaryButton("The day so far  (H)", ToggleDayBoard);
         DayButton.Name = "DayButton";
         DayButton.Theme = UiStyle.Theme;
@@ -369,6 +382,8 @@ public partial class FestivalScene : Node3D
         PlaceGapButton();
         DayBoard.BuildBarTop = BuildBar.Visible ? BuildBar.Top : null;
         Money.BuildBarTop = DayBoard.BuildBarTop;
+        CampLife.BuildBarTop = DayBoard.BuildBarTop;
+        CampLife.Visible = Game.CampTime != CampTime.None && !DayBoard.Visible && !Money.Visible && !Year.HasCentrePanel;
         if (!DayButton.Visible && DayBoard.Visible)
         {
             DayBoard.Visible = false;

@@ -19,7 +19,7 @@ public class CampLayoutTests
     }
 
     /// <summary>The grass of the camping field.</summary>
-    private static TileRect CampOf(FestivalGame game) => game.Field.CampFields.Single();
+    internal static TileRect CampOf(FestivalGame game) => game.Field.CampFields.Single();
 
     /// <summary>Fire lanes up and across the camp, 40 m apart, close enough together for every tent.</summary>
     internal static void LayFireLanes(FestivalGame game)
@@ -37,7 +37,7 @@ public class CampLayoutTests
     }
 
     /// <summary>A fence across the way in with turnstiles in it, and ticket staff on every lane.</summary>
-    private static void OpenAWayIn(FestivalGame game)
+    internal static void OpenAWayIn(FestivalGame game)
     {
         var gap = game.Field.Gap;
         var vertical = gap.Height > gap.Width;
@@ -57,7 +57,7 @@ public class CampLayoutTests
         }
     }
 
-    private static TilePoint Free(FestivalGame game, StallKind kind, int x, int y)
+    internal static TilePoint Free(FestivalGame game, StallKind kind, int x, int y)
     {
         for (var dy = 0; dy < 40; dy += 2)
         {

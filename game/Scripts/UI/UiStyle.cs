@@ -124,6 +124,8 @@ public static class UiStyle
         ["bag"] = "<path d='M5 8h14l1 13H4z'/><path d='M9 11V6a3 3 0 0 1 6 0v5'/>",
         ["tent"] = "<path d='M2 20h20M12 4L3 20M12 4l9 16'/><path d='M12 11l-3 9M12 11l3 9'/>",
         ["shower"] = "<path d='M6 21V8a4 4 0 0 1 8 0'/><path d='M10 8h8'/><path d='M12 12v1M15 12v1M18 12v1M13.5 15.5v1M16.5 15.5v1'/>",
+        ["fire"] = "<path d='M12 3c1 3 4 5 4 9a4 4 0 0 1-8 0c0-2 1-3 2-4 0 2 1 3 2 3 0-3-1-5 0-8z'/><path d='M5 21l14-3M5 18l14 3'/>",
+        ["torch"] = "<path d='M9 10h6l-1 11h-4z'/><path d='M8 6l8 0-1 4H9z'/><path d='M12 2v1M7 3l1 1M17 3l-1 1'/>",
         ["lane"] = "<path d='M6 3v18M18 3v18'/><path d='M12 4v3M12 10.5v3M12 17v3'/>",
         ["glass"] = "<path d='M6 3h12l-1.5 9a4.5 4.5 0 0 1-9 0zM12 16.5V21M8 21h8'/>",
     };
