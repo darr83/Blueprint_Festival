@@ -81,6 +81,30 @@ public static class StageMix
         return level < 0.01 ? 0 : level;
     }
 
+    /// <summary>How far a fairground ride carries, in metres, against the height of the view: a little more than an entertainer.</summary>
+    public const double FairCarryPerViewMetre = 0.22;
+
+    /// <summary>A ride always carries at least this far, in metres.</summary>
+    public const double FairLeastCarry = 9;
+
+    /// <summary>
+    /// How loud a fairground ride (or hook a duck) is, from 0 to 1, with the view centred on a point
+    /// and a given height of view. Looking at the fair it is plain to hear; it falls away quickly as
+    /// the view moves off it, and zoomed right out over the site it is silent, so the organ and the
+    /// squeals are only heard while the fair is on screen.
+    /// </summary>
+    public static double Fair(double x, double y, double viewHeight, double fx, double fy)
+    {
+        var zoom = ZoomedOut(viewHeight);
+        var overall = (1 - zoom) * (1 - (0.5 * zoom));
+        var carry = Math.Max(FairLeastCarry, Math.Clamp(viewHeight, ClosestView, FurthestView) * FairCarryPerViewMetre);
+        var dx = fx - x;
+        var dy = fy - y;
+        var away = Math.Sqrt((dx * dx) + (dy * dy)) / carry;
+        var level = overall / (1 + (away * away * away));
+        return level < 0.02 ? 0 : level;
+    }
+
     /// <summary>
     /// How loud each stage is while a stage camera films one of them: that stage in full, the others
     /// faint in the distance.

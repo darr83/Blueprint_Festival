@@ -24,6 +24,16 @@ public sealed class PathFinder
 
     private readonly FieldMap _map;
     private readonly float[] _crowding;
+
+    /// <summary>Scratch for <see cref="Refresh"/>: tiles to the nearest thing in the way, up to four.</summary>
+    private readonly byte[] _near;
+
+    /// <summary>Which tiles could be walked on at the last <see cref="Refresh"/>, and at the one before.</summary>
+    private bool[] _open;
+    private bool[] _was;
+
+    /// <summary>True once the whole map has been worked out: after that only what changes is.</summary>
+    private bool _swept;
     private readonly bool[] _onPath;
     private readonly int[] _pathSum;
     private bool _anyPaths;
@@ -55,6 +65,9 @@ public sealed class PathFinder
         _staff = staff;
         _vip = vip && !staff;
         _crowding = new float[map.Width * map.Height];
+        _near = new byte[_crowding.Length];
+        _open = new bool[_crowding.Length];
+        _was = new bool[_crowding.Length];
         _cost = new double[_crowding.Length];
         _cameFrom = new int[_crowding.Length];
         _searched = new int[_crowding.Length];
@@ -123,24 +136,151 @@ public sealed class PathFinder
         return _pathSum[(y1 * stride) + x1] - _pathSum[(y0 * stride) + x1] - _pathSum[(y1 * stride) + x0] + _pathSum[(y0 * stride) + x0] > 0;
     }
 
-    /// <summary>Works out again where the tight spots are. Call after anything is built or removed.</summary>
+    /// <summary>
+    /// Works out again where the tight spots are. Call after anything is built or removed.
+    /// A tile's weight comes from how many tiles it is to the nearest one that cannot be walked
+    /// on (counting the edge of the map), found for the whole map in two sweeps rather than by
+    /// looking all round every tile, so that putting something down on a big site is quick.
+    /// </summary>
     public void Refresh()
     {
-        var map = _map;
-        Array.Clear(_crowding);
-        for (var y = 0; y < map.Height; y++)
+        var width = _map.Width;
+        var height = _map.Height;
+        _map.FillWalkable(_was, _staff, _vip);
+        (_open, _was) = (_was, _open);
+        if (_swept)
         {
-            for (var x = 0; x < map.Width; x++)
+            // Only the ground near what changed needs working out again: a tile's weight only
+            // depends on the tiles up to three away from it.
+            int x0 = width, y0 = height, x1 = -1, y1 = -1;
+            for (var i = 0; i < _open.Length; i++)
             {
-                if (Walkable(x, y))
+                if (_open[i] != _was[i])
                 {
-                    _crowding[(y * map.Width) + x] = Clearance(x, y) switch { 1 => 2.0f, 2 => 0.8f, 3 => 0.3f, _ => 0f };
+                    var (x, y) = (i % width, i / width);
+                    x0 = Math.Min(x0, x);
+                    x1 = Math.Max(x1, x);
+                    y0 = Math.Min(y0, y);
+                    y1 = Math.Max(y1, y);
                 }
+            }
+
+            if (x1 < 0)
+            {
+                return;
+            }
+
+            // A big change, such as a new field, is quicker done in sweeps over the whole map.
+            if ((long)(x1 - x0 + 1) * (y1 - y0 + 1) * 8 < (long)width * height)
+            {
+                for (var y = Math.Max(0, y0 - MostClearance); y <= Math.Min(height - 1, y1 + MostClearance); y++)
+                {
+                    for (var x = Math.Max(0, x0 - MostClearance); x <= Math.Min(width - 1, x1 + MostClearance); x++)
+                    {
+                        var d = _open[(y * width) + x] ? Clearance(x, y) : 0;
+                        _near[(y * width) + x] = (byte)d;
+                        _crowding[(y * width) + x] = Weight(d);
+                    }
+                }
+
+                return;
+            }
+        }
+
+        _swept = true;
+        var near = _near;
+        var open = _open;
+
+        // Down and across: each tile is one further than the closest of the four it has already seen.
+        for (var y = 0; y < height; y++)
+        {
+            var row = y * width;
+            for (var x = 0; x < width; x++)
+            {
+                if (!open[row + x])
+                {
+                    near[row + x] = 0;
+                    continue;
+                }
+
+                // Off the edge of the map counts as something in the way.
+                var d = Math.Min(Math.Min(x + 1, y + 1), Math.Min(width - x, height - y));
+                if (x > 0)
+                {
+                    d = Math.Min(d, near[row + x - 1] + 1);
+                }
+
+                if (y > 0)
+                {
+                    var above = row - width + x;
+                    d = Math.Min(d, near[above] + 1);
+                    if (x > 0)
+                    {
+                        d = Math.Min(d, near[above - 1] + 1);
+                    }
+
+                    if (x < width - 1)
+                    {
+                        d = Math.Min(d, near[above + 1] + 1);
+                    }
+                }
+
+                near[row + x] = (byte)Math.Min(d, MostClearance);
+            }
+        }
+
+        // Back up and across the other way, picking up what is below and to the right.
+        for (var y = height - 1; y >= 0; y--)
+        {
+            var row = y * width;
+            for (var x = width - 1; x >= 0; x--)
+            {
+                int d = near[row + x];
+                if (d == 0)
+                {
+                    _crowding[row + x] = 0f;
+                    continue;
+                }
+
+                if (x < width - 1)
+                {
+                    d = Math.Min(d, near[row + x + 1] + 1);
+                }
+
+                if (y < height - 1)
+                {
+                    var below = row + width + x;
+                    d = Math.Min(d, near[below] + 1);
+                    if (x < width - 1)
+                    {
+                        d = Math.Min(d, near[below + 1] + 1);
+                    }
+
+                    if (x > 0)
+                    {
+                        d = Math.Min(d, near[below - 1] + 1);
+                    }
+                }
+
+                near[row + x] = (byte)d;
+                _crowding[row + x] = Weight(d);
             }
         }
     }
 
-    /// <summary>How many tiles it is to the nearest tile that cannot be walked on (up to 4).</summary>
+    /// <summary>How much harder it is to walk somewhere this many tiles from the nearest thing in the way.</summary>
+    private static float Weight(int clearance) => clearance switch { 1 => 2.0f, 2 => 0.8f, 3 => 0.3f, _ => 0f };
+
+    /// <summary>Clearance is only counted up to here: four tiles and more is open ground.</summary>
+    private const int MostClearance = 4;
+
+    /// <summary>True if a tile could be walked on at the last <see cref="Refresh"/>. Off the map cannot.</summary>
+    private bool OpenAt(int x, int y) => x >= 0 && y >= 0 && x < _map.Width && y < _map.Height && _open[(y * _map.Width) + x];
+
+    /// <summary>
+    /// How many tiles it is to the nearest tile that cannot be walked on (up to 4), as at the last
+    /// <see cref="Refresh"/>, looking all round. Used near something just built or taken away.
+    /// </summary>
     private int Clearance(int x, int y)
     {
         for (var r = 1; r <= 3; r++)
@@ -149,7 +289,7 @@ public sealed class PathFinder
             {
                 for (var dx = -r; dx <= r; dx++)
                 {
-                    if (Math.Max(Math.Abs(dx), Math.Abs(dy)) == r && !Walkable(x + dx, y + dy))
+                    if (Math.Max(Math.Abs(dx), Math.Abs(dy)) == r && !OpenAt(x + dx, y + dy))
                     {
                         return r;
                     }
@@ -158,6 +298,44 @@ public sealed class PathFinder
         }
 
         return 4;
+    }
+
+    /// <summary>
+    /// How many tiles it is from a tile to the nearest one that cannot be walked on, up to four, as
+    /// at the last <see cref="Refresh"/>. 0 on a tile that cannot be walked on; 2 or more means all
+    /// eight tiles round it can be walked on.
+    /// </summary>
+    public int ClearanceAt(int x, int y) => _map.InBounds(x, y) ? _near[(y * _map.Width) + x] : 0;
+
+    /// <summary>The weight <see cref="Refresh"/> gave a tile, for the tests.</summary>
+    public float CrowdingAt(int x, int y) => _crowding[(y * _map.Width) + x];
+
+    /// <summary>
+    /// The weight a tile would have if worked out the slow way, from the map as it is now, for
+    /// the tests to check the quick ways in <see cref="Refresh"/> agree.
+    /// </summary>
+    public float CrowdingTheSlowWay(int x, int y)
+    {
+        if (!Walkable(x, y))
+        {
+            return 0f;
+        }
+
+        for (var r = 1; r <= 3; r++)
+        {
+            for (var dy = -r; dy <= r; dy++)
+            {
+                for (var dx = -r; dx <= r; dx++)
+                {
+                    if (Math.Max(Math.Abs(dx), Math.Abs(dy)) == r && !Walkable(x + dx, y + dy))
+                    {
+                        return Weight(r);
+                    }
+                }
+            }
+        }
+
+        return 0f;
     }
 
     /// <summary>

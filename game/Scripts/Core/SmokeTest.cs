@@ -204,7 +204,7 @@ public partial class SmokeTest : Node
                     }
 
                     opened.BuildBar.ShowShelf(StallGroup.Services);
-                    Check(opened.BuildBar.ChoiceCount == 4, "The last shelf should offer two sizes of toilets, the water point and the litter bin.");
+                    Check(opened.BuildBar.ChoiceCount == 8, "The last shelf should offer six kinds of toilets, the water point and the litter bin.");
                     opened.BuildBar.ShowShelf(StallGroup.Camping);
                     Check(opened.BuildBar.ChoiceCount == 4, "The camping shelf should offer the showers, the info point, the camp shop and the fire pit.");
                     foreach (var camp in Catalogue.StallsIn(StallGroup.Camping))
@@ -217,7 +217,7 @@ public partial class SmokeTest : Node
                     opened.BuildBar.ShowCampThings(false);
                     opened.BuildBar.Toggle(BuildMode.Camp);
                     Check(opened.BuildBar.ChoiceCount == 7 && opened.BuildBar.CampCheckLines.Count == 1, "The Camping tab should offer seven kinds of ground, and say there is no camping field.");
-                    Check(opened.BuildBar.Choose("staffCampSteward") && opened.BuildBar.CampThings && opened.BuildBar.ChoiceCount == 7, "The Camping tab's other half should offer six things to put up and camp stewards.");
+                    Check(opened.BuildBar.Choose("staffCampSteward") && opened.BuildBar.CampThings && opened.BuildBar.ChoiceCount == 10, "The Camping tab's other half should offer nine things to put up and camp stewards.");
                     Check(opened.BuildBar.Choose(UI.BuildBar.CampKey(CampZone.FireLane)) && opened.Build.Mode == BuildMode.Camp && opened.Build.CampZone == CampZone.FireLane, "The fire lane should be on the Camping tab.");
                     Check(!opened.Build.DragCampZone(new TilePoint(grass.X + 10, grass.Y + 10), new TilePoint(grass.X + 20, grass.Y + 20)).Ok, "The village field is not camping ground.");
                     opened.BuildBar.Toggle(BuildMode.Stall);
@@ -758,6 +758,16 @@ public partial class SmokeTest : Node
                     Check(game.BuildStall(StallKind.Bar, grass.X + 7, grass.Y + 52, Facing.East).Ok, "A bar should go up.");
                     Check(game.BuildStall(StallKind.Toilets, grass.X + 26, grass.Y + 5, Facing.South).Ok, "Toilets should go up.");
                     Check(game.BuildStall(StallKind.Toilets, grass.X + 36, grass.Y + 5, Facing.South).Ok, "More toilets should go up.");
+
+                    // Putting one thing down draws just that one thing, not the whole site again.
+                    build.Site.Rebuild();
+                    var stallsDrawn = build.Site.StallCount;
+                    Check(game.BuildComfort(ComfortKind.Bench, grass.X + 30, grass.Y + 44, Facing.South).Ok, "A bench should go down.");
+                    build.Site.Rebuild();
+                    Check(build.Site.MadeLastTime == 1 && build.Site.ComfortCount == 1 && build.Site.StallCount == stallsDrawn, $"Putting a bench down should draw only the bench, not {build.Site.MadeLastTime} models.");
+                    Check(game.Remove(new TilePoint(grass.X + 30, grass.Y + 44)) > 0, "The bench should come up again.");
+                    build.Site.Rebuild();
+                    Check(build.Site.MadeLastTime == 0 && build.Site.ComfortCount == 0, $"Taking the bench away should draw nothing new, not {build.Site.MadeLastTime} models.");
 
                     // Staff from the build bar: someone on the gate, a first-aider, security, and a first aid tent.
                     build.BuildBar.Toggle(BuildMode.Staff);

@@ -179,6 +179,10 @@ public partial class GameManager : Node
             {
                 AddChild(new SignShots(arg["--sign-shots=".Length..]) { Name = "SignShots" });
             }
+            else if (arg.StartsWith("--toilet-shots=", StringComparison.Ordinal))
+            {
+                AddChild(new ToiletShots(arg["--toilet-shots=".Length..]) { Name = "ToiletShots" });
+            }
             else if (arg.StartsWith("--decor-shots=", StringComparison.Ordinal))
             {
                 AddChild(new DecorShots(arg["--decor-shots=".Length..]) { Name = "DecorShots" });

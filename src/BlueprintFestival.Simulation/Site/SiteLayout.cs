@@ -580,10 +580,96 @@ public sealed partial class SiteLayout
     /// <summary>A place in line with the door of one cubicle of a toilet, in metres: so far out from the front (or in, if negative).</summary>
     public static (double X, double Y) CubicleDoor(PlacedStall stall, int cubicle, double metresOut)
     {
+        var way = CubicleWay(stall, cubicle);
+        var (nx, ny) = (way.DoorX - way.InX, way.DoorY - way.InY);
+        var length = Math.Max(0.01, Math.Sqrt((nx * nx) + (ny * ny)));
+        var plane = way.Plane;
+        return (plane.X + (nx / length * metresOut), plane.Y + (ny / length * metresOut));
+    }
+
+    /// <summary>How far out from a cabin's door people stop before going in, in metres.</summary>
+    public const double DoorFrontMetres = 0.9;
+
+    /// <summary>How far in from a cabin's door people stand once inside, in metres.</summary>
+    public const double InsideMetres = 0.6;
+
+    /// <summary>
+    /// The way to one cubicle or urinal place, in metres on the map: where its door is, the spot
+    /// in front of it where people stop, the spot inside where they stand, and the corners they walk
+    /// round first when its door is not on the side the queue is (the back row of a back-to-back
+    /// block, or the sides and back of a urinal stand).
+    /// </summary>
+    public static CubicleRoute CubicleWay(PlacedStall stall, int cubicle)
+    {
         var info = Catalogue.Of(stall.Kind);
+        var sideways = stall.Facing is Facing.East or Facing.West;
+        var wide = (sideways ? stall.Rect.Height : stall.Rect.Width) * FieldMap.TileMetres;
+        var deep = (sideways ? stall.Rect.Width : stall.Rect.Height) * FieldMap.TileMetres;
+        var door = info.Servers - 1 - cubicle;
+
+        // In the model's own frame: x across its front from left to right as you face it, z out of its front.
+        double x, z, nx = 0, nz = 1, doorOut = DoorFrontMetres, inside = InsideMetres;
+        switch (stall.Kind)
+        {
+            case StallKind.BackToBackToilets:
+                var half = info.Servers / 2;
+                if (door < half)
+                {
+                    (x, z) = ((door - ((half - 1) / 2.0)) * CubicleMetres, deep / 2);
+                }
+                else
+                {
+                    (x, z, nz) = (-((door - half - ((half - 1) / 2.0)) * CubicleMetres), -deep / 2, -1);
+                }
+
+                break;
+            case StallKind.AccessibleToilet:
+                (x, z) = (0, 0.05);
+                break;
+            case StallKind.UrinalStand:
+                var angle = door * Math.PI / 2;
+                (nx, nz) = (Math.Round(Math.Sin(angle)), Math.Round(Math.Cos(angle)));
+                (x, z, doorOut, inside) = (nx * 1.0, nz * 1.0, 0.45, 0.1);
+                break;
+            case StallKind.UrinalTrough:
+                (x, z, doorOut, inside) = ((door - ((info.Servers - 1) / 2.0)) * 5.6 / info.Servers, 0.2, 0.9, 0.2);
+                break;
+            default:
+                (x, z) = ((door - ((info.Servers - 1) / 2.0)) * CubicleMetres, deep / 2);
+                break;
+        }
+
+        var round = new List<(double X, double Y)>();
+        if (stall.Kind == StallKind.UrinalStand)
+        {
+            // A round stand: the side places are straight there, the back one is round one side.
+            if (nz < -0.5)
+            {
+                round.Add(Local(stall, 1.7, 0));
+            }
+        }
+        else if (nz < 0.5)
+        {
+            // Round the end nearest the door, then along the back if it is on the back.
+            var side = Math.Abs(nx) > 0.5 ? Math.Sign(nx) : (x >= 0 ? 1 : -1);
+            var clear = (wide / 2) + 0.7;
+            round.Add(Local(stall, side * clear, (deep / 2) + 0.7));
+            if (nz < -0.5)
+            {
+                round.Add(Local(stall, side * clear, -(deep / 2) - 0.7));
+            }
+        }
+
+        return new CubicleRoute(Local(stall, x, z), Local(stall, x + (nx * doorOut), z + (nz * doorOut)), Local(stall, x - (nx * inside), z - (nz * inside)), round);
+    }
+
+    /// <summary>A point given in a stall's own frame (x across its front, z out of its front, from its middle) on the map, in metres.</summary>
+    private static (double X, double Y) Local(PlacedStall stall, double x, double z)
+    {
         var (fx, fy, dx, dy) = Front(stall.Rect, stall.Facing);
-        var across = (cubicle - ((info.Servers - 1) / 2.0)) * CubicleMetres;
-        return (fx + (dx * metresOut) - (dy * across), fy + (dy * metresOut) + (dx * across));
+        var deep = (stall.Facing is Facing.East or Facing.West ? stall.Rect.Width : stall.Rect.Height) * FieldMap.TileMetres;
+        var m = z - (deep / 2);
+        return (fx + (dx * m) + (dy * x), fy + (dy * m) - (dx * x));
     }
 
     public BuildCheck CheckStall(StallKind kind, int x, int y, Facing facing)
@@ -1229,38 +1315,120 @@ public sealed partial class SiteLayout
     private void Flood(IEnumerable<TilePoint> from, Side side, HashSet<TilePoint> gateTiles)
     {
         var width = _map.Width;
-        var queue = new Queue<TilePoint>();
+        var height = _map.Height;
+
+        // The gate tiles as a map, so the flood over a big site never has to look them up one by one.
+        if (_gateMask.Length != _sides.Length)
+        {
+            _gateMask = new bool[_sides.Length];
+        }
+        else
+        {
+            Array.Clear(_gateMask);
+        }
+
+        foreach (var g in gateTiles)
+        {
+            if (_map.InBounds(g.X, g.Y))
+            {
+                _gateMask[(g.Y * width) + g.X] = true;
+            }
+        }
+
+        if (_floodOpen.Length != _sides.Length)
+        {
+            _floodOpen = new bool[_sides.Length];
+        }
+
+        var open = _floodOpen;
+        _map.FillWalkable(open, vip: true);
+        var sides = _sides;
+        var gates = _gateMask;
+        var queue = _floodQueue;
+        queue.Clear();
         foreach (var p in from)
         {
-            if (_map.IsWalkableForVip(p.X, p.Y) && _sides[(p.Y * width) + p.X] == Side.Nowhere && !gateTiles.Contains(p))
+            if (_map.IsWalkableForVip(p.X, p.Y) && _sides[(p.Y * width) + p.X] == Side.Nowhere && !_gateMask[(p.Y * width) + p.X])
             {
                 _sides[(p.Y * width) + p.X] = side;
-                queue.Enqueue(p);
+                queue.Enqueue((p.Y * width) + p.X);
             }
         }
 
         while (queue.TryDequeue(out var at))
         {
-            foreach (var (dx, dy) in new[] { (1, 0), (-1, 0), (0, 1), (0, -1) })
+            var x = at % width;
+            var y = at / width;
+            for (var k = 0; k < 4; k++)
             {
-                var next = new TilePoint(at.X + dx, at.Y + dy);
-                if (!_map.IsWalkableForVip(next.X, next.Y) || gateTiles.Contains(next))
+                int index;
+                if (k == 0)
                 {
-                    continue;
+                    if (x + 1 >= width)
+                    {
+                        continue;
+                    }
+
+                    index = at + 1;
+                }
+                else if (k == 1)
+                {
+                    if (x == 0)
+                    {
+                        continue;
+                    }
+
+                    index = at - 1;
+                }
+                else if (k == 2)
+                {
+                    if (y + 1 >= height)
+                    {
+                        continue;
+                    }
+
+                    index = at + width;
+                }
+                else
+                {
+                    if (y == 0)
+                    {
+                        continue;
+                    }
+
+                    index = at - width;
                 }
 
-                var index = (next.Y * width) + next.X;
-                if (_sides[index] == Side.Nowhere)
+                if (open[index] && !gates[index] && sides[index] == Side.Nowhere)
                 {
-                    _sides[index] = side;
-                    queue.Enqueue(next);
+                    sides[index] = side;
+                    queue.Enqueue(index);
                 }
             }
         }
     }
+
+    private bool[] _gateMask = Array.Empty<bool>();
+    private readonly Queue<int> _floodQueue = new();
+    private bool[] _floodOpen = Array.Empty<bool>();
 }
 
 /// <summary>The layout as written to a save file.</summary>
 public sealed record SiteSave(List<PlacedStage>? Stages, List<PlacedGate>? Gates, List<FenceRun>? Fences, List<PlacedStall>? Stalls = null,
     List<List<TilePoint>>? Lanes = null, List<TileRect>? KeepOut = null,
     List<PlacedLight>? Lights = null, List<FairyString>? FairyLights = null, List<PlacedScreen>? Screens = null, PlacedLaunchPad? LaunchPad = null, List<PlacedComfort>? Comforts = null, List<PlacedSign>? Signs = null, List<PlacedDecor>? Decor = null, List<BuntingRun>? Bunting = null, List<TileRect>? VipGround = null, List<PlacedArea>? Areas = null, List<CampZoneRect>? CampZones = null);
+
+/// <summary>
+/// The way to one cubicle or urinal place, in metres on the map: its door (Plane), the spot in front
+/// of it, the spot inside, and any corners to walk round first, in order from the front.
+/// </summary>
+public sealed record CubicleRoute((double X, double Y) Plane, (double X, double Y) Door, (double X, double Y) Inside, IReadOnlyList<(double X, double Y)> Round)
+{
+    public double DoorX => Door.X;
+
+    public double DoorY => Door.Y;
+
+    public double InX => Inside.X;
+
+    public double InY => Inside.Y;
+}

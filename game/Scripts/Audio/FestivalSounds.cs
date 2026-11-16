@@ -1,5 +1,6 @@
 using BlueprintFestival.Simulation;
 using BlueprintFestival.Simulation.Sound;
+using BlueprintFestival.World;
 using Godot;
 
 namespace BlueprintFestival.Audio;
@@ -15,6 +16,8 @@ public partial class FestivalSounds : Node
 
     private SoundScript _script = null!;
     private double _wait;
+    private CameraRig? _rig;
+    private StageCam? _cam;
 
     public void Initialise(FestivalGame game)
     {
@@ -27,6 +30,14 @@ public partial class FestivalSounds : Node
         }
 
         Pass();
+    }
+
+    /// <summary>Listens from where the player is looking, so the fairground is only heard near the fair.</summary>
+    public void Follow(CameraRig rig, StageCam? cam)
+    {
+        _rig = rig;
+        _cam = cam;
+        Look();
     }
 
     public override void _Process(double delta)
@@ -42,6 +53,11 @@ public partial class FestivalSounds : Node
     public void Look()
     {
         _wait = Every;
+        if (_rig is not null)
+        {
+            _script.Listen(_rig.Target.X, _rig.Target.Z, _rig.Size, _cam?.Showing is not null);
+        }
+
         _script.Poll();
         Pass();
     }

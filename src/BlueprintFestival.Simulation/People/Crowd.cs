@@ -334,6 +334,12 @@ public sealed class Party
 
     public bool HasChild => Members.Any(m => m.Look.Age == AgeGroup.Child);
 
+    /// <summary>True when someone in the party needs an accessible toilet (and an accessible pitch if they camp).</summary>
+    public bool NeedsAccess => (uint)(Id * 2246822519u) % 100 < Crowd.NeedAccessShare * 100;
+
+    /// <summary>True for a party of men and boys only: they may use the urinals.</summary>
+    public bool AllMale => Members.All(m => !m.Look.Female);
+
     /// <summary>True for a party on VIP tickets: they wear lanyards and may use VIP ground, stalls and buildings.</summary>
     public bool Vip { get; internal set; }
 
@@ -791,6 +797,12 @@ public sealed partial class Crowd
     /// <summary>How many of a stall's servers are busy with someone.</summary>
     public int BeingServed(int stall) => stall < _serving.Count ? _serving[stall].Count(p => p is not null) + _cubicles[stall].Count(c => c is not null) : 0;
 
+    /// <summary>Who is using one cubicle or urinal place just now, and where they are standing, in metres; null when nobody is.</summary>
+    public (Party Party, int Member, double X, double Y, bool Inside)? CubicleUser(int stall, int cubicle) =>
+        stall < 0 || stall >= _cubicles.Count || cubicle < 0 || cubicle >= _cubicles[stall].Length || _cubicles[stall][cubicle] is not { } use
+            ? null
+            : (use.Party, use.Member, use.X, use.Y, use.Phase == CubiclePhase.Inside);
+
     /// <summary>How one cubicle of a toilet looks just now: vacant, with its door open as someone goes in or out, or engaged.</summary>
     public CubicleLook Cubicle(int stall, int cubicle) =>
         stall < 0 || stall >= _cubicles.Count || cubicle < 0 || cubicle >= _cubicles[stall].Length ? CubicleLook.Vacant : _cubicles[stall][cubicle]?.Phase switch
@@ -905,13 +917,15 @@ public sealed partial class Crowd
                     {
                         if (cubicles[i] >= 0 && _cubicles[party.Stall][cubicles[i]] is { } use)
                         {
-                            if (use.Phase == CubiclePhase.Inside)
+                            var urinal = Catalogue.IsUrinal(_site.Stalls[party.Stall].Kind);
+                            if (use.Phase == CubiclePhase.Inside && !urinal)
                             {
                                 // Behind a shut door.
                                 continue;
                             }
 
-                            (x, y, heading, walking) = (use.X, use.Y, use.Heading, true);
+                            // At a urinal they stand still facing it while they go.
+                            (x, y, heading, walking) = (use.X, use.Y, use.Heading, !(urinal && use.Phase is CubiclePhase.Inside or CubiclePhase.Entering));
                         }
                         else if (cubicles[i] == -2)
                         {
@@ -1252,7 +1266,8 @@ public sealed partial class Crowd
             for (var x = f.X + inset; x < f.Right - inset; x++)
             {
                 var p = new TilePoint(x, y);
-                if (_site.SideOf(p) == wanted && HasRoom(p) && _map.InFestival(p))
+                // Room all round: the route finder has just worked out how far every tile is from anything in the way.
+                if (_site.SideOf(p) == wanted && _paths.ClearanceAt(x, y) >= 2 && _map.InFestival(p))
                 {
                     _standable.Add(p);
                 }
@@ -1331,23 +1346,6 @@ public sealed partial class Crowd
                     break;
             }
         }
-    }
-
-    /// <summary>True if a tile and all eight round it can be walked on, so a party is not standing in a fence.</summary>
-    private bool HasRoom(TilePoint p)
-    {
-        for (var dy = -1; dy <= 1; dy++)
-        {
-            for (var dx = -1; dx <= 1; dx++)
-            {
-                if (!_map.IsWalkable(p.X + dx, p.Y + dy))
-                {
-                    return false;
-                }
-            }
-        }
-
-        return true;
     }
 
     private TilePoint NearestWalkable(TilePoint from)
@@ -1456,7 +1454,7 @@ public sealed partial class Crowd
             {
                 if (info.Serves == Need.Toilet)
                 {
-                    Take(SiteLayout.CubicleDoor(stall, k, DoorMetres));
+                    Take(SiteLayout.CubicleWay(stall, k).Door);
                     Take(SiteLayout.CubicleDoor(stall, k, WaitMetres));
                 }
                 else
@@ -2441,12 +2439,19 @@ public sealed partial class Crowd
 
         var best = -1;
         var bestScore = double.MaxValue;
+        var keptForThem = need == Need.Toilet && party.NeedsAccess && _site.Stalls.Any(s => s.Kind == StallKind.AccessibleToilet && MayUse(party, s));
         for (var i = 0; i < _site.Stalls.Count; i++)
         {
             var stall = _site.Stalls[i];
             var info = Catalogue.Of(stall.Kind);
             if (info.Serves != need || _stallQueues[i] is not { } queue || !WorthIt(party, stall) || !MayUse(party, stall))
             {
+                continue;
+            }
+
+            if (keptForThem && stall.Kind != StallKind.AccessibleToilet)
+            {
+                // Someone who needs the accessible toilet goes to it when there is one.
                 continue;
             }
 
@@ -2880,14 +2885,31 @@ public sealed partial class Crowd
         }
     }
 
+    /// <summary>What a guest who needs an accessible toilet loses each time they have to use an ordinary cabin.</summary>
+    public const double NoAccessibleToilet = 0.04;
+
+    /// <summary>How many times today someone who needed an accessible toilet had to make do with an ordinary one.</summary>
+    public int WithoutAccessibleToilet { get; private set; }
+
+    /// <summary>How long a door takes to open, or a step up to a urinal, in seconds.</summary>
+    public static int DoorTime(StallKind kind) => Catalogue.IsUrinal(kind) ? 3 : DoorSeconds;
+
     /// <summary>Moves one person on through their visit to a cubicle. True once they are out and the door has shut.</summary>
     private static bool Step(CubicleUse use, PlacedStall stall, int cubicle, StallInfo info)
     {
-        var (tx, ty) = SiteLayout.CubicleDoor(stall, cubicle, use.Phase == CubiclePhase.Entering ? -0.6 : DoorMetres);
+        var way = SiteLayout.CubicleWay(stall, cubicle);
+        var target = use.Phase switch
+        {
+            CubiclePhase.Approaching => use.Leg < way.Round.Count ? way.Round[use.Leg] : way.Door,
+            CubiclePhase.Entering => way.Inside,
+            CubiclePhase.Returning => way.Round[Math.Clamp(use.Leg, 0, Math.Max(0, way.Round.Count - 1))],
+            _ => way.Door,
+        };
+        var arrived = true;
         if (use.Phase != CubiclePhase.Inside)
         {
-            var dx = tx - use.X;
-            var dy = ty - use.Y;
+            var dx = target.X - use.X;
+            var dy = target.Y - use.Y;
             var distance = Math.Sqrt((dx * dx) + (dy * dy));
             if (distance > 0.02)
             {
@@ -2895,18 +2917,35 @@ public sealed partial class Crowd
                 use.X += dx / distance * step;
                 use.Y += dy / distance * step;
                 use.Heading = Math.Atan2(dx, dy);
+                arrived = step >= distance - 0.02;
             }
+        }
 
-            if (use.Phase == CubiclePhase.Approaching)
-            {
-                if (distance <= 0.02)
+        var door = DoorTime(stall.Kind);
+        switch (use.Phase)
+        {
+            case CubiclePhase.Approaching:
+                if (arrived)
                 {
-                    use.Phase = CubiclePhase.Entering;
-                    use.Left = DoorSeconds;
+                    if (use.Leg < way.Round.Count)
+                    {
+                        use.Leg++;
+                    }
+                    else
+                    {
+                        use.Phase = CubiclePhase.Entering;
+                        use.Left = door;
+                    }
                 }
 
                 return false;
-            }
+            case CubiclePhase.Returning:
+                if (arrived)
+                {
+                    use.Leg--;
+                }
+
+                return use.Leg < 0 || way.Round.Count == 0;
         }
 
         if (--use.Left > 0)
@@ -2919,13 +2958,24 @@ public sealed partial class Crowd
             case CubiclePhase.Entering:
                 // The walk there and the door take time too, so the visit itself is that much shorter.
                 use.Phase = CubiclePhase.Inside;
-                use.Left = Math.Max(10, info.SecondsPerPerson - (2 * DoorSeconds) - 8);
+                use.Left = Math.Max(10, info.SecondsPerPerson - (2 * door) - 8);
+
+                // Facing the bowl, or facing the door to shut it behind them.
+                use.Heading = Math.Atan2(way.Inside.X - way.Door.X, way.Inside.Y - way.Door.Y);
                 return false;
             case CubiclePhase.Inside:
                 use.Phase = CubiclePhase.Leaving;
-                use.Left = DoorSeconds;
+                use.Left = door;
                 return false;
             default:
+                if (way.Round.Count > 0)
+                {
+                    // Out of a door on the far side: back round the corner to the rest of the party.
+                    use.Phase = CubiclePhase.Returning;
+                    use.Leg = way.Round.Count - 1;
+                    return false;
+                }
+
                 return true;
         }
     }
@@ -3103,6 +3153,13 @@ public sealed partial class Crowd
                 break;
             case Need.Toilet:
                 party.Toilet = 0;
+                if (party.NeedsAccess && stall.Kind != StallKind.AccessibleToilet)
+                {
+                    // An ordinary cabin is cramped and hard to get into without rails or a ramp.
+                    party.Mood = Math.Max(0, party.Mood - NoAccessibleToilet);
+                    WithoutAccessibleToilet += 1;
+                }
+
                 break;
         }
 
@@ -3832,7 +3889,7 @@ public sealed partial class Crowd
                 Cubicles = p.Cubicles?.ToList(), WaitRow = p.WaitRow,
                 Visits = p.Cubicles is null || p.Stall < 0 || p.Stall >= _cubicles.Count ? null : _cubicles[p.Stall]
                     .Where(c => ReferenceEquals(c?.Party, p))
-                    .Select(c => new CubicleSave(c!.Member, (int)c.Phase, c.Left, c.X, c.Y, c.Heading))
+                    .Select(c => new CubicleSave(c!.Member, (int)c.Phase, c.Left, c.X, c.Y, c.Heading, c.Leg))
                     .ToList(),
                 QueuedSince = p.QueuedSince, NeedRetryAt = p.NeedRetryAt, GaveUp = p.GaveUp, Spent = p.Spent, LeftUnhappy = p.LeftUnhappy, Leaves = p.Leaves, LitterAt = p.LitterAt, DecidedSecond = p.DecidedSecond, DecidedThird = p.DecidedThird, DecidedFourth = p.DecidedFourth, StayDecided = p.StayDecided,
                 Holding = p.Members.Any(m => m.Holding != Carried.None) ? p.Members.Select(m => (int)m.Holding).ToList() : null,
@@ -3972,7 +4029,7 @@ public sealed partial class Crowd
                                 {
                                     _cubicles[s.Stall][k] = new CubicleUse(party, visit.Member)
                                     {
-                                        Phase = (CubiclePhase)visit.Phase, Left = visit.Left, X = visit.X, Y = visit.Y, Heading = visit.Heading,
+                                        Phase = (CubiclePhase)visit.Phase, Left = visit.Left, X = visit.X, Y = visit.Y, Heading = visit.Heading, Leg = visit.Leg,
                                     };
                                 }
                             }
@@ -4188,4 +4245,4 @@ public sealed record WatchingPlaces(int Slot, Dictionary<int, int>? Claims, int 
 }
 
 /// <summary>One person's visit to a toilet cubicle as written to a save file.</summary>
-public sealed record CubicleSave(int Member, int Phase, int Left, double X, double Y, double Heading);
+public sealed record CubicleSave(int Member, int Phase, int Left, double X, double Y, double Heading, int Leg = 0);

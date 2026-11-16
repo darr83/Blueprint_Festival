@@ -377,7 +377,14 @@ public sealed partial class FestivalGame
             _ground[(row * WearColumns) + column] = (byte)((int)kind + 1);
             if (IsPath(kind) || IsLawn(kind) || was is not null)
             {
-                PathsChanged();
+                if (_layingMany)
+                {
+                    _pathsStale = true;
+                }
+                else
+                {
+                    PathsChanged();
+                }
             }
         }
 
@@ -471,16 +478,56 @@ public sealed partial class FestivalGame
         var check = CheckPath(kind, from, to, width);
         if (check.Ok)
         {
-            foreach (var (c, r) in PathLine(from, to, width).ToList())
+            LayingMany(() =>
             {
-                if (GroundAt(c, r) != kind)
+                foreach (var (c, r) in PathLine(from, to, width).ToList())
                 {
-                    LayGround(kind, c, r);
+                    if (GroundAt(c, r) != kind)
+                    {
+                        LayGround(kind, c, r);
+                    }
                 }
-            }
+            });
         }
 
         return check;
+    }
+
+    private bool _layingMany;
+    private bool _pathsStale;
+
+    /// <summary>
+    /// Lays straw, trackway or path on every patch in a box, as one drag. The crowd is told where
+    /// the paths are once at the end rather than after every patch, so a long drag is quick.
+    /// </summary>
+    public void LayGround(GroundKind kind, int column0, int row0, int column1, int row1) => LayingMany(() =>
+    {
+        for (var r = row0; r <= row1; r++)
+        {
+            for (var c = column0; c <= column1; c++)
+            {
+                LayGround(kind, c, r);
+            }
+        }
+    });
+
+    private void LayingMany(Action lay)
+    {
+        _layingMany = true;
+        _pathsStale = false;
+        try
+        {
+            lay();
+        }
+        finally
+        {
+            _layingMany = false;
+            if (_pathsStale)
+            {
+                _pathsStale = false;
+                PathsChanged();
+            }
+        }
     }
 
     /// <summary>Wet grass sends more people looking for a path: on sodden ground nine in ten keep to one.</summary>

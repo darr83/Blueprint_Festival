@@ -64,7 +64,11 @@ public sealed partial class Crowd
     private bool MayUse(Party party, PlacedComfort comfort) => party.Vip || !_site.ForVips(comfort);
 
     /// <summary>True if this party may use this stall: anyone at an ordinary stall, only VIPs at a VIP one.</summary>
-    public static bool MayUse(Party party, PlacedStall stall) => party.Vip || !stall.ForVips;
+    public static bool MayUse(Party party, PlacedStall stall) => (party.Vip || !stall.ForVips) && Suits(party, stall.Kind);
+
+    /// <summary>True unless a stall is only for some guests: the urinals for men and boys, the accessible toilet for those who need it.</summary>
+    public static bool Suits(Party party, StallKind kind) =>
+        Catalogue.IsUrinal(kind) ? party.AllMale : kind != StallKind.AccessibleToilet || party.NeedsAccess;
 
     /// <summary>How many seconds more of queue a VIP guest will put up with to use a stall kept for VIPs.</summary>
     public const double VipPreference = 240;

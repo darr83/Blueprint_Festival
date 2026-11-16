@@ -354,6 +354,23 @@ public sealed class FieldMap
 
     public bool InBounds(int x, int y) => x >= 0 && y >= 0 && x < Width && y < Height;
 
+    /// <summary>
+    /// Fills a map, one entry a tile, with whether each tile can be walked on: by the public, by
+    /// VIP guests, or by staff. The same as asking <see cref="IsWalkable(int, int)"/> and the
+    /// others tile by tile, done in one go for the whole map when something is built.
+    /// </summary>
+    public void FillWalkable(bool[] into, bool staff = false, bool vip = false)
+    {
+        var tiles = _tiles;
+        var blocked = _blocked;
+        var staffOnly = _staffOnly;
+        var vipOnly = _vipOnly;
+        for (var i = 0; i < into.Length && i < tiles.Length; i++)
+        {
+            into[i] = tiles[i] is Ground.Grass or Ground.Lane && !blocked[i] && (staff || (!staffOnly[i] && (vip || !vipOnly[i])));
+        }
+    }
+
     /// <summary>True where people can walk: grass or lane with nothing built on it.</summary>
     public bool IsWalkable(int x, int y) => this[x, y] is Ground.Grass or Ground.Lane && !_blocked[(y * Width) + x] && !_staffOnly[(y * Width) + x] && !_vipOnly[(y * Width) + x];
 

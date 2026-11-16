@@ -239,6 +239,7 @@ public partial class FestivalScene : Node3D
         AddChild(StageCam);
         StageCam.Initialise(Game, Camera);
         Music.Follow(Camera, StageCam);
+        Sounds.Follow(Camera, StageCam);
 
         Build = new BuildTool { Name = "BuildTool" };
         AddChild(Build);

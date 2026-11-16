@@ -164,6 +164,18 @@ public enum StallKind
 
     /// <summary>A ring of stones with a steel bowl, where campers sit round a fire at night.</summary>
     FirePit,
+
+    /// <summary>A round open-air urinal with four places, back to back round a middle post. Quick, and only some guests use one.</summary>
+    UrinalStand,
+
+    /// <summary>A screened steel trough with six places along it.</summary>
+    UrinalTrough,
+
+    /// <summary>Twelve toilet cabins in two rows of six, back to back, with doors on both sides.</summary>
+    BackToBackToilets,
+
+    /// <summary>One wide cabin with a ramp, rails and room to turn a wheelchair, for the guests who need it.</summary>
+    AccessibleToilet,
 }
 
 /// <summary>Which shelf of the build bar a stall is on.</summary>
@@ -378,6 +390,10 @@ public static class Catalogue
         new StallInfo(StallKind.CampInfo, "Camp info and lockers", 10, 8, 250, null, 0, 45, 2, "Information, lost property and a wall of lockers where campers leave their valuables for the night."),
         new StallInfo(StallKind.CampShop, "Camp shop", 10, 6, 150, null, 0, 40, 2, "Everything campers forget: gas, tent pegs, a camping chair, and breakfast for the morning."),
         new StallInfo(StallKind.FirePit, "Fire pit", 4, 4, 80, null, 0, 60, 1, "A steel fire bowl in a ring of stones and logs. Campers sit round it at night instead of lighting fires by their tents. A camp steward nearby makes sure it is put out."),
+        new StallInfo(StallKind.UrinalStand, "Urinal stand", 5, 5, 30, Need.Toilet, 0, 25, 4, "Four places round a post, open to the sky. Quick, so the queue moves, but only some guests will use one."),
+        new StallInfo(StallKind.UrinalTrough, "Urinal trough", 12, 3, 60, Need.Toilet, 0, 25, 6, "Six places along a screened steel trough. Quick, but only some guests will use one."),
+        new StallInfo(StallKind.BackToBackToilets, "Back-to-back block", 16, 6, 150, Need.Toilet, 0, 75, 12, "Twelve cabins in two rows of six, with doors on both sides. More toilets in less length of field."),
+        new StallInfo(StallKind.AccessibleToilet, "Accessible toilet", 6, 6, 60, Need.Toilet, 0, 100, 1, "One wide cabin with a ramp, grab rails and room to turn a wheelchair. Kept for the guests who need it."),
     };
 
     private static readonly IReadOnlyList<StallItem> NothingToSell = Array.Empty<StallItem>();
@@ -516,6 +532,15 @@ public static class Catalogue
     /// <summary>True for a drink with alcohol in it.</summary>
     public static bool IsAlcohol(StallKind kind, StallItem item) => item is not null && item.AdultsOnly && SellsAlcohol(kind);
 
+    /// <summary>True for the urinals: open places with no doors, quicker than a cabin, used by only some guests.</summary>
+    public static bool IsUrinal(StallKind kind) => kind is StallKind.UrinalStand or StallKind.UrinalTrough;
+
+    /// <summary>Every kind of toilet with cabins: anyone can use one of these.</summary>
+    public static readonly StallKind[] CabinToilets = { StallKind.Toilets, StallKind.ToiletBlock, StallKind.BackToBackToilets, StallKind.AccessibleToilet };
+
+    /// <summary>True for toilets with cabins and doors (everything that serves the toilet need except the urinals).</summary>
+    public static bool HasCabins(StallKind kind) => Of(kind).Serves == Need.Toilet && !IsUrinal(kind);
+
     /// <summary>True for a stall people queue at: anything that sells, the toilets and the taps.</summary>
     public static bool HasQueue(StallKind kind) => Of(kind).Serves is not null || Sells(kind);
 
@@ -544,7 +569,7 @@ public static class Catalogue
         StallKind.HotDogs, StallKind.Burgers, StallKind.Fries, StallKind.Pizza, StallKind.Noodles, StallKind.IceCream,
         StallKind.Bar, StallKind.Coffee, StallKind.Slush, StallKind.Cocktails,
         StallKind.Ponchos, StallKind.BucketHats, StallKind.Merchandise, StallKind.PhoneCharging,
-        StallKind.Toilets, StallKind.ToiletBlock, StallKind.WaterPoint, StallKind.Bin,
+        StallKind.Toilets, StallKind.ToiletBlock, StallKind.BackToBackToilets, StallKind.AccessibleToilet, StallKind.UrinalStand, StallKind.UrinalTrough, StallKind.WaterPoint, StallKind.Bin,
         StallKind.VipLounge, StallKind.VipPlatform,
         StallKind.Carousel, StallKind.BigWheel, StallKind.Waltzer, StallKind.Twister, StallKind.Skylark, StallKind.HookADuck,
         StallKind.ShowerBlock, StallKind.CampInfo, StallKind.CampShop, StallKind.FirePit,

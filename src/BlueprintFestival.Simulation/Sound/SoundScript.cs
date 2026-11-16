@@ -1,5 +1,6 @@
 using BlueprintFestival.Simulation.Show;
 using BlueprintFestival.Simulation.Site;
+using BlueprintFestival.Simulation.World;
 
 namespace BlueprintFestival.Simulation.Sound;
 
@@ -223,7 +224,104 @@ public sealed class SoundScript : IDisposable
     /// <summary>How loud the fairground is with this many rides going: one is plain to hear, more are a little louder.</summary>
     public static double FairgroundLevel(int rides) => rides <= 0 ? 0 : Math.Clamp(0.55 + (rides * 0.15), 0, 1);
 
-    private void OnTeddy(PlacedStall stall) => Cue?.Invoke(Sounds.TeddyWin);
+    /// <summary>The quietest a ride's bell, a duck or a teddy win can be and still be played: anything fainter is not heard at all.</summary>
+    public const double FairCueHeard = 0.12;
+
+    private (double X, double Y, double ViewHeight)? _ear;
+    private bool _filming;
+
+    /// <summary>
+    /// Where the player is listening from: the point of the field in the middle of the view (in
+    /// metres) and the height of the view. The fairground is only heard near where the player is
+    /// looking. Filming is true while a stage camera is on, when the fair is not heard at all.
+    /// Until this is called the whole field is heard as if close to.
+    /// </summary>
+    public void Listen(double x, double y, double viewHeight, bool filming)
+    {
+        _ear = (x, y, viewHeight);
+        _filming = filming;
+    }
+
+    /// <summary>The middle of a stall on the field, in metres.</summary>
+    public static (double X, double Y) MiddleOf(PlacedStall stall)
+    {
+        var r = stall.Rect;
+        return ((r.X + (r.Width / 2.0)) * FieldMap.TileMetres, (r.Y + (r.Height / 2.0)) * FieldMap.TileMetres);
+    }
+
+    /// <summary>How loud one fairground stall is from where the player is listening, from 0 to 1.</summary>
+    public double HeardAt(PlacedStall stall)
+    {
+        if (_filming)
+        {
+            return 0;
+        }
+
+        if (_ear is not { } ear)
+        {
+            return 1;
+        }
+
+        var (fx, fy) = MiddleOf(stall);
+        return StageMix.Fair(ear.X, ear.Y, ear.ViewHeight, fx, fy);
+    }
+
+    /// <summary>
+    /// How loud the fairground's organ and squeals are, from where the player is listening: the
+    /// nearest ride going round with people on it, and a little more for each other one heard.
+    /// </summary>
+    public double FairgroundHeard()
+    {
+        var game = _game;
+        var loudest = 0.0;
+        var all = 0.0;
+        var going = 0;
+        for (var i = 0; i < game.Site.Stalls.Count; i++)
+        {
+            var stall = game.Site.Stalls[i];
+            if (!Rides.IsRide(stall.Kind) || Rides.TurnAt(stall, game.Now).Boarding || game.Crowd.Riding(i) <= 0)
+            {
+                continue;
+            }
+
+            going++;
+            var heard = HeardAt(stall);
+            loudest = Math.Max(loudest, heard);
+            all += heard;
+        }
+
+        if (going == 0)
+        {
+            return 0;
+        }
+
+        // Close to (or before anyone is listening) this is the old rule: more rides, a little louder.
+        var close = FairgroundLevel(going);
+        return Math.Clamp(close * (loudest + (0.25 * (all - loudest))), 0, 1);
+    }
+
+    /// <summary>How loud the nearest stall of this kind is from where the player is listening.</summary>
+    private double NearestHeard(StallKind kind)
+    {
+        var best = 0.0;
+        foreach (var stall in _game.Site.Stalls)
+        {
+            if (stall.Kind == kind)
+            {
+                best = Math.Max(best, HeardAt(stall));
+            }
+        }
+
+        return best;
+    }
+
+    private void OnTeddy(PlacedStall stall)
+    {
+        if (HeardAt(stall) >= FairCueHeard)
+        {
+            Cue?.Invoke(Sounds.TeddyWin);
+        }
+    }
 
     /// <summary>The cheer that greets an act watched by this many people.</summary>
     public static string CheerFor(int watching) => watching < 60 ? Sounds.CheerSmall : watching < 500 ? Sounds.CheerMedium : Sounds.CheerBig;
@@ -243,10 +341,10 @@ public sealed class SoundScript : IDisposable
         StallKind.BucketHats or StallKind.Merchandise => Sounds.MerchBag,
         StallKind.PhoneCharging => Sounds.ChargePlug,
         StallKind.VipLounge or StallKind.VipPlatform => Sounds.ChampagnePop,
-        StallKind.WaterPoint or StallKind.ShowerBlock => Sounds.WaterTap,
+        StallKind.WaterPoint or StallKind.ShowerBlock or StallKind.UrinalStand or StallKind.UrinalTrough => Sounds.WaterTap,
         StallKind.CampInfo or StallKind.CampShop => Sounds.MerchBag,
         StallKind.Bin => Sounds.BinDrop,
-        StallKind.Toilets or StallKind.ToiletBlock => Sounds.ToiletDoor,
+        StallKind.Toilets or StallKind.ToiletBlock or StallKind.BackToBackToilets or StallKind.AccessibleToilet => Sounds.ToiletDoor,
         StallKind.HookADuck => Sounds.HookADuck,
         StallKind.BigWheel or StallKind.Waltzer or StallKind.Twister or StallKind.Carousel or StallKind.Skylark => Sounds.RideBell,
         // The first aid and medical tents are heard through the radio instead.
@@ -276,7 +374,8 @@ public sealed class SoundScript : IDisposable
         _levels[Sounds.FireCrackle] = pits == 0 ? 0 : Math.Clamp(0.5 + (pits * 0.15), 0, 1) * Math.Clamp((0.7 - game.Light) / 0.4, 0, 1) * hush;
 
         // The fairground: its organ and the squeals from the rides, for as long as a ride is going round with people on it.
-        _levels[Sounds.Fairground] = day ? FairgroundLevel(RidesGoing(game)) : 0;
+        // Only heard near where the player is looking, and not at all on a stage camera.
+        _levels[Sounds.Fairground] = day ? FairgroundHeard() : 0;
 
         var (small, medium, large) = day ? Murmur(game.Crowd.InField) : (0, 0, 0);
         _levels[Sounds.CrowdSmall] = small;
@@ -466,6 +565,12 @@ public sealed class SoundScript : IDisposable
 
     private void OnServed(StallKind kind, int people, int paid)
     {
+        // The fairground's bells, ducks and tills are only heard near where the player is looking.
+        if (Rides.IsFair(kind) && NearestHeard(kind) < FairCueHeard)
+        {
+            return;
+        }
+
         if (ServedAt(kind) is { } sound)
         {
             Cue?.Invoke(sound);

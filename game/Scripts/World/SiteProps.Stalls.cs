@@ -62,6 +62,18 @@ public static partial class SiteProps
             case StallKind.ToiletBlock:
                 Toilets(b, node, 9);
                 break;
+            case StallKind.BackToBackToilets:
+                BackToBack(b, node);
+                break;
+            case StallKind.AccessibleToilet:
+                AccessibleToilet(b, node);
+                break;
+            case StallKind.UrinalStand:
+                UrinalStand(b, node);
+                break;
+            case StallKind.UrinalTrough:
+                UrinalTrough(b, node);
+                break;
             case StallKind.FirstAidTent:
                 return FirstAidTent();
             case StallKind.MedicalTent:
