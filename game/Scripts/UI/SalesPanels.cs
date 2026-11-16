@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using BlueprintFestival.Simulation.Sound;
 using Godot;
@@ -15,18 +16,51 @@ public sealed record SlotView(int Set, string Time, string? Name, string Detail,
 }
 
 /// <summary>One artist who could be booked for the set that is picked.</summary>
-public sealed record ArtistView(string Name, string Detail, int Stars, int Fee, string Note, bool Here);
+public sealed record ArtistView(string Name, string Detail, int Stars, int Fee, string Note, bool Here)
+{
+    /// <summary>Why they cannot be booked, such as having signed for another festival. Empty if they can.</summary>
+    public string Blocked { get; init; } = "";
+
+    /// <summary>Who else is after them and when they will be gone, or empty.</summary>
+    public string Rivals { get; init; } = "";
+
+    /// <summary>True if this is the artist an offer is being made to.</summary>
+    public bool Asked { get; init; }
+}
+
+/// <summary>The offer being made to an artist: what they ask, what is offered, the chance of a yes and what they said last.</summary>
+public sealed record OfferView(string Name, int Stars, int Ask, int Offer, string Chance, string Wants, string Said, bool CanOffer);
 
 /// <summary>What the planning screen shows in January.</summary>
 public sealed record PlanView(int Year, string Festival, string Date, int Licence, int Bank, IReadOnlyList<SlotView> Main, IReadOnlyList<SlotView>? Second,
     int Picked, string PickedName, IReadOnlyList<ArtistView> Artists, int Price, int FairPrice, int Pull, int Fees, int Acts, int ToPay,
     string Forecast = "", string Field = "", int Rent = 0,
-    bool Camping = false, int CampingCost = 0, int Campers = 0, int CampingFee = 0, TravelView? Travel = null);
+    bool Camping = false, int CampingCost = 0, int Campers = 0, int CampingFee = 0, TravelView? Travel = null)
+{
+    /// <summary>The offer being made, if an artist has been clicked.</summary>
+    public OfferView? Offer { get; init; }
+
+    /// <summary>What size of stage the main stage's acts need in build week, or empty.</summary>
+    public string MainNeeds { get; init; } = "";
+
+    /// <summary>What size of stage the second stage's acts need in build week, or empty.</summary>
+    public string SecondNeeds { get; init; } = "";
+}
 
 /// <summary>What the planning screen can do.</summary>
 public sealed record PlanActions(System.Action? Book = null, System.Action<int>? PickSlot = null, System.Action<string?>? PickArtist = null,
     System.Action? ToggleSecond = null, System.Action<int>? Price = null, System.Action? Camping = null, System.Action? Fields = null,
-    System.Action<int>? Parking = null, System.Action<int>? Buses = null, System.Action<int, int>? MoveSet = null, System.Action<int>? Pitch = null);
+    System.Action<int>? Parking = null, System.Action<int>? Buses = null, System.Action<int, int>? MoveSet = null, System.Action<int>? Pitch = null)
+{
+    /// <summary>Puts the offer up or down a step.</summary>
+    public System.Action<int>? ChangeOffer { get; init; }
+
+    /// <summary>Makes the offer as it stands.</summary>
+    public System.Action? MakeOffer { get; init; }
+
+    /// <summary>Pays what the artist asks.</summary>
+    public System.Action? PayAsk { get; init; }
+}
 
 /// <summary>One way of advertising, and whether it is switched on.</summary>
 public sealed record AdvertView(string Id, string Name, int Cost, int Reach, string Reaches, bool On);
@@ -318,7 +352,7 @@ public static partial class YearPanels
         var bill = new VBoxContainer { CustomMinimumSize = new Vector2(520, 0) };
         bill.AddThemeConstantOverride("separation", 2);
         columns.AddChild(bill);
-        bill.AddChild(Section("Main stage"));
+        bill.AddChild(Section(view.MainNeeds.Length > 0 ? $"Main stage  ·  {view.MainNeeds}" : "Main stage"));
         foreach (var slot in view.Main)
         {
             bill.AddChild(SlotTile(slot, slot.Set == view.Picked, does.PickSlot, does.MoveSet));
@@ -326,7 +360,7 @@ public static partial class YearPanels
 
         bill.AddChild(new Control { CustomMinimumSize = new Vector2(0, 8) });
         var second = new HBoxContainer();
-        var heading = Section("Second stage");
+        var heading = Section(view.SecondNeeds.Length > 0 && view.Second is not null ? $"Second stage  ·  {view.SecondNeeds}" : "Second stage");
         heading.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
         second.AddChild(heading);
         var toggle = UiStyle.ChipButton(view.Second is null ? "+  Add a second stage" : "Remove", does.ToggleSecond ?? (() => { }));
@@ -363,7 +397,13 @@ public static partial class YearPanels
         asking.AddChild(empty);
         roster.AddChild(asking);
         var extras = view.Forecast.Length > 0 || view.CampingCost > 0;
-        var room = 438 - (view.Travel is null ? 0 : view.Travel.Pitch is null ? 150 : 170) - (extras ? 62 : 0);
+        Control? offerBox = view.Offer is null ? null : OfferBox(view.Offer, does);
+        if (offerBox is not null)
+        {
+            roster.AddChild(offerBox);
+        }
+
+        var room = Math.Max(150, 438 - (view.Travel is null ? 0 : view.Travel.Pitch is null ? 150 : 170) - (extras ? 62 : 0) - (offerBox is null ? 0 : 118));
         var scroller = new ScrollContainer { CustomMinimumSize = new Vector2(590, room), HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled, Name = "Artists" };
         roster.AddChild(scroller);
         var list = new GridContainer { Columns = 2, SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
@@ -373,7 +413,12 @@ public static partial class YearPanels
         foreach (var artist in view.Artists)
         {
             var name = artist.Name;
-            var tile = Tile(artist.Here, 280, does.PickArtist is null ? null : () => does.PickArtist(name));
+            var tile = Tile(artist.Here || artist.Asked, 280, does.PickArtist is null ? null : () => does.PickArtist(name));
+            if (artist.Blocked.Length > 0)
+            {
+                tile.Modulate = new Color(1, 1, 1, 0.45f);
+            }
+
             var row = new HBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
             row.AddThemeConstantOverride("separation", 8);
             var words = new VBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore, SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
@@ -381,10 +426,10 @@ public static partial class YearPanels
             var called = UiStyle.Body(artist.Name, size: 15, bold: true);
             called.ClipText = true;
             words.AddChild(called);
-            var booked = artist.Note.Length > 0;
-            var detail = UiStyle.Body(booked ? artist.Note : artist.Detail, muted: !booked, size: 12, bold: booked);
+            var booked = artist.Note.Length > 0 || artist.Blocked.Length > 0;
+            var detail = UiStyle.Body(artist.Blocked.Length > 0 ? artist.Blocked : booked ? artist.Note : artist.Detail, muted: !booked, size: 12, bold: booked);
             detail.ClipText = true;
-            detail.TooltipText = artist.Detail;
+            detail.TooltipText = artist.Rivals.Length > 0 ? $"{artist.Detail}\n{artist.Rivals}" : artist.Detail;
             if (booked)
             {
                 detail.AddThemeColorOverride("font_color", UiStyle.StagePink);
@@ -392,7 +437,18 @@ public static partial class YearPanels
 
             words.AddChild(detail);
             var under = new HBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
+            under.AddThemeConstantOverride("separation", 8);
             under.AddChild(Stars(artist.Stars));
+            if (artist.Rivals.Length > 0 && artist.Blocked.Length == 0)
+            {
+                var rivals = UiStyle.Body(artist.Rivals, size: 11, bold: true);
+                rivals.AddThemeColorOverride("font_color", new Color("#B57D00"));
+                rivals.ClipText = true;
+                rivals.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+                rivals.MouseFilter = Control.MouseFilterEnum.Ignore;
+                under.AddChild(rivals);
+            }
+
             words.AddChild(under);
             row.AddChild(words);
             var fee = UiStyle.Heading($"£{artist.Fee:N0}", 19);
@@ -456,6 +512,58 @@ public static partial class YearPanels
         go.CustomMinimumSize = new Vector2(0, 50);
         foot.AddChild(go);
         roster.AddChild(foot);
+        return panel;
+    }
+
+    /// <summary>The offer to an artist: what they ask, the offer with a button either side, the chance of a yes, and the two ways to book them.</summary>
+    private static Control OfferBox(OfferView offer, PlanActions does)
+    {
+        var panel = new PanelContainer { Name = "Offer" };
+        panel.AddThemeStyleboxOverride("panel", UiStyle.Box(UiStyle.SunTint, 10, null, 10));
+        var box = new VBoxContainer();
+        box.AddThemeConstantOverride("separation", 4);
+        panel.AddChild(box);
+        var top = new HBoxContainer();
+        top.AddThemeConstantOverride("separation", 10);
+        var name = UiStyle.Heading(offer.Name, 19);
+        name.ClipText = true;
+        name.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        top.AddChild(name);
+        top.AddChild(Stars(offer.Stars));
+        top.AddChild(UiStyle.Body($"asks £{offer.Ask:N0}", size: 14, bold: true));
+        box.AddChild(top);
+        var said = UiStyle.Body(offer.Said.Length > 0 ? offer.Said : offer.Wants, muted: offer.Said.Length == 0, size: 12, bold: offer.Said.Length > 0);
+        said.ClipText = true;
+        said.TooltipText = offer.Wants;
+        said.MouseFilter = Control.MouseFilterEnum.Stop;
+        if (offer.Said.Length > 0)
+        {
+            said.AddThemeColorOverride("font_color", UiStyle.StagePink);
+        }
+
+        box.AddChild(said);
+        var row = new HBoxContainer();
+        row.AddThemeConstantOverride("separation", 8);
+        row.AddChild(StepButton(false, does.ChangeOffer is null || !offer.CanOffer ? null : () => does.ChangeOffer(-1)));
+        var amount = UiStyle.Heading($"£{offer.Offer:N0}", 22);
+        amount.CustomMinimumSize = new Vector2(84, 0);
+        amount.HorizontalAlignment = HorizontalAlignment.Center;
+        row.AddChild(amount);
+        row.AddChild(StepButton(true, does.ChangeOffer is null || !offer.CanOffer ? null : () => does.ChangeOffer(1)));
+        var chance = UiStyle.Body(offer.Chance, size: 13, bold: true);
+        chance.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        chance.TooltipText = "Offer less than they ask and they may say no. A second no and they sign for another festival.";
+        chance.MouseFilter = Control.MouseFilterEnum.Stop;
+        row.AddChild(chance);
+        var make = UiStyle.ChipButton($"Offer £{offer.Offer:N0}", does.MakeOffer ?? (() => { }));
+        make.Name = "MakeOffer";
+        make.Disabled = !offer.CanOffer || offer.Offer >= offer.Ask;
+        row.AddChild(make);
+        var pay = UiStyle.ChipButton($"Pay £{offer.Ask:N0}", does.PayAsk ?? (() => { }));
+        pay.Name = "PayAsk";
+        pay.Disabled = !offer.CanOffer;
+        row.AddChild(pay);
+        box.AddChild(row);
         return panel;
     }
 

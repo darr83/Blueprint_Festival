@@ -34,6 +34,7 @@ public sealed partial class FestivalGame
             Money = setup.Bank;
             BailedOut = setup.BailedOut;
             LastHappiness = setup.LastHappiness;
+            EmptyBill = setup.EmptyBill;
             Planned = true;
             Phase = Phase.Plan;
             start ??= FestivalDay(Year) + GameClock.DefaultStart.TimeOfDay;
@@ -98,6 +99,10 @@ public sealed partial class FestivalGame
         if (Planned)
         {
             MakeOffers();
+            if (EmptyBill)
+            {
+                ClearBill();
+            }
         }
     }
 
@@ -446,7 +451,7 @@ public sealed partial class FestivalGame
 
         // The crowd's plan is for the day the festival is on, whatever time it was saved at.
         var game = data.Year is { } year
-            ? new FestivalGame(data.Name, year.Day.Date + GameClock.DefaultStart.TimeOfDay, data.Seed, new YearSetup(year.Number, year.Licence, 0, year.BailedOut, year.LastHappiness, year.Fields))
+            ? new FestivalGame(data.Name, year.Day.Date + GameClock.DefaultStart.TimeOfDay, data.Seed, new YearSetup(year.Number, year.Licence, 0, year.BailedOut, year.LastHappiness, year.Fields) { EmptyBill = year.EmptyBill })
             : new FestivalGame(data.Name, data.Clock.Now.Date + GameClock.DefaultStart.TimeOfDay, data.Seed);
         // The clock comes back first so the rain is right, and the weather before the crowd is planned again.
         game.Clock.RestoreState(data.Clock);

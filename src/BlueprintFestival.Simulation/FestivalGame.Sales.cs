@@ -141,7 +141,7 @@ public sealed partial class FestivalGame
             }
 
             var paid = (double)TicketTakings / Math.Max(1, TicketsSold - VipTicketsSold);
-            return People.Crowd.StartingMood + Math.Clamp(0.45 * ((FairPrice / Math.Max(1, paid)) - 1), -0.25, 0.08);
+            return People.Crowd.StartingMood + Math.Clamp(0.45 * ((FairPrice / Math.Max(1, paid)) - 1), -0.25, 0.08) - NoShowMood;
         }
     }
 

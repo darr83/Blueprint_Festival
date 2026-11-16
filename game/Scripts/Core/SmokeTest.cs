@@ -615,13 +615,21 @@ public partial class SmokeTest : Node
                     // Booking the bill by hand: any artist in any set, a second stage, and sets left empty.
                     plan.Year.PickSlot(0);
                     plan.Year.PickArtist("Tobias Pell");
-                    Check(game.Show.At(0)?.Name == "Tobias Pell", "Clicking an artist should book them for the set picked.");
+                    Check(game.Show.At(0)?.Name != "Tobias Pell" && plan.Year.OfferFor == "Tobias Pell" && plan.Year.OfferNow == game.FeeFor("Tobias Pell"), "Clicking an artist should open an offer at what they ask.");
+                    Check(plan.Year.FindChild("Offer", true, false) is not null, "The offer box should show.");
+                    plan.Year.ChangeOffer(-1);
+                    Check(plan.Year.OfferNow < game.FeeFor("Tobias Pell"), "The minus button should lower the offer.");
+                    plan.Year.PayAsk();
+                    Check(game.Show.At(0)?.Name == "Tobias Pell" && plan.Year.OfferFor is null, "Paying what they ask should book them for the set picked.");
+                    plan.Year.PickArtist("The Velvet Otters");
+                    Check(plan.Year.OfferFor is null, "A five star act should not take an early set.");
                     plan.Year.PickSlot(1);
                     plan.Year.PickArtist(null);
                     Check(game.Show.At(1) is null && game.Show.Slots.Count == 3, "A set should be able to be left empty.");
                     plan.Year.ToggleStage();
                     Check(game.SecondStageBooked && game.SecondShow.Slots.Count == 0 && plan.Year.SlotPicked == RunningOrder.SecondBase, "Adding a second stage should give four empty sets.");
                     plan.Year.PickArtist("DJ Haybale");
+                    plan.Year.PayAsk();
                     Check(game.SecondShow.At(RunningOrder.SecondBase)?.Name == "DJ Haybale", "An artist should be bookable for the second stage.");
                     plan.Year.MoveSet(RunningOrder.SecondBase, -1);
                     Check(game.SecondShow.HourOf(0) == 13 && game.Show.HourOf(0) == 14, "The arrows should move a second stage set an hour earlier without moving the main stage.");
