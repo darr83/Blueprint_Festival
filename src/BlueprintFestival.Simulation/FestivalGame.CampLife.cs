@@ -443,8 +443,7 @@ public sealed partial class FestivalGame
         var showersAnHour = inCamp.Where(s => s.Kind == StallKind.ShowerBlock).Sum(s => Catalogue.Of(s.Kind).Servers) * 3600.0 / Catalogue.Of(StallKind.ShowerBlock).SecondsPerPerson;
         var showering = campers * 0.4 / 2.5;
         ShowerQueueMinutes = showersAnHour <= 0 ? 0 : QueueMinutes(showering, showersAnHour);
-        var looKinds = new[] { StallKind.Toilets, StallKind.ToiletBlock };
-        var loosAnHour = inCamp.Where(s => looKinds.Contains(s.Kind)).Sum(s => Catalogue.Of(s.Kind).Servers * 3600.0 / Catalogue.Of(s.Kind).SecondsPerPerson);
+        var loosAnHour = inCamp.Where(s => Catalogue.HasCabins(s.Kind) || Catalogue.IsUrinal(s.Kind)).Sum(s => Catalogue.Of(s.Kind).Servers * 3600.0 / Catalogue.Of(s.Kind).SecondsPerPerson);
         var loos = campers * 0.9 / 2.5;
         ToiletQueueMinutes = loosAnHour <= 0 ? 0 : QueueMinutes(loos, loosAnHour);
         if (showersAnHour <= 0)

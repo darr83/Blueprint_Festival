@@ -75,10 +75,19 @@ public sealed partial class FestivalGame
             ? new CampCheck(CampCheckState.Met, $"Every tent within {CampLayout.FireLaneReach:0} m of a fire lane")
             : new CampCheck(CampCheckState.NotMet, $"{far:N0} tents more than {CampLayout.FireLaneReach:0} m from a fire lane: the fire officer will fine you £{CampLayout.FireFine:N0}"));
 
-        var noLoo = plan.Count(p => Crowd.Nearest(p.Pitch, StallKind.Toilets, StallKind.ToiletBlock) > CampLayout.FacilitiesReach);
+        var noLoo = plan.Count(p => Crowd.Nearest(p.Pitch, Catalogue.CabinToilets) > CampLayout.FacilitiesReach);
         checks.Add(noLoo == 0
             ? new CampCheck(CampCheckState.Met, $"Toilets within {CampLayout.FacilitiesReach:0} m of every tent")
             : new CampCheck(CampCheckState.NotMet, $"{noLoo:N0} tents with no toilets within {CampLayout.FacilitiesReach:0} m"));
+
+        var needAccess = plan.Where(p => p.Party.NeedsAccess).ToList();
+        if (needAccess.Count > 0)
+        {
+            var noAccessLoo = needAccess.Count(p => Crowd.Nearest(p.Pitch, StallKind.AccessibleToilet) > CampLayout.FacilitiesReach);
+            checks.Add(noAccessLoo == 0
+                ? new CampCheck(CampCheckState.Met, $"An accessible toilet within {CampLayout.FacilitiesReach:0} m of the campers who need one")
+                : new CampCheck(CampCheckState.NotMet, $"{noAccessLoo:N0} of {needAccess.Count:N0} campers who need an accessible toilet have none within {CampLayout.FacilitiesReach:0} m"));
+        }
 
         var noTap = plan.Count(p => Crowd.Nearest(p.Pitch, StallKind.WaterPoint) > CampLayout.FacilitiesReach);
         checks.Add(noTap == 0

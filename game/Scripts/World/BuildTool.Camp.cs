@@ -113,7 +113,7 @@ public partial class BuildTool
     {
         if (_campMarks is not null)
         {
-            _campMarks.Visible = Mode == BuildMode.Camp || (Mode == BuildMode.Stall && (Catalogue.GroupOf(Stall) == StallGroup.Camping || Stall is StallKind.WaterPoint or StallKind.ToiletBlock or StallKind.Toilets) && _game.HasCampingGround);
+            _campMarks.Visible = Mode == BuildMode.Camp || (Mode == BuildMode.Stall && (Catalogue.GroupOf(Stall) == StallGroup.Camping || Stall == StallKind.WaterPoint || Catalogue.Of(Stall).Serves == Need.Toilet) && _game.HasCampingGround);
         }
     }
 }

@@ -70,7 +70,7 @@ public sealed partial class Crowd
 
     /// <summary>The kind of camping a party looks for: accessible, family, quiet or general.</summary>
     public static CampZone WishOf(Party party) =>
-        (uint)(party.Id * 2246822519u) % 100 < NeedAccessShare * 100 ? CampZone.Accessible
+        party.NeedsAccess ? CampZone.Accessible
         : party.HasChild ? CampZone.Family
         : (uint)(party.Id * 3266489917u) % 100 < QuietShare * 100 ? CampZone.Quiet
         : CampZone.General;
@@ -208,8 +208,14 @@ public sealed partial class Crowd
             feel -= FamilyLeftOut;
         }
 
-        if (Nearest(pitch, StallKind.Toilets, StallKind.ToiletBlock) > CampLayout.FacilitiesReach)
+        if (Nearest(pitch, Catalogue.CabinToilets) > CampLayout.FacilitiesReach)
         {
+            feel -= NoToiletsNear;
+        }
+
+        if (wish == CampZone.Accessible && Nearest(pitch, StallKind.AccessibleToilet) > CampLayout.FacilitiesReach)
+        {
+            // Pitched where they can get round, perhaps, but nowhere near a toilet they can use.
             feel -= NoToiletsNear;
         }
 

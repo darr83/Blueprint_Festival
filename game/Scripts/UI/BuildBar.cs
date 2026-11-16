@@ -518,7 +518,7 @@ public partial class BuildBar : VBoxContainer
         var k = key.ToLowerInvariant();
         var booth = k.StartsWith("stall") || k.StartsWith("staff");
         return booth && (k.Contains("aid") || k.Contains("medical")) ? ("cross", UiStyle.FirstAidGreen)
-            : booth && k.Contains("toilet") ? ("door", UiStyle.StagePink)
+            : booth && (k.Contains("toilet") || k.Contains("urinal")) ? ("door", UiStyle.StagePink)
             : booth && k.Contains("water") ? ("drop", UiStyle.StagePink)
             : k is "stallbar" or "stallcocktails" or "stallslush" ? ("glass", UiStyle.StagePink)
             : k == "stallcoffee" ? ("cup", UiStyle.StagePink)

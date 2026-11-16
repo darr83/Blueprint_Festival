@@ -114,6 +114,9 @@ internal enum CubiclePhase
     Entering,
     Inside,
     Leaving,
+
+    /// <summary>Walking back round the block from a door on the far side.</summary>
+    Returning,
 }
 
 /// <summary>One person's visit to a toilet cubicle: who, how far through it they are, and where they are standing.</summary>
@@ -132,6 +135,9 @@ internal sealed class CubicleUse
     public CubiclePhase Phase { get; set; }
 
     public int Left { get; set; }
+
+    /// <summary>Which corner of the way round they are walking to, for a door that is not on the queue's side.</summary>
+    public int Leg { get; set; }
 
     public double X { get; set; }
 
