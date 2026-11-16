@@ -22,12 +22,81 @@ public partial class CampView : Node3D
 
     private FestivalGame _game = null!;
     private MultiMeshInstance3D _tents = null!;
+    private MultiMeshInstance3D _bells = null!;
+    private MultiMeshInstance3D _vans = null!;
+    private string _drawnKinds = "";
     private Node3D _gate = null!;
     private double _since = 1;
     private int _drawn = -1;
 
-    /// <summary>How many tents are drawn.</summary>
+    /// <summary>How many tents are drawn (bell tents and campervans included).</summary>
     public int TentCount => Mathf.Max(0, _drawn);
+
+    /// <summary>How many bell tents and campervans are drawn.</summary>
+    public int BellTents => _bells.Multimesh.InstanceCount;
+
+    public int Campervans => _vans.Multimesh.InstanceCount;
+
+    /// <summary>The colour of every tent put up ready pitched, so the rows read as one hire company's.</summary>
+    private static readonly Color HireTeal = new("#2A8C8C");
+
+    private MultiMeshInstance3D Many(string name, Mesh mesh)
+    {
+        var many = new MultiMeshInstance3D
+        {
+            Name = name,
+            Multimesh = new MultiMesh { TransformFormat = MultiMesh.TransformFormatEnum.Transform3D, Mesh = mesh },
+            MaterialOverride = new StandardMaterial3D { VertexColorUseAsAlbedo = true, Roughness = 0.85f },
+        };
+        AddChild(many);
+        return many;
+    }
+
+    /// <summary>A bell tent: a round canvas wall, a cone of a roof with a pole through the top, and a dark doorway.</summary>
+    private static Mesh BellTentMesh()
+    {
+        var b = new MeshBuilder();
+        var canvas = new Color("#F1E8D2");
+        b.Tube(new Vector3(0, 0.45f, 0), new Vector3(4.6f, 0.9f, 4.6f), canvas);
+        b.Cone(new Vector3(0, 1.85f, 0), new Vector3(5.0f, 1.9f, 5.0f), new Color("#F6EFDD"));
+        b.Tube(new Vector3(0, 2.9f, 0), new Vector3(0.08f, 0.5f, 0.08f), new Color("#7A5A3A"));
+        b.Box(new Vector3(0, 0.6f, 2.25f), new Vector3(0.9f, 1.2f, 0.12f), new Color("#3A3330"));
+        b.Box(new Vector3(0, 0.05f, 3.0f), new Vector3(1.4f, 0.06f, 1.2f), new Color("#C9B48E"));
+        return MeshOf(b, "Bell");
+    }
+
+    /// <summary>A campervan with a pop-up roof and an awning out to one side, on its gravel pitch.</summary>
+    private static Mesh CampervanMesh()
+    {
+        var b = new MeshBuilder();
+        b.Box(new Vector3(0, 0.02f, 0), new Vector3(5.6f, 0.03f, 4.6f), new Color("#B8B0A2"));
+        b.Box(new Vector3(0, 1.05f, -0.6f), new Vector3(4.8f, 1.5f, 1.95f), new Color("#F4F4F0"));
+        b.Box(new Vector3(0, 0.55f, -0.6f), new Vector3(4.82f, 0.5f, 1.97f), new Color("#4FA3C7"));
+        b.Box(new Vector3(0, 1.95f, -0.6f), new Vector3(3.2f, 0.3f, 1.8f), new Color("#E8C547"));
+        b.Box(new Vector3(2.42f, 1.35f, -0.6f), new Vector3(0.04f, 0.6f, 1.7f), new Color("#26313A"));
+        b.Box(new Vector3(-0.6f, 1.35f, 0.37f), new Vector3(2.4f, 0.5f, 0.04f), new Color("#26313A"));
+        foreach (var x in new[] { -1.6f, 1.6f })
+        {
+            foreach (var z in new[] { -1.5f, 0.3f })
+            {
+                b.Tube(new Vector3(x, 0.32f, z), new Vector3(0.62f, 0.25f, 0.62f), new Color("#222226"), new Vector3(90, 0, 0));
+            }
+        }
+
+        // The awning, out on two poles.
+        b.Box(new Vector3(-0.4f, 2.0f, 1.25f), new Vector3(3.0f, 0.06f, 1.8f), new Color("#E66A9A"), new Vector3(-8, 0, 0));
+        b.Tube(new Vector3(-1.8f, 1.0f, 2.05f), new Vector3(0.05f, 2.0f, 0.05f), new Color("#9A9A9A"));
+        b.Tube(new Vector3(1.0f, 1.0f, 2.05f), new Vector3(0.05f, 2.0f, 0.05f), new Color("#9A9A9A"));
+        return MeshOf(b, "Van");
+    }
+
+    private static Mesh MeshOf(MeshBuilder b, string name)
+    {
+        var node = b.BuildNode(name);
+        var mesh = node.Mesh;
+        node.Free();
+        return mesh;
+    }
 
     /// <summary>True if the farm gate is shut across the gateway.</summary>
     public bool GateShut => _gate.Visible;
@@ -50,6 +119,8 @@ public partial class CampView : Node3D
             MaterialOverride = new StandardMaterial3D { VertexColorUseAsAlbedo = true, Roughness = 0.9f, CullMode = BaseMaterial3D.CullModeEnum.Disabled },
         };
         AddChild(_tents);
+        _bells = Many("BellTents", BellTentMesh());
+        _vans = Many("Campervans", CampervanMesh());
         game.Site.CampZonesChanged += DrawFireLanes;
         DrawFireLanes();
         if (!map.HasCamp)
@@ -95,6 +166,14 @@ public partial class CampView : Node3D
         {
             var rect = vertical ? new TileRect(x, y, 1, length) : new TileRect(x, y, length, 1);
             b.Box(SiteView.Middle(rect) + new Vector3(0, 0.012f, 0), new Vector3(rect.Width * T, 0.01f, rect.Height * T), new Color("#A8D47E"));
+        }
+
+        // Campervan ground is laid with gravel, which shows whatever tool is in hand too.
+        var gravel = new System.Collections.Generic.HashSet<TilePoint>(_game.Site.CampZones.Where(z => z.Value == CampZone.Campervan).Select(z => z.Key));
+        foreach (var (x, y, length, vertical) in SiteLayout.RunsOf(gravel))
+        {
+            var rect = vertical ? new TileRect(x, y, 1, length) : new TileRect(x, y, length, 1);
+            b.Box(SiteView.Middle(rect) + new Vector3(0, 0.011f, 0), new Vector3(rect.Width * T, 0.01f, rect.Height * T), new Color("#C2BAAB"));
         }
 
         _fireLanes = b.IsEmpty ? new MeshInstance3D { Name = "FireLanes" } : b.BuildNode("FireLanes");
@@ -158,18 +237,32 @@ public partial class CampView : Node3D
     public void Refresh()
     {
         _gate.Visible = _game.Field.HasCamp && !_game.CampingBooked;
-        var tents = _game.Crowd.Tents.ToList();
-        if (tents.Count == _drawn)
+        var all = _game.Crowd.TentsUp.ToList();
+        var kinds = $"{all.Count}|{all.Count(t => t.Kind == CampKind.Glamping)}|{all.Count(t => t.Kind == CampKind.Campervan)}";
+        if (kinds == _drawnKinds)
         {
             return;
         }
 
-        _drawn = tents.Count;
+        _drawnKinds = kinds;
+        _drawn = all.Count;
+        Place(_bells, all.Where(t => t.Kind == CampKind.Glamping).ToList());
+        Place(_vans, all.Where(t => t.Kind == CampKind.Campervan).ToList());
+        var tents = all.Where(t => t.Kind is CampKind.OwnTent or CampKind.ReadyPitched).ToList();
         var mesh = _tents.Multimesh;
         mesh.InstanceCount = tents.Count;
         for (var i = 0; i < tents.Count; i++)
         {
-            var (pitch, party) = tents[i];
+            var (pitch, party, kind) = tents[i];
+            if (kind == CampKind.ReadyPitched)
+            {
+                // Hired tents stand square, all the same size and colour.
+                var (hx, hz) = FieldMap.CentreOf(pitch);
+                mesh.SetInstanceTransform(i, new Transform3D(Basis.Identity.Scaled(Vector3.One * 0.78f), new Vector3((float)hx, 0.02f, (float)hz)));
+                mesh.SetInstanceColor(i, HireTeal.SrgbToLinear());
+                continue;
+            }
+
             var (x, z) = FieldMap.CentreOf(pitch);
             // Each tent faces whichever way its campers liked and is a little bigger or smaller, the
             // same way every time, so the field looks pitched by hand and not laid out in rows.
@@ -178,6 +271,17 @@ public partial class CampView : Node3D
             var basis = new Basis(Vector3.Up, turn).Scaled(new Vector3(size, size, size));
             mesh.SetInstanceTransform(i, new Transform3D(basis, new Vector3((float)x, 0.02f, (float)z)));
             mesh.SetInstanceColor(i, Colours[(party * 7) % Colours.Length].SrgbToLinear());
+        }
+    }
+
+    /// <summary>Puts a bell tent or a campervan on each pitch, all facing the same way.</summary>
+    private static void Place(MultiMeshInstance3D many, System.Collections.Generic.List<(TilePoint Pitch, int Party, CampKind Kind)> on)
+    {
+        many.Multimesh.InstanceCount = on.Count;
+        for (var i = 0; i < on.Count; i++)
+        {
+            var (x, z) = FieldMap.CentreOf(on[i].Pitch);
+            many.Multimesh.SetInstanceTransform(i, new Transform3D(Basis.Identity, new Vector3((float)x, 0, (float)z)));
         }
     }
 }

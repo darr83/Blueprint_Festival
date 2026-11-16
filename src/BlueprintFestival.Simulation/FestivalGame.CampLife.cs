@@ -499,6 +499,12 @@ public sealed partial class FestivalGame
                 feel -= 0.03;
             }
 
+            if (Crowd.KindOf(party) == CampKind.Glamping && (ShowerQueueMinutes == 0 || ShowerQueueMinutes > 10))
+            {
+                // Glamping guests paid for comfort, and a queue for the showers is not it.
+                feel -= GlampersKeptWaiting;
+            }
+
             if (ToiletQueueMinutes == 0 || ToiletQueueMinutes > 10)
             {
                 feel -= 0.03;

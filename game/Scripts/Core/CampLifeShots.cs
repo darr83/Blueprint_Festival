@@ -15,7 +15,7 @@ namespace BlueprintFestival.Core;
 /// </summary>
 public partial class CampLifeShots : Node
 {
-    private static readonly string[] Scenes = { "1_the_camp_at_night", "2_round_a_fire_pit", "3_the_morning_after" };
+    private static readonly string[] Scenes = { "1_the_camp_at_night", "2_round_a_fire_pit", "3_the_morning_after", "4_ways_to_camp" };
 
     private readonly string _directory;
     private int _scene = -1;
@@ -87,7 +87,12 @@ public partial class CampLifeShots : Node
         game.ConfirmPlan();
         Lay(game);
         game.OpenGates();
-        var until = Scenes[_scene] == "3_the_morning_after" ? game.Day + TimeSpan.FromHours(32.6) : game.Day + TimeSpan.FromHours(24.6);
+        var until = Scenes[_scene] switch
+        {
+            "3_the_morning_after" => game.Day + TimeSpan.FromHours(32.6),
+            "4_ways_to_camp" => game.Day + TimeSpan.FromHours(16),
+            _ => game.Day + TimeSpan.FromHours(24.6),
+        };
         for (var i = 0; i < 200000 && game.Phase == Phase.Day && game.Now < until; i++)
         {
             game.Clock.Step();
@@ -157,6 +162,9 @@ public partial class CampLifeShots : Node
         game.HireStaff(StaffKind.CampSteward, new TilePoint(camp.X + 120, mid + 8));
         game.HireStaff(StaffKind.CampSteward, new TilePoint(camp.X + 220, mid + 8));
         game.HireStaff(StaffKind.Security, new TilePoint(camp.X + 160, mid + 8));
+        game.MarkCamp(new TilePoint(camp.X + 2, camp.Y + 2), new TilePoint(camp.X + 70, camp.Y + 40), CampZone.ReadyPitched);
+        game.MarkCamp(new TilePoint(camp.X + 90, camp.Y + 2), new TilePoint(camp.X + 150, camp.Y + 40), CampZone.Campervan);
+        game.MarkCamp(new TilePoint(camp.X + 170, camp.Y + 2), new TilePoint(camp.X + 230, camp.Y + 40), CampZone.Glamping);
     }
 
     private void Arrange(FestivalScene festival)
@@ -170,6 +178,10 @@ public partial class CampLifeShots : Node
             case "2_round_a_fire_pit":
                 var pit = game.CampFires.FirstOrDefault(f => f.InPit);
                 festival.Camera.LookAt(pit is null ? (camp.X + 110) * 0.5f : (float)pit.X, pit is null ? mid * 0.5f : (float)pit.Y, 18f);
+                break;
+            case "4_ways_to_camp":
+                festival.Camera.LookAt((camp.X + 120) * 0.5f, (camp.Y + 22) * 0.5f, 55f);
+                festival.BuildBar.Toggle(BuildMode.Camp);
                 break;
             default:
                 festival.Camera.LookAt(cx, cz, 110f);

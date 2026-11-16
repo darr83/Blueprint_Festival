@@ -70,6 +70,7 @@ public sealed partial class FestivalGame
         BusesHired = other.BusesHired;
         CampingPrice = other.CampingPrice;
         Crowd.CamperShare = CamperShare;
+        RestoreCampKindPrices(other._kindPrices.Skip(1).ToList());
         ApplyTravel();
         return this;
     }

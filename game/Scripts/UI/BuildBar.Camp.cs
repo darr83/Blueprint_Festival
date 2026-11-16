@@ -23,6 +23,46 @@ public partial class BuildBar
     public System.Collections.Generic.IReadOnlyList<string> CampCheckLines =>
         _checks.Visible ? _checks.GetChildren().OfType<Label>().Select(l => l.Text).ToList() : System.Array.Empty<string>();
 
+    /// <summary>True while the prices of the dearer ways to camp can be changed on the Camping tab.</summary>
+    public bool CampPricesShown => _checks.Visible && _checks.GetNodeOrNull("WaysToCamp") is not null;
+
+    private HBoxContainer _campRow = null!;
+    private readonly Button[] _campChips = new Button[2];
+
+    /// <summary>True while the Camping group shows the things to put up, false while it shows the kinds of ground to mark.</summary>
+    public bool CampThings { get; private set; }
+
+    /// <summary>The two halves of the Camping group: the ground to mark, and the things to put up and the people to hire.</summary>
+    private void AddCampRow(Container shelves)
+    {
+        _campRow = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center, Visible = false };
+        _campRow.AddThemeConstantOverride("separation", 6);
+        for (var i = 0; i < 2; i++)
+        {
+            var things = i == 1;
+            var chip = UiStyle.ChipButton(things ? "Things to put up" : "Ground to mark", () => ShowCampThings(things), BlueprintFestival.Simulation.Sound.Sounds.Tab);
+            chip.ToggleMode = true;
+            _campRow.AddChild(chip);
+            _campChips[i] = chip;
+        }
+
+        shelves.AddChild(_campRow);
+    }
+
+    /// <summary>Turns the Camping group to its kinds of ground or to the things to put up.</summary>
+    public void ShowCampThings(bool things)
+    {
+        CampThings = things;
+        if (_open != BuildMode.Camp)
+        {
+            return;
+        }
+
+        ClearChoices();
+        AddCampChoices();
+        _tool.Stop();
+    }
+
     private void AddCampChoices()
     {
         if (!_watchingCamp)
@@ -32,9 +72,16 @@ public partial class BuildBar
             _game.Site.CampZonesChanged += ShowCampChecks;
         }
 
-        foreach (var zone in CampLayout.Zones)
+        _campChips[0].SetPressedNoSignal(!CampThings);
+        _campChips[1].SetPressedNoSignal(CampThings);
+        if (!CampThings)
         {
-            AddChoice(CampKey(zone), CampLayout.Name(zone), "Free", $"{CampLayout.About(zone)}\nDrag over camping ground to mark it. Start on ground marked this way to clear it.", () => _tool.PickCampZone(zone));
+            foreach (var zone in CampLayout.Zones)
+            {
+                AddChoice(CampKey(zone), CampLayout.Name(zone), "Free", $"{CampLayout.About(zone)}\nDrag over camping ground to mark it. Start on ground marked this way to clear it.", () => _tool.PickCampZone(zone));
+            }
+
+            return;
         }
 
         foreach (var kind in new[] { StallKind.ShowerBlock, StallKind.CampInfo, StallKind.CampShop, StallKind.FirePit, StallKind.ToiletBlock, StallKind.WaterPoint })
@@ -85,6 +132,45 @@ public partial class BuildBar
             };
             _checks.AddChild(CheckLine($"{mark}  {check.Text}", colour));
         }
+
+        if (_game.Phase is Phase.Plan or Phase.Sell or Phase.Build)
+        {
+            _checks.AddChild(WaysToCamp());
+        }
+    }
+
+    /// <summary>The prices of the dearer ways to camp, each with a step down and a step up, set before the gates open.</summary>
+    private Control WaysToCamp()
+    {
+        var row = new HBoxContainer { Name = "WaysToCamp", Alignment = BoxContainer.AlignmentMode.Center };
+        row.AddThemeConstantOverride("separation", 6);
+        var title = UiStyle.Body("Ways to camp:", size: 13, bold: true);
+        row.AddChild(title);
+        foreach (var kind in CampLayout.Extras)
+        {
+            var step = kind == CampKind.Glamping ? 10 : 5;
+            row.AddChild(PriceButton("−", kind, -step));
+            var label = UiStyle.Body($"{CampLayout.KindName(kind)} £{_game.CampKindPrice(kind)}", size: 13);
+            label.TooltipText = $"What a party pays for {CampLayout.KindName(kind).ToLowerInvariant()}. Dearer means fewer book it. Mark ground for it above.";
+            label.MouseFilter = MouseFilterEnum.Pass;
+            row.AddChild(label);
+            row.AddChild(PriceButton("+", kind, step));
+            row.AddChild(new Control { CustomMinimumSize = new Vector2(10, 0) });
+        }
+
+        return row;
+    }
+
+    private Button PriceButton(string text, CampKind kind, int by)
+    {
+        var button = UiStyle.ChipButton(text, () =>
+        {
+            _game.SetCampKindPrice(kind, _game.CampKindPrice(kind) + by);
+            ShowCampChecks();
+        });
+        button.Name = $"{kind}{(by > 0 ? "Up" : "Down")}";
+        button.CustomMinimumSize = new Vector2(28, 26);
+        return button;
     }
 
     private static Label CheckLine(string text, Color colour)

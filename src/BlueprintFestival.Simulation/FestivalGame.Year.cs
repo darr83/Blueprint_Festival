@@ -628,6 +628,7 @@ public sealed partial class FestivalGame
         {
             // Tents go up round whatever was built and marked out in the camping field during the week.
             Crowd.PitchCamp();
+            SetUpCampExtras();
             FireOfficerCalls();
         }
 
@@ -904,6 +905,7 @@ public sealed partial class FestivalGame
         Stages = StagesBooked,
         Camping = CampingBooked,
         CampingPrice = CampingPrice,
+        CampKindPrices = SaveCampKindPrices(),
         LineUp = Shows.SelectMany(show => Enumerable.Range(0, RunningOrder.SetsAStage).Select(i => show.At(show.Base + i)?.Name)).ToList(),
         Sales = SaveSales(),
         Booking = SaveBooking(),
@@ -962,6 +964,7 @@ public sealed partial class FestivalGame
         BusesHired = Math.Clamp(year.Buses, 0, MostBuses);
         RestoreSales(year.Sales);
         CampingPrice = Math.Clamp(year.CampingPrice ?? CampingPrice, 0, DearestPitch);
+        RestoreCampKindPrices(year.CampKindPrices);
         Crowd.CamperShare = CamperShare;
         CampingBooked = Plan is null ? year.Camping && CampingOffered : CampingBooked;
         Phase = Enum.IsDefined(year.Phase) ? year.Phase : Phase.Plan;
@@ -1024,6 +1027,9 @@ public sealed record YearSave(int Number, int Licence, Phase Phase, DateTime Day
 
     /// <summary>What a pitch cost, or null in an older save (four pounds).</summary>
     public int? CampingPrice { get; init; }
+
+    /// <summary>The prices of a tent ready pitched, a campervan pitch and glamping; null while all are at their usual price.</summary>
+    public List<int>? CampKindPrices { get; init; }
 
     /// <summary>Who is booked for each set: the main stage's four, then the second stage's four. Null is an empty set.</summary>
     public List<string?>? LineUp { get; init; }
