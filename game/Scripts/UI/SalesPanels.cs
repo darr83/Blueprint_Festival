@@ -37,6 +37,9 @@ public sealed record PlanView(int Year, string Festival, string Date, int Licenc
     string Forecast = "", string Field = "", int Rent = 0,
     bool Camping = false, int CampingCost = 0, int Campers = 0, int CampingFee = 0, TravelView? Travel = null)
 {
+    /// <summary>The month, when another act is being booked while tickets are on sale. Empty in January.</summary>
+    public string Late { get; init; } = "";
+
     /// <summary>The offer being made, if an artist has been clicked.</summary>
     public OfferView? Offer { get; init; }
 
@@ -86,6 +89,9 @@ public partial class SalesChart : Control
 
     /// <summary>How much of the newest turn is drawn yet, from 0 to 1, while the month runs.</summary>
     public float Shown { get; set; } = 1;
+
+    /// <summary>The turns that began with an announcement, each marked with a dot on the line where the rush starts.</summary>
+    public IReadOnlyList<int> Marks { get; set; } = System.Array.Empty<int>();
 
     /// <summary>Where along the year a turn ends: six months, then seven days sharing the last seventh.</summary>
     public static float Along(int turn) => turn <= 6 ? turn : 6 + ((turn - 6) / 7f);
@@ -144,6 +150,16 @@ public partial class SalesChart : Control
             }
 
             DrawPolyline(points.ToArray(), UiStyle.StagePink, 4, true);
+        }
+
+        foreach (var mark in Marks)
+        {
+            if (mark >= 0 && mark < SoldAfter.Count - (Shown < 1 ? 1 : 0))
+            {
+                var at = At(Along(mark), SoldAfter[mark]);
+                DrawCircle(at, 7, Colors.White);
+                DrawCircle(at, 5, UiStyle.Sunflower);
+            }
         }
 
         DrawCircle(points[^1], 9, Colors.White);
@@ -343,7 +359,8 @@ public static partial class YearPanels
         }
 
         day.AddChild(where);
-        Masthead(box, $"January  ·  {view.Festival}  ·  Year {view.Year}", "The running order", day);
+        var late = view.Late.Length > 0;
+        Masthead(box, $"{(late ? view.Late : "January")}  ·  {view.Festival}  ·  Year {view.Year}", late ? "Book another act" : "The running order", day);
 
         var columns = new HBoxContainer();
         columns.AddThemeConstantOverride("separation", 40);
@@ -364,11 +381,12 @@ public static partial class YearPanels
         heading.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
         second.AddChild(heading);
         var toggle = UiStyle.ChipButton(view.Second is null ? "+  Add a second stage" : "Remove", does.ToggleSecond ?? (() => { }));
+        toggle.Visible = !late;
         second.AddChild(toggle);
         bill.AddChild(second);
         if (view.Second is null)
         {
-            bill.AddChild(Wrapped("Four more sets, on a stage you put up in build week. It splits the crowd between two fronts.", 500, muted: true, size: 13));
+            bill.AddChild(Wrapped(late ? "No second stage was booked in January." : "Four more sets, on a stage you put up in build week. It splits the crowd between two fronts.", 500, muted: true, size: 13));
         }
         else
         {
@@ -379,7 +397,15 @@ public static partial class YearPanels
         }
 
         bill.AddChild(new Control { CustomMinimumSize = new Vector2(0, 6), SizeFlagsVertical = Control.SizeFlags.ExpandFill });
-        bill.AddChild(PriceTicket(view.Price, view.FairPrice, does.Price, "Admit", $"{view.Licence:N0}"));
+        if (late)
+        {
+            bill.AddChild(Wrapped("Pick an empty set, then an artist. Fees have gone up since January and are paid at once. Booking someone is one of the month's jobs, and they still have to be announced.", 500, muted: true, size: 13));
+        }
+        else
+        {
+            bill.AddChild(PriceTicket(view.Price, view.FairPrice, does.Price, "Admit", $"{view.Licence:N0}"));
+        }
+
         var summary = UiStyle.Body($"{view.Acts} acts  ·  fees £{view.Fees:N0}  ·  line-up pull {view.Pull}%", muted: true, size: 13);
         summary.TooltipText = "Sets are an hour and a half and can start on any hour from 12:00 to 21:00 (the arrows by each time), with the next set on that stage on the next hour after it ends at the earliest. Any can be left empty, and the two stages can start and finish at different times. Every act helps sell tickets by its stars and fans, the last act on the main stage most of all. Four kinds of music or more bring a wider crowd.";
         summary.MouseFilter = Control.MouseFilterEnum.Stop;
@@ -394,16 +420,17 @@ public static partial class YearPanels
         asking.AddChild(who);
         var empty = UiStyle.ChipButton("Leave it empty", does.PickArtist is null ? () => { } : () => does.PickArtist(null));
         empty.TooltipText = "Nobody plays this set and nothing is paid.";
+        empty.Visible = !late;
         asking.AddChild(empty);
         roster.AddChild(asking);
-        var extras = view.Forecast.Length > 0 || view.CampingCost > 0;
+        var extras = !late && (view.Forecast.Length > 0 || view.CampingCost > 0);
         Control? offerBox = view.Offer is null ? null : OfferBox(view.Offer, does);
         if (offerBox is not null)
         {
             roster.AddChild(offerBox);
         }
 
-        var room = Math.Max(150, 438 - (view.Travel is null ? 0 : view.Travel.Pitch is null ? 150 : 170) - (extras ? 62 : 0) - (offerBox is null ? 0 : 118));
+        var room = Math.Max(150, 438 - (view.Travel is null || late ? 0 : view.Travel.Pitch is null ? 150 : 170) - (extras ? 62 : 0) - (offerBox is null ? 0 : 118));
         var scroller = new ScrollContainer { CustomMinimumSize = new Vector2(590, room), HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled, Name = "Artists" };
         roster.AddChild(scroller);
         var list = new GridContainer { Columns = 2, SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
@@ -463,7 +490,7 @@ public static partial class YearPanels
             scroller.Ready += () => scroller.SetDeferred(ScrollContainer.PropertyName.ScrollVertical, (int)scroll);
         }
 
-        if (view.Travel is not null)
+        if (view.Travel is not null && !late)
         {
             roster.AddChild(Travel(view.Travel, does.Parking, does.Buses, camping: does.Pitch));
         }
@@ -500,13 +527,15 @@ public static partial class YearPanels
         var sums = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
         sums.AddThemeConstantOverride("separation", -2);
         var rent = view.Rent > 0 ? $"  ·  field rent £{view.Rent:N0}" : "";
-        var short_ = view.ToPay > view.Bank;
-        sums.AddChild(UiStyle.Body(short_ ? "There is not the money for all this."
+        var short_ = !late && view.ToPay > view.Bank;
+        sums.AddChild(UiStyle.Body(late ? "A new act is paid for as soon as they say yes."
+            : short_ ? "There is not the money for all this."
             : $"To pay today: acts £{view.Fees:N0}{rent}{(view.Camping ? "  ·  camping field" : "")}", muted: true, size: 13));
-        sums.AddChild(UiStyle.Heading($"£{view.Bank - view.ToPay:N0} left", 26));
+        sums.AddChild(UiStyle.Heading(late ? $"£{view.Bank:N0} in the bank" : $"£{view.Bank - view.ToPay:N0} left", 26));
         foot.AddChild(sums);
-        var go = UiStyle.Button("Print the tickets", does.Book ?? (() => { }));
-        go.TooltipText = "Book the acts and put tickets on sale";
+        var go = UiStyle.Button(late ? "Back to the campaign" : "Print the tickets", does.Book ?? (() => { }));
+        go.Name = "Book";
+        go.TooltipText = late ? "Back to the month's jobs" : "Book the acts and put tickets on sale";
         go.Disabled = short_;
         go.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
         go.CustomMinimumSize = new Vector2(0, 50);

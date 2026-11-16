@@ -35,6 +35,7 @@ public partial class YearScreen : Control
     private string? _offerFor;
     private int _offer;
     private string _offerSaid = "";
+    private bool _booking;
     private float _run = -1;
     private int _turnShown = -1;
     private int _priceShown = -1;
@@ -164,6 +165,7 @@ public partial class YearScreen : Control
         var old = GetChildren();
 
         var scroll = FindChild("Artists", true, false) is ScrollContainer artists ? artists.ScrollVertical : 0;
+        var jobs = FindChild(YearPanels.JobsScroll, true, false) is ScrollContainer jobList ? jobList.ScrollVertical : 0;
         // A price change rebuilds the panel: keep it scrolled where the player had it.
         _sideScrollWanted = FindChild(YearPanels.SideScroll, true, false) is ScrollContainer side ? side.ScrollVertical : 0;
         _sideScrollTries = 3;
@@ -196,6 +198,23 @@ public partial class YearScreen : Control
                     MakeOffer = MakeOffer,
                     PayAsk = PayAsk,
                 }, scroll));
+                break;
+            case Phase.Sell when _game.Campaigning && _booking && !Running:
+                Centre(YearPanels.Plan(PlanOf(_game, _slot, _offerFor, _offer, _offerSaid) with { Late = _game.NextSalesTurn ?? "" },
+                    new PlanActions(StopBooking, PickSlot, PickArtist)
+                    {
+                        ChangeOffer = ChangeOffer,
+                        MakeOffer = MakeOffer,
+                        PayAsk = PayAsk,
+                    }, scroll));
+                break;
+            case Phase.Sell when _game.Campaigning:
+                Centre(YearPanels.Campaign(CampaignOf(_game, Running), new CampaignActions(RunMonth, DoJob, AnswerNews, ChangePrice, ChangeVipPrice, ChangeParking, ChangeBuses, ChangeCamping), Running, jobs));
+                if (Running && FindChild("Chart", true, false) is SalesChart line)
+                {
+                    line.Shown = 0;
+                }
+
                 break;
             case Phase.Sell:
                 Centre(YearPanels.Sales(SalesOf(_game, Running), RunMonth, ToggleAdvert, ChangePrice, Running, ChangeParking, ChangeBuses, ChangeCamping, ChangeVipPrice));
@@ -354,6 +373,142 @@ public partial class YearScreen : Control
             game.SalesLog.Select(l => (l.When, l.Tickets, l.Price, l.AdCost, l.Vips, l.VipPrice)).ToList(), after, TravelOf(game), VipOf(game));
     }
 
+    /// <summary>The sets nobody is booked for, on the stages that are booked.</summary>
+    public static IReadOnlyList<int> EmptySets(FestivalGame game)
+    {
+        var sets = Enumerable.Range(0, RunningOrder.SetsAStage).Where(s => game.Show.At(s) is null).ToList();
+        if (game.SecondStageBooked)
+        {
+            sets.AddRange(Enumerable.Range(RunningOrder.SecondBase, RunningOrder.SetsAStage).Where(s => game.SecondShow.At(s) is null));
+        }
+
+        return sets;
+    }
+
+    /// <summary>What the campaign screen shows: the sales, and the month's jobs, buzz, releases and news.</summary>
+    public static CampaignView CampaignOf(FestivalGame game, bool running = false)
+    {
+        var sales = SalesOf(game, running) with { FairPrice = (int)System.Math.Round(game.PerceivedFairPrice) };
+        var time = game.JobsLeft > 0;
+        var jobs = new List<JobView>();
+        var closing = game.Show.Slots.LastOrDefault()?.Act.Name;
+        foreach (var slot in game.Secret.OrderByDescending(s => game.AnnounceWorth(s.Act.Name)))
+        {
+            var act = slot.Act;
+            var head = act.Name == closing ? " Your headliner: extra buzz." : "";
+            jobs.Add(new JobView($"announce:{act.Name}", "Announce an act", $"Announce {act.Name}",
+                $"{act.Rating} star{(act.Rating == 1 ? "" : "s")}, {Roster.FansText(act.Fans)} fans. About {game.AnnounceWorth(act.Name):N0} tickets this month.{head}", "Announce", time));
+        }
+
+        if (game.ReleaseOpen < Campaign.Releases.Count - 1)
+        {
+            var next = game.ReleaseOpen + 1;
+            jobs.Add(new JobView("release", "Tickets", $"Open the {Campaign.Releases[next].Name.ToLowerInvariant()}",
+                $"Puts {game.ReleaseSize(next):N0} more tickets on sale. {game.ReleaseLeft:N0} are left of those on sale now.", "Open", game.CanOpenRelease));
+        }
+
+        foreach (var stunt in Campaign.Stunts)
+        {
+            var ready = game.StuntReadyIn(stunt.Id);
+            var cost = game.StuntCost(stunt);
+            var again = stunt.EveryMonths == 0 ? "Once a year." : $"Every {stunt.EveryMonths} months.";
+            jobs.Add(new JobView($"stunt:{stunt.Id}", "Get talked about", stunt.Name, $"{stunt.About} Buzz up {stunt.Buzz}. {again}",
+                ready < 0 ? "Done" : ready > 0 ? $"In {ready} mo." : cost > 0 ? $"£{cost:N0}" : "Free", game.CanDoStunt(stunt.Id)));
+        }
+
+        foreach (var advert in Adverts.All)
+        {
+            var on = game.AdvertOn(advert.Id);
+            jobs.Add(new JobView($"advert:{advert.Id}", $"Adverts  ·  reaching {game.AdvertReach:N0}  ·  paid each month they run", advert.Name,
+                $"{advert.Reaches}. Reaches {advert.Reach:N0} people for £{advert.Cost:N0} a month.{(on ? " Stopping is not a job." : "")}", on ? "Stop" : "Start", on || time)
+            {
+                Done = on,
+            });
+        }
+
+        var empty = EmptySets(game).Count;
+        var free = Roster.Artists.Count(a => game.AvailabilityOf(a) == Availability.Free);
+        var dearer = (int)System.Math.Round(Booking.DearerAMonth * 100 * game.SalesTurn);
+        jobs.Add(new JobView("book", "The line-up", "Book another act",
+            empty == 0 ? "Every set has an act." : $"{empty} set{(empty == 1 ? " is" : "s are")} empty and {free} artists are still free.{(dearer > 0 ? $" Fees are up {dearer}% since January." : "")}",
+            "Book", time && empty > 0));
+
+        var releases = Campaign.Releases.Select((r, i) => new ReleaseView(r.Name, game.ReleaseSize(i), game.ReleaseSold(i),
+            game.ReleaseSize(i) > 0 && game.ReleaseSold(i) >= game.ReleaseSize(i) ? "Sold out" : i <= game.ReleaseOpen ? "On sale" : "Not yet")).ToList();
+        var news = game.PendingNews is { } item
+            ? new NewsView(item.Headline, item.About, item.Choices.Select((c, i) => new NewsChoiceView(c.Label, c.Outcome, game.CanAnswerNews(i))).ToList())
+            : null;
+        string When(int turn) => turn < FestivalGame.SalesMonths.Count ? FestivalGame.SalesMonths[turn] : "Build week";
+        return new CampaignView(sales, game.JobsLeft, Campaign.JobsAMonth, (int)System.Math.Round(game.Buzz), Campaign.BuzzWords(game.Buzz), (int)Campaign.BuzzFade, jobs, releases,
+            running ? null : news, game.CampaignNotes.Select(n => (n.Turn, When(n.Turn), n.What)).ToList(), game.ReleaseLeft);
+    }
+
+    /// <summary>Does one of the month's jobs, by the id on its card.</summary>
+    public void DoJob(string id)
+    {
+        if (Running)
+        {
+            return;
+        }
+
+        var colon = id.IndexOf(':');
+        var what = colon < 0 ? id : id[..colon];
+        var which = colon < 0 ? "" : id[(colon + 1)..];
+        bool done;
+        switch (what)
+        {
+            case "announce":
+                done = _game.Announce(which);
+                break;
+            case "release":
+                done = _game.OpenRelease();
+                break;
+            case "stunt":
+                done = _game.DoStunt(which);
+                break;
+            case "advert" when _game.AdvertOn(which):
+                _game.SetAdvert(which, false);
+                done = true;
+                break;
+            case "advert":
+                done = _game.StartAdvert(which);
+                break;
+            case "book" when _game.JobsLeft > 0 && EmptySets(_game) is { Count: > 0 } empty:
+                _booking = true;
+                _slot = empty[^1];
+                _offerFor = null;
+                _offerSaid = "";
+                done = true;
+                break;
+            default:
+                done = false;
+                break;
+        }
+
+        SoundBoard.Cue(done ? (what == "announce" ? Sounds.Coins : Sounds.Click) : Sounds.Refuse);
+        Rebuild();
+    }
+
+    /// <summary>True while another act is being booked from the campaign screen.</summary>
+    public bool BookingLate => _booking;
+
+    /// <summary>Goes back from booking another act to the month's jobs.</summary>
+    public void StopBooking()
+    {
+        _booking = false;
+        _offerFor = null;
+        _offerSaid = "";
+        SoundBoard.Cue(Sounds.Click);
+        Rebuild();
+    }
+
+    /// <summary>Answers this month's news with one of its choices.</summary>
+    public void AnswerNews(int choice)
+    {
+        SoundBoard.Cue(_game.AnswerNews(choice) ? Sounds.Click : Sounds.Refuse);
+        Rebuild();
+    }
+
     /// <summary>The VIP tickets for the sales screens, or null in a year paid for at the gate.</summary>
     public static VipView? VipOf(FestivalGame game) => game.VipOnSale <= 0 ? null
         : new VipView(game.VipTicketsSold, game.VipOnSale, game.VipTicketPrice, (int)System.Math.Round(game.VipFairPrice), game.VipForecast, game.VipTakings);
@@ -413,6 +568,15 @@ public partial class YearScreen : Control
     public void PickArtist(string? artist)
     {
         _offerSaid = "";
+        if (_game.Phase == Phase.Sell && (artist is null || _game.SetOf(artist) is not null || !EmptySets(_game).Contains(_slot)))
+        {
+            // Once tickets are on sale nobody can be moved or dropped: only empty sets can be filled.
+            _offerSaid = artist is not null && _game.SetOf(artist) is null ? "Pick an empty set first." : "";
+            SoundBoard.Cue(Sounds.Refuse);
+            Rebuild();
+            return;
+        }
+
         if (artist is null || _game.SetOf(artist) is not null)
         {
             _offerFor = null;
@@ -461,12 +625,14 @@ public partial class YearScreen : Control
             return;
         }
 
-        var outcome = _game.Offer(_slot, artist, pounds);
+        var late = _game.Phase == Phase.Sell;
+        var outcome = late ? _game.OfferLate(_slot, artist, pounds) : _game.Offer(_slot, artist, pounds);
         switch (outcome)
         {
             case OfferOutcome.Accepted:
                 _offerFor = null;
                 _offerSaid = "";
+                _booking = false;
                 SoundBoard.Cue(Sounds.Coins);
                 break;
             case OfferOutcome.Refused:
@@ -478,7 +644,9 @@ public partial class YearScreen : Control
                 SoundBoard.Cue(Sounds.Refuse);
                 break;
             default:
-                _offerSaid = outcome == OfferOutcome.WantsLaterSet ? "They only play one of the last two sets." : "They cannot be booked for this set.";
+                _offerSaid = outcome == OfferOutcome.WantsLaterSet ? "They only play one of the last two sets."
+                    : outcome == OfferOutcome.NoMoney ? "There is not the money in the bank for that."
+                    : "They cannot be booked for this set.";
                 SoundBoard.Cue(Sounds.Refuse);
                 break;
         }
@@ -561,6 +729,12 @@ public partial class YearScreen : Control
 
     public void ToggleAdvert(string id)
     {
+        if (_game.Campaigning && _game.Phase == Phase.Sell)
+        {
+            DoJob($"advert:{id}");
+            return;
+        }
+
         _game.SetAdvert(id, !_game.AdvertOn(id));
         SoundBoard.Cue(Sounds.Click);
         Rebuild();
@@ -569,8 +743,9 @@ public partial class YearScreen : Control
     /// <summary>Books the acts and puts the tickets on sale: on to the sales screen.</summary>
     public void BookEvent()
     {
-        if (_game.BookEvent())
+        if (_game.BookEvent(campaign: true))
         {
+            _booking = false;
             Rebuild();
         }
         else

@@ -811,6 +811,7 @@ public sealed partial class FestivalGame
             .Concat(Enumerable.Range(0, RunningOrder.SetsAStage).Select(i => SecondShow.At(RunningOrder.SecondBase + i)?.Name)).ToList(),
         Sales = SaveSales(),
         Booking = SaveBooking(),
+        Campaign = SaveCampaign(),
         EmptyBill = EmptyBill,
         GatesShut = Phase == Phase.Day && Crowd.GatesShut,
         GatesOpenedAt = GatesOpenedAt,
@@ -848,6 +849,7 @@ public sealed partial class FestivalGame
         }
 
         RestoreBooking(year.Booking);
+        RestoreCampaign(year.Campaign);
         ParkingCharge = Math.Clamp(year.Parking ?? ParkingCharge, 0, DearestParking);
         BusesHired = Math.Clamp(year.Buses, 0, MostBuses);
         RestoreSales(year.Sales);
@@ -917,6 +919,9 @@ public sealed record YearSave(int Number, int Licence, Phase Phase, DateTime Day
 
     /// <summary>True if every January of this festival starts with nobody booked.</summary>
     public bool EmptyBill { get; init; }
+
+    /// <summary>The ticket campaign, or null in a year without one.</summary>
+    public CampaignSave? Campaign { get; init; }
 
     /// <summary>The fees agreed with artists and who has said no, or null in an old save.</summary>
     public Show.BookingSave? Booking { get; init; }

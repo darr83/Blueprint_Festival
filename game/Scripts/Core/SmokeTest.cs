@@ -646,24 +646,60 @@ public partial class SmokeTest : Node
                     var fees = game.PlanCost;
                     plan.Year.BookEvent();
                     Check(game.Phase == Phase.Sell && plan.Year.Showing == Phase.Sell && plan.Year.HasCentrePanel && game.Money == 2000 - fees, $"Booking the event should pay £{fees} and open the ticket sales screen.");
-                    foreach (var advert in new[] { "posters", "newsletter", "flyers", "banners", "email" })
-                    {
-                        plan.Year.ToggleAdvert(advert);
-                    }
-
-                    Check(game.AdvertReach == 1200 && game.AdvertCost == 39, "Switching adverts on should add up their reach and cost.");
+                    // The campaign: three jobs a month, and it is the jobs that sell the tickets.
+                    Check(game.Campaigning && game.JobsLeft == 3 && plan.Year.FindChild(BlueprintFestival.UI.YearPanels.JobsScroll, true, false) is not null, "Booking the event should open the campaign with three jobs to do.");
+                    var quiet = game.SalesForecast;
+                    var first = game.Secret.First().Act.Name;
+                    plan.Year.DoJob($"announce:{first}");
+                    Check(game.ActsAnnounced.Contains(first) && game.JobsLeft == 2 && game.SalesForecast > quiet, "Announcing an act should use a job and bring its fans.");
+                    plan.Year.ToggleAdvert("posters");
+                    Check(game.AdvertOn("posters") && game.AdvertReach == 150 && game.AdvertCost == 5 && game.JobsLeft == 1, "Starting an advert should use a job.");
+                    var buzz = game.Buzz;
+                    plan.Year.DoJob("stunt:interview");
+                    Check(game.Buzz > buzz && game.JobsLeft == 0, "A radio interview should lift the buzz and use the last job.");
+                    plan.Year.DoJob("stunt:press");
+                    Check(game.StuntReadyIn("press") == 0, "With no time left a fourth job should not be done.");
+                    plan.Year.ToggleAdvert("posters");
+                    plan.Year.ToggleAdvert("posters");
+                    Check(!game.AdvertOn("posters"), "Stopping an advert is free, but starting it again needs a job.");
+                    var campaign = BlueprintFestival.UI.YearScreen.CampaignOf(game);
+                    Check(campaign.Releases.Count == 3 && campaign.Releases[0].State == "On sale" && campaign.Releases[1].State == "Not yet" && campaign.Jobs.Any(j => j.Id == "book"), "The campaign screen should show three releases and the jobs.");
                     plan.Year.RunMonth();
-                    Check(plan.Year.Running && game.SalesTurn == 1 && game.TicketsSold > 0, "Running January should sell tickets and play the month out.");
+                    Check(plan.Year.Running && game.SalesTurn == 1 && game.TicketsSold > 0 && game.JobsLeft == 3, "Running January should sell tickets, play the month out and bring three more jobs.");
                     plan.Year.FinishRun();
                     Check(!plan.Year.Running && BlueprintFestival.UI.YearScreen.SalesOf(game).SoldAfter.Count == 2, "The sales screen should show January sold.");
+
+                    // Another act can be booked into the set left empty, for one of the month's jobs.
+                    plan.Year.DoJob("book");
+                    Check(plan.Year.BookingLate && plan.Year.SlotPicked == 1 && plan.Year.FindChild("Artists", true, false) is not null, "Book another act should open the artists with the empty set picked.");
+                    var extra = Roster.Artists.First(a => a.Rating == 1 && game.SetOf(a.Name) is null).Name;
+                    plan.Year.PickArtist(extra);
+                    Check(plan.Year.OfferFor == extra && plan.Year.FindChild("Offer", true, false) is not null, "Clicking a free artist should open an offer for the empty set.");
+                    var late = game.FeeFor(extra);
+                    var bank = game.Money;
+                    plan.Year.PayAsk();
+                    Check(!plan.Year.BookingLate && game.Show.At(1)?.Name == extra && game.Money == bank - late && game.JobsLeft == 2, "Booking a late act should pay them at once, use a job and go back to the campaign.");
                     for (var month = 1; month < 6; month++)
                     {
+                        if (game.PendingNews is not null)
+                        {
+                            plan.Year.AnswerNews(0);
+                            Check(game.PendingNews is null, "Answering the news should clear it.");
+                        }
+
+                        plan.Year.DoJob("release");
+                        foreach (var slot in game.Secret.ToList())
+                        {
+                            plan.Year.DoJob($"announce:{slot.Act.Name}");
+                        }
+
                         plan.Year.RunMonth();
                         plan.Year.FinishRun();
                     }
 
+                    Check(game.ReleaseOpen == 2 && !game.Secret.Any(), "By build week every release should be open and every act announced.");
                     Check(game.Phase == Phase.Build && plan.Year.Showing == Phase.Build && game.SalesLog.Count == 6, "After June it should be build week.");
-                    Check(game.Money == 2000 - fees + game.SalesLog.Sum(l => l.Taken - l.AdCost), "The bank should hold the ticket money less the adverts.");
+                    Check(game.Money == 2000 - fees - late + game.SalesLog.Sum(l => l.Taken - l.AdCost), "The bank should hold the ticket money less the adverts and the late act.");
                     Check(game.Crowd.Expected == System.Math.Max(10, game.TicketsSold), "The crowd expected should be the tickets sold.");
                     plan.Year.NextDay();
                     Check(game.SalesTurn == 7 && game.NextSalesTurn == "Monday", "Ending Sunday should sell Sunday's tickets.");
