@@ -220,7 +220,14 @@ public sealed partial class FestivalGame
                 {
                     Walk(member, member.PostX, member.PostY, StaffState.Returning);
                 }
-                else if (Step(member))
+                else if (Step(member) && _sick.Any(p => Distance(p.X, p.Y, member.HoldX, member.HoldY) <= 1.6))
+                {
+                    // Sick to mop up: stand back from it a little and face it.
+                    member.State = StaffState.Mopping;
+                    member.HoldLeft = MopTicks;
+                    member.Heading = Math.Atan2(member.HoldX - member.X, member.HoldY - member.Y);
+                }
+                else if (member.Path is null)
                 {
                     member.State = StaffState.Picking;
                     member.HoldLeft = BinBy(member.X, member.Y) is { } bin && BinFill(bin) >= BinWantsEmptying ? EmptyTicks : PickTicks;
@@ -228,6 +235,20 @@ public sealed partial class FestivalGame
                     {
                         var (bx, by) = FieldMap.CentreOf(new TilePoint(facing.X, facing.Y));
                         member.Heading = Math.Atan2(bx - member.X, by - member.Y);
+                    }
+                }
+
+                break;
+
+            case StaffState.Mopping:
+                if (--member.HoldLeft <= 0)
+                {
+                    Mopped(member);
+                    member.State = StaffState.Looking;
+                    member.Wait = 4;
+                    if (working)
+                    {
+                        SetOffToClean(member);
                     }
                 }
 
@@ -278,7 +299,30 @@ public sealed partial class FestivalGame
     /// <summary>Sends a cleaner to the nearest bin that wants emptying, or else the nearest litter nobody else is going for. False if there is nothing in sight.</summary>
     private bool SetOffToClean(StaffMember member)
     {
-        bool Taken(double x, double y) => _staff.Any(s => s != member && s.State is StaffState.Cleaning or StaffState.Picking && Distance(s.HoldX, s.HoldY, x, y) <= PickReach + 0.5);
+        bool Taken(double x, double y) => _staff.Any(s => s != member && s.State is StaffState.Cleaning or StaffState.Picking or StaffState.Mopping && Distance(s.HoldX, s.HoldY, x, y) <= PickReach + 0.5);
+
+        // Sick comes before anything else, and a cleaner will go further for it.
+        if (SickToMop(member, CleanerSight * 1.5) is { } patch)
+        {
+            // Stop a step short of it, on the side they come from.
+            var (px, py) = (member.X - patch.X, member.Y - patch.Y);
+            var far = Math.Sqrt((px * px) + (py * py));
+            var (sx, sy) = far < 0.9 ? (member.X, member.Y) : (patch.X + (px / far * 0.85), patch.Y + (py / far * 0.85));
+            if (!Field.IsWalkableForStaff(FieldMap.TileAt(sx, sy)))
+            {
+                (sx, sy) = (patch.X, patch.Y);
+            }
+
+            var route = _staffPaths.FindPath(FieldMap.TileAt(member.X, member.Y), FieldMap.TileAt(sx, sy));
+            if (route is not null)
+            {
+                (member.HoldX, member.HoldY) = (patch.X, patch.Y);
+                member.State = StaffState.Cleaning;
+                member.Path = route;
+                member.PathIndex = 0;
+                return true;
+            }
+        }
 
         (double X, double Y)? job = null;
         var nearest = CleanerSight;

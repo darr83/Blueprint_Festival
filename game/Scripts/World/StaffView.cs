@@ -72,7 +72,12 @@ public partial class StaffView : Node3D
             }
 
             var person = view.GetChild<PersonView>(0);
-            person.Pose = member.IsWalking && speed > 0 ? Pose.Walking : Pose.Standing;
+            var mopping = member.State == StaffState.Mopping;
+            person.Pose = mopping ? Pose.Performing : member.IsWalking && speed > 0 ? Pose.Walking : Pose.Standing;
+            if (member.Kind == Simulation.Site.StaffKind.Cleaner)
+            {
+                Mop(view, person, member, mopping);
+            }
 
             // A cleaner picking something up leans down to it.
             var lean = member.State == StaffState.Picking ? 0.38f : 0f;
@@ -128,6 +133,47 @@ public partial class StaffView : Node3D
         }
 
         Sweep(_markers);
+    }
+
+    /// <summary>
+    /// A cleaner mopping up: the litter picker and sack are swapped for a mop in both hands, pushed
+    /// back and forth over the mess, with the yellow bucket and caution board stood beside it.
+    /// </summary>
+    private void Mop(Node3D view, PersonView person, StaffMember member, bool mopping)
+    {
+        var kit = view.GetNodeOrNull<Node3D>("Mopping");
+        if (!mopping)
+        {
+            if (kit is { Visible: true })
+            {
+                kit.Visible = false;
+                view.GetNode<Node3D>("Mop bucket").Visible = false;
+                view.GetNode<Node3D>("Uniform").Visible = true;
+            }
+
+            return;
+        }
+
+        var h = person.StandingHeight / 1.6f;
+        if (kit is null)
+        {
+            kit = SiteProps.MoppingKit(h);
+            view.AddChild(kit);
+            var bucket = SiteProps.MopBucket();
+            bucket.Position = new Vector3(-1.1f, 0, 0.5f);
+            bucket.RotationDegrees = new Vector3(0, 25, 0);
+            view.AddChild(bucket);
+        }
+
+        kit.Visible = true;
+        view.GetNode<Node3D>("Mop bucket").Visible = true;
+        view.GetNode<Node3D>("Uniform").Visible = false;
+
+        // Pushing and pulling: the mop and the hands on it slide forward and back together.
+        var push = Mathf.Sin((float)_time * 4.2f + member.Id) * 0.12f;
+        kit.Position = new Vector3(0, 0, push);
+        var (left, right) = SiteProps.MopHands(h);
+        person.Perform(left + new Vector3(0, 0, push), right + new Vector3(0, 0, push), 0, new Vector3(10 + (push * 40), 0, 0));
     }
 
     /// <summary>An entertainer on their pitch: idle between sets, playing along to their music during one.</summary>

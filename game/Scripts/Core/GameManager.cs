@@ -35,6 +35,10 @@ public partial class GameManager : Node
             {
                 AddChild(new PeopleShots(arg["--people-shots=".Length..]) { Name = "PeopleShots" });
             }
+            else if (arg.StartsWith("--trouble-mock=", StringComparison.Ordinal))
+            {
+                AddChild(new TroubleShots(arg["--trouble-mock=".Length..]) { Name = "TroubleShots" });
+            }
             else if (arg.StartsWith("--ride-shots=", StringComparison.Ordinal))
             {
                 AddChild(new RideShots(arg["--ride-shots=".Length..]) { Name = "RideShots" });

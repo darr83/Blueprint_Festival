@@ -591,6 +591,7 @@ public sealed partial class FestivalGame
         TickStaff(clock.Now);
         TickBusking(clock.Now);
         TickSafety(clock.Now);
+        TickTrouble(clock.Now);
         TickFireworks(clock.Now);
         TickWeather(clock.Now);
         TickDayLog(clock.Now);
@@ -647,6 +648,7 @@ public sealed partial class FestivalGame
 
         LitterAtStart = _litter.Count;
         _incidents.Clear();
+        EndTrouble();
         foreach (var member in _staff)
         {
             (member.X, member.Y, member.Heading, member.State, member.Incident, member.Path) = (member.PostX, member.PostY, member.PostHeading, StaffState.AtPost, -1, null);
@@ -659,6 +661,7 @@ public sealed partial class FestivalGame
     public int PickLitter(double x, double y, double radius = 1.5)
     {
         Need(Phase.Tidy);
+        _sick.RemoveAll(s => ((s.X - x) * (s.X - x)) + ((s.Y - y) * (s.Y - y)) <= radius * radius);
         return _litter.RemoveAll(l => ((l.X - x) * (l.X - x)) + ((l.Y - y) * (l.Y - y)) <= radius * radius);
     }
 
@@ -674,6 +677,7 @@ public sealed partial class FestivalGame
 
         Spend("Scouts' litter pick", fee);
         _litter.Clear();
+        _sick.Clear();
         return true;
     }
 

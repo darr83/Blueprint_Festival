@@ -92,6 +92,7 @@ public sealed partial class FestivalGame
         StartStaff();
         StartRounds();
         StartSafety();
+        StartTrouble();
         StartAreas();
         StartWeather();
         if (Planned)

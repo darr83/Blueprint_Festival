@@ -39,6 +39,12 @@ public sealed partial class FestivalGame
     /// <summary>Keeps a stall for VIP guests only, or opens it to everyone, while the prices can still be changed.</summary>
     public bool SetVipOnly(int stall, bool vipOnly) => CanSetPrices && Site.SetVipOnly(stall, vipOnly);
 
+    /// <summary>
+    /// Tells a bar not to serve anyone who is drunk, or to serve everyone again. Unlike the prices,
+    /// this can be changed at any time, in the build or during the day.
+    /// </summary>
+    public bool SetNoDrunks(int stall, bool noDrunks) => Phase is Phase.Build or Phase.Day && Site.SetNoDrunks(stall, noDrunks);
+
     /// <summary>Puts everything on a stall's menu back to its usual price.</summary>
     public bool ResetPrices(int stall)
     {

@@ -79,13 +79,31 @@ public sealed class DayReport
 
     public int HurtByFireworks { get; private init; }
 
-    public int Hurt => HurtInCrush + HurtByFireworks;
+    public int Hurt => HurtInCrush + HurtByFireworks + HurtInFights;
 
     public int Treated { get; private init; }
 
     public int Untreated { get; private init; }
 
     public int TroubleSorted { get; private init; }
+
+    public int Fights { get; private init; }
+
+    public int ThrownOut { get; private init; }
+
+    public int HurtInFights { get; private init; }
+
+    public int PassedOut { get; private init; }
+
+    /// <summary>How many times someone has been sick on the ground, and how many of those puddles are still there.</summary>
+    public int TimesSick { get; private init; }
+
+    public int SickWaiting { get; private init; }
+
+    /// <summary>Grown-ups on site who are merry, tipsy and drunk just now.</summary>
+    public (int Merry, int Tipsy, int Drunk) Drinkers { get; private init; }
+
+    public int DrinksRefused { get; private init; }
 
     public int BedsUsed { get; private init; }
 
@@ -140,6 +158,14 @@ public sealed class DayReport
             Treated = game.Treated,
             Untreated = game.Untreated,
             TroubleSorted = game.TroubleSorted,
+            Fights = game.Fights,
+            ThrownOut = game.ThrownOut,
+            HurtInFights = game.FightInjuries,
+            PassedOut = game.PassedOut,
+            TimesSick = game.TimesSick,
+            SickWaiting = game.Sick.Count,
+            Drinkers = game.Drinkers,
+            DrinksRefused = game.DrinksRefused,
             Beds = beds,
             BedsUsed = Math.Max(0, beds - game.FreeBeds),
             In = game.Income.GroupBy(l => l.What).Select(g => new MoneyLine(g.Key, g.Sum(l => l.Amount))).Where(l => l.Amount != 0).OrderByDescending(l => l.Amount).ToList(),
@@ -218,6 +244,20 @@ public sealed class DayReport
         if (waiting > 0)
         {
             worries.Add(waiting == 1 ? "Someone is waiting for help: nobody free to go" : $"{waiting} people are waiting for help: nobody free to go");
+        }
+
+        if (game.Sick.Count > 0 && !game.Staff.Any(s => s.Kind == StaffKind.Cleaner))
+        {
+            worries.Add(game.Sick.Count == 1 ? "Someone has been sick and there is no cleaner to mop it up" : $"{game.Sick.Count} lots of sick on the ground and no cleaner to mop it up");
+        }
+        else if (game.Sick.Count >= 4)
+        {
+            worries.Add($"{game.Sick.Count} lots of sick on the ground: the cleaners cannot keep up");
+        }
+
+        if (game.Drinkers.Drunk >= Math.Max(8, crowd.OnSite / 25))
+        {
+            worries.Add($"{game.Drinkers.Drunk} people are drunk: a bar can be told not to serve them");
         }
 
         if (beds > 0 && game.FreeBeds <= 0)

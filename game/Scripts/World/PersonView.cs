@@ -24,6 +24,12 @@ public enum Pose
 
     /// <summary>Sitting down, legs out in front, on a seat as high as <see cref="PersonView.SeatHeight"/>.</summary>
     Sitting,
+
+    /// <summary>Fists up and swinging at someone in front of them.</summary>
+    Fighting,
+
+    /// <summary>Bent double, hands on knees, being sick on the ground.</summary>
+    BeingSick,
 }
 
 /// <summary>
@@ -58,6 +64,9 @@ public partial class PersonView : Node3D
     private float _clap;
     private float _perform;
     private float _sit;
+    private float _fight;
+    private float _sick;
+    private MeshInstance3D? _spew;
     private Vector3 _performLeft;
     private Vector3 _performRight;
     private float _performLift;
@@ -103,6 +112,12 @@ public partial class PersonView : Node3D
     public PersonLook Look { get; private set; } = null!;
 
     public Pose Pose { get; set; } = Pose.Standing;
+
+    /// <summary>
+    /// How unsteady they are on their feet, from 0 (sober) to 1 (very drunk): the body sways, the
+    /// arms drift out for balance and the walk rolls from side to side.
+    /// </summary>
+    public float Wobble { get; set; }
 
     /// <summary>How high off the ground the seat is while the pose is <see cref="Pose.Sitting"/>, in metres.</summary>
     public float SeatHeight { get; set; } = 0.45f;
@@ -578,6 +593,8 @@ public partial class PersonView : Node3D
         _clap = Mathf.MoveToward(_clap, Pose == Pose.Clapping ? 1f : 0f, step * 5f);
         _perform = Mathf.MoveToward(_perform, Pose == Pose.Performing ? 1f : 0f, step * 6f);
         _sit = Mathf.MoveToward(_sit, Pose == Pose.Sitting ? 1f : 0f, step * 4f);
+        _fight = Mathf.MoveToward(_fight, Pose == Pose.Fighting ? 1f : 0f, step * 6f);
+        _sick = Mathf.MoveToward(_sick, Pose == Pose.BeingSick ? 1f : 0f, step * 3f);
         _hold = Mathf.MoveToward(_hold, HeldUp ? 1f : 0f, step * 5f);
         ApplyPose();
     }
@@ -628,6 +645,34 @@ public partial class PersonView : Node3D
         _mouth.Scale = new Vector3(_headR * (0.36f + (0.12f * open)), _headR * (0.1f + (0.42f * open)), 0.03f);
     }
 
+    /// <summary>What comes out while someone is being sick: only made the first time, and only there on a heave.</summary>
+    private void Spew(float heave)
+    {
+        if (_spew is null)
+        {
+            if (heave < 0.25f)
+            {
+                return;
+            }
+
+            _spew = new MeshInstance3D
+            {
+                Name = "Spew",
+                Mesh = new CapsuleMesh { Radius = 0.5f, Height = 2f, RadialSegments = 8, Rings = 3 },
+                MaterialOverride = new StandardMaterial3D { AlbedoColor = SiteProps.SickColour, Roughness = 0.5f },
+                CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+            };
+            _upper.AddChild(_spew);
+        }
+
+        _spew.Visible = heave >= 0.25f;
+        var length = 0.2f + (0.3f * heave);
+        // Out of the mouth and on along the way the face is pointing, which is at the ground.
+        _spew.Position = new Vector3(0, _headY + _mouthY - HipY - 0.02f, _headR + (length * 0.5f));
+        _spew.RotationDegrees = new Vector3(90, 0, 0);
+        _spew.Scale = new Vector3(0.05f, length * 0.5f, 0.05f);
+    }
+
     /// <summary>
     /// The arm angles (degrees) that point an arm from its shoulder towards a point in this
     /// person's space. An arm hangs straight down; X swings it forward (negative) and Z out to the side.
@@ -670,6 +715,8 @@ public partial class PersonView : Node3D
         _clap = pose == Pose.Clapping ? 1 : 0;
         _perform = pose == Pose.Performing ? 1 : 0;
         _sit = pose == Pose.Sitting ? 1 : 0;
+        _fight = pose == Pose.Fighting ? 1 : 0;
+        _sick = pose == Pose.BeingSick ? 1 : 0;
         _hold = HeldUp ? 1 : 0;
         ApplyPose();
     }
@@ -762,9 +809,52 @@ public partial class PersonView : Node3D
             lift = Mathf.Lerp(lift, SeatHeight + 0.07f - (HipY * (float)Look.Height), _sit);
         }
 
+        var roll = 0f;
+        var clock = ((float)Time.GetTicksMsec() / 1000f) + (Look.Seed * 0.37f);
+        if (Wobble > 0 && _sit < 0.5f)
+        {
+            // Unsteady: the body sways about over the feet and the arms drift out for balance.
+            var sway = Mathf.Sin(clock * 1.9f);
+            lean += new Vector3(Mathf.Sin(clock * 1.3f) * 7f, 0, sway * 9f) * Wobble;
+            roll = Mathf.Sin((clock * 1.1f) + 1f) * 7f * Wobble;
+            _armRight.RotationDegrees += new Vector3(0, 0, (14f + (sway * 10f)) * Wobble);
+            if (_hold <= 0)
+            {
+                _armLeft.RotationDegrees += new Vector3(0, 0, (-14f + (sway * 10f)) * Wobble);
+            }
+        }
+
+        if (_fight > 0)
+        {
+            // Fists up, one arm then the other thrown out straight, the body rocking in behind each punch.
+            var punch = Mathf.Sin(clock * Mathf.Tau * 1.5f);
+            var jab = Mathf.Pow(Mathf.Max(0, punch), 0.6f);
+            var cross = Mathf.Pow(Mathf.Max(0, -punch), 0.6f);
+            _armLeft.RotationDegrees = _armLeft.RotationDegrees.Lerp(new Vector3(-118f + (28f * jab), 0, 16f), _fight);
+            _armRight.RotationDegrees = _armRight.RotationDegrees.Lerp(new Vector3(-118f + (28f * cross), 0, -16f), _fight);
+            lean = lean.Lerp(new Vector3(14f + (8f * Mathf.Abs(punch)), punch * 16f, 0), _fight);
+            lift = Mathf.Lerp(lift, Mathf.Abs(Mathf.Sin(clock * Mathf.Tau * 1.5f)) * 0.03f, _fight);
+            _legLeft.RotationDegrees = new Vector3(-16f * _fight, 0, -6f * _fight);
+            _legRight.RotationDegrees = new Vector3(18f * _fight, 0, 6f * _fight);
+        }
+
+        var heave = 0f;
+        if (_sick > 0)
+        {
+            // Bent double with the hands on the knees, heaving every couple of seconds.
+            heave = Mathf.Pow(Mathf.Max(0, Mathf.Sin(clock * Mathf.Tau * 0.45f)), 2f);
+            var bend = 58f + (14f * heave);
+            lean = lean.Lerp(new Vector3(bend, 0, 0), _sick);
+            _armLeft.RotationDegrees = _armLeft.RotationDegrees.Lerp(new Vector3(-bend + 12f, 0, -5f), _sick);
+            _armRight.RotationDegrees = _armRight.RotationDegrees.Lerp(new Vector3(-bend + 12f, 0, 5f), _sick);
+            _legLeft.RotationDegrees = new Vector3(0, 0, -7f * _sick);
+            _legRight.RotationDegrees = new Vector3(0, 0, 7f * _sick);
+        }
+
+        Spew(_sick > 0.8f ? heave : 0f);
         _upper.RotationDegrees = lean;
         _figure.Position = new Vector3(0, lift, 0);
-        _figure.RotationDegrees = new Vector3(0, turn, 0);
+        _figure.RotationDegrees = new Vector3(0, turn, roll);
     }
 
     /// <summary>

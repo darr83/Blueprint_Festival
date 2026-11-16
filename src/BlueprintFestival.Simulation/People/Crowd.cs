@@ -304,6 +304,18 @@ public sealed class Party
     /// <summary>True for a party on VIP tickets: they wear lanyards and may use VIP ground, stalls and buildings.</summary>
     public bool Vip { get; internal set; }
 
+    /// <summary>How much the grown-ups have had to drink, in drinks each. It wears off at one an hour.</summary>
+    public double Drink { get; internal set; }
+
+    /// <summary>Until when one of them is bent double being sick.</summary>
+    public DateTime SickUntil { get; internal set; }
+
+    /// <summary>True while one of them is in a fight.</summary>
+    public bool Fighting { get; internal set; }
+
+    /// <summary>The party they are fighting, or -1.</summary>
+    public int Opponent { get; internal set; } = -1;
+
     internal GameRandom Random { get; set; }
 
     internal List<TilePoint>? Path { get; set; }
@@ -328,6 +340,15 @@ public readonly record struct PersonOnSite(int Id, PersonLook Look, double X, do
 
     /// <summary>Which seat of the ride they are in.</summary>
     public int RideSeat { get; init; }
+
+    /// <summary>How unsteady they are with drink, from 0 (steady) to 1 (staggering).</summary>
+    public double Wobble { get; init; }
+
+    /// <summary>True while they are in a fight.</summary>
+    public bool Fighting { get; init; }
+
+    /// <summary>True while they are bent double being sick.</summary>
+    public bool BeingSick { get; init; }
 }
 
 /// <summary>
@@ -839,6 +860,9 @@ public sealed partial class Crowd
                         Ride = OnRide(party) ? party.Stall : -1,
                         RideSeat = (Math.Max(0, party.Server) * Rides.SeatsEach) + Math.Min(i, Rides.SeatsEach - 1),
                         Ticket = party.State == PartyState.Queuing && party.InLine && party.ServiceLeft >= 0 && i >= party.Checked && i < party.Checked + CheckersOn(party.Gate, party.Lane),
+                        Wobble = party.Drink > 0 && GrownUp(m) ? WobbleOf(party.Drink) : 0,
+                        Fighting = party.Fighting && i == 0,
+                        BeingSick = i == 0 && _now < party.SickUntil && party.State == PartyState.Standing,
                     };
                 }
             }
@@ -2451,7 +2475,9 @@ public sealed partial class Crowd
             case StallKind.Coffee:
                 return party.Thirst < 0.25 ? 0 : 0.02 * (hour < 12 ? 2 : 1) * (wet ? 2 : 1) * (hot ? 0.3 : 1);
             case StallKind.Cocktails:
-                return party.Thirst < 0.25 || !party.Members.Any(GrownUp) ? 0 : 0.015 * (hour >= 17 ? 2.5 : 1) * (party.HasChild ? 0.3 : 1);
+                return (party.Thirst < 0.25 || !party.Members.Any(GrownUp) ? 0 : 0.015 * (hour >= 17 ? 2.5 : 1) * (party.HasChild ? 0.3 : 1)) + (AnotherRound(party, stall, now) * 0.5);
+            case StallKind.Bar:
+                return AnotherRound(party, stall, now);
             case StallKind.PhoneCharging:
                 // Batteries run down as the day goes on.
                 return party.Charged ? 0 : hour < 12 ? 0.004 : hour < 16 ? 0.012 : 0.02;
@@ -2904,6 +2930,7 @@ public sealed partial class Crowd
         var filled = 0.0;
         var dearness = 0.0;
         var handful = false;
+        var rounds = 0;
         for (var m = 0; m < party.Members.Count && menu.Count > 0; m++)
         {
             var member = party.Members[m];
@@ -2927,6 +2954,20 @@ public sealed partial class Crowd
 
             PutOn(member, item, pick);
             Sold?.Invoke(stall, pick, price);
+            rounds += Catalogue.IsAlcohol(stall.Kind, item) ? 1 : 0;
+        }
+
+        if (rounds > 0)
+        {
+            Drank(party, rounds);
+        }
+        else if (stall.NoDrunks && party.Drink >= HadEnoughAt && Catalogue.SellsAlcohol(stall.Kind))
+        {
+            // Told they have had enough. They are not pleased about it, and do not try again for a while.
+            Refused++;
+            party.Mood = Math.Max(0, party.Mood - 0.02);
+            var later = now + TimeSpan.FromMinutes(40);
+            party.FancyAt = party.FancyAt > later ? party.FancyAt : later;
         }
 
         var share = buyers == 0 ? 1 : filled / buyers;
@@ -2935,10 +2976,17 @@ public sealed partial class Crowd
             case Need.Food when menu.Count == 0 || buyers > 0:
                 // Fries or an ice cream are not a meal.
                 party.Hunger = Math.Max(0, party.Hunger - (menu.Count == 0 ? 1.2 : share * 1.2));
+                Lined(party, 0.5 * share);
                 break;
             case Need.Drink when menu.Count == 0 || buyers > 0:
                 party.Thirst = Math.Max(0, party.Thirst - (menu.Count == 0 ? 1.2 : share * 1.2));
                 party.Toilet = Math.Min(1.2, party.Toilet + (0.2 * (menu.Count == 0 ? 1 : share)));
+                if (rounds == 0)
+                {
+                    // Water, or a soft drink.
+                    Lined(party, 0.3);
+                }
+
                 break;
             case Need.Toilet:
                 party.Toilet = 0;
@@ -3029,6 +3077,12 @@ public sealed partial class Crowd
             if (menu[i].Gives == Carried.Bag && member.Look.Age == AgeGroup.Child)
             {
                 // The grown-ups carry the shopping.
+                continue;
+            }
+
+            if (stall.NoDrunks && party.Drink >= HadEnoughAt && Catalogue.IsAlcohol(stall.Kind, menu[i]))
+            {
+                // This bar does not serve anyone who has had too many.
                 continue;
             }
 
@@ -3642,6 +3696,7 @@ public sealed partial class Crowd
                 Holding = p.Members.Any(m => m.Holding != Carried.None) ? p.Members.Select(m => (int)m.Holding).ToList() : null,
                 Bought = p.Members.Any(m => m.Bought != 0) ? p.Members.Select(m => m.Bought).ToList() : null,
                 HoldUntil = p.HoldUntil, FancyAt = p.FancyAt, GrumbleAt = p.GrumbleAt, BoughtHats = p.BoughtHats, BoughtMerch = p.BoughtMerch, FairGoes = p.FairGoes == 0 ? null : p.FairGoes, Fancying = p.Fancying,
+                Moving = p.Moving && p.State == PartyState.AtStall && p.Server >= 0, Drink = p.Drink <= 0 ? null : p.Drink, SickUntil = p.SickUntil == default ? null : p.SickUntil, Opponent = p.Fighting ? p.Opponent : null,
                 Charged = p.Charged, OnGround = p.State == PartyState.Sitting && p.OnGround, SitUntil = p.State == PartyState.Sitting ? p.SitUntil : default, RestAfter = p.RestAfter,
                 Seat = p.State == PartyState.Sitting && p.Seat is { } sat ? new TilePoint(sat.X, sat.Y) : null,
                 Seats = p.State == PartyState.Sitting && p.Seat is not null ? p.Seats?.ToList() : null,
@@ -3710,6 +3765,20 @@ public sealed partial class Crowd
             party.BoughtMerch = s.BoughtMerch;
             party.FairGoes = s.FairGoes ?? 0;
             party.Charged = s.Charged;
+            party.Drink = s.Drink ?? 0;
+            party.SickUntil = s.SickUntil ?? default;
+            if (s.SickUntil is { } sick && party.State == PartyState.Standing)
+            {
+                party.RetryAt = sick;
+            }
+
+            party.Opponent = s.Opponent ?? -1;
+            party.Fighting = s.Opponent is not null;
+            if (party.Fighting)
+            {
+                party.RetryAt = s.WaitUntil;
+            }
+
             party.Fancying = false;
             RestoreSeat(party, s);
             for (var m = 0; m < party.Members.Count; m++)
@@ -3779,6 +3848,7 @@ public sealed partial class Crowd
                     else if (s.Server >= 0 && s.Server < _serving[s.Stall].Length && _serving[s.Stall][s.Server] is null)
                     {
                         party.Server = s.Server;
+                        party.Moving = s.Moving;
                         _serving[s.Stall][s.Server] = party;
                     }
                     else
@@ -3937,6 +4007,17 @@ public sealed record PartySave(int Id, PartyState State, double X, double Y, dou
     public int? FairGoes { get; init; }
 
     public bool Fancying { get; init; }
+
+    /// <summary>True for a party called forward at a stall or a ride who are still walking up to it.</summary>
+    public bool Moving { get; init; }
+
+    /// <summary>How much they have had to drink.</summary>
+    public double? Drink { get; init; }
+
+    public DateTime? SickUntil { get; init; }
+
+    /// <summary>The party they are in a fight with, if they are in one.</summary>
+    public int? Opponent { get; init; }
 }
 
 /// <summary>
