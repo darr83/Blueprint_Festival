@@ -186,6 +186,9 @@ public sealed partial class FestivalGame
     /// <summary>How long someone who is ill waits for help before going home in a bad way.</summary>
     public const double IllPatienceMinutes = 20;
 
+    /// <summary>How long before a set the security behind the front barrier stop being sent off elsewhere.</summary>
+    public const double PitBackMinutes = 20;
+
     /// <summary>How long trouble goes on with nobody dealing with it before it spoils things for everyone nearby.</summary>
     public const double TroublePatienceMinutes = 10;
 
@@ -439,8 +442,9 @@ public sealed partial class FestivalGame
             }
 
             var wanted = incident.Kind == IncidentKind.Ill ? StaffKind.FirstAider : StaffKind.Security;
-            // Security behind a front barrier stay put while an act is on, and are the last to be sent otherwise.
-            var playing = MusicOn;
+            // Security behind a front barrier stay put while an act is on or about to come on, and are
+            // the last to be sent otherwise, so they are back at the front for the start of the set.
+            var playing = MusicOn || (NextAct is { } next && next.Start - now <= TimeSpan.FromMinutes(PitBackMinutes));
             var nearest = _staff.Where(s => s.Kind == wanted && s.IsFree && !(playing && InPit(s)))
                 .OrderBy(s => InPit(s) ? 1 : 0).ThenBy(s => Distance(s.X, s.Y, incident.X, incident.Y)).FirstOrDefault();
             if (nearest is not null)

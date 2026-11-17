@@ -124,7 +124,37 @@ public partial class CrowdView : Node3D
         return node;
     }
 
-    public override void _Process(double delta) => Sync(delta, snap: false);
+    public override void _Process(double delta)
+    {
+        if (_game.SkippingTo is not null)
+        {
+            // While skipping to the next act the crowd stands still on screen, so nearly all of each
+            // frame goes on running the day; everyone jumps to where they have got to at the end.
+            if (!_frozen)
+            {
+                _frozen = true;
+                ApplauseLevel = 0;
+                SoundBoard.Instance?.SetLoop(Sounds.ApplauseLoop, 0);
+            }
+
+            return;
+        }
+
+        if (_frozen)
+        {
+            _frozen = false;
+            Snap();
+            return;
+        }
+
+        Sync(delta, snap: false);
+    }
+
+    /// <summary>True while a skip runs and the crowd is not being moved on screen.</summary>
+    private bool _frozen;
+
+    /// <summary>True while a skip runs and the crowd is not being moved on screen.</summary>
+    public bool Frozen => _frozen;
 
     /// <summary>Puts every figure exactly where the rules say, with no gliding. Used after a jump in time.</summary>
     public void Snap() => Sync(0, snap: true);

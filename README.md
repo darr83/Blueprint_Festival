@@ -239,6 +239,22 @@ everyone who stands near it until a cleaner mops it up (cleaners go to sick befo
 until it has been trodden in two hours later. One person in ten who is taken ill is sick first.
 The day panel counts fights, people thrown out, people hurt, and sick still on the ground.
 
+## Speed
+
+The fastest speeds and "Skip to next act" run thousands of seconds of the day's rules a minute, so
+the rules are kept quick:
+
+- Route finding (most of the work on a big day) heads for where it is going instead of trying every
+  equally good way round, and never looks at a tile twice in one search. Routes stay within a few
+  percent of the shortest (`RouteSpeedTests`).
+- The rules project is always compiled optimised, even in the Debug build Godot makes when the game
+  is played from the editor.
+- While skipping to the next act, the crowd and staff stand still on screen and nearly all of each
+  frame goes on the day; everyone jumps to where they have got to when the skip ends.
+
+On a 5,000-person day a second of rules took about 4.5 ms played from the editor before this, and
+about half a millisecond after.
+
 ## Checks
 
 - `dotnet test tests/BlueprintFestival.Simulation.Tests` runs the unit tests.

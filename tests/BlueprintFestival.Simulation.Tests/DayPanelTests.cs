@@ -100,7 +100,8 @@ public class DayPanelTests
         RunUntil(game, game.Day.AddHours(24));
 
         var report = DayReport.Of(game);
-        var bad = game.DayLog.Where(n => n.Kind == DayNoteKind.Ill && n.Tone == DayTone.Bad).ToList();
+        // Someone hurt in a fight or a crush who is left untreated counts too.
+        var bad = game.DayLog.Where(n => n.Kind is DayNoteKind.Ill or DayNoteKind.Hurt && n.Tone == DayTone.Bad).ToList();
         Assert.Equal(game.Untreated, bad.Count);
         Assert.All(bad, n => Assert.Contains("Nobody came", n.Outcome));
         Assert.Equal(game.TroubleIgnored, game.DayLog.Count(n => n.Kind is DayNoteKind.Trouble or DayNoteKind.LostChild && n.Tone == DayTone.Bad));

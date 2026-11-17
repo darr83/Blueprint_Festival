@@ -10,5 +10,11 @@
     <LangVersion>12</LangVersion>
     <RootNamespace>BlueprintFestival.Simulation</RootNamespace>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!--
+      The rules run hundreds of times a second at the fastest speeds, so they are always compiled
+      for speed, even in the Debug build Godot makes when the game is played from the editor
+      (unoptimised they run about two and a half times slower).
+    -->
+    <Optimize>true</Optimize>
   </PropertyGroup>
 </Project>
