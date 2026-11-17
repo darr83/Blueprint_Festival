@@ -11,6 +11,12 @@ public class DancingTests
     [InlineData(Genre.Electronic, DanceMove.Jump)]
     [InlineData(Genre.Country, DanceMove.Sway)]
     [InlineData(Genre.HipHop, DanceMove.Nod)]
+    [InlineData(Genre.Indie, DanceMove.Shuffle)]
+    [InlineData(Genre.Punk, DanceMove.Pogo)]
+    [InlineData(Genre.Folk, DanceMove.Jig)]
+    [InlineData(Genre.Reggae, DanceMove.Skank)]
+    [InlineData(Genre.Soul, DanceMove.Shimmy)]
+    [InlineData(Genre.Disco, DanceMove.Disco)]
     public void EachSortOfMusicHasItsOwnMove(Genre genre, DanceMove move) => Assert.Equal(move, Dancing.MoveFor(genre));
 
     [Fact]
@@ -78,6 +84,22 @@ public class DancingTests
         {
             Assert.All(Enumerable.Range(0, 300), b => Assert.InRange(Dancing.Through(b * 0.37, move, b), 0, 1 - 1e-12));
         }
+    }
+
+    [Fact]
+    public void EverySortOfMusicHasAMoveNoOtherSortUses()
+    {
+        var moves = Enum.GetValues<Genre>().Select(g => Dancing.MoveFor(g)).ToList();
+        Assert.Equal(moves.Count, moves.Distinct().Count());
+
+        // Nobody pogos at a folk or soul gig, or jigs to punk.
+        Assert.DoesNotContain(DanceMove.Pogo, Enumerable.Range(0, 2000).Select(p => Dancing.MoveFor(Genre.Folk, p)));
+        Assert.DoesNotContain(DanceMove.Pogo, Enumerable.Range(0, 2000).Select(p => Dancing.MoveFor(Genre.Soul, p)));
+        Assert.DoesNotContain(DanceMove.Jig, Enumerable.Range(0, 2000).Select(p => Dancing.MoveFor(Genre.Punk, p)));
+
+        // Nobody pogos or jigs twice as fast.
+        Assert.All(Enumerable.Range(0, 2000), p => Assert.NotEqual(DanceTiming.DoubleTime, Dancing.TimingOf(DanceMove.Pogo, p)));
+        Assert.All(Enumerable.Range(0, 2000), p => Assert.NotEqual(DanceTiming.DoubleTime, Dancing.TimingOf(DanceMove.Jig, p)));
     }
 
     [Fact]

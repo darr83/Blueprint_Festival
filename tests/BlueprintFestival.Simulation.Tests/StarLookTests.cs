@@ -30,7 +30,7 @@ public class StarLookTests
     [Fact]
     public void Each_kind_of_music_has_its_own_look()
     {
-        foreach (var (act, _, look) in EveryMember())
+        foreach (var (act, member, look) in EveryMember())
         {
             switch (act.Genre)
             {
@@ -52,10 +52,28 @@ public class StarLookTests
                 case Genre.HipHop:
                     Assert.NotNull(look.Chain);
                     break;
+                case Genre.Punk:
+                    Assert.Contains(look.Hair, new[] { HairStyle.Mohawk, HairStyle.Crop });
+                    Assert.NotNull(look.Chain);
+                    break;
+                case Genre.Indie:
+                    Assert.Contains(look.Hair, new[] { HairStyle.Mop, HairStyle.Bob });
+                    break;
+                case Genre.Disco:
+                    Assert.True(look.Sparkles is not null || act.Rating < 4);
+                    break;
+                case Genre.Soul:
+                    Assert.True(look.Jacket is not null || look.Top == TopStyle.Dress || act.Members[member] == BandRole.Drummer);
+                    break;
             }
 
             Assert.Null(look.Poncho);
         }
+
+        // Folk men wear flat caps, and some reggae stars a striped knitted hat.
+        Assert.All(EveryMember().Where(m => m.Act.Genre == Genre.Folk && !m.Look.Female), m => Assert.Equal(Hat.FlatCap, m.Look.Hat));
+        Assert.Contains(EveryMember(), m => m.Act.Genre == Genre.Reggae && m.Look.Hat == Hat.Tam);
+        Assert.Contains(EveryMember(), m => m.Act.Genre == Genre.Punk && m.Look.Hair == HairStyle.Mohawk);
 
         // Rock stars wear leather jackets, unless they are behind the drums.
         Assert.All(EveryMember().Where(m => m.Act.Genre == Genre.Rock && m.Act.Members[m.Member] != BandRole.Drummer), m => Assert.NotNull(m.Look.Jacket));

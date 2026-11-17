@@ -22,6 +22,9 @@ public enum ActKind
     FolkBand,
     Band,
     Dj,
+
+    /// <summary>A three-piece: guitar, bass and drums.</summary>
+    Trio,
 }
 
 /// <summary>The sort of music an act plays.</summary>
@@ -33,6 +36,12 @@ public enum Genre
     Electronic,
     Metal,
     HipHop,
+    Indie,
+    Punk,
+    Folk,
+    Reggae,
+    Soul,
+    Disco,
 }
 
 /// <summary>
@@ -67,7 +76,7 @@ public sealed record Act(string Name, ActKind Kind, IReadOnlyList<BandRole> Memb
     public IReadOnlyList<BandRole> On(int room) => Members.Take(Math.Max(1, room)).ToList();
 }
 
-/// <summary>One of the 25 artists who play the festival. Headline artists are the ones offered to close the night.</summary>
+/// <summary>One of the 50 artists who play the festival. Headline artists are the ones offered to close the night.</summary>
 /// <remarks>
 /// Who says whether each member is a woman ('f') or a man ('m'), in the order the members are
 /// listed: singer first, then guitarist and so on (see the line-ups in <see cref="ActGenerator"/>).
@@ -117,6 +126,46 @@ public static class Roster
         new Artist("DJ Magpie", ActKind.Dj, Genre.HipHop, 3, 47000, Headline: true, Who: "f"),
         new Artist("DJ Foxglove", ActKind.Dj, Genre.Electronic, 4, 420000, Headline: true, Who: "f"),
         new Artist("DJ Otter", ActKind.Dj, Genre.Electronic, 5, 3100000, Headline: true, Who: "m"),
+
+        // The second 25 (17 Nov 2026): six more sorts of music, and mostly bands.
+        // Indie.
+        new Artist("Puddle Club", ActKind.Band, Genre.Indie, 2, 6200, Who: "mfmmf"),
+        new Artist("The Hayloft Assembly", ActKind.Band, Genre.Indie, 3, 41000, Who: "fmmfm"),
+        new Artist("Cartwheel Season", ActKind.Trio, Genre.Indie, 4, 290000, Who: "fmm"),
+
+        // Punk.
+        new Artist("Nettle Rash", ActKind.Trio, Genre.Punk, 1, 610, Who: "ffm"),
+        new Artist("The Rusty Kettles", ActKind.Band, Genre.Punk, 2, 7800, Headline: true, Who: "mmfmm"),
+        new Artist("Scarecrow Riot", ActKind.Band, Genre.Punk, 4, 210000, Headline: true, Who: "fmmmf"),
+
+        // Folk.
+        new Artist("Ivy and Thistle", ActKind.Duo, Genre.Folk, 1, 450, Who: "ff"),
+        new Artist("The Millpond Fiddlers", ActKind.FolkBand, Genre.Folk, 2, 3900, Who: "mfmf"),
+        new Artist("The Barleycorn Circle", ActKind.FolkBand, Genre.Folk, 3, 29000, Who: "fmfm"),
+        new Artist("The Old Oak Ramblers", ActKind.FolkBand, Genre.Folk, 4, 160000, Who: "mmfm"),
+
+        // Reggae.
+        new Artist("Sunny Allotment", ActKind.Band, Genre.Reggae, 2, 5500, Who: "mfmmm"),
+        new Artist("The Orchard Sound System", ActKind.Band, Genre.Reggae, 3, 36000, Who: "fmmmf"),
+        new Artist("Roots of the Willow", ActKind.Band, Genre.Reggae, 4, 250000, Who: "mmmfm"),
+
+        // Soul.
+        new Artist("Della Marsh", ActKind.Solo, Genre.Soul, 2, 8100, Who: "f"),
+        new Artist("The Honeysuckle Revue", ActKind.Band, Genre.Soul, 3, 58000, Who: "fmfmm"),
+        new Artist("The Golden Sparrows", ActKind.Band, Genre.Soul, 5, 2200000, Headline: true, Who: "fmmff"),
+
+        // Disco.
+        new Artist("Glitterbarn", ActKind.Band, Genre.Disco, 2, 9100, Who: "fmfmf"),
+        new Artist("The Mirrorball Mice", ActKind.Band, Genre.Disco, 3, 33000, Headline: true, Who: "mfmfm"),
+        new Artist("Starling Disco Club", ActKind.Band, Genre.Disco, 5, 2800000, Headline: true, Who: "ffmmf"),
+
+        // More of the first six sorts, as bands.
+        new Artist("Gravel Lane", ActKind.Trio, Genre.Rock, 1, 870, Who: "mmf"),
+        new Artist("Iron Pitchfork", ActKind.Band, Genre.Metal, 2, 6600, Who: "mmfmm"),
+        new Artist("Sugar Beet Social", ActKind.Band, Genre.Pop, 2, 4400, Who: "ffmfm"),
+        new Artist("Cider Gate", ActKind.Trio, Genre.Country, 2, 3100, Who: "fmm"),
+        new Artist("Harvest Crew", ActKind.Duo, Genre.HipHop, 2, 6900, Who: "mf"),
+        new Artist("DJ Pylon", ActKind.Dj, Genre.Electronic, 3, 51000, Who: "f"),
     };
 
     /// <summary>The artist of that name, or null.</summary>
@@ -215,6 +264,7 @@ public static class ActGenerator
         new[] { BandRole.Singer, BandRole.Fiddler, BandRole.Guitarist, BandRole.Drummer },
         new[] { BandRole.Singer, BandRole.Guitarist, BandRole.Bassist, BandRole.Drummer, BandRole.Keys },
         new[] { BandRole.Dj },
+        new[] { BandRole.Guitarist, BandRole.Bassist, BandRole.Drummer },
     };
 
     /// <summary>One act from the roster. Headliners are bands or DJs where one is free, and draw most of the field.</summary>
@@ -223,7 +273,7 @@ public static class ActGenerator
         var roll = random.NextDouble();
         var kind = headliner
             ? (roll < 0.7 ? ActKind.Band : ActKind.Dj)
-            : roll < 0.18 ? ActKind.Solo : roll < 0.42 ? ActKind.Duo : roll < 0.68 ? ActKind.FolkBand : roll < 0.9 ? ActKind.Band : ActKind.Dj;
+            : roll < 0.08 ? ActKind.Solo : roll < 0.22 ? ActKind.Duo : roll < 0.36 ? ActKind.Trio : roll < 0.54 ? ActKind.FolkBand : roll < 0.9 ? ActKind.Band : ActKind.Dj;
 
         string name;
         do
@@ -235,7 +285,7 @@ public static class ActGenerator
                 ActKind.Solo => People[random.Next(People.Length)],
                 ActKind.Duo => $"{a} & {b}",
                 ActKind.Dj => $"DJ {b[..^1]}",
-                ActKind.FolkBand => $"{a} {b}",
+                ActKind.FolkBand or ActKind.Trio => $"{a} {b}",
                 _ => $"The {a} {b}",
             };
         }

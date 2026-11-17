@@ -13,7 +13,7 @@ namespace BlueprintFestival.Core;
 /// </summary>
 public partial class StarShots : Node
 {
-    private static readonly string[] Names = { "1_every_genre_front", "2_every_genre_back", "3_country_rock_metal", "4_pop_electronic_hip_hop", "5_star_or_local" };
+    private static readonly string[] Names = { "1_every_genre_front", "2_every_genre_back", "3_country_rock_metal", "4_pop_electronic_hip_hop", "5_star_or_local", "6_indie_punk_folk", "7_reggae_soul_disco" };
 
     private readonly string _directory;
     private int _scene = -1;
@@ -99,6 +99,14 @@ public partial class StarShots : Node
             case 4:
                 StarOrLocal();
                 festival.Camera.LookCloser(centre.X - 0.5f, centre.Z - 0.5f, 3.4f);
+                break;
+            case 5:
+                Rows(new[] { Genre.Indie, Genre.Punk, Genre.Folk }, false, 1.25f);
+                festival.Camera.LookCloser(centre.X - 0.55f, centre.Z - 0.55f, 2.9f);
+                break;
+            case 6:
+                Rows(new[] { Genre.Reggae, Genre.Soul, Genre.Disco }, false, 1.25f);
+                festival.Camera.LookCloser(centre.X - 0.55f, centre.Z - 0.55f, 2.9f);
                 break;
         }
 

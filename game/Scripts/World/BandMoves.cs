@@ -222,7 +222,7 @@ public static class BandMoves
     /// <summary>How high a rock or metal player jumps on the first beat of every eighth bar.</summary>
     private static float Jump(double beat, Genre genre)
     {
-        if (genre is not (Genre.Rock or Genre.Metal))
+        if (genre is not (Genre.Rock or Genre.Metal or Genre.Punk))
         {
             return 0;
         }

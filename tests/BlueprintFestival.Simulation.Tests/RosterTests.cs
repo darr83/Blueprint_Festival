@@ -17,12 +17,13 @@ public class RosterTests
     }
 
     [Fact]
-    public void There_are_twenty_five_artists_of_every_kind_and_genre()
+    public void There_are_fifty_artists_of_every_kind_and_genre()
     {
         var artists = Roster.Artists;
 
-        Assert.Equal(25, artists.Count);
-        Assert.Equal(25, artists.Select(a => a.Name).Distinct(StringComparer.OrdinalIgnoreCase).Count());
+        Assert.Equal(50, artists.Count);
+        Assert.Equal(50, artists.Select(a => a.Name).Distinct(StringComparer.OrdinalIgnoreCase).Count());
+        Assert.True(artists.Count(a => a.Kind == ActKind.Trio) >= 4);
         Assert.True(artists.Count(a => a.Kind == ActKind.Solo) >= 4);
         Assert.True(artists.Count(a => a.Kind == ActKind.Duo) >= 4);
         Assert.True(artists.Count(a => a.Kind is ActKind.Band or ActKind.FolkBand) >= 8);
@@ -60,9 +61,40 @@ public class RosterTests
     {
         for (var stars = 2; stars <= 5; stars++)
         {
-            Assert.Single(Roster.Artists, a => a.Headline && a.Rating == stars && a.Kind == ActKind.Band);
+            Assert.Contains(Roster.Artists, a => a.Headline && a.Rating == stars && a.Kind == ActKind.Band);
             Assert.Single(Roster.Artists, a => a.Headline && a.Rating == stars && a.Kind == ActKind.Dj);
         }
+    }
+
+    [Fact]
+    public void The_second_twenty_five_are_mostly_bands_and_bring_six_new_sorts_of_music()
+    {
+        var second = Roster.Artists.Skip(25).ToList();
+        Assert.Equal(25, second.Count);
+        Assert.True(second.Count(a => a.Kind is ActKind.Band or ActKind.FolkBand or ActKind.Trio) >= 20);
+        Assert.True(second.Count(a => a.Kind == ActKind.Solo) <= 1);
+        foreach (var genre in new[] { Genre.Indie, Genre.Punk, Genre.Folk, Genre.Reggae, Genre.Soul, Genre.Disco })
+        {
+            Assert.InRange(second.Count(a => a.Genre == genre), 3, 4);
+        }
+
+        // A three-piece plays guitar, bass and drums.
+        var trio = ActGenerator.Of(Roster.Named("Cartwheel Season")!);
+        Assert.Equal(new[] { BandRole.Guitarist, BandRole.Bassist, BandRole.Drummer }, trio.Members);
+    }
+
+    [Fact]
+    public void Festivals_book_more_bands_than_solo_acts()
+    {
+        var kinds = new List<ActKind>();
+        for (var seed = 0; seed < 400; seed++)
+        {
+            kinds.Add(ActGenerator.Make(new BlueprintFestival.Simulation.Core.GameRandom((ulong)seed + 1), false, new HashSet<string>()).Kind);
+        }
+
+        var bands = kinds.Count(k => k is ActKind.Band or ActKind.FolkBand or ActKind.Trio);
+        Assert.True(bands > kinds.Count / 2, $"Only {bands} of {kinds.Count} support acts were bands.");
+        Assert.True(kinds.Count(k => k == ActKind.Solo) < kinds.Count / 6);
     }
 
     [Fact]

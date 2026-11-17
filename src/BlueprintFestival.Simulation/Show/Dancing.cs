@@ -38,6 +38,24 @@ public enum DanceMove
 
     /// <summary>Singing along in a chorus: both arms up, swaying slowly from side to side, head back.</summary>
     SingAlong,
+
+    /// <summary>A shuffle: shoulders hunched, stepping on the spot, one elbow and then the other swinging up (indie).</summary>
+    Shuffle,
+
+    /// <summary>The pogo: straight up and down on the spot, arms stiff by the sides (punk).</summary>
+    Pogo,
+
+    /// <summary>A jig: hopping from one foot to the other, hands on the hips (folk).</summary>
+    Jig,
+
+    /// <summary>A skank: knees bending slowly, arms bent and rolling forward one after the other (reggae).</summary>
+    Skank,
+
+    /// <summary>A shimmy: shoulders shaking side to side, hands low and clicking (soul).</summary>
+    Shimmy,
+
+    /// <summary>The disco point: one hand up high to the side and then down across the body (disco).</summary>
+    Disco,
 }
 
 /// <summary>Which beats someone dances on.</summary>
@@ -69,6 +87,12 @@ public static class Dancing
         Genre.Electronic => DanceMove.Jump,
         Genre.Country => DanceMove.Sway,
         Genre.HipHop => DanceMove.Nod,
+        Genre.Indie => DanceMove.Shuffle,
+        Genre.Punk => DanceMove.Pogo,
+        Genre.Folk => DanceMove.Jig,
+        Genre.Reggae => DanceMove.Skank,
+        Genre.Soul => DanceMove.Shimmy,
+        Genre.Disco => DanceMove.Disco,
         _ => DanceMove.Bounce,
     };
 
@@ -96,6 +120,12 @@ public static class Dancing
                 Genre.HipHop => DanceMove.Bounce,
                 Genre.Pop => DanceMove.Sway,
                 Genre.Country => DanceMove.Step,
+                Genre.Indie => DanceMove.Bounce,
+                Genre.Punk => DanceMove.HeadBang,
+                Genre.Folk => DanceMove.Sway,
+                Genre.Reggae => DanceMove.Step,
+                Genre.Soul => DanceMove.Sway,
+                Genre.Disco => DanceMove.Bounce,
                 _ => DanceMove.Tap,
             };
         }
@@ -121,6 +151,12 @@ public static class Dancing
         Genre.Electronic => ElectronicStyles,
         Genre.Country => CountryStyles,
         Genre.HipHop => HipHopStyles,
+        Genre.Indie => IndieStyles,
+        Genre.Punk => PunkStyles,
+        Genre.Folk => FolkStyles,
+        Genre.Reggae => ReggaeStyles,
+        Genre.Soul => SoulStyles,
+        Genre.Disco => DiscoStyles,
         _ => PopStyles,
     };
 
@@ -130,6 +166,12 @@ public static class Dancing
     private static readonly DanceMove[] ElectronicStyles = { DanceMove.Wave, DanceMove.Point, DanceMove.Step, DanceMove.ClapHigh };
     private static readonly DanceMove[] CountryStyles = { DanceMove.Step, DanceMove.ClapHigh, DanceMove.Wave };
     private static readonly DanceMove[] HipHopStyles = { DanceMove.Point, DanceMove.Wave, DanceMove.Step, DanceMove.Bounce };
+    private static readonly DanceMove[] IndieStyles = { DanceMove.Jump, DanceMove.Point, DanceMove.ClapHigh, DanceMove.Step };
+    private static readonly DanceMove[] PunkStyles = { DanceMove.Jump, DanceMove.Point, DanceMove.Horns };
+    private static readonly DanceMove[] FolkStyles = { DanceMove.Step, DanceMove.ClapHigh, DanceMove.Wave };
+    private static readonly DanceMove[] ReggaeStyles = { DanceMove.Wave, DanceMove.Sway, DanceMove.Point };
+    private static readonly DanceMove[] SoulStyles = { DanceMove.Step, DanceMove.ClapHigh, DanceMove.Wave, DanceMove.Point };
+    private static readonly DanceMove[] DiscoStyles = { DanceMove.Point, DanceMove.Step, DanceMove.ClapHigh, DanceMove.Wave };
 
     /// <summary>
     /// Which beats someone dances on: most on the hit with everyone else, about one in eight on the
@@ -150,7 +192,7 @@ public static class Dancing
             return DanceTiming.Offbeat;
         }
 
-        if (roll < 20 && move is not (DanceMove.Jump or DanceMove.Wave or DanceMove.Step))
+        if (roll < 20 && move is not (DanceMove.Jump or DanceMove.Wave or DanceMove.Step or DanceMove.Pogo or DanceMove.Jig or DanceMove.Skank))
         {
             return DanceTiming.DoubleTime;
         }
@@ -170,7 +212,8 @@ public static class Dancing
     /// a hip hop nod leans one way and then the other.
     /// </summary>
     public static int BeatsAMove(DanceMove move) =>
-        move is DanceMove.Sway or DanceMove.Jump or DanceMove.Nod or DanceMove.Bounce or DanceMove.Wave or DanceMove.Point or DanceMove.Step or DanceMove.SingAlong ? 2 : 1;
+        move is DanceMove.Sway or DanceMove.Jump or DanceMove.Nod or DanceMove.Bounce or DanceMove.Wave or DanceMove.Point or DanceMove.Step or DanceMove.SingAlong
+            or DanceMove.Shuffle or DanceMove.Jig or DanceMove.Shimmy or DanceMove.Disco ? 2 : 1;
 
     /// <summary>
     /// How far off the beat someone is, as a part of a beat: nobody is more than a twentieth of a

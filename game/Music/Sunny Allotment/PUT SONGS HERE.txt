@@ -1,0 +1,13 @@
+Sunny Allotment
+Five-piece band. Reggae. 2 out of 5 stars. 5.5k fans.
+
+Put 2, 3 or 4 songs for Sunny Allotment in this folder.
+
+Name each file with a number and the song's title, like this:
+
+    01 Song Title.mp3
+    02 Another Song.mp3
+    03 The Big Finish.mp3
+
+The number is the order the songs are played in. The title is what the game shows.
+The files can be .mp3, .ogg or .wav.

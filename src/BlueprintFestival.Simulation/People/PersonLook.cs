@@ -25,6 +25,12 @@ public enum HairStyle
 
     /// <summary>Short at the sides with a swept-up front.</summary>
     Quiff,
+
+    /// <summary>Shaved at the sides with a tall spiky crest down the middle (punk stars).</summary>
+    Mohawk,
+
+    /// <summary>A shaggy mop over the ears and forehead (indie stars).</summary>
+    Mop,
 }
 
 public enum TopStyle
@@ -68,6 +74,12 @@ public enum Hat
 
     /// <summary>A cap worn with the peak at the back.</summary>
     CapBackwards,
+
+    /// <summary>A flat tweed cap with a short peak (folk stars).</summary>
+    FlatCap,
+
+    /// <summary>A big slouchy knitted hat in red, gold and green bands (reggae stars).</summary>
+    Tam,
 }
 
 /// <summary>

@@ -24,6 +24,12 @@ public partial class DanceShots : Node
         ("4_electronic", "DJ Foxglove", 0),
         ("5_country", "Tobias Pell", 40),
         ("6_hip_hop", "DJ Magpie", 40),
+        ("7_indie", "Cartwheel Season", 40),
+        ("8_punk", "Scarecrow Riot", 40),
+        ("9_folk", "The Old Oak Ramblers", 40),
+        ("10_reggae", "Roots of the Willow", 40),
+        ("11_soul", "The Golden Sparrows", 40),
+        ("12_disco", "Starling Disco Club", 40),
     };
 
     /// <summary>How many frames each scene is filmed for.</summary>
