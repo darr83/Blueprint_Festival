@@ -32,7 +32,7 @@ public partial class FestivalSounds : Node
         Pass();
     }
 
-    /// <summary>Listens from where the player is looking, so the fairground, the stalls and the gates are only heard near where the player is looking.</summary>
+    /// <summary>Listens from where the player is looking, so the fairground, and the stalls are only heard near where the player is looking.</summary>
     public void Follow(CameraRig rig, StageCam? cam)
     {
         _rig = rig;

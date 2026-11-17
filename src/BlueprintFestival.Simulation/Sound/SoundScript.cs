@@ -279,7 +279,7 @@ public sealed class SoundScript : IDisposable
         return level <= 0 ? 0 : level * (1 - (StageDrowns * StageHeard()));
     }
 
-    /// <summary>The quietest a stall's serving sound or a gate's ticket check can be and still be played.</summary>
+    /// <summary>The quietest a stall's serving sound can be and still be played.</summary>
     public const double StallCueHeard = 0.12;
 
     /// <summary>How much a stage playing nearby drowns out the stalls and the fair: at full music they are this much quieter.</summary>
@@ -655,25 +655,8 @@ public sealed class SoundScript : IDisposable
         }
     }
 
-    private void OnTickets(int people)
-    {
-        var sound = _game.Site.Gates.Any(g => g.Kind == GateKind.TurnstileRow) ? Sounds.GateTurnstile : Sounds.GateTicket;
-        var level = 0.0;
-        foreach (var gate in _game.Site.Gates)
-        {
-            level = Math.Max(level, NearbyHeard(MiddleOf(gate.Rect)));
-        }
-
-        if (_game.Site.Gates.Count == 0)
-        {
-            level = NearbyHeard(null);
-        }
-
-        if (level >= StallCueHeard)
-        {
-            Say(sound, level);
-        }
-    }
+    private void OnTickets(int people) =>
+        Say(_game.Site.Gates.Any(g => g.Kind == GateKind.TurnstileRow) ? Sounds.GateTurnstile : Sounds.GateTicket);
 
     private void OnServed(PlacedStall stall, int people, int paid)
     {
