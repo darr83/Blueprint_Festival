@@ -105,6 +105,30 @@ public static class StageMix
         return level < 0.02 ? 0 : level;
     }
 
+    /// <summary>How far a stall's serving sounds (a till, a pour, a fryer) carry, in metres, against the height of the view: less than an entertainer.</summary>
+    public const double StallCarryPerViewMetre = 0.15;
+
+    /// <summary>A stall's sounds always carry at least this far, in metres.</summary>
+    public const double StallLeastCarry = 6;
+
+    /// <summary>
+    /// How loud one stall's serving sounds are, from 0 to 1, with the view centred on a point and a
+    /// given height of view. Close in it is plain to hear; it falls away quickly as the view moves
+    /// off the stall, and zoomed out over the site it is silent, so a row of food vans and bars is
+    /// only heard while the player is looking at them.
+    /// </summary>
+    public static double Stall(double x, double y, double viewHeight, double sx, double sy)
+    {
+        var zoom = ZoomedOut(viewHeight);
+        var overall = 0.8 * (1 - zoom) * (1 - zoom);
+        var carry = Math.Max(StallLeastCarry, Math.Clamp(viewHeight, ClosestView, FurthestView) * StallCarryPerViewMetre);
+        var dx = sx - x;
+        var dy = sy - y;
+        var away = Math.Sqrt((dx * dx) + (dy * dy)) / carry;
+        var level = overall / (1 + (away * away * away));
+        return level < 0.02 ? 0 : level;
+    }
+
     /// <summary>
     /// How loud each stage is while a stage camera films one of them: that stage in full, the others
     /// faint in the distance.

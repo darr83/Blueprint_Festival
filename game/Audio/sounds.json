@@ -141,7 +141,7 @@
       "bus": "Effects",
       "seconds": 1,
       "loop": false,
-      "volume": 0.5,
+      "volume": 0.35,
       "gap": 1.5,
       "prompt": "A paper ticket torn in half, then a rubber hand stamp thump."
     },
@@ -150,7 +150,7 @@
       "bus": "Effects",
       "seconds": 1,
       "loop": false,
-      "volume": 0.5,
+      "volume": 0.35,
       "gap": 1.0,
       "prompt": "A metal turnstile rotating with a solid clunk."
     },
@@ -159,7 +159,7 @@
       "bus": "Effects",
       "seconds": 1,
       "loop": false,
-      "volume": 0.45,
+      "volume": 0.3,
       "gap": 2.5,
       "prompt": "An old-fashioned cash register opening with a ka-ching bell."
     },
@@ -168,7 +168,7 @@
       "bus": "Effects",
       "seconds": 2,
       "loop": false,
-      "volume": 0.45,
+      "volume": 0.3,
       "gap": 4,
       "prompt": "Beer poured from a tap into a plastic cup."
     },
@@ -177,7 +177,7 @@
       "bus": "Effects",
       "seconds": 2,
       "loop": false,
-      "volume": 0.45,
+      "volume": 0.3,
       "gap": 4,
       "prompt": "Food sizzling on a hot griddle in a food van."
     },
@@ -186,7 +186,7 @@
       "bus": "Effects",
       "seconds": 1,
       "loop": false,
-      "volume": 0.45,
+      "volume": 0.3,
       "gap": 4,
       "prompt": "A china teacup set down on a saucer with a clink."
     },
@@ -195,7 +195,7 @@
       "bus": "Effects",
       "seconds": 1.5,
       "loop": false,
-      "volume": 0.4,
+      "volume": 0.3,
       "gap": 4,
       "prompt": "The plastic door of a portable toilet banging shut and the latch sliding across."
     },
@@ -204,7 +204,7 @@
       "bus": "Effects",
       "seconds": 2,
       "loop": false,
-      "volume": 0.4,
+      "volume": 0.3,
       "gap": 5,
       "prompt": "An outdoor standpipe tap filling a plastic bottle for a moment, then turned off."
     },
@@ -312,7 +312,7 @@
       "bus": "Effects",
       "seconds": 1.5,
       "loop": false,
-      "volume": 0.7,
+      "volume": 0.35,
       "gap": 0.0,
       "prompt": "A thin plastic rain poncho shaken out and rustling."
     },
@@ -863,7 +863,7 @@
       "bus": "Effects",
       "seconds": 2,
       "loop": false,
-      "volume": 0.45,
+      "volume": 0.3,
       "gap": 0.6,
       "prompt": "An espresso machine at an outdoor coffee van, a short burst of steam wand hissing and a cup set down."
     },
@@ -872,7 +872,7 @@
       "bus": "Effects",
       "seconds": 2,
       "loop": false,
-      "volume": 0.45,
+      "volume": 0.3,
       "gap": 0.6,
       "prompt": "A slush machine churning and a tap pouring crushed iced drink into a plastic cup."
     },
@@ -881,7 +881,7 @@
       "bus": "Effects",
       "seconds": 2,
       "loop": false,
-      "volume": 0.45,
+      "volume": 0.3,
       "gap": 0.6,
       "prompt": "A bartender shaking a metal cocktail shaker full of ice, then pouring it into a glass."
     },
@@ -890,7 +890,7 @@
       "bus": "Effects",
       "seconds": 1.5,
       "loop": false,
-      "volume": 0.45,
+      "volume": 0.3,
       "gap": 0.6,
       "prompt": "A metal scoop scraping ice cream from a tub and pressing it into a crunchy cone."
     },
@@ -899,7 +899,7 @@
       "bus": "Effects",
       "seconds": 1.5,
       "loop": false,
-      "volume": 0.45,
+      "volume": 0.3,
       "gap": 0.6,
       "prompt": "A cardboard pizza box flipped open and shut, and a pizza peel sliding out of a wood fired oven."
     },
@@ -908,7 +908,7 @@
       "bus": "Effects",
       "seconds": 2,
       "loop": false,
-      "volume": 0.45,
+      "volume": 0.3,
       "gap": 0.6,
       "prompt": "Noodles tossed in a hot wok, a loud sizzle and a metal spatula scraping."
     },
@@ -917,7 +917,7 @@
       "bus": "Effects",
       "seconds": 1.5,
       "loop": false,
-      "volume": 0.45,
+      "volume": 0.3,
       "gap": 0.6,
       "prompt": "A paper carrier bag being opened and something soft folded into it, the paper rustling."
     },
@@ -926,7 +926,7 @@
       "bus": "Effects",
       "seconds": 1,
       "loop": false,
-      "volume": 0.45,
+      "volume": 0.3,
       "gap": 0.6,
       "prompt": "A phone charging cable plugged into a socket with a small click and a short electronic chime."
     },
@@ -935,7 +935,7 @@
       "bus": "Effects",
       "seconds": 2,
       "loop": false,
-      "volume": 0.5,
+      "volume": 0.35,
       "gap": 0.6,
       "prompt": "A champagne cork popping, fizz poured into two glasses and the glasses clinking."
     },
@@ -944,7 +944,7 @@
       "bus": "Effects",
       "seconds": 1,
       "loop": false,
-      "volume": 0.4,
+      "volume": 0.3,
       "gap": 0.6,
       "prompt": "An empty plastic cup and paper wrapper tossed into a wheelie bin, a hollow plastic thunk as the lid drops."
     },
