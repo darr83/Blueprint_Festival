@@ -59,6 +59,7 @@ public partial class ShowView : Node3D
     private Node3D _rig = null!;
     private PlacedStage? _stage;
     private int _slot = -2;
+    private Act? _act;
     private int _onStage = -1;
     private bool _djLights;
     private double _time;
@@ -158,7 +159,8 @@ public partial class ShowView : Node3D
         // stays on for a few minutes to take the applause.
         var slot = _beat.Slot;
         var roles = slot is null || stage is null ? System.Array.Empty<BandRole>() : slot.Act.On(Catalogue.Of(stage.Kind).Performers);
-        if (stage != _stage || (slot?.Index ?? -1) != _slot || roles.Count != _onStage)
+        // A different act put on in the same set (from the dev panel) changes who is on stage too.
+        if (stage != _stage || (slot?.Index ?? -1) != _slot || roles.Count != _onStage || slot?.Act != _act)
         {
             var dj = slot?.Act.Kind == ActKind.Dj;
             if (stage != _stage || dj != _djLights)
@@ -168,6 +170,7 @@ public partial class ShowView : Node3D
 
             _stage = stage;
             _slot = slot?.Index ?? -1;
+            _act = slot?.Act;
             _onStage = roles.Count;
             _djLights = dj;
             BuildBand(stage, slot, roles);

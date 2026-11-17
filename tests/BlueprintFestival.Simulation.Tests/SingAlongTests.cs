@@ -3,6 +3,7 @@ using Xunit;
 
 namespace BlueprintFestival.Simulation.Tests;
 
+[Collection(SingingCollection.Name)]
 public class SingAlongTests
 {
     [Fact]

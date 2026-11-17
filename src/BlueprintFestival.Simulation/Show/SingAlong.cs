@@ -1,5 +1,18 @@
 namespace BlueprintFestival.Simulation.Show;
 
+/// <summary>How the crowd sings along, set from the dev panel.</summary>
+public enum SingingSetting
+{
+    /// <summary>Nobody sings along.</summary>
+    Off,
+
+    /// <summary>As the game plays it: the happier the crowd, the more sing, and now and then the act leaves a chorus to them.</summary>
+    Normal,
+
+    /// <summary>Every chorus is left to the crowd: the act and the music drop out and only the crowd sings.</summary>
+    JustTheCrowd,
+}
+
 /// <summary>
 /// Who in the crowd sings along in a chorus, and how loud they are. A happy crowd sings and a fed-up
 /// one does not; an act with a big following gets more of the field singing. The people at the front
@@ -23,10 +36,23 @@ public static class SingAlong
     /// </summary>
     public static double Share(int happiness, int fans)
     {
+        if (Setting == SingingSetting.Off)
+        {
+            return 0;
+        }
+
         var mood = Math.Clamp((happiness - SingsFrom) / 45.0, 0, 1);
         var following = Math.Clamp((Math.Log10(Math.Max(fans, 1)) - 2.5) / 4.0, 0, 1);
-        return mood * (0.45 + (0.55 * following));
+        var share = mood * (0.45 + (0.55 * following));
+        // With every chorus left to them, enough of the crowd sings to carry it, however they feel.
+        return Setting == SingingSetting.JustTheCrowd ? Math.Max(share, JustTheCrowdShare) : share;
     }
+
+    /// <summary>How the crowd sings along just now. Normal unless changed on the dev panel; not saved.</summary>
+    public static SingingSetting Setting { get; set; } = SingingSetting.Normal;
+
+    /// <summary>How keen the crowd is to sing, at least, while every chorus is left to them.</summary>
+    public const double JustTheCrowdShare = 0.6;
 
     /// <summary>
     /// Whether one person is singing: the keener the crowd, the more do, the front first. Someone at
@@ -89,6 +115,17 @@ public static class SingAlong
     /// <param name="chorus">The chorus.</param>
     public static Chorus? LeftToTheCrowd(int roll, Chorus chorus)
     {
+        if (Setting == SingingSetting.Off)
+        {
+            return null;
+        }
+
+        if (Setting == SingingSetting.JustTheCrowd)
+        {
+            // The whole chorus, from the first word to the last.
+            return chorus.End - chorus.Start >= 1 ? new Chorus(chorus.Start, chorus.End) : null;
+        }
+
         if ((Roll(roll, 5) % 1000) / 1000.0 >= LeftToTheCrowdChance)
         {
             return null;

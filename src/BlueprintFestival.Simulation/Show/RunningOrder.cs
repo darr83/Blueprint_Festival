@@ -246,6 +246,23 @@ public sealed class RunningOrder
         Put(index, act);
     }
 
+    /// <summary>
+    /// Puts a different act on in a booked set, keeping its times: from the dev panel, to try any act
+    /// at once. False if nobody is booked for that set.
+    /// </summary>
+    public bool Swap(int index, Act act)
+    {
+        ArgumentNullException.ThrowIfNull(act);
+        var place = _slots.FindIndex(s => s.Index == index);
+        if (place < 0)
+        {
+            return false;
+        }
+
+        _slots[place] = _slots[place] with { Act = act };
+        return true;
+    }
+
     /// <summary>Who is booked for a set, or null if it is empty.</summary>
     public Act? At(int index) => _slots.FirstOrDefault(s => s.Index == index)?.Act;
 
