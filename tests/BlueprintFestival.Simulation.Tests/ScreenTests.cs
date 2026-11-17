@@ -111,8 +111,8 @@ public class ScreenTests
     [Fact]
     public void At_a_big_festival_screens_bring_the_act_to_the_people_at_the_back()
     {
-        var bare = GrowthTests.Built(1500);
-        var screened = GrowthTests.Built(1500);
+        var bare = GrowthTests.Built(4000);
+        var screened = GrowthTests.Built(4000);
         var stage = screened.Site.Stages[0].Rect;
         var middle = stage.X + (stage.Width / 2);
 

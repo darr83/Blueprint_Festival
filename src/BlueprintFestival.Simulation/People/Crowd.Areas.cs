@@ -143,7 +143,7 @@ public sealed partial class Crowd
             _waitingAt[area] -= party.Members.Count;
             if (party.Watch >= 0)
             {
-                Claim(spot, party.Members.Count, RunningOrder.StageOf(party.Watch));
+                Claim(party, spot, RunningOrder.StageOf(party.Watch));
             }
         }
     }
