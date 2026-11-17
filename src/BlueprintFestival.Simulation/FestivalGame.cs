@@ -361,10 +361,14 @@ public sealed partial class FestivalGame
         return SkippingTo is null ? Clock.Advance(realSeconds) : RunSkip();
     }
 
-    /// <summary>The most ticks a skip runs in one frame, and the longest it may take over them, so the game keeps drawing.</summary>
-    public const int SkipTicksAFrame = 600;
+    /// <summary>
+    /// The most ticks a skip runs in one frame, and the longest it may take over them, so the game
+    /// keeps drawing. The crowd stands still on screen while a skip runs, so nearly all of each
+    /// frame can go on the rules: about thirty frames a second.
+    /// </summary>
+    public const int SkipTicksAFrame = 1200;
 
-    private static readonly TimeSpan SkipFrameBudget = TimeSpan.FromMilliseconds(14);
+    public static readonly TimeSpan SkipFrameBudget = TimeSpan.FromMilliseconds(30);
 
     /// <summary>The start of the next set on any stage, or null once the last has begun or with no music to come.</summary>
     public Slot? NextAct

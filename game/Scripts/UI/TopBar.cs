@@ -359,7 +359,7 @@ public partial class TopBar : PanelContainer
         _skip.Visible = _game.Phase == Phase.Day && music.Stage is not null;
         _skip.Disabled = upNext is null && _game.SkippingTo is null;
         _skip.Position = new Vector2(_showPill.GlobalPosition.X + ((_showPill.Size.X - _skip.Size.X) / 2), _showPill.GlobalPosition.Y + _showPill.Size.Y + 8);
-        _skip.Text = _game.SkippingTo is not null ? "Skipping..." : "Skip to next act";
+        _skip.Text = _game.SkippingTo is { } until ? $"Skipping to {until.ToString("HH:mm", British)}..." : "Skip to next act";
         _skip.TooltipText = _game.SkippingTo is not null ? "Click to stop skipping"
             : upNext is null ? "There are no more acts to come today"
             : $"Hurry the day on to {upNext.Act.Name} at {upNext.Start.ToString("HH:mm", British)} (N)";

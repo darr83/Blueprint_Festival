@@ -36,7 +36,26 @@ public partial class StaffView : Node3D
         Sync(0, snap: true);
     }
 
-    public override void _Process(double delta) => Sync(delta, snap: false);
+    public override void _Process(double delta)
+    {
+        if (_game.SkippingTo is not null)
+        {
+            // Like the crowd, the staff stand still while skipping to the next act and jump on at the end.
+            _frozen = true;
+            return;
+        }
+
+        if (_frozen)
+        {
+            _frozen = false;
+            Snap();
+            return;
+        }
+
+        Sync(delta, snap: false);
+    }
+
+    private bool _frozen;
 
     /// <summary>Puts everyone exactly where the rules say, with no gliding.</summary>
     public void Snap() => Sync(0, snap: true);

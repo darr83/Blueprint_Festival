@@ -3885,7 +3885,7 @@ public sealed partial class Crowd
             {
                 Hunger = p.Hunger, Thirst = p.Thirst, Toilet = p.Toilet, Mood = p.Mood, Stall = p.Stall,
                 StallPlace = p.Stall >= 0 && p.Stall < _stallQueues.Count ? _stallQueues[p.Stall]?.Parties.IndexOf(p) ?? 0 : 0,
-                Server = p.Server, InLine = p.InLine, LinePos = p.LinePos, Checked = p.Checked,
+                Server = p.Server, InLine = p.InLine, LinePos = p.LinePos, Checked = p.Checked, Rejoins = p.Rejoins,
                 Cubicles = p.Cubicles?.ToList(), WaitRow = p.WaitRow,
                 Visits = p.Cubicles is null || p.Stall < 0 || p.Stall >= _cubicles.Count ? null : _cubicles[p.Stall]
                     .Where(c => ReferenceEquals(c?.Party, p))
@@ -3954,7 +3954,7 @@ public sealed partial class Crowd
             party.InLine = false;
             party.Checked = 0;
             party.Cubicles = null;
-            party.Rejoins = 0;
+            party.Rejoins = s.Rejoins;
             party.GaveUp = s.GaveUp;
             party.Spent = s.Spent;
             party.LeftUnhappy = s.LeftUnhappy;
@@ -4156,6 +4156,9 @@ public sealed record PartySave(int Id, PartyState State, double X, double Y, dou
     public bool InLine { get; init; }
 
     public double LinePos { get; init; }
+
+    /// <summary>How many times they have gone round to the back of the queue again on their way to it.</summary>
+    public int Rejoins { get; init; }
 
     /// <summary>How many of the party have had their tickets checked, or have left the queue for a toilet cubicle.</summary>
     public int Checked { get; init; }
