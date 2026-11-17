@@ -123,7 +123,7 @@ public sealed partial class FestivalGame
             return false;
         }
 
-        if (InPit(member) || OnAGap(member))
+        if (InPit(member) || OnAGap(member) || OnSteps(member))
         {
             return true;
         }

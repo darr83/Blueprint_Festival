@@ -54,6 +54,12 @@ public sealed partial class Crowd
     /// <summary>True if a party is out of the rain and the sun: under a parasol, a sail or the marquee roof.</summary>
     public bool Sheltered(Party party)
     {
+        if (party.Stand >= 0 && _site.StandRoofOver(party.X, party.Y))
+        {
+            // Under the roof of a stand.
+            return true;
+        }
+
         if (_site.Comforts.Count == 0)
         {
             return false;

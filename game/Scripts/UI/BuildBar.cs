@@ -51,6 +51,17 @@ public partial class BuildBar : VBoxContainer
     /// <summary>The key of the VIP ground choice, under Fences.</summary>
     public const string VipGroundKey = "fenceVipGround";
 
+    /// <summary>The key of a kind of stand, under Areas.</summary>
+    public static string StandKey(StandKind kind) => $"stand{kind}";
+
+    private static string StandAbout(StandKind kind) => (kind switch
+    {
+        StandKind.Seated => "Rows of seats, each row higher than the one in front. People sit to watch, see over the crowd and rest their feet.",
+        StandKind.Terrace => "Rows of standing steps, each higher than the one in front. Cheaper than seats; people see over the crowd.",
+        StandKind.Deck => $"A deck {Stands.DeckHeight:0.#} m up on scaffold, with a rail round it, for people to stand on and see over everyone.",
+        _ => "A low deck with a ramp, for people in wheelchairs or who cannot stand in a crowd, and their friends.",
+    }) + "\nSet the rows and roof, then drag along its front. It faces the nearest stage. Post one security by the steps to keep it to its places.";
+
     /// <summary>The key of a kind of crowd area, under Areas.</summary>
     public static string AreaKey(AreaKind kind) => $"area{kind}";
 
@@ -225,7 +236,7 @@ public partial class BuildBar : VBoxContainer
         AddTab(row, BuildMode.Path, "path", "Paths", "Mown, bark, gravel and boardwalk paths, up to 6 m wide");
         AddTab(row, BuildMode.Comfort, "bench", "Comforts", "Seats, tables, hand washing and shade");
         AddTab(row, BuildMode.Camp, "tent", "Camping", "Lay out the camping field: quiet, family and accessible camping, fire lanes, showers, lockers and a camp shop");
-        AddTab(row, BuildMode.Area, "area", "Areas", "Pens and areas in front of the stages, each with its own limit on how many people get in");
+        AddTab(row, BuildMode.Area, "area", "Areas", "Pens and areas in front of the stages, each with its own limit on how many people get in, and seated stands, terraces and raised decks");
         AddTab(row, BuildMode.Sign, "sign", "Decor", "Signs with your own words on, and decorations: bunting, flags, flowers, a fire pit and giant letters");
         AddTab(row, BuildMode.Light, "light", "Lights", "Path lights, floodlights and fairy lights for after dark");
         AddTab(row, BuildMode.Fireworks, "firework", "Fireworks", "A launch pad, and firework shows to plan on the mixer");
@@ -400,6 +411,10 @@ public partial class BuildBar : VBoxContainer
 
                 AddChoice(KeepOutKey, "Keep clear", "Free",
                     "Ground nobody stands on, such as a walkway round a pen for security. Staff still go there.\nDrag to mark it; start on marked ground to clear it. It only shows while you are marking.", () => _tool.PickKeepOut());
+                AddChoice(StandKey(StandKind.Seated), "Seated stand", $"£{Stands.SeatCost} a seat", StandAbout(StandKind.Seated), () => _tool.PickStand(StandKind.Seated));
+                AddChoice(StandKey(StandKind.Terrace), "Terrace", $"£{Stands.TerraceCost} a place", StandAbout(StandKind.Terrace), () => _tool.PickStand(StandKind.Terrace));
+                AddChoice(StandKey(StandKind.Deck), "Raised deck", $"£{Stands.DeckCostPerMetre} a m²", StandAbout(StandKind.Deck), () => _tool.PickStand(StandKind.Deck));
+                AddChoice(StandKey(StandKind.Accessible), "Accessible deck", $"£{Stands.AccessibleCostPerMetre} a m²", StandAbout(StandKind.Accessible), () => _tool.PickStand(StandKind.Accessible));
                 break;
             case BuildMode.Remove:
                 _tool.PickRemove();
@@ -542,6 +557,8 @@ public partial class BuildBar : VBoxContainer
             : k.StartsWith("camp") ? ("tent", UiStyle.StagePink)
             : k.StartsWith("stage") ? ("stage", UiStyle.StagePink)
             : k.StartsWith("fence") ? ("fence", UiStyle.StagePink)
+            : k == "standaccessible" ? ("ramp", UiStyle.StagePink)
+            : k.StartsWith("stand") ? ("tiers", UiStyle.StagePink)
             : k.StartsWith("area") ? ("area", UiStyle.StagePink)
             : k.StartsWith("gate") ? ("gate", UiStyle.StagePink)
             : k.StartsWith("staff") ? ("staff", UiStyle.StagePink)
@@ -630,6 +647,7 @@ public partial class BuildBar : VBoxContainer
             BuildMode.KeepOut => KeepOutKey,
             BuildMode.VipGround => VipGroundKey,
             BuildMode.Area => AreaKey(_tool.Area),
+            BuildMode.Stand => StandKey(_tool.StandKind),
             BuildMode.Camp => CampKey(_tool.CampZone),
             BuildMode.Gate => $"gate{_tool.Gate}",
             BuildMode.Stall => $"stall{_tool.Stall}",

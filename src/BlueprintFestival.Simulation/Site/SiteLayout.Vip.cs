@@ -222,6 +222,7 @@ public sealed partial class SiteLayout
             }
         }
 
-        _map.SetVipOnly(_vipGround.Concat(_vipInside).Concat(VipAreaInside()));
+        StandHeights();
+        _map.SetVipOnly(_vipGround.Concat(_vipInside).Concat(VipAreaInside()).Concat(VipStandTiles()));
     }
 }

@@ -51,6 +51,9 @@ public partial class SiteView : Node3D
     /// <summary>How many crowd areas are drawn.</summary>
     public int AreaCount { get; private set; }
 
+    /// <summary>How many stands are drawn.</summary>
+    public int StandCount { get; private set; }
+
     public int LaneCount { get; private set; }
 
     /// <summary>How many straight runs of fence are drawn.</summary>
@@ -455,6 +458,12 @@ public partial class SiteView : Node3D
             });
         }
 
+        // The stands, drawn where they stand. Who may use one shows in the colour of its rail.
+        foreach (var stand in site.Stands)
+        {
+            Keep(("stand", stand.Kind, stand.Rect, stand.Facing, stand.Roof, stand.Use, string.Join(";", stand.Steps)), () => SiteProps.Stand(stand));
+        }
+
         // Whatever was drawn last time and is not there now has been taken away.
         foreach (var gone in _drawn.Values)
         {
@@ -468,6 +477,7 @@ public partial class SiteView : Node3D
         (_drawn, _drawing) = (_drawing, _drawn);
 
         AreaCount = site.Areas.Count;
+        StandCount = site.Stands.Count;
 
         LaneCount = site.Lanes.Count;
 
