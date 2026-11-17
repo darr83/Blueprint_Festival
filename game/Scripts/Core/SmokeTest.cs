@@ -269,7 +269,7 @@ public partial class SmokeTest : Node
 
                     // Crowd areas: dragged out from the Areas group, barrier round them, a card to set how many they let in.
                     opened.BuildBar.Toggle(BuildMode.Area);
-                    Check(opened.BuildBar.ChoiceCount == 4 && opened.BuildBar.Choose(UI.BuildBar.AreaKey(AreaKind.FrontPen)) && opened.Build.Mode == BuildMode.Area, "The Areas group should offer a front pen, a standing area, a VIP area and keep clear.");
+                    Check(opened.BuildBar.ChoiceCount == 8 && opened.BuildBar.Choose(UI.BuildBar.AreaKey(AreaKind.FrontPen)) && opened.Build.Mode == BuildMode.Area, "The Areas group should offer a front pen, a standing area, a VIP area, keep clear and four kinds of stand.");
                     var (penFrom, penTo) = (new TilePoint(grass.X + 50, grass.Y + 50), new TilePoint(grass.X + 65, grass.Y + 61));
                     opened.Build.HoldDrag(penFrom, penTo);
                     Check(opened.Build.Status.Contains("lets in 70") && opened.Build.AreaMarksShown, $"The bar should say what the pen lets in, not '{opened.Build.Status}'.");
@@ -279,6 +279,22 @@ public partial class SmokeTest : Node
                     Check(opened.Site.AreaCount == 1 && opened.Site.GetNodeOrNull("AreaBarriers") is not null && !opened.Game.Field.IsWalkable(new TilePoint(grass.X + 50, grass.Y + 55)), "The pen's barrier should be drawn and block the way.");
                     opened.BuildBar.Toggle(BuildMode.Remove);
                     Check(!opened.Areas.EditorShown && opened.Build.ClickAt(new TilePoint(grass.X + 55, grass.Y + 55)).Ok && site.Areas.Count == 0 && site.AreaBarriers.Count == 0, "Taking the pen down should take its barrier too.");
+
+                    // Stands: rows and roof set on a card, then dragged along the front; a card to say who may use it.
+                    opened.BuildBar.Toggle(BuildMode.Area);
+                    Check(opened.BuildBar.Choose(UI.BuildBar.StandKey(StandKind.Seated)) && opened.Build.Mode == BuildMode.Stand && opened.StandCards.SetupShown, "A seated stand should be picked with its setting-up card open.");
+                    opened.Build.SetStandRows(3);
+                    opened.Build.SetStandRoof(StandRoof.Full);
+                    Check(opened.StandCards.RowsText == "3", $"The card should show 3 rows, not '{opened.StandCards.RowsText}'.");
+                    var (standFrom, standTo) = (new TilePoint(grass.X + 50, grass.Y + 50), new TilePoint(grass.X + 65, grass.Y + 50));
+                    opened.Build.HoldDrag(standFrom, standTo);
+                    Check(opened.Build.Status.Contains("42 seats"), $"The bar should say how many seats the stand has, not '{opened.Build.Status}'.");
+                    Check(opened.Build.DragStand(standFrom, standTo).Ok && site.Stands.Count == 1 && opened.StandCards.EditorShown && opened.StandCards.SizeText.Contains("42 seats"), $"A seated stand should go up and open its card, not '{opened.StandCards.SizeText}'.");
+                    Check(opened.Game.SetStandUse(0, StandUse.SeatTicket) && opened.Game.SetStandPrice(0, 7) == 7, "Seat tickets should be set on the stand.");
+                    opened.Site.Rebuild();
+                    Check(opened.Site.StandCount == 1 && site.HeightAt(site.Stands[0].At(2, 5)) > 1 && !opened.Game.Field.IsWalkable(site.Stands[0].At(-1, 2)), "The stand should be drawn, high at the back, with a rail round it.");
+                    opened.BuildBar.Toggle(BuildMode.Remove);
+                    Check(!opened.StandCards.EditorShown && opened.Build.ClickAt(new TilePoint(grass.X + 55, grass.Y + 53)).Ok && site.Stands.Count == 0 && opened.Game.Field.IsWalkable(new TilePoint(grass.X + 50, grass.Y + 52)), "Taking the stand down should clear its ground.");
 
                     // Lights: a floodlight is clicked down, fairy lights are dragged out and their poles go in by themselves.
                     opened.BuildBar.Toggle(BuildMode.Light);

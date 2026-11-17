@@ -88,6 +88,9 @@ public partial class FestivalScene : Node3D
     /// <summary>The card for setting a crowd area's limit, and the card when one fills up.</summary>
     public AreaPanel Areas { get; private set; } = null!;
 
+    /// <summary>The cards for setting up a stand and for one that is up.</summary>
+    public StandPanel StandCards { get; private set; } = null!;
+
     /// <summary>The labels over the crowd areas.</summary>
     public AreaLabels AreaTags { get; private set; } = null!;
 
@@ -324,6 +327,9 @@ public partial class FestivalScene : Node3D
             StageCam.Show(null);
             Camera.LookAt((float)x, (float)y, 18f);
         };
+        StandCards = new StandPanel { Name = "StandPanel" };
+        _hud.AddChild(StandCards);
+        StandCards.Initialise(Game, Build);
         AreaTags = new AreaLabels { Name = "AreaLabels" };
         AddChild(AreaTags);
         AreaTags.Initialise(Game, Build, Density);

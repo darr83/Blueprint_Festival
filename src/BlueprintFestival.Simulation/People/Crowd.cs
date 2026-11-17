@@ -123,6 +123,15 @@ public sealed class Party
     /// <summary>The crowd area this party is waiting by the gaps of to be let in, or -1.</summary>
     public int WaitFor { get; internal set; } = -1;
 
+    /// <summary>The stand a party is watching from, or walking up to, or -1.</summary>
+    public int Stand { get; internal set; } = -1;
+
+    /// <summary>Which row of the stand's places they have, counting from the front.</summary>
+    internal int StandRow { get; set; }
+
+    /// <summary>The first of their places in that row; the rest of the party sit beside them.</summary>
+    internal int StandFirst { get; set; }
+
     public DateTime WaitUntil { get; internal set; }
 
     public bool IsOnSite => State is not (PartyState.Expected or PartyState.Gone);
@@ -643,10 +652,17 @@ public sealed partial class Crowd
     /// How much of an act a party watching it gets: all of it near the stage, less and less further
     /// back, unless they are in front of a big screen.
     /// </summary>
-    public double ShareOfTheAct(Party party) =>
-        FromTheStage(party) is not { } metres || metres <= ClearFor(party) || (OnScreen?.Invoke(party.X, party.Y) ?? false)
-            ? 1
-            : BigScreens.Enjoyment(metres, ClearFor(party));
+    public double ShareOfTheAct(Party party)
+    {
+        if (FromTheStage(party) is not { } metres)
+        {
+            return 1;
+        }
+
+        // Up on a stand, people see over the heads of the crowd in front and take in more of it.
+        var clear = ClearFor(party) * (UpOnAStand(party) ? Stands.SeeFurther : 1);
+        return metres <= clear || (OnScreen?.Invoke(party.X, party.Y) ?? false) ? 1 : BigScreens.Enjoyment(metres, clear);
+    }
 
     /// <summary>
     /// How far back from the stage a party is watching people see and hear well: further for a
@@ -953,7 +969,7 @@ public sealed partial class Crowd
                         party.State == PartyState.Unwell && i == 0)
                     {
                         Holding = m.Holding,
-                        Seat = party.State == PartyState.Sitting ? SeatHeight(party, i) : null,
+                        Seat = party.State == PartyState.Sitting ? SeatHeight(party, i) : InTheSeats(party) ? Stands.SeatHeight : null,
                         Ride = OnRide(party) ? party.Stall : -1,
                         RideSeat = (Math.Max(0, party.Server) * Rides.SeatsEach) + Math.Min(i, Rides.SeatsEach - 1),
                         Ticket = party.State == PartyState.Queuing && party.InLine && party.ServiceLeft >= 0 && i >= party.Checked && i < party.Checked + CheckersOn(party.Gate, party.Lane),
@@ -1282,7 +1298,7 @@ public sealed partial class Crowd
             {
                 var p = new TilePoint(x, y);
                 // Room all round: the route finder has just worked out how far every tile is from anything in the way.
-                if (_site.SideOf(p) == wanted && _paths.ClearanceAt(x, y) >= 2 && _map.InFestival(p))
+                if (_site.SideOf(p) == wanted && _paths.ClearanceAt(x, y) >= 2 && _map.InFestival(p) && _site.StandAt(p) < 0)
                 {
                     _standable.Add(p);
                 }
@@ -1919,6 +1935,11 @@ public sealed partial class Crowd
             return comfort.Place(Comforts.Of(comfort.Kind).Seats[seats[i]]);
         }
 
+        if (party.Stand >= 0 && StandPlace(party, i) is { } onStand)
+        {
+            return onStand;
+        }
+
         var m = party.Members[i];
         return (party.X + m.OffsetX, party.Y + m.OffsetY, party.Heading);
     }
@@ -2082,6 +2103,7 @@ public sealed partial class Crowd
             Density.Measure(Loose());
             FreeLeftPlaces();
             CountAreas(now);
+            CountStands(now);
         }
 
         var closing = now.TimeOfDay >= EveryoneOut;
@@ -2355,9 +2377,9 @@ public sealed partial class Crowd
             }
         }
 
-        if (party.State == PartyState.Sitting)
+        if (party.State == PartyState.Sitting || InTheSeats(party))
         {
-            // A sit down does everyone good.
+            // A sit down does everyone good, watching an act from a seat too.
             change += SitPerHour * perHour;
         }
 
@@ -3457,10 +3479,13 @@ public sealed partial class Crowd
 
         // VIP guests watch from a VIP platform near the stage if there is room on it, or from a VIP area.
         var deck = party.Vip ? PlatformSpot(party, stage) : null;
-        var vipArea = party.Vip && deck is null ? VipAreaSpot(party, stage) : null;
-        var chosen = deck ?? vipArea ?? PlaceToWatch(stage, party.Random, slot.Act.Draw, party.Members.Count, _audience[number]);
+
+        // Some would sooner watch from a stand: to sit, to see over the crowd, or to keep dry.
+        var standing = deck is null ? StandSpot(party, stage, slot.Act.Draw) : null;
+        var vipArea = party.Vip && deck is null && standing is null ? VipAreaSpot(party, stage) : null;
+        var chosen = deck ?? standing?.Tile ?? vipArea ?? PlaceToWatch(stage, party.Random, slot.Act.Draw, party.Members.Count, _audience[number]);
         var waitFor = -1;
-        if (deck is null && vipArea is null && _turnedAway >= 0 && slot.Act.Draw >= KeenToWait && party.Random.NextDouble() < 0.6 && WaitByGap(_turnedAway, party) is { } wait)
+        if (deck is null && vipArea is null && standing is null && _turnedAway >= 0 && slot.Act.Draw >= KeenToWait && party.Random.NextDouble() < 0.6 && WaitByGap(_turnedAway, party) is { } wait)
         {
             // A keen fan turned away from a full pen waits by its gap to be let in.
             (chosen, waitFor) = (wait, _turnedAway);
@@ -3479,7 +3504,11 @@ public sealed partial class Crowd
             return false;
         }
 
-        if (deck is null)
+        if (standing is { } up)
+        {
+            TakeStand(party, up);
+        }
+        else if (deck is null)
         {
             Claim(party, spot, number);
         }
@@ -3505,8 +3534,9 @@ public sealed partial class Crowd
     {
         foreach (var party in _parties)
         {
-            if (!party.IsOnSite || party.State is PartyState.Queuing or PartyState.AtStall or PartyState.Unwell)
+            if (!party.IsOnSite || party.State is PartyState.Queuing or PartyState.AtStall or PartyState.Unwell || UpOnAStand(party))
             {
+                // Nobody pushes on a stand: everyone has their own place in a row.
                 continue;
             }
 
@@ -3763,7 +3793,7 @@ public sealed partial class Crowd
         var moved = 0;
         foreach (var party in _parties)
         {
-            if (party.State != PartyState.Watching || party.Watch != slot.Index || Density.At(party.X, party.Y) < DensityMap.Busy || !Listens(party, share))
+            if (party.State != PartyState.Watching || party.Watch != slot.Index || party.Stand >= 0 || Density.At(party.X, party.Y) < DensityMap.Busy || !Listens(party, share))
             {
                 continue;
             }
@@ -3821,6 +3851,7 @@ public sealed partial class Crowd
     {
         LeaveQueue(party);
         LeaveStall(party);
+        party.Stand = -1;
         party.State = PartyState.Unwell;
         party.Watch = -1;
         party.Path = null;
@@ -3899,6 +3930,7 @@ public sealed partial class Crowd
     private void Send(Party party, TilePoint? target, PartyState state)
     {
         GiveUpSeat(party);
+        party.Stand = -1;
         var from = FieldMap.TileAt(party.X, party.Y);
         party.Target = target ?? from;
         if (state == PartyState.Leaving && target is not null && target != party.Pitch && WayOut(party, from) is { } gate
@@ -4027,6 +4059,7 @@ public sealed partial class Crowd
                 Charged = p.Charged, OnGround = p.State == PartyState.Sitting && p.OnGround, SitUntil = p.State == PartyState.Sitting ? p.SitUntil : default, RestAfter = p.RestAfter,
                 Seat = p.State == PartyState.Sitting && p.Seat is { } sat ? new TilePoint(sat.X, sat.Y) : null,
                 Seats = p.State == PartyState.Sitting && p.Seat is not null ? p.Seats?.ToList() : null,
+                Stand = p.Stand, StandRow = p.StandRow, StandFirst = p.StandFirst,
             })
         .ToList();
 
@@ -4123,6 +4156,7 @@ public sealed partial class Crowd
             }
 
             party.StayDecided = s.StayDecided;
+            (party.Stand, party.StandRow, party.StandFirst) = (s.Stand, s.StandRow, s.StandFirst);
             party.NeedRetryAt = s.NeedRetryAt;
             if (s.Mood is { } mood)
             {
@@ -4263,6 +4297,13 @@ public sealed record PartySave(int Id, PartyState State, double X, double Y, dou
     public List<int>? Seats { get; init; }
 
     public bool OnGround { get; init; }
+
+    /// <summary>The stand they are watching from, the row and their first place in it.</summary>
+    public int Stand { get; init; } = -1;
+
+    public int StandRow { get; init; }
+
+    public int StandFirst { get; init; }
 
     public DateTime SitUntil { get; init; }
 

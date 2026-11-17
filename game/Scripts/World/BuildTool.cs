@@ -65,6 +65,9 @@ public enum BuildMode
 
     /// <summary>Marking camping ground for quiet, family or accessible camping, or a fire lane. Also the Camping group on the build bar.</summary>
     Camp,
+
+    /// <summary>Dragging out a seated stand, a terrace or a raised deck. It is on the Areas group of the build bar.</summary>
+    Stand,
 }
 
 /// <summary>
@@ -385,6 +388,7 @@ public partial class BuildTool : Node3D
             BuildMode.VipGround => "Hold the mouse button and drag over ground for VIP guests only. Start on VIP ground to clear it.",
             BuildMode.Camp => $"Hold the mouse button and drag over camping ground to mark it for {CampLayout.Name(CampZone).ToLowerInvariant()}. Start on ground marked that way to clear it.",
             BuildMode.Area => $"Hold the mouse button and drag out a {CrowdAreas.Name(Area).ToLowerInvariant()}. Click an area's barrier to open or close a gap; click inside to set how many it lets in.",
+            BuildMode.Stand => StandHint(StandKind),
             BuildMode.Light => "Click on the grass to put the light up.",
             BuildMode.LaunchPad => "Click on the grass to put the launch pad down. Its safe zone must be clear. Fence it off from the firework mixer.",
             BuildMode.Screen => "Click on the grass to put the screen up. R turns it. It shows the nearest stage to the people in front of it.",
@@ -413,6 +417,11 @@ public partial class BuildTool : Node3D
         if (mode != BuildMode.Area && SelectedArea >= 0)
         {
             SelectArea(-1);
+        }
+
+        if (mode != BuildMode.Stand && SelectedStand >= 0)
+        {
+            SelectStand(-1);
         }
     }
 
@@ -465,6 +474,14 @@ public partial class BuildTool : Node3D
     /// <summary>Turns the thing being placed a quarter turn.</summary>
     public void Turn()
     {
+        if (Mode == BuildMode.Stand)
+        {
+            // A stand turns round to face the other way along the line being dragged.
+            StandTurned = !StandTurned;
+            StandPicked?.Invoke();
+            return;
+        }
+
         Facing = (Facing)(((int)Facing + 1) % 4);
         Vertical = !Vertical;
         ClearGhost();
@@ -1069,6 +1086,10 @@ public partial class BuildTool : Node3D
                 return;
             }
 
+            case BuildMode.Stand:
+                HoverStand(at);
+                return;
+
             case BuildMode.Camp:
             {
                 var from = _dragFrom ?? at;
@@ -1221,7 +1242,7 @@ public partial class BuildTool : Node3D
                 break;
 
             case InputEventMouseButton { ButtonIndex: MouseButton.Left } click when _hovering:
-                if (Mode is BuildMode.Fence or BuildMode.Ground or BuildMode.Lane or BuildMode.KeepOut or BuildMode.VipGround or BuildMode.Fairy or BuildMode.Bunting or BuildMode.Area or BuildMode.Camp)
+                if (Mode is BuildMode.Fence or BuildMode.Ground or BuildMode.Lane or BuildMode.KeepOut or BuildMode.VipGround or BuildMode.Fairy or BuildMode.Bunting or BuildMode.Area or BuildMode.Camp or BuildMode.Stand)
                 {
                     if (click.Pressed)
                     {
@@ -1230,7 +1251,18 @@ public partial class BuildTool : Node3D
                     else if (_dragFrom is { } from)
                     {
                         _dragFrom = null;
-                        if (Mode == BuildMode.Area)
+                        if (Mode == BuildMode.Stand)
+                        {
+                            if (from == _hover)
+                            {
+                                ClickStand(from);
+                            }
+                            else
+                            {
+                                DragStand(from, _hover);
+                            }
+                        }
+                        else if (Mode == BuildMode.Area)
                         {
                             if (from == _hover)
                             {
