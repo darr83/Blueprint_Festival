@@ -179,7 +179,8 @@ public class RoundsTests
     [Fact]
     public void Cleaners_carry_on_the_morning_after_and_a_full_bin_gets_emptied()
     {
-        var game = BuildDay();
+        // A festival whose line-up brings enough litter to fill a bin.
+        var game = BuildDay("Top Field Fair");
         var f = game.Field.Field;
         AddBins(game);
 

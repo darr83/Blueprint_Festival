@@ -49,8 +49,10 @@ public class FanPullTests
         Assert.All(tastes, t => Assert.NotEqual(t.Favourite, t.Hates));
 
         double Share(Genre g) => tastes.Count(t => t.Favourite == g) / (double)tastes.Count;
-        Assert.InRange(Share(Genre.Pop), 0.22, 0.28);
-        Assert.InRange(Share(Genre.Metal), 0.08, 0.12);
+        Assert.InRange(Share(Genre.Pop), 0.15, 0.21);
+        Assert.InRange(Share(Genre.Metal), 0.05, 0.09);
+        Assert.InRange(Share(Genre.Reggae), 0.015, 0.045);
+        Assert.All(Enum.GetValues<Genre>(), g => Assert.True(Share(g) > 0.01, $"Nobody likes {g} best."));
         Assert.InRange(tastes.Count(t => t.Hates is not null) / (double)tastes.Count, 0.32, 0.38);
         Assert.All(Enum.GetValues<Genre>(), g => Assert.Contains(tastes, t => t.Hates == g));
     }
@@ -76,7 +78,7 @@ public class FanPullTests
         Assert.True(game.BookAct(RunningOrder.SetsAStage - 1, "Little Ferrets"));
         var small = game.LineUpPull;
         Assert.True(game.BookAct(RunningOrder.SetsAStage - 1, "The Lantern Hearts"));
-        Assert.True(game.LineUpPull > small + 0.5);
+        Assert.True(game.LineUpPull > small + 0.45, $"{small} {game.LineUpPull}");
     }
 
     [Fact]

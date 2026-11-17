@@ -196,6 +196,14 @@ public partial class SoundBoard : Node
 
         _last[id] = now;
         _asked[id] = Asked(id) + 1;
+
+        // An act's announcement not made yet: read their other one instead, if that one is there.
+        if (sound.Stream is null && sound.Spoken && id.Length > 2 && id[^2] == '_'
+            && _sounds.TryGetValue(id[..^1] + (id[^1] == '1' ? "2" : "1"), out var other) && other.Stream is not null)
+        {
+            sound = other;
+        }
+
         if (sound.Stream is null)
         {
             return true;

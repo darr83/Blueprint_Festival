@@ -624,7 +624,8 @@ public partial class SmokeTest : Node
                     var board = SoundBoard.Instance;
                     Check(board is { Listed: 108 }, "The sound board should be loaded with all 108 sounds on its list.");
                     Check(Sounds.Loops.All(board!.Knows) && board.Knows(Sounds.Till), "The sound board should know the background sounds and the till.");
-                    Check(board.Announcements == (50, 50), $"All 50 announcements introducing the acts should be loaded with their files, not {board.Announcements}.");
+                    var spoken = Simulation.Show.Roster.Artists.Count * Simulation.Sound.Announcements.Takes;
+                    Check(board.Announcements == (spoken, spoken), $"All {spoken} announcements introducing the acts should be loaded with their files, not {board.Announcements}.");
                     Check(board.Asked(Sounds.Notebook) == 1, "The planning notebook should be heard opening.");
                     board.SetVolume("Crowd", 0.5f, save: false);
                     Check(Mathf.Abs(SoundBoard.Volume("Crowd") - 0.5f) < 0.01f, "The crowd volume slider should turn the crowd down.");
@@ -664,7 +665,7 @@ public partial class SmokeTest : Node
                     plan.Year.ToggleStage();
                     Check(!game.SecondStageBooked && game.LineUp.Count() == 3, "Taking the second stage away should take its acts off the bill.");
                     var view = BlueprintFestival.UI.YearScreen.PlanOf(game, plan.Year.SlotPicked);
-                    Check(view.Main.Count == 4 && view.Second is null && view.Artists.Count == 25 && view.Acts == 3 && view.Fees == game.ActFees, "The planning screen should show four sets, 25 artists and the fees.");
+                    Check(view.Main.Count == 4 && view.Second is null && view.Artists.Count == Roster.Artists.Count && view.Acts == 3 && view.Fees == game.ActFees, "The planning screen should show four sets, every artist and the fees.");
                     plan.Year.ChangePrice(-3);
                     Check(game.TicketPrice == 5, "The price buttons should change the ticket price a pound at a time.");
 

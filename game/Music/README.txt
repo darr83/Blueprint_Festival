@@ -52,6 +52,32 @@ THE ARTISTS
   DJ Foxglove             DJ, headline act                  Electronic  4 stars   420k fans
   DJ Otter                DJ, headline act                  Electronic  5 stars   3.1m fans
 
+  Puddle Club               Five-piece band                   Indie       2 stars   6.2k fans
+  The Hayloft Assembly      Five-piece band                   Indie       3 stars   41k fans
+  Cartwheel Season          Three-piece band                  Indie       4 stars   290k fans
+  Nettle Rash               Three-piece band                  Punk        1 stars   610 fans
+  The Rusty Kettles         Five-piece band, headline act     Punk        2 stars   7.8k fans
+  Scarecrow Riot            Five-piece band, headline act     Punk        4 stars   210k fans
+  Ivy and Thistle           Duo                               Folk        1 stars   450 fans
+  The Millpond Fiddlers     Four-piece band with a fiddle     Folk        2 stars   3.9k fans
+  The Barleycorn Circle     Four-piece band with a fiddle     Folk        3 stars   29k fans
+  The Old Oak Ramblers      Four-piece band with a fiddle     Folk        4 stars   160k fans
+  Sunny Allotment           Five-piece band                   Reggae      2 stars   5.5k fans
+  The Orchard Sound System  Five-piece band                   Reggae      3 stars   36k fans
+  Roots of the Willow       Five-piece band                   Reggae      4 stars   250k fans
+  Della Marsh               Solo guitarist                    Soul        2 stars   8.1k fans
+  The Honeysuckle Revue     Five-piece band                   Soul        3 stars   58k fans
+  The Golden Sparrows       Five-piece band, headline act     Soul        5 stars   2.2m fans
+  Glitterbarn               Five-piece band                   Disco       2 stars   9.1k fans
+  The Mirrorball Mice       Five-piece band, headline act     Disco       3 stars   33k fans
+  Starling Disco Club       Five-piece band, headline act     Disco       5 stars   2.8m fans
+  Gravel Lane               Three-piece band                  Rock        1 stars   870 fans
+  Iron Pitchfork            Five-piece band                   Metal       2 stars   6.6k fans
+  Sugar Beet Social         Five-piece band                   Pop         2 stars   4.4k fans
+  Cider Gate                Three-piece band                  Country     2 stars   3.1k fans
+  Harvest Crew              Duo                               Hip hop     2 stars   6.9k fans
+  DJ Pylon                  DJ                                Electronic  3 stars   51k fans
+
 THE ENTERTAINERS
 
 The guitarist, pianist, drummer and DJ you can hire to play in the camping and food fields have

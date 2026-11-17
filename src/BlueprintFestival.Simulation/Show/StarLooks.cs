@@ -27,6 +27,16 @@ public static class StarLooks
     private static readonly string[] Neon = { "#39E07A", "#FF4FA3", "#4FD8FF", "#FFE14F", "#B565D9" };
     private static readonly string[] Bright = { "#D9483B", "#3C8DAD", "#F6B93B", White, "#2FB7A8", Black };
     private static readonly string[] DarkHair = { "#1E1A17", "#2E2019", "#4A3426" };
+    private static readonly string[] IndieTops = { "#2E4057", "#8C2F39", "#F3EBDD", "#3D5A40", "#D9A441" };
+    private static readonly string[] Parkas = { "#5C6B3A", "#2E4057", "#7A6A55" };
+    private static readonly string[] PunkHair = { "#39E07A", "#FF4FA3", "#D9483B", "#4FD8FF", "#FFE14F" };
+    private const string Tartan = "#B0303A";
+    private static readonly string[] Tweeds = { "#7A6A55", "#5C5446", "#8A7A5A", "#4E5A4A" };
+    private static readonly string[] FolkDresses = { "#6E8F5A", "#B5542A", "#3C6FB0", "#8C2F39" };
+    private static readonly string[] ReggaeColours = { "#D9483B", "#F2C14E", "#2F8F5B", White };
+    private static readonly string[] Suits = { Black, "#5A1F2E", "#2E4057", "#F5F5F5", "#B5542A" };
+    private static readonly string[] DiscoShine = { Gold, Silver, "#E94F7B", "#B565D9", "#2FB7A8" };
+    private static readonly string[] DiscoFlares = { White, "#F2C14E", "#E94F7B", "#B565D9", Black };
     private static readonly string[] AnyHair = { "#1E1A17", "#2E2019", "#4A3426", "#6B4A2E", "#B5542A", "#C9A25A", "#E3C779" };
 
     /// <summary>How member number <paramref name="member"/> of an act looks on stage. The same act always looks the same.</summary>
@@ -68,6 +78,12 @@ public static class StarLooks
             Genre.Metal => Metal(basic, random, female),
             Genre.Pop => Pop(basic, random, female, star),
             Genre.Electronic => Electronic(basic, random, female),
+            Genre.Indie => Indie(basic, random, female),
+            Genre.Punk => Punk(basic, random, female),
+            Genre.Folk => Folk(basic, random, female),
+            Genre.Reggae => Reggae(basic, random, female),
+            Genre.Soul => Soul(basic, random, female, star),
+            Genre.Disco => Disco(basic, random, female, star),
             _ => HipHop(basic, random, female, star),
         };
 
@@ -85,7 +101,7 @@ public static class StarLooks
         // DJs wear headphones whatever they play.
         if (role == BandRole.Dj && look.Headphones is null)
         {
-            look = look with { Headphones = Pick(random, Neon), Hat = look.Hat is Hat.Cowboy or Hat.Beanie ? Hat.None : look.Hat };
+            look = look with { Headphones = Pick(random, Neon), Hat = look.Hat is Hat.Cowboy or Hat.Beanie or Hat.Tam or Hat.FlatCap ? Hat.None : look.Hat, Hair = look.Hair == HairStyle.Mohawk ? HairStyle.Crop : look.Hair };
         }
 
         return look;
@@ -202,6 +218,118 @@ public static class StarLooks
             FeetColour = White,
             Chain = Gold,
             Sparkles = star && r.NextDouble() < 0.4 ? Gold : null,
+        };
+    }
+
+    private static PersonLook Indie(PersonLook l, Random r, bool female)
+    {
+        var parka = r.NextDouble() < 0.6;
+        return l with
+        {
+            Hair = female ? (r.NextDouble() < 0.5 ? HairStyle.Bob : HairStyle.Mop) : HairStyle.Mop,
+            HairColour = Pick(r, AnyHair),
+            Top = r.NextDouble() < 0.5 ? TopStyle.Stripes : TopStyle.TShirt,
+            TopColour = Pick(r, IndieTops),
+            TopDetail = r.NextDouble() < 0.5 ? White : null,
+            Jacket = parka ? Pick(r, Parkas) : null,
+            Legs = LegStyle.Trousers,
+            LegColour = r.NextDouble() < 0.6 ? Black : Pick(r, DenimShades),
+            Feet = Footwear.Trainers,
+            FeetColour = r.NextDouble() < 0.5 ? White : Black,
+        };
+    }
+
+    private static PersonLook Punk(PersonLook l, Random r, bool female) => l with
+    {
+        Hair = r.NextDouble() < 0.7 ? HairStyle.Mohawk : HairStyle.Crop,
+        HairColour = r.NextDouble() < 0.8 ? Pick(r, PunkHair) : Pick(r, DarkHair),
+        Top = r.NextDouble() < 0.5 ? TopStyle.Vest : TopStyle.TShirt,
+        TopColour = r.NextDouble() < 0.6 ? White : Black,
+        TopDetail = r.NextDouble() < 0.7 ? Pick(r, PunkHair) : null,
+        Jacket = r.NextDouble() < 0.7 ? Black : null,
+        Sparkles = r.NextDouble() < 0.5 ? Silver : null,
+        Legs = female && r.NextDouble() < 0.5 ? LegStyle.Skirt : LegStyle.Trousers,
+        LegColour = r.NextDouble() < 0.6 ? Tartan : Black,
+        Feet = Footwear.Boots,
+        FeetColour = Black,
+        Chain = Silver,
+    };
+
+    private static PersonLook Folk(PersonLook l, Random r, bool female)
+    {
+        var tweed = Pick(r, Tweeds);
+        var dress = female && r.NextDouble() < 0.4;
+        return l with
+        {
+            Hair = female ? (r.NextDouble() < 0.5 ? HairStyle.Long : HairStyle.Ponytail) : HairStyle.Short,
+            HairColour = Pick(r, AnyHair),
+            Beard = !female && r.NextDouble() < 0.6,
+            Hat = !female || r.NextDouble() < 0.3 ? Hat.FlatCap : Hat.None,
+            HatColour = tweed,
+            Top = dress ? TopStyle.Dress : r.NextDouble() < 0.5 ? TopStyle.Check : TopStyle.LongSleeve,
+            TopColour = dress ? Pick(r, FolkDresses) : "#F3EBDD",
+            TopDetail = dress ? null : r.NextDouble() < 0.5 ? tweed : null,
+            Jacket = dress ? null : r.NextDouble() < 0.5 ? tweed : null,
+            Legs = dress ? LegStyle.Skirt : LegStyle.Trousers,
+            LegColour = dress ? Pick(r, FolkDresses) : "#6B5A45",
+            Feet = Footwear.Boots,
+            FeetColour = "#5A3A22",
+        };
+    }
+
+    private static PersonLook Reggae(PersonLook l, Random r, bool female) => l with
+    {
+        Hair = r.NextDouble() < 0.5 ? HairStyle.Long : female ? HairStyle.Afro : HairStyle.Short,
+        HairColour = Pick(r, DarkHair),
+        Beard = !female && r.NextDouble() < 0.5,
+        Hat = r.NextDouble() < 0.7 ? Hat.Tam : Hat.None,
+        HatColour = "#2F8F5B",
+        Top = r.NextDouble() < 0.5 ? TopStyle.Stripes : TopStyle.TShirt,
+        TopColour = Pick(r, ReggaeColours),
+        TopDetail = Pick(r, ReggaeColours),
+        Legs = LegStyle.Trousers,
+        LegColour = r.NextDouble() < 0.5 ? "#D8CBB0" : Pick(r, DenimShades),
+        Feet = r.NextDouble() < 0.4 ? Footwear.Sandals : Footwear.Trainers,
+        FeetColour = "#7A5232",
+    };
+
+    private static PersonLook Soul(PersonLook l, Random r, bool female, bool star)
+    {
+        var suit = Pick(r, Suits);
+        var dress = female && r.NextDouble() < 0.6;
+        return l with
+        {
+            Hair = female ? (r.NextDouble() < 0.5 ? HairStyle.Afro : HairStyle.Bun) : (r.NextDouble() < 0.5 ? HairStyle.Short : HairStyle.Crop),
+            HairColour = Pick(r, DarkHair),
+            Top = dress ? TopStyle.Dress : TopStyle.LongSleeve,
+            TopColour = dress ? suit : White,
+            TopDetail = null,
+            Jacket = dress ? null : suit,
+            Sparkles = dress && (star || r.NextDouble() < 0.5) ? Gold : null,
+            Legs = dress ? LegStyle.Skirt : LegStyle.Trousers,
+            LegColour = suit,
+            Feet = Footwear.Boots,
+            FeetColour = Black,
+            Chain = star || r.NextDouble() < 0.4 ? Gold : null,
+        };
+    }
+
+    private static PersonLook Disco(PersonLook l, Random r, bool female, bool star)
+    {
+        var shine = Pick(r, DiscoShine);
+        var flares = Pick(r, DiscoFlares);
+        return l with
+        {
+            Hair = r.NextDouble() < 0.6 ? HairStyle.Afro : female ? HairStyle.Long : HairStyle.Curly,
+            HairColour = r.NextDouble() < 0.7 ? Pick(r, AnyHair) : "#F3D27A",
+            Top = female && r.NextDouble() < 0.5 ? TopStyle.Dress : TopStyle.LongSleeve,
+            TopColour = shine,
+            Sparkles = star || r.NextDouble() < 0.8 ? (shine == Silver ? White : Silver) : null,
+            Legs = LegStyle.Trousers,
+            LegColour = flares,
+            Feet = Footwear.Boots,
+            FeetColour = r.NextDouble() < 0.5 ? White : Gold,
+            Chain = star ? Gold : null,
         };
     }
 

@@ -450,6 +450,456 @@
       "lead": 0.8,
       "volume": 1.0,
       "prompt": "Hello, festival! Grab a drink and come on over, because DJ Otter is on in a few minutes. An electronic DJ!"
+    },
+    {
+      "id": "intro_puddle_club_1",
+      "artist": "Puddle Club",
+      "take": 1,
+      "voice": "JBFqnCBsd6RMkjVDRZzb",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Coming up next, an indie band... Puddle Club!"
+    },
+    {
+      "id": "intro_puddle_club_2",
+      "artist": "Puddle Club",
+      "take": 2,
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Down to the front, please! Puddle Club are on soon. An indie band!"
+    },
+    {
+      "id": "intro_the_hayloft_assembly_1",
+      "artist": "The Hayloft Assembly",
+      "take": 1,
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Coming up next, an indie band... The Hayloft Assembly!"
+    },
+    {
+      "id": "intro_the_hayloft_assembly_2",
+      "artist": "The Hayloft Assembly",
+      "take": 2,
+      "voice": "onwK4e9ZLuTAKqWW03F9",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Down to the front, please! The Hayloft Assembly are on soon. An indie band!"
+    },
+    {
+      "id": "intro_cartwheel_season_1",
+      "artist": "Cartwheel Season",
+      "take": 1,
+      "voice": "onwK4e9ZLuTAKqWW03F9",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Coming up next, an indie three-piece band... Cartwheel Season!"
+    },
+    {
+      "id": "intro_cartwheel_season_2",
+      "artist": "Cartwheel Season",
+      "take": 2,
+      "voice": "JBFqnCBsd6RMkjVDRZzb",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Down to the front, please! Cartwheel Season are on soon. An indie three-piece band!"
+    },
+    {
+      "id": "intro_nettle_rash_1",
+      "artist": "Nettle Rash",
+      "take": 1,
+      "voice": "JBFqnCBsd6RMkjVDRZzb",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Coming up next, a punk three-piece band... Nettle Rash!"
+    },
+    {
+      "id": "intro_nettle_rash_2",
+      "artist": "Nettle Rash",
+      "take": 2,
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Down to the front, please! Nettle Rash are on soon. A punk three-piece band!"
+    },
+    {
+      "id": "intro_the_rusty_kettles_1",
+      "artist": "The Rusty Kettles",
+      "take": 1,
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Coming up next, a punk band... The Rusty Kettles!"
+    },
+    {
+      "id": "intro_the_rusty_kettles_2",
+      "artist": "The Rusty Kettles",
+      "take": 2,
+      "voice": "onwK4e9ZLuTAKqWW03F9",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Down to the front, please! The Rusty Kettles are on soon. A punk band!"
+    },
+    {
+      "id": "intro_scarecrow_riot_1",
+      "artist": "Scarecrow Riot",
+      "take": 1,
+      "voice": "onwK4e9ZLuTAKqWW03F9",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Coming up next, a punk band... Scarecrow Riot!"
+    },
+    {
+      "id": "intro_scarecrow_riot_2",
+      "artist": "Scarecrow Riot",
+      "take": 2,
+      "voice": "JBFqnCBsd6RMkjVDRZzb",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Down to the front, please! Scarecrow Riot are on soon. A punk band!"
+    },
+    {
+      "id": "intro_ivy_and_thistle_1",
+      "artist": "Ivy and Thistle",
+      "take": 1,
+      "voice": "JBFqnCBsd6RMkjVDRZzb",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Coming up next, a folk duo... Ivy and Thistle!"
+    },
+    {
+      "id": "intro_ivy_and_thistle_2",
+      "artist": "Ivy and Thistle",
+      "take": 2,
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Down to the front, please! Ivy and Thistle are on soon. A folk duo!"
+    },
+    {
+      "id": "intro_the_millpond_fiddlers_1",
+      "artist": "The Millpond Fiddlers",
+      "take": 1,
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Coming up next, a folk band... The Millpond Fiddlers!"
+    },
+    {
+      "id": "intro_the_millpond_fiddlers_2",
+      "artist": "The Millpond Fiddlers",
+      "take": 2,
+      "voice": "onwK4e9ZLuTAKqWW03F9",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Down to the front, please! The Millpond Fiddlers are on soon. A folk band!"
+    },
+    {
+      "id": "intro_the_barleycorn_circle_1",
+      "artist": "The Barleycorn Circle",
+      "take": 1,
+      "voice": "onwK4e9ZLuTAKqWW03F9",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Coming up next, a folk band... The Barleycorn Circle!"
+    },
+    {
+      "id": "intro_the_barleycorn_circle_2",
+      "artist": "The Barleycorn Circle",
+      "take": 2,
+      "voice": "JBFqnCBsd6RMkjVDRZzb",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Down to the front, please! The Barleycorn Circle are on soon. A folk band!"
+    },
+    {
+      "id": "intro_the_old_oak_ramblers_1",
+      "artist": "The Old Oak Ramblers",
+      "take": 1,
+      "voice": "JBFqnCBsd6RMkjVDRZzb",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Coming up next, a folk band... The Old Oak Ramblers!"
+    },
+    {
+      "id": "intro_the_old_oak_ramblers_2",
+      "artist": "The Old Oak Ramblers",
+      "take": 2,
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Down to the front, please! The Old Oak Ramblers are on soon. A folk band!"
+    },
+    {
+      "id": "intro_sunny_allotment_1",
+      "artist": "Sunny Allotment",
+      "take": 1,
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Coming up next, a reggae band... Sunny Allotment!"
+    },
+    {
+      "id": "intro_sunny_allotment_2",
+      "artist": "Sunny Allotment",
+      "take": 2,
+      "voice": "onwK4e9ZLuTAKqWW03F9",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Down to the front, please! Sunny Allotment are on soon. A reggae band!"
+    },
+    {
+      "id": "intro_the_orchard_sound_system_1",
+      "artist": "The Orchard Sound System",
+      "take": 1,
+      "voice": "onwK4e9ZLuTAKqWW03F9",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Coming up next, a reggae band... The Orchard Sound System!"
+    },
+    {
+      "id": "intro_the_orchard_sound_system_2",
+      "artist": "The Orchard Sound System",
+      "take": 2,
+      "voice": "JBFqnCBsd6RMkjVDRZzb",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Down to the front, please! The Orchard Sound System are on soon. A reggae band!"
+    },
+    {
+      "id": "intro_roots_of_the_willow_1",
+      "artist": "Roots of the Willow",
+      "take": 1,
+      "voice": "JBFqnCBsd6RMkjVDRZzb",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Coming up next, a reggae band... Roots of the Willow!"
+    },
+    {
+      "id": "intro_roots_of_the_willow_2",
+      "artist": "Roots of the Willow",
+      "take": 2,
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Down to the front, please! Roots of the Willow are on soon. A reggae band!"
+    },
+    {
+      "id": "intro_della_marsh_1",
+      "artist": "Della Marsh",
+      "take": 1,
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Coming up next, a soul solo artist... Della Marsh!"
+    },
+    {
+      "id": "intro_della_marsh_2",
+      "artist": "Della Marsh",
+      "take": 2,
+      "voice": "onwK4e9ZLuTAKqWW03F9",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Down to the front, please! Della Marsh is on soon. A soul solo artist!"
+    },
+    {
+      "id": "intro_the_honeysuckle_revue_1",
+      "artist": "The Honeysuckle Revue",
+      "take": 1,
+      "voice": "onwK4e9ZLuTAKqWW03F9",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Coming up next, a soul band... The Honeysuckle Revue!"
+    },
+    {
+      "id": "intro_the_honeysuckle_revue_2",
+      "artist": "The Honeysuckle Revue",
+      "take": 2,
+      "voice": "JBFqnCBsd6RMkjVDRZzb",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Down to the front, please! The Honeysuckle Revue are on soon. A soul band!"
+    },
+    {
+      "id": "intro_the_golden_sparrows_1",
+      "artist": "The Golden Sparrows",
+      "take": 1,
+      "voice": "JBFqnCBsd6RMkjVDRZzb",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Coming up next, a soul band... The Golden Sparrows!"
+    },
+    {
+      "id": "intro_the_golden_sparrows_2",
+      "artist": "The Golden Sparrows",
+      "take": 2,
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Down to the front, please! The Golden Sparrows are on soon. A soul band!"
+    },
+    {
+      "id": "intro_glitterbarn_1",
+      "artist": "Glitterbarn",
+      "take": 1,
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Coming up next, a disco band... Glitterbarn!"
+    },
+    {
+      "id": "intro_glitterbarn_2",
+      "artist": "Glitterbarn",
+      "take": 2,
+      "voice": "onwK4e9ZLuTAKqWW03F9",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Down to the front, please! Glitterbarn are on soon. A disco band!"
+    },
+    {
+      "id": "intro_the_mirrorball_mice_1",
+      "artist": "The Mirrorball Mice",
+      "take": 1,
+      "voice": "onwK4e9ZLuTAKqWW03F9",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Coming up next, a disco band... The Mirrorball Mice!"
+    },
+    {
+      "id": "intro_the_mirrorball_mice_2",
+      "artist": "The Mirrorball Mice",
+      "take": 2,
+      "voice": "JBFqnCBsd6RMkjVDRZzb",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Down to the front, please! The Mirrorball Mice are on soon. A disco band!"
+    },
+    {
+      "id": "intro_starling_disco_club_1",
+      "artist": "Starling Disco Club",
+      "take": 1,
+      "voice": "JBFqnCBsd6RMkjVDRZzb",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Coming up next, a disco band... Starling Disco Club!"
+    },
+    {
+      "id": "intro_starling_disco_club_2",
+      "artist": "Starling Disco Club",
+      "take": 2,
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Down to the front, please! Starling Disco Club are on soon. A disco band!"
+    },
+    {
+      "id": "intro_gravel_lane_1",
+      "artist": "Gravel Lane",
+      "take": 1,
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Coming up next, a rock three-piece band... Gravel Lane!"
+    },
+    {
+      "id": "intro_gravel_lane_2",
+      "artist": "Gravel Lane",
+      "take": 2,
+      "voice": "onwK4e9ZLuTAKqWW03F9",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Down to the front, please! Gravel Lane are on soon. A rock three-piece band!"
+    },
+    {
+      "id": "intro_iron_pitchfork_1",
+      "artist": "Iron Pitchfork",
+      "take": 1,
+      "voice": "onwK4e9ZLuTAKqWW03F9",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Coming up next, a metal band... Iron Pitchfork!"
+    },
+    {
+      "id": "intro_iron_pitchfork_2",
+      "artist": "Iron Pitchfork",
+      "take": 2,
+      "voice": "JBFqnCBsd6RMkjVDRZzb",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Down to the front, please! Iron Pitchfork are on soon. A metal band!"
+    },
+    {
+      "id": "intro_sugar_beet_social_1",
+      "artist": "Sugar Beet Social",
+      "take": 1,
+      "voice": "JBFqnCBsd6RMkjVDRZzb",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Coming up next, a pop band... Sugar Beet Social!"
+    },
+    {
+      "id": "intro_sugar_beet_social_2",
+      "artist": "Sugar Beet Social",
+      "take": 2,
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Down to the front, please! Sugar Beet Social are on soon. A pop band!"
+    },
+    {
+      "id": "intro_cider_gate_1",
+      "artist": "Cider Gate",
+      "take": 1,
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Coming up next, a country three-piece band... Cider Gate!"
+    },
+    {
+      "id": "intro_cider_gate_2",
+      "artist": "Cider Gate",
+      "take": 2,
+      "voice": "onwK4e9ZLuTAKqWW03F9",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Down to the front, please! Cider Gate are on soon. A country three-piece band!"
+    },
+    {
+      "id": "intro_harvest_crew_1",
+      "artist": "Harvest Crew",
+      "take": 1,
+      "voice": "onwK4e9ZLuTAKqWW03F9",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Coming up next, a hip hop duo... Harvest Crew!"
+    },
+    {
+      "id": "intro_harvest_crew_2",
+      "artist": "Harvest Crew",
+      "take": 2,
+      "voice": "JBFqnCBsd6RMkjVDRZzb",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Down to the front, please! Harvest Crew are on soon. A hip hop duo!"
+    },
+    {
+      "id": "intro_dj_pylon_1",
+      "artist": "DJ Pylon",
+      "take": 1,
+      "voice": "JBFqnCBsd6RMkjVDRZzb",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Coming up next, an electronic DJ... DJ Pylon!"
+    },
+    {
+      "id": "intro_dj_pylon_2",
+      "artist": "DJ Pylon",
+      "take": 2,
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "lead": 0.8,
+      "volume": 1.0,
+      "prompt": "Down to the front, please! DJ Pylon is on soon. An electronic dj!"
     }
   ]
 }

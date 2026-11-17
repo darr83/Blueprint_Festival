@@ -179,10 +179,10 @@ public class ShowTests
         Assert.True(game.Crowd.Watching > 10);
         RunUntil(game, 15.6);
         Assert.Equal(0, game.Crowd.Watching);
-        game.Show.Book(1, game.Show.At(2));
+        game.Show.Book(1, ActGenerator.Of(Roster.Named("Tobias Pell")!));
         RunUntil(game, 16.8);
         // With nothing to eat or drink on this bare field some have gone home by now, but those left come back.
-        Assert.True(game.Crowd.Watching > 5);
+        Assert.True(game.Crowd.Watching > 5, $"{game.Crowd.Watching} came back");
         Assert.All(game.Crowd.Parties.Where(p => p.State == PartyState.Watching), p => Assert.Equal(1, p.Watch));
     }
 

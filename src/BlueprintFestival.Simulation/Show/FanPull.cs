@@ -50,10 +50,11 @@ public static class FanPull
         _ => "huge crowd",
     };
 
-    /// <summary>How the sorts of music are liked across a crowd, out of 100: most like pop, fewest metal.</summary>
+    /// <summary>How the sorts of music are liked across a crowd, out of 100: most like pop, fewest reggae and soul.</summary>
     private static readonly (Genre Genre, int Share)[] Favourites =
     {
-        (Genre.Pop, 25), (Genre.Rock, 20), (Genre.Country, 18), (Genre.Electronic, 14), (Genre.HipHop, 13), (Genre.Metal, 10),
+        (Genre.Pop, 18), (Genre.Rock, 14), (Genre.Country, 12), (Genre.Electronic, 10), (Genre.HipHop, 9), (Genre.Metal, 7),
+        (Genre.Indie, 9), (Genre.Folk, 6), (Genre.Disco, 5), (Genre.Punk, 4), (Genre.Soul, 3), (Genre.Reggae, 3),
     };
 
     /// <summary>The share of people with a sort of music they cannot stand.</summary>

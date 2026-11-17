@@ -358,6 +358,28 @@ public partial class PersonView : Node3D
 
                 body.Ball(new Vector3(0, headY + (headR * 1.0f), -headR * 0.2f), headR * 0.9f, hair);
                 break;
+            case HairStyle.Mohawk:
+                // Shaved close at the sides, a tall crest of spikes from the forehead to the back.
+                Cap(1.0f, 0.12f, 0.12f);
+                body.Box(new Vector3(0, headY + (headR * 0.95f), -headR * 0.1f), new Vector3(headR * 0.42f, headR * 0.5f, headR * 1.9f), hair);
+                for (var i = 0; i < 5; i++)
+                {
+                    var t = (i / 4f) - 0.5f;
+                    var at = new Vector3(0, headY + (headR * (1.45f - (t * t * 0.8f))), (-t * headR * 1.7f) - (headR * 0.1f));
+                    body.Cone(at, new Vector3(headR * 0.62f, headR * 1.05f, headR * 0.6f), hair, new Vector3(-t * 40f, 0, 0));
+                }
+
+                break;
+            case HairStyle.Mop:
+                // A shaggy mop: a full cap with a fringe over the forehead and hair over the ears.
+                Cap(1.08f, 0.24f, 0.22f);
+                body.Ball(new Vector3(0, headY + (headR * 0.85f), headR * 0.42f), new Vector3(headR * 1.7f, headR * 0.42f, headR * 0.6f), hair, new Vector3(12, 0, 0));
+                foreach (var side in new[] { -1f, 1f })
+                {
+                    body.Ball(new Vector3(side * headR * 0.88f, headY - (headR * 0.05f), -headR * 0.1f), new Vector3(headR * 0.5f, headR * 1.2f, headR * 1.1f), hair);
+                }
+
+                break;
         }
     }
 
@@ -392,6 +414,17 @@ public partial class PersonView : Node3D
             case Hat.Beanie:
                 body.Ball(new Vector3(0, brimY - 0.01f, -0.015f), new Vector3(headR * 2.18f, headR * 1.55f, headR * 2.18f), colour);
                 body.Tube(new Vector3(0, brimY - 0.05f, -0.015f), new Vector3(headR * 2.24f, 0.07f, headR * 2.24f), colour.Darkened(0.12f));
+                break;
+            case Hat.FlatCap:
+                // Low and flat on the head, sloping down to a short peak at the front.
+                body.Ball(new Vector3(0, brimY + 0.01f, -0.01f), new Vector3(headR * 2.2f, headR * 0.9f, headR * 2.25f), colour, new Vector3(8, 0, 0));
+                body.Box(new Vector3(0, brimY - 0.005f, headR * 1.08f), new Vector3(headR * 1.5f, 0.022f, headR * 0.55f), colour.Darkened(0.12f), new Vector3(10, 0, 0));
+                break;
+            case Hat.Tam:
+                // A big slouchy knitted hat drooping at the back, in bands of red, gold and green.
+                body.Ball(new Vector3(0, brimY + 0.04f, -headR * 0.45f), new Vector3(headR * 2.5f, headR * 1.7f, headR * 2.9f), colour, new Vector3(-14, 0, 0));
+                body.Tube(new Vector3(0, brimY - 0.04f, -0.01f), new Vector3(headR * 2.26f, 0.06f, headR * 2.26f), new Color("#D9483B"));
+                body.Tube(new Vector3(0, brimY + 0.02f, -0.02f), new Vector3(headR * 2.36f, 0.06f, headR * 2.4f), new Color("#F2C14E"));
                 break;
         }
     }
@@ -971,6 +1004,53 @@ public partial class PersonView : Node3D
                 // hits, head and shoulders tipped back, the knees giving a little on each hit.
                 var side = Mathf.Sin(through * Mathf.Tau) * 24f * e;
                 return (new Vector3(-14, 0, -158 + side), new Vector3(-14, 0, 158 + side), -0.015f * hit * e, new Vector3(-11f, 0, side * 0.22f), side * 0.25f);
+            }
+
+            case DanceMove.Shuffle:
+            {
+                // Shoulders hunched, stepping on the spot, one elbow and then the other swinging up,
+                // the head nodding down on each hit.
+                var shift = Mathf.Sin(through * Mathf.Tau);
+                return (new Vector3(-45 - (35 * Mathf.Max(0, shift) * e), 0, -22), new Vector3(-45 - (35 * Mathf.Max(0, -shift) * e), 0, 22), -0.03f * hit * e, new Vector3(10 + (8 * hit * e), 0, 4 * shift * e), 8f * shift * e);
+            }
+
+            case DanceMove.Pogo:
+            {
+                // Straight up and down on the spot, arms stiff by the sides, landing on the hit.
+                var air = Mathf.Sin(inBeat * Mathf.Pi) * 0.26f * e;
+                return (new Vector3(4, 0, -10 - (8 * (1 - hit))), new Vector3(4, 0, 10 + (8 * (1 - hit))), air, new Vector3(-3 * (1 - hit), 0, 0), 0);
+            }
+
+            case DanceMove.Jig:
+            {
+                // Hopping from one foot to the other, hands on the hips, the body tipping with each hop.
+                var hop = Mathf.Sin(inBeat * Mathf.Pi) * 0.1f * e;
+                var tip = (second ? 1f : -1f) * 7f * e;
+                return (new Vector3(-20, 0, -48), new Vector3(-20, 0, 48), hop, new Vector3(-2, 0, tip), tip * 0.6f);
+            }
+
+            case DanceMove.Skank:
+            {
+                // Knees bending slowly into the hit, arms bent and rolling forward one after the other.
+                var roll = Mathf.Sin(through * Mathf.Tau);
+                return (new Vector3(-60 + (30 * roll * e), 0, -28), new Vector3(-60 - (30 * roll * e), 0, 28), -0.06f * hit * e, new Vector3(9 * hit * e, 0, 0), 5f * roll * e);
+            }
+
+            case DanceMove.Shimmy:
+            {
+                // Shoulders shaking quickly side to side, hands low and out, clicking on the hit.
+                var shake = Mathf.Sin(through * Mathf.Tau * 4f) * 7f * e;
+                var sway = Mathf.Sin(through * Mathf.Tau) * 6f * e;
+                return (new Vector3(-35, 0, -30 - (10 * hit)), new Vector3(-35, 0, 30 + (10 * hit)), -0.025f * hit * e, new Vector3(-4, 0, sway), shake);
+            }
+
+            case DanceMove.Disco:
+            {
+                // One hand up high to the side on the hit, then down across the body on the next,
+                // the hips swinging the other way and the other hand on the hip.
+                var up = second ? 0f : 1f;
+                var right = new Vector3(-20 - (20 * (1 - up)), 0, (165 * up) + (-25 * (1 - up)));
+                return (new Vector3(-20, 0, -48), right, -0.03f * hit * e, new Vector3(0, 0, (up - 0.5f) * -12f * e), (up - 0.5f) * 16f * e);
             }
 
             default:
