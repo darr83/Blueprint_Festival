@@ -761,6 +761,9 @@ public sealed partial class Crowd
     /// <summary>Raised when a stall serves a party: which kind of stall, how many people, and what they paid.</summary>
     public event Action<StallKind, int, int>? Served;
 
+    /// <summary>Raised with <see cref="Served"/>: the stall itself, so its sounds can be heard from where it stands.</summary>
+    public event Action<PlacedStall, int, int>? ServedAtStall;
+
     /// <summary>Raised each time one person buys one thing: the stall, which thing on its menu, and what they paid.</summary>
     public event Action<PlacedStall, int, int>? Sold;
 
@@ -3227,6 +3230,7 @@ public sealed partial class Crowd
         }
 
         Served?.Invoke(stall.Kind, party.Members.Count, paid);
+        ServedAtStall?.Invoke(stall, party.Members.Count, paid);
         if (info.Serves == Need.Toilet)
         {
             GoAndWash(party, now);

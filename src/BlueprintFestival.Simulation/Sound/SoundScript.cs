@@ -166,7 +166,7 @@ public sealed class SoundScript : IDisposable
         _game = game;
         Remember();
         game.Crowd.TicketsSold += OnTickets;
-        game.Crowd.Served += OnServed;
+        game.Crowd.ServedAtStall += OnServed;
         game.Crowd.TeddyWon += OnTeddy;
         game.CrushWarning += OnCrushWarning;
         game.CrushInjury += OnCrushInjury;
@@ -178,13 +178,25 @@ public sealed class SoundScript : IDisposable
     /// <summary>A one-off sound has just happened.</summary>
     public event Action<string>? Cue;
 
+    /// <summary>
+    /// A one-off sound has just happened, and how loud it is from where the player is listening,
+    /// from 0 to 1: a till or a fryer is quieter the further the view is from its stall.
+    /// </summary>
+    public event Action<string, double>? Heard;
+
+    private void Say(string id, double level = 1)
+    {
+        Cue?.Invoke(id);
+        Heard?.Invoke(id, level);
+    }
+
     /// <summary>How loud each background sound should be now, from 0 (silent) to 1.</summary>
     public IReadOnlyDictionary<string, double> Levels => _levels;
 
     public void Dispose()
     {
         _game.Crowd.TicketsSold -= OnTickets;
-        _game.Crowd.Served -= OnServed;
+        _game.Crowd.ServedAtStall -= OnServed;
         _game.Crowd.TeddyWon -= OnTeddy;
         _game.CrushWarning -= OnCrushWarning;
         _game.CrushInjury -= OnCrushInjury;
@@ -192,12 +204,12 @@ public sealed class SoundScript : IDisposable
         _game.ActCancelled -= OnActCancelled;
     }
 
-    private void OnAnnounced(int which) => Cue?.Invoke(Sounds.StepBack[which % Sounds.StepBack.Count]);
+    private void OnAnnounced(int which) => Say(Sounds.StepBack[which % Sounds.StepBack.Count]);
 
     private void OnActCancelled(Slot slot)
     {
-        Cue?.Invoke(Sounds.PaStop);
-        Cue?.Invoke(Sounds.Groan);
+        Say(Sounds.PaStop);
+        Say(Sounds.Groan);
     }
 
     /// <summary>Which crowd murmur fits this many people, each as a loudness from 0 to 1.</summary>
@@ -263,8 +275,80 @@ public sealed class SoundScript : IDisposable
         }
 
         var (fx, fy) = MiddleOf(stall);
-        return StageMix.Fair(ear.X, ear.Y, ear.ViewHeight, fx, fy);
+        var level = StageMix.Fair(ear.X, ear.Y, ear.ViewHeight, fx, fy);
+        return level <= 0 ? 0 : level * (1 - (StageDrowns * StageHeard()));
     }
+
+    /// <summary>The quietest a stall's serving sound or a gate's ticket check can be and still be played.</summary>
+    public const double StallCueHeard = 0.12;
+
+    /// <summary>How much a stage playing nearby drowns out the stalls and the fair: at full music they are this much quieter.</summary>
+    public const double StageDrowns = 0.7;
+
+    /// <summary>The middle of a patch of tiles, in metres.</summary>
+    public static (double X, double Y) MiddleOf(TileRect r) =>
+        ((r.X + (r.Width / 2.0)) * FieldMap.TileMetres, (r.Y + (r.Height / 2.0)) * FieldMap.TileMetres);
+
+    /// <summary>
+    /// How loud the music of the loudest stage with an act on is from where the player is
+    /// listening, from 0 to 1. Zoomed in on a stage it is close to 1.
+    /// </summary>
+    public double StageHeard()
+    {
+        if (_ear is not { } ear || _game.Phase != Phase.Day || _game.ActPaused)
+        {
+            return 0;
+        }
+
+        var game = _game;
+        var fronts = new List<(double X, double Y)>(game.Shows.Count);
+        var playing = new List<bool>(game.Shows.Count);
+        foreach (var show in game.Shows)
+        {
+            var (x, y, _, _) = show.Stage is { } placed ? Show.RunningOrder.Front(placed) : (0.0, 0.0, 0, 0);
+            fronts.Add((x, y));
+            playing.Add(show.Stage is not null && show.Playing(game.Now) is not null);
+        }
+
+        var levels = StageMix.Levels(ear.X, ear.Y, ear.ViewHeight, fronts);
+        var loudest = 0.0;
+        for (var i = 0; i < levels.Length; i++)
+        {
+            loudest = playing[i] ? Math.Max(loudest, levels[i]) : loudest;
+        }
+
+        return loudest;
+    }
+
+    /// <summary>
+    /// How loud something at a spot on the field (in metres) is from where the player is listening,
+    /// from 0 to 1: close to the view it is plain, away from it or zoomed out it is silent, on a
+    /// stage camera it is not heard at all, and a stage playing nearby drowns it out. With no
+    /// spot given, or before anyone is listening, it is heard in full.
+    /// </summary>
+    private double NearbyHeard((double X, double Y)? at)
+    {
+        if (_filming)
+        {
+            return 0;
+        }
+
+        if (_ear is not { } ear)
+        {
+            return 1;
+        }
+
+        if (at is not { } spot)
+        {
+            return 0;
+        }
+
+        var level = StageMix.Stall(ear.X, ear.Y, ear.ViewHeight, spot.X, spot.Y);
+        return level <= 0 ? 0 : level * (1 - (StageDrowns * StageHeard()));
+    }
+
+    /// <summary>How loud a stall's serving sounds are from where the player is listening, from 0 to 1.</summary>
+    public double StallHeard(PlacedStall stall) => NearbyHeard(MiddleOf(stall));
 
     /// <summary>
     /// How loud the fairground's organ and squeals are, from where the player is listening: the
@@ -317,9 +401,9 @@ public sealed class SoundScript : IDisposable
 
     private void OnTeddy(PlacedStall stall)
     {
-        if (HeardAt(stall) >= FairCueHeard)
+        if (HeardAt(stall) is var heard && heard >= FairCueHeard)
         {
-            Cue?.Invoke(Sounds.TeddyWin);
+            Say(Sounds.TeddyWin, heard);
         }
     }
 
@@ -370,8 +454,19 @@ public sealed class SoundScript : IDisposable
         _levels[Sounds.RainHeavy] = Math.Clamp((rain - 0.45) / 0.3, 0, 1);
 
         // Fire pits crackle once it is getting dark, more of them a little louder; rain dampens them.
-        var pits = game.Site.Decorations.Count(d => d.Kind == DecorKind.FirePit);
-        _levels[Sounds.FireCrackle] = pits == 0 ? 0 : Math.Clamp(0.5 + (pits * 0.15), 0, 1) * Math.Clamp((0.7 - game.Light) / 0.4, 0, 1) * hush;
+        // Like the stalls, they are only heard near where the player is looking.
+        var pits = 0;
+        var nearestPit = 0.0;
+        foreach (var decor in game.Site.Decorations)
+        {
+            if (decor.Kind == DecorKind.FirePit)
+            {
+                pits++;
+                nearestPit = Math.Max(nearestPit, NearbyHeard(((decor.X + 0.5) * FieldMap.TileMetres, (decor.Y + 0.5) * FieldMap.TileMetres)));
+            }
+        }
+
+        _levels[Sounds.FireCrackle] = pits == 0 ? 0 : Math.Clamp(0.5 + (pits * 0.15), 0, 1) * nearestPit * Math.Clamp((0.7 - game.Light) / 0.4, 0, 1) * hush;
 
         // The fairground: its organ and the squeals from the rides, for as long as a ride is going round with people on it.
         // Only heard near where the player is looking, and not at all on a stage camera.
@@ -390,7 +485,7 @@ public sealed class SoundScript : IDisposable
         else if (day && _shut && !game.GatesShut)
         {
             // The day began with the gates shut, and they have just been opened.
-            Cue?.Invoke(Sounds.GatesOpen);
+            Say(Sounds.GatesOpen);
         }
 
         if (day)
@@ -399,18 +494,18 @@ public sealed class SoundScript : IDisposable
             Trouble();
             if (rain > 0.05 && !_raining)
             {
-                Cue?.Invoke(Sounds.RainStart);
+                Say(Sounds.RainStart);
             }
 
             if (game.Wetness > 0.5 && _polls % 40 == 0 && game.Crowd.InField > 0)
             {
-                Cue?.Invoke(Sounds.MudSquelch);
+                Say(Sounds.MudSquelch);
             }
         }
 
         if (game.Phase == Phase.Tidy && game.Litter.Count < _litter)
         {
-            Cue?.Invoke(Sounds.LitterPick);
+            Say(Sounds.LitterPick);
         }
 
         Remember();
@@ -439,20 +534,20 @@ public sealed class SoundScript : IDisposable
         switch (to)
         {
             case Phase.Build when from == Phase.Plan:
-                Cue?.Invoke(Sounds.RubberStamp);
+                Say(Sounds.RubberStamp);
                 break;
             case Phase.Day when from == Phase.Build && !_game.GatesShut:
-                Cue?.Invoke(Sounds.GatesOpen);
+                Say(Sounds.GatesOpen);
                 break;
             case Phase.Tidy:
-                Cue?.Invoke(Sounds.DayEnd);
+                Say(Sounds.DayEnd);
                 break;
             case Phase.Results:
-                Cue?.Invoke(_game.Result is { } result && result.LicenceNext >= result.LicenceNow && !result.Loan && result.Happy >= 60
+                Say(_game.Result is { } result && result.LicenceNext >= result.LicenceNow && !result.Loan && result.Happy >= 60
                     ? Sounds.ResultsGood : Sounds.ResultsBad);
                 break;
             case Phase.Closed:
-                Cue?.Invoke(Sounds.GateClosed);
+                Say(Sounds.GateClosed);
                 break;
         }
     }
@@ -463,22 +558,22 @@ public sealed class SoundScript : IDisposable
         if (game.Show.CalledOff is not null && !_calledOff)
         {
             // The music has been stopped for the day.
-            Cue?.Invoke(Sounds.PaStop);
-            Cue?.Invoke(Sounds.Groan);
+            Say(Sounds.PaStop);
+            Say(Sounds.Groan);
             return;
         }
 
         if (game.ActPaused != _paused)
         {
-            Cue?.Invoke(game.ActPaused ? Sounds.PaStop : Sounds.PaStart);
+            Say(game.ActPaused ? Sounds.PaStop : Sounds.PaStart);
             if (game.ActPaused)
             {
-                Cue?.Invoke(Sounds.Groan);
+                Say(Sounds.Groan);
             }
             else if (game.MusicOn)
             {
                 // The music comes back with a thank you over the PA.
-                Cue?.Invoke(Sounds.PaRestart);
+                Say(Sounds.PaRestart);
             }
         }
 
@@ -509,13 +604,13 @@ public sealed class SoundScript : IDisposable
             // cheering together, as the crowd clap them off.
             var headliner = show.Slots.Any(s => s.Index == before && s.Headliner);
             var big = headliner || watching >= 500;
-            Cue?.Invoke(big ? Sounds.ApplauseBig : Sounds.ApplauseSmall);
-            Cue?.Invoke(big ? Sounds.SetEndOvation : CheerFor(watching));
+            Say(big ? Sounds.ApplauseBig : Sounds.ApplauseSmall);
+            Say(big ? Sounds.SetEndOvation : CheerFor(watching));
         }
 
         if (now is not null)
         {
-            Cue?.Invoke(CheerFor(watching));
+            Say(CheerFor(watching));
         }
     }
 
@@ -540,7 +635,7 @@ public sealed class SoundScript : IDisposable
 
         var take = (_lastTake.GetValueOrDefault(next.Act.Name) % Announcements.Takes) + 1;
         _lastTake[next.Act.Name] = take;
-        Cue?.Invoke(Announcements.IdFor(next.Act.Name, take));
+        Say(Announcements.IdFor(next.Act.Name, take));
     }
 
     private void Trouble()
@@ -550,39 +645,82 @@ public sealed class SoundScript : IDisposable
         {
             if (incident.Id >= _incidents && !incident.Crush)
             {
-                Cue?.Invoke(incident.Kind == IncidentKind.Ill ? Sounds.FirstAid : Sounds.Trouble);
+                Say(incident.Kind == IncidentKind.Ill ? Sounds.FirstAid : Sounds.Trouble);
             }
         }
 
         if (game.Treated + game.TroubleSorted > _sorted)
         {
-            Cue?.Invoke(Sounds.AllClear);
+            Say(Sounds.AllClear);
         }
     }
 
-    private void OnTickets(int people) =>
-        Cue?.Invoke(_game.Site.Gates.Any(g => g.Kind == GateKind.TurnstileRow) ? Sounds.GateTurnstile : Sounds.GateTicket);
-
-    private void OnServed(StallKind kind, int people, int paid)
+    private void OnTickets(int people)
     {
+        var sound = _game.Site.Gates.Any(g => g.Kind == GateKind.TurnstileRow) ? Sounds.GateTurnstile : Sounds.GateTicket;
+        var level = 0.0;
+        foreach (var gate in _game.Site.Gates)
+        {
+            level = Math.Max(level, NearbyHeard(MiddleOf(gate.Rect)));
+        }
+
+        if (_game.Site.Gates.Count == 0)
+        {
+            level = NearbyHeard(null);
+        }
+
+        if (level >= StallCueHeard)
+        {
+            Say(sound, level);
+        }
+    }
+
+    private void OnServed(PlacedStall stall, int people, int paid)
+    {
+        var kind = stall.Kind;
+
         // The fairground's bells, ducks and tills are only heard near where the player is looking.
-        if (Rides.IsFair(kind) && NearestHeard(kind) < FairCueHeard)
+        if (Rides.IsFair(kind))
+        {
+            var fair = NearestHeard(kind);
+            if (fair < FairCueHeard)
+            {
+                return;
+            }
+
+            if (ServedAt(kind) is { } bell)
+            {
+                Say(bell, fair);
+            }
+
+            if (paid > 0)
+            {
+                Say(Sounds.Till, StallHeard(stall));
+            }
+
+            return;
+        }
+
+        // Every other stall too: a fryer or a bar is heard while the player is looking at it, and
+        // not over the music from across the site or on a stage camera.
+        var level = StallHeard(stall);
+        if (level < StallCueHeard)
         {
             return;
         }
 
         if (ServedAt(kind) is { } sound)
         {
-            Cue?.Invoke(sound);
+            Say(sound, level);
         }
 
         if (paid > 0)
         {
-            Cue?.Invoke(Sounds.Till);
+            Say(Sounds.Till, level);
         }
     }
 
-    private void OnCrushWarning(double x, double y) => Cue?.Invoke(Sounds.RadioAlert);
+    private void OnCrushWarning(double x, double y) => Say(Sounds.RadioAlert);
 
-    private void OnCrushInjury(double x, double y) => Cue?.Invoke(Sounds.Alarm);
+    private void OnCrushInjury(double x, double y) => Say(Sounds.Alarm);
 }
