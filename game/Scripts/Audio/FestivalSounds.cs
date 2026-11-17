@@ -22,7 +22,7 @@ public partial class FestivalSounds : Node
     public void Initialise(FestivalGame game)
     {
         _script = new SoundScript(game);
-        _script.Cue += SoundBoard.Cue;
+        _script.Heard += Play;
         if (game.Phase == Phase.Plan)
         {
             // The year opens on the planning notebook.
@@ -32,7 +32,7 @@ public partial class FestivalSounds : Node
         Pass();
     }
 
-    /// <summary>Listens from where the player is looking, so the fairground is only heard near the fair.</summary>
+    /// <summary>Listens from where the player is looking, so the fairground, and the stalls are only heard near where the player is looking.</summary>
     public void Follow(CameraRig rig, StageCam? cam)
     {
         _rig = rig;
@@ -62,6 +62,9 @@ public partial class FestivalSounds : Node
         Pass();
     }
 
+    /// <summary>Plays a one-off sound at how loud it is from where the player is looking.</summary>
+    private static void Play(string id, double level) => SoundBoard.Instance?.Play(id, (float)level);
+
     private void Pass()
     {
         if (SoundBoard.Instance is { } board)
@@ -75,7 +78,7 @@ public partial class FestivalSounds : Node
 
     public override void _ExitTree()
     {
-        _script.Cue -= SoundBoard.Cue;
+        _script.Heard -= Play;
         _script.Dispose();
         SoundBoard.Instance?.QuietLoops();
     }
