@@ -77,8 +77,8 @@ public class SafetyTests
     public void A_bigger_name_pulls_its_audience_in_closer_and_tighter()
     {
         var game = BuildDay(bigName: false);
-        Assert.True(game.Crowd.AudienceReach(0.95) < game.Crowd.AudienceReach(0.7));
-        Assert.True(game.Crowd.AudienceReach(0.7) < game.Crowd.AudienceReach(0.3));
+        Assert.True(Crowd.AudienceReach(0.95, game.Crowd.OnSite) < Crowd.AudienceReach(0.7, game.Crowd.OnSite));
+        Assert.True(Crowd.AudienceReach(0.7, game.Crowd.OnSite) < Crowd.AudienceReach(0.3, game.Crowd.OnSite));
         Assert.True(Crowd.Squeeze(0.3) <= DensityMap.Busy);
         Assert.True(Crowd.Squeeze(0.71) < DensityMap.Crush);
         Assert.True(Crowd.Squeeze(0.87) > DensityMap.Crush);
