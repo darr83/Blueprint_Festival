@@ -258,7 +258,7 @@ public sealed partial class FestivalGame
     /// <summary>Once a second on the day: lets off any show whose time has come.</summary>
     private void TickFireworks(DateTime now)
     {
-        if (Phase != Phase.Day || _shows.Count == 0)
+        if (Phase != Phase.Day || _shows.Count == 0 || FireworksHeld)
         {
             return;
         }

@@ -336,7 +336,40 @@ public partial class FestivalScene : Node3D
         _hint.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.BottomLeft, Control.LayoutPresetMode.Minsize, 22);
         _hint.GrowVertical = Control.GrowDirection.Begin;
 
+        // The dev panel sits on its own layer above the rest, so it stays when the other panels are hidden.
+        var dev = new CanvasLayer { Name = "Dev", Layer = 5 };
+        AddChild(dev);
+        _frameRate = UiStyle.Body("", size: 13, bold: true);
+        _frameRate.Theme = UiStyle.Theme;
+        _frameRate.AddThemeColorOverride("font_color", Colors.White);
+        _frameRate.AddThemeColorOverride("font_shadow_color", new Color(0, 0, 0, 0.6f));
+        _frameRate.Position = new Vector2(24, 4);
+        _frameRate.Visible = false;
+        dev.AddChild(_frameRate);
+        DevTools = new DevPanel();
+        dev.AddChild(DevTools);
+        DevTools.Initialise(this);
+
         Sky.Apply(Game, StageCam.Yaw);
+    }
+
+    /// <summary>The dev panel, opened with F10.</summary>
+    public DevPanel DevTools { get; private set; } = null!;
+
+    private Label _frameRate = null!;
+
+    /// <summary>True while every panel but the dev panel is hidden, to see the festival clearly.</summary>
+    public bool PanelsHidden
+    {
+        get => !_hud.Visible;
+        set => _hud.Visible = !value;
+    }
+
+    /// <summary>True while the frames a second show in the top left corner.</summary>
+    public bool FrameRateShowing
+    {
+        get => _frameRate.Visible;
+        set => _frameRate.Visible = value;
     }
 
     /// <summary>
@@ -375,6 +408,11 @@ public partial class FestivalScene : Node3D
     public override void _Process(double delta)
     {
         Game.Advance(delta);
+        if (_frameRate.Visible)
+        {
+            _frameRate.Text = $"{Engine.GetFramesPerSecond():0} fps  ·  {Game.Crowd.OnSite:N0} people";
+        }
+
         Sky.Apply(Game, StageCam.Yaw);
         CrowdSafety.RightInset = Money.Visible ? Money.Size.X + 14 : DayBoard.Visible ? DayBoard.Size.X + 14 : 0;
         Areas.TopInset = CrowdSafety.WarningBottom;
@@ -492,12 +530,23 @@ public partial class FestivalScene : Node3D
             case Key.H when DayButton.Visible:
                 ToggleDayBoard();
                 break;
+            case Key.F10:
+                DevTools.Toggle();
+                break;
             case Key.Tab:
                 // On a stage camera, on to the next stage.
                 StageCam.NextStage();
                 break;
             case Key.Escape:
-                if (DayBoard.Visible)
+                if (DevTools.Visible)
+                {
+                    DevTools.Visible = false;
+                }
+                else if (PanelsHidden)
+                {
+                    PanelsHidden = false;
+                }
+                else if (DayBoard.Visible)
                 {
                     DayBoard.Visible = false;
                 }

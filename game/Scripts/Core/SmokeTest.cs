@@ -497,6 +497,7 @@ public partial class SmokeTest : Node
                     show.BuildBar.Close();
                     show.ToggleMoney();
                     CheckDayBoard(show);
+                    CheckDevPanel(show);
                     CheckStageCams(show);
                     show.TogglePause();
                     Check(show.Game.Clock.IsPaused, "Space should pause the game.");
@@ -972,6 +973,35 @@ public partial class SmokeTest : Node
         show.ToggleMoney();
         Check(show.Money.Visible && !show.DayBoard.Visible, "Opening the money panel should shut the day so far panel.");
         show.ToggleMoney();
+    }
+
+    /// <summary>F10 opens the dev panel on every tab, it adds money and changes the singing, and Esc shuts it.</summary>
+    private void CheckDevPanel(FestivalScene show)
+    {
+        var f10 = new InputEventKey { Keycode = Key.F10, Pressed = true };
+        Check(!show.DevTools.Visible, "The dev panel should start shut.");
+        show._UnhandledInput(f10);
+        Check(show.DevTools.Visible, "F10 should open the dev panel.");
+        foreach (var tab in System.Enum.GetValues<DevPanel.Tab>())
+        {
+            show.DevTools.Show(tab);
+            Check(show.DevTools.Showing == tab, $"The dev panel should show its {tab} tab.");
+        }
+
+        show.DevTools.Show(DevPanel.Tab.Show);
+        var money = show.Game.Money;
+        show.Game.DevAddMoney(1_000);
+        Check(show.Game.Money == money + 1_000, "The dev panel should add money.");
+        show.Game.DevAddMoney(-1_000);
+        SingAlong.Setting = SingingSetting.Off;
+        show.DevTools._Process(1);
+        SingAlong.Setting = SingingSetting.Normal;
+        show.PanelsHidden = true;
+        var esc = new InputEventKey { Keycode = Key.Escape, Pressed = true };
+        show._UnhandledInput(esc);
+        Check(!show.DevTools.Visible && show.PanelsHidden, "Esc should shut the dev panel first.");
+        show._UnhandledInput(esc);
+        Check(!show.PanelsHidden && show.GetNodeOrNull("Hud/PauseMenu") is null, "Esc should then bring the other panels back, not open the menu.");
     }
 
     /// <summary>The two stage camera buttons take over the view, and pressing again or Esc gives the site view back.</summary>

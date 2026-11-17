@@ -26,6 +26,8 @@ public partial class StageMusic : Node
     private AudioStreamPlayer _player = null!;
     private IReadOnlyList<SongFile> _songs = [];
     private int _slot = -1;
+    private Act? _act;
+    private SingingSetting _singing = SingAlong.Setting;
     private int _song;
     private float _level;
     private BeatLibrary _beats = null!;
@@ -210,9 +212,11 @@ public partial class StageMusic : Node
         var show = Show;
         var on = _game.Phase == Phase.Day ? show.Playing(now) : null;
         var index = on?.Index ?? -1;
-        if (index != _slot)
+        // A new set, or a different act put on in the same set from the dev panel.
+        if (index != _slot || (on is not null && on.Act != _act))
         {
             _slot = index;
+            _act = on?.Act;
             Artist = on?.Act.Name ?? "";
             Genre = on?.Act.Genre ?? Genre.Pop;
             _songs = on is null ? [] : MusicPlayer.SongsOf(on.Act.MusicFolder);
@@ -230,6 +234,13 @@ public partial class StageMusic : Node
                 _level = 0;
                 NextSong();
             }
+        }
+
+        if (_singing != SingAlong.Setting)
+        {
+            // Sing-along changed on the dev panel: work out again which choruses are left to the crowd.
+            _singing = SingAlong.Setting;
+            RollLeft();
         }
 
         // The music stops while the act is stopped for the crowd's safety, and while the game is paused.
@@ -355,6 +366,34 @@ public partial class StageMusic : Node
         Voice = Mathf.MoveToward(Voice, level, (float)delta * 14f);
     }
 
+    /// <summary>Which choruses the artist leaves to the crowd this time round: different each time the song is played.</summary>
+    private void RollLeft()
+    {
+        _left = [];
+        foreach (var chorus in _marks.All)
+        {
+            if (SingAlong.LeftToTheCrowd(_rolls.Next(), chorus) is { } left)
+            {
+                _left.Add(left);
+            }
+        }
+    }
+
+    /// <summary>Moves on to the act's next song straight away, from the dev panel. False with no act on or no songs.</summary>
+    public bool SkipSong()
+    {
+        if (_slot < 0 || _songs.Count == 0)
+        {
+            return false;
+        }
+
+        _gapLeft = 0;
+        _player.Stop();
+        _vocals.Stop();
+        NextSong();
+        return true;
+    }
+
     private void NextSong()
     {
         if (_slot < 0 || _songs.Count == 0)
@@ -371,15 +410,7 @@ public partial class StageMusic : Node
         _marks = ChorusLibrary.Of(Artist, song);
         _vocals.Stop();
         _vocals.Stream = ChorusLibrary.VocalsOf(Artist, song) is { } vocals && ResourceLoader.Load(vocals) is AudioStream sung ? sung : null;
-        // Which choruses the artist leaves to the crowd this time round: different each time the song is played.
-        _left = [];
-        foreach (var chorus in _marks.All)
-        {
-            if (SingAlong.LeftToTheCrowd(_rolls.Next(), chorus) is { } left)
-            {
-                _left.Add(left);
-            }
-        }
+        RollLeft();
         if (ResourceLoader.Load($"{MusicPlayer.Folder}/{Artist}/{song.File}") is AudioStream stream)
         {
             _player.Stream = stream;
